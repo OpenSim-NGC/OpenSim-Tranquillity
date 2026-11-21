@@ -398,6 +398,16 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
     /// Mono gives "LSL on Mono". A script with no Luau target is described as before, by Mono alone.
     /// </summary>
     public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target)
+        => ScriptRunningEvent(objectID, itemID, running, avatarID, target, null, null);
+
+    /// <summary>
+    /// The same, with the script's engines for a viewer that asked for them (it listed SetScriptEngine in its seed
+    /// request): "Engine" and "EngineChoice" are added after the fields above, which keep their meaning. A viewer reads
+    /// the fields of this map by name, so one that does not know them ignores them; with <paramref name="engine"/> null
+    /// they are not sent at all.
+    /// </summary>
+    public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target,
+            string engine, string engineChoice)
     {
         osUTF8 sb = StartEvent("ScriptRunningReply");
         LLSDxmlEncode2.AddArrayAndMap("Script", sb);
@@ -413,6 +423,11 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
                 LLSDxmlEncode2.AddElem("Mono", false, sb);
                 LLSDxmlEncode2.AddElem("Luau", true, sb);
                 LLSDxmlEncode2.AddElem("LuauLanguage", target == ScriptCompileTarget.Luau, sb);
+            }
+            if (engine is not null)
+            {
+                LLSDxmlEncode2.AddElem("Engine", engine, sb);
+                LLSDxmlEncode2.AddElem("EngineChoice", engineChoice ?? string.Empty, sb);
             }
         LLSDxmlEncode2.AddEndMapAndArray(sb);
 

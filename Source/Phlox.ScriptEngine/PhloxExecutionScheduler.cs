@@ -78,7 +78,6 @@ namespace Phlox.ScriptEngine
         private readonly PhloxEngine m_Engine;
         /// <summary>Scripts loaded with the item's Running flag off and never started; enabling one owes it a state_entry.</summary>
         private readonly HashSet<UUID> m_HeldFresh = new HashSet<UUID>();
-        private readonly IWorldComm m_WorldComm;
 
         // All scripts regardless of run state
         private readonly System.Collections.Generic.Dictionary<UUID, Interpreter> m_AllScripts = new();
@@ -241,11 +240,10 @@ namespace Phlox.ScriptEngine
 
         private readonly System.Diagnostics.Stopwatch m_SliceWatch = new();
 
-        public PhloxExecutionScheduler(WorkArrivedDelegate workArrived, PhloxEngine engine, IWorldComm worldComm)
+        public PhloxExecutionScheduler(WorkArrivedDelegate workArrived, PhloxEngine engine)
         {
             m_WorkArrived = workArrived;
             m_Engine = engine;
-            m_WorldComm = worldComm;
 
             // [InWorldz.Phlox] ServiceCallTimeoutMs (35000), ServiceCallThreads (4 per region).
             var cfg = engine?.Config;
@@ -844,6 +842,9 @@ namespace Phlox.ScriptEngine
         {
             Interpreter script;
             if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
+            // An instance the region has let go is not reset: a reset would end the item's permissions and start the
+            // script again, and the item may run in another engine by now (PhloxEngine.HasLetGo).
+            if (m_Engine != null && m_Engine.HasLetGo(itemId)) return false;
 
             UnregisterFromNotifications(script);
             m_Engine.StateManager?.DeleteState(itemId);
@@ -1410,6 +1411,14 @@ namespace Phlox.ScriptEngine
                 var followingScript = m_NextScript.Next;
                 var currentNode = m_NextScript;
                 var current = currentNode.Value;
+                // The region has let this instance go (PhloxEngine.HasLetGo): from this timeslice on it runs nothing more,
+                // not even the rest of the event it is in, and leaves the run queue until its unload. Whatever wakes it
+                // puts it back here.
+                if (m_Engine != null && m_Engine.HasLetGo(current.ItemId))
+                {
+                    RemoveFromRunQueue(current.ItemId);
+                    continue;
+                }
                 int ticks = 0;
                 bool terminated = false;
                 lock (m_SliceLock)
@@ -1744,6 +1753,14 @@ namespace Phlox.ScriptEngine
                     // script's late sensor, HTTP or dataserver event, another engine's script, a failed compile - is dropped.
                     if (m_Engine != null && m_Engine.IsLoading(pe.ItemId)) AddDeferredEvent(pe.ItemId, pe.Evt);
                     else m_DroppedForUnloaded++;
+                    continue;
+                }
+
+                // An instance the region has let go hears nothing more: the item may run in another engine by now.
+                if (m_Engine != null && m_Engine.HasLetGo(pe.ItemId))
+                {
+                    pe.Evt.SignalCompleted();
+                    m_DroppedForUnloaded++;
                     continue;
                 }
 
@@ -3248,8 +3265,9 @@ namespace Phlox.ScriptEngine
                 m_TouchHandles.Remove(script.ItemId);
                 m_SleepHeap.Delete(h);
             }
-
-            m_WorldComm.DeleteListener(script.ItemId);
+            // Phlox keeps its scripts' listens in its own PhloxListenManager, which the API releases (ReleaseScriptResources).
+            // The core WorldComm holds only another engine's listens, keyed by item, so nothing here removes them: an unload
+            // that runs after the region moved the item to YEngine would otherwise take the listen YEngine's instance opened.
         }
 
         /// <summary>

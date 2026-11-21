@@ -185,7 +185,10 @@ public static class AisMutation
                     if (desc != item.Description) { item.Description = desc; changed.Add(key); }
                     break;
                 case "flags":
-                    var flags = (uint)body["flags"].AsInteger();
+                    // The viewer was told the flags without the region's own script bits (ForViewer), so those are
+                    // kept as the item has them, as the UDP item update keeps every bit but the low byte.
+                    var flags = ((uint)body["flags"].AsInteger() & ~ScriptCompileTargets.RegionOnlyFlags)
+                        | (item.Flags & ScriptCompileTargets.RegionOnlyFlags);
                     if (flags != item.Flags) { item.Flags = flags; changed.Add(key); }
                     break;
                 case "asset_id":

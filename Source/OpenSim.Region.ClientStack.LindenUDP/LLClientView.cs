@@ -3705,10 +3705,22 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             scriptRunningReply.Script.Running = running;
             OutPacket(scriptRunningReply, ThrottleOutPacketType.Task);
         }
+        else if (WantsScriptEngines())
+        {
+            eq.ScriptRunningEvent(objectID, itemID, running, m_agentId, target,
+                m_scene.GetScriptEngineRunning(objectID, itemID), m_scene.GetScriptEngineChoice(objectID, itemID));
+        }
         else
         {
             eq.ScriptRunningEvent(objectID, itemID, running, m_agentId, target);
         }
+    }
+
+    /// <summary>Whether this viewer listed SetScriptEngine in its seed request, and so is told a script's engines.</summary>
+    private bool WantsScriptEngines()
+    {
+        Caps caps = m_scene.CapsModule?.GetCapsForUser(CircuitCode);
+        return caps is not null && (caps.Flags & Caps.CapsFlags.ScriptEngineChoice) != 0;
     }
 
     public void SendAsset(AssetRequestToClient req)

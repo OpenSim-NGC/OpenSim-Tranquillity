@@ -566,7 +566,56 @@ namespace Phlox.ScriptEngine
                 foreach (int evt in m_thisScript.EventTypesHandledIn(m_thisScript.ScriptState.LSLState))
                     flags |= MapEventFlag((SupportedEventList.Events)evt);
             }
-            m_host.SetScriptEvents(m_itemID, flags);
+            WhileOurs(() => m_host.SetScriptEvents(m_itemID, flags));
+        }
+
+        /// <summary>
+        /// Runs a set-up the core keeps under this script's item id (a URL, an HTTP request, an XML-RPC channel or remote
+        /// data request, taken controls, the item's permissions, the event mask, a target, a bot's path events) only while
+        /// this instance is the script's live one, and returns whether it ran. It does not run once the region has let this
+        /// instance go (IScriptHostServices.HasLetGo), nor while another engine holds the item (Scene.ScriptItemHolders):
+        /// that engine's instance owns what is kept under the item's id, and Phlox's unload leaves it alone. The check and
+        /// the set-up run under the lock that the region's removal takes (PhloxEngine.OnRemoveScript), so a set-up is made
+        /// either before the instance is let go, as any set-up of a live instance, or not at all. Never waits for another
+        /// engine.
+        /// <para>The region fires that removal while it holds the prim's inventory lock
+        /// (SceneObjectPartInventory.RemoveInventoryItem), so a set-up here must not take an inventory lock, nor anything
+        /// that can (a sensor sweep reads other prims): such a caller takes the inventory lock first, as the region does,
+        /// or checks <see cref="IsOurs"/> before it acts.</para>
+        /// </summary>
+        private bool WhileOurs(Action setUp)
+        {
+            Scene world = m_ScriptEngine?.World;
+            if (world == null) { setUp(); return true; }
+            bool ran = false;
+            world.ScriptItemHolders.ReleaseWhileHeld(m_itemID, PhloxEngineHeader.PhloxName, () =>
+            {
+                if (m_ScriptEngine.HasLetGo(m_itemID)) return;
+                setUp();
+                ran = true;
+            });
+            return ran;
+        }
+
+        /// <summary>
+        /// Whether this instance may set things up under its item id now (<see cref="WhileOurs"/>). Enough on its own for
+        /// what only Phlox keeps (listens, sensors): those reach only Phlox's own instance, which is let go, and its unload
+        /// drops them.
+        /// </summary>
+        private bool IsOurs() => WhileOurs(static () => { });
+
+        /// <summary>
+        /// Runs a change to what the core keeps by this script's item id (the prim's event mask, URLs, HTTP requests, XML-RPC
+        /// channels, taken controls) only while Phlox holds the item or no engine does (Scene.ScriptItemHolders). When the
+        /// region moves the script to another engine, Phlox lets this instance go later, on its loader thread, and the other
+        /// engine's instance may by then have set up its own under the same item id: an unload, reset or state change of
+        /// this instance that comes after that leaves them alone. Never waits for another engine.
+        /// </summary>
+        private void WhileHeld(Action change)
+        {
+            Scene world = m_ScriptEngine?.World;
+            if (world == null) { change(); return; }
+            world.ScriptItemHolders.ReleaseWhileHeld(m_itemID, PhloxEngineHeader.PhloxName, change);
         }
 
         /// <summary>
@@ -655,7 +704,7 @@ namespace Phlox.ScriptEngine
         public void OnStateChange() => ReleaseScriptResources(ScriptEnd.StateChange);
         public void OnScriptUnloaded(ScriptUnloadReason reason, RuntimeState.LocalDisableFlag localFlag)
         {
-            m_host?.RemoveScriptEvents(m_itemID);
+            WhileHeld(() => m_host?.RemoveScriptEvents(m_itemID));
             ReleaseScriptResources(ScriptEnd.Unload);
             // Halcyon OnScriptUnloaded "silently release controls". The permissions and the Control record stay
             // with the item and its saved state (a crossing object takes them with it); only an avatar still here is let go.
@@ -689,9 +738,17 @@ namespace Phlox.ScriptEngine
             PauseSensorForParcel();
             m_PendingDataserver.Clear();
             var async = m_ScriptEngine?.AsyncCommands;
-            async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID);
-            async?.XmlRequestPlugin.RemoveEvents(m_localID, m_itemID);
+            async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID, stopInCore: false);
+            WhileHeld(() =>
+            {
+                StopHttpRequestsInCore();
+                async?.XmlRequestPlugin.RemoveEvents(m_localID, m_itemID);
+            });
         }
+
+        /// <summary>The core's HTTP module stops this item's requests still in flight (called under <see cref="WhileHeld"/>).</summary>
+        private void StopHttpRequestsInCore()
+            => m_ScriptEngine?.World?.RequestModuleInterface<IHttpRequestModule>()?.StopHttpRequest(m_localID, m_itemID);
 
         /// <summary>
         /// The unload's release of taken controls, from what the script and the region hold, never from the part's
@@ -707,8 +764,11 @@ namespace Phlox.ScriptEngine
             if (misc == null || !misc.ContainsKey((int)RuntimeState.MiscAttr.Control)) return;
             ScenePresence holder = ControlsHolder(UUID.Zero, hadRecord: true);
             if (holder != null)
-                using (PhloxEngine.OwnControlChange())
-                    holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+                WhileHeld(() =>
+                {
+                    using (PhloxEngine.OwnControlChange())
+                        holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+                });
             m_ScriptEngine?.RequestParcelCheck(m_itemID);
         }
         // ── What ends with the script ──────────────────────────────────────────
@@ -741,6 +801,8 @@ namespace Phlox.ScriptEngine
         /// <item>XML-RPC channels and llSendRemoteData: unload only (Halcyon RemoveScript; its reset did nothing and SL says nothing).</item>
         /// <item>permission requests still waiting for an answer, both kinds: reset and unload (<see cref="CancelPermissionRequests"/>).</item>
         /// </list>
+        /// What the core modules keep by item id (HTTP requests, URLs, XML-RPC channels) is released only while Phlox holds the
+        /// item (<see cref="WhileHeld"/>); Phlox's own records go on every end as listed.
         /// </summary>
         internal void ReleaseScriptResources(ScriptEnd end)
         {
@@ -755,18 +817,23 @@ namespace Phlox.ScriptEngine
             {
                 // Halcyon ScriptLoader: AsyncCommandManager.RemoveScript(engine, localId, itemId) - sensor, HTTP, XML-RPC
                 if (m_ScriptEngine != null && async != null)
-                    Phlox.ScriptEngine.AsyncCommand.AsyncCommandManager.RemoveScript(m_ScriptEngine.ScriptEngine, m_localID, m_itemID);
+                    Phlox.ScriptEngine.AsyncCommand.AsyncCommandManager.RemoveScript(m_ScriptEngine.ScriptEngine, m_localID, m_itemID, releaseInCore: false);
             }
             else
             {
                 async?.SensorRepeatPlugin.RemoveScript(m_itemID);
                 m_thisScript?.ScriptState?.MiscAttributes?.Remove((int)RuntimeState.MiscAttr.SensorRepeat);
-                if (end == ScriptEnd.Reset) async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID);
+                if (end == ScriptEnd.Reset) async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID, stopInCore: false);
             }
 
             if (end != ScriptEnd.StateChange)
             {
-                m_ScriptEngine?.World?.RequestModuleInterface<IUrlModule>()?.ScriptRemoved(m_itemID);
+                WhileHeld(() =>
+                {
+                    StopHttpRequestsInCore();
+                    if (end == ScriptEnd.Unload) async?.XmlRequestPlugin.RemoveEvents(m_localID, m_itemID);
+                    m_ScriptEngine?.World?.RequestModuleInterface<IUrlModule>()?.ScriptRemoved(m_itemID);
+                });
                 CancelPermissionRequests();
             }
         }
@@ -1261,8 +1328,11 @@ namespace Phlox.ScriptEngine
             if ((item.PermsMask & PERMISSION_TAKE_CONTROLS) == 0) return;
             ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
             if (sp == null || sp.IsChildAgent) return;
-            using (PhloxEngine.OwnControlChange())
-                sp.RegisterControlEventsToScript(controls, accept, pass_on, m_host.LocalId, m_itemID);
+            if (!WhileOurs(() =>
+            {
+                using (PhloxEngine.OwnControlChange())
+                    sp.RegisterControlEventsToScript(controls, accept, pass_on, m_host.LocalId, m_itemID);
+            })) return;
             m_ScriptEngine?.RequestParcelCheck(m_itemID);   // Holding controls exempts it from a No Scripts parcel
         }
 
@@ -3111,10 +3181,13 @@ namespace Phlox.ScriptEngine
             {
                 // A grant that came from an Experience stays one while bits of it end (a reset of the controls, a stand);
                 // any other grant, from another granter or with a bit it did not hold, is not that Experience's.
-                if (mask == 0 || granter != item.PermsGranter || (mask & ~item.PermsMask) != 0)
-                    ForgetExperienceGrant();
-                item.PermsGranter = granter;
-                item.PermsMask = mask;
+                bool notThatExperiences = mask == 0 || granter != item.PermsGranter || (mask & ~item.PermsMask) != 0;
+                if (!WhileOurs(() =>
+                {
+                    item.PermsGranter = granter;
+                    item.PermsMask = mask;
+                })) return;
+                if (notThatExperiences) ForgetExperienceGrant();
                 m_host.Inventory.ForceInventoryPersistence();
                 m_host.ParentGroup.HasGroupChanged = true;
                 GrantChanged();
@@ -3168,11 +3241,15 @@ namespace Phlox.ScriptEngine
             int implicitPerms = GetImplicitPermissions(item, agentID);
             if (implicitPerms == 0) return false;
             if ((perm & (~implicitPerms)) != 0) return false;
+            // The inventory lock first, then the guard's: the region's order when it removes a script.
+            bool granted;
             using (InventoryLock.Write(m_host.TaskInventory))
-            {
-                item.PermsGranter = agentID;
-                item.PermsMask = perm;
-            }
+                granted = WhileOurs(() =>
+                {
+                    item.PermsGranter = agentID;
+                    item.PermsMask = perm;
+                });
+            if (!granted) return true;   // Nothing granted and nothing asked: the instance was let go
             PermsChange(item, item.PermsGranter, item.PermsMask);
             m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                 "run_time_permissions", new object[] { (int)item.PermsMask },
@@ -3220,6 +3297,7 @@ namespace Phlox.ScriptEngine
         public void llRequestPermissions(string agent, int perm)
         {
             if (!UUID.TryParse(agent, out UUID agentID)) return;
+            if (!IsOurs()) return;   // No question for an instance the region let go: no answer to it could be kept
             UUID invItemID = InventorySelf();
             if (invItemID == UUID.Zero) return;
             TaskInventoryItem item;
@@ -3326,8 +3404,11 @@ namespace Phlox.ScriptEngine
             if (sp == null || sp.IsChildAgent) return;
             // The script's own call; a release the core raises for it (a re-take, or pass_on without accept) is
             // not a stand-up (PhloxEngine.OnScriptControlsReleased)
-            using (PhloxEngine.OwnControlChange())
-                sp.RegisterControlEventsToScript(controls, accept, pass_on, m_host.LocalId, m_itemID);
+            if (!WhileOurs(() =>
+            {
+                using (PhloxEngine.OwnControlChange())
+                    sp.RegisterControlEventsToScript(controls, accept, pass_on, m_host.LocalId, m_itemID);
+            })) return;
             m_thisScript.ScriptState.MiscAttributes[(int)RuntimeState.MiscAttr.Control] =
                 new object[] { controls, accept, pass_on };
             m_ScriptEngine?.RequestParcelCheck(m_itemID);   // Holding controls exempts it from a No Scripts parcel
@@ -3377,8 +3458,11 @@ namespace Phlox.ScriptEngine
                 }
                 ScenePresence holder = ControlsHolder(item?.PermsGranter ?? UUID.Zero, hadRecord);
                 if (holder != null)
-                    using (PhloxEngine.OwnControlChange())
-                        holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+                    WhileHeld(() =>
+                    {
+                        using (PhloxEngine.OwnControlChange())
+                            holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+                    });
                 if (hadRecord || holder != null)
                     m_ScriptEngine?.RequestParcelCheck(m_itemID);   // Without controls a No Scripts parcel pauses it
             }
@@ -5168,6 +5252,7 @@ namespace Phlox.ScriptEngine
        public void llSensor(string name, string id, int type, float range, float arc)
         {
             if (!UUID.TryParse(id, out UUID keyID)) keyID = UUID.Zero;
+            if (!IsOurs()) return;
             m_ScriptEngine.AsyncCommands?.SensorRepeatPlugin.SenseOnce(
                 m_localID, m_itemID, name, keyID, type, range, arc, m_host);
         }
@@ -5175,6 +5260,7 @@ namespace Phlox.ScriptEngine
         public void llSensorRepeat(string name, string id, int type, float range, float arc, float rate)
         {
             if (!UUID.TryParse(id, out UUID keyID)) keyID = UUID.Zero;
+            if (!IsOurs()) return;
             m_ScriptEngine.AsyncCommands?.SensorRepeatPlugin.SetSenseRepeatEvent(
                 m_localID, m_itemID, name, keyID, type, range, arc, rate, m_host);
             m_thisScript.ScriptState.MiscAttributes[(int)RuntimeState.MiscAttr.SensorRepeat] =
@@ -5228,6 +5314,7 @@ namespace Phlox.ScriptEngine
             {
                 Channel = channel, Name = name, Key = id, Message = msg, RegexBitfield = regexBitfield, HostKey = botKey
             };
+            if (!IsOurs()) return 0;
             int handle = m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, hostID, channel, name, filterKey, msg,
                 regexBitfield, saved);
             if (handle > 0)
@@ -11062,7 +11149,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public int llTarget(Vector3 position, float range)
         {
             if (m_host?.ParentGroup == null) return -1;
-            return m_host.ParentGroup.RegisterTargetWaypoint(m_itemID, position, range);
+            int handle = -1;
+            WhileOurs(() => handle = m_host.ParentGroup.RegisterTargetWaypoint(m_itemID, position, range));
+            return handle;
         }
 
         public void llTargetRemove(int number)
@@ -11074,7 +11163,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public int llRotTarget(Quaternion rot, float error)
         {
             if (m_host?.ParentGroup == null) return -1;
-            return m_host.ParentGroup.RegisterRotTargetWaypoint(m_itemID, rot, error);
+            int handle = -1;
+            WhileOurs(() => handle = m_host.ParentGroup.RegisterRotTargetWaypoint(m_itemID, rot, error));
+            return handle;
         }
 
         public void llRotTargetRemove(int number)
@@ -12867,6 +12958,25 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             OsslForceAttachFromInventory(m_host.OwnerID, itemName, attachmentPoint);
         }
 
+        /// <summary>OSSL_Api.osSetScriptEngine: the engine of another script in this prim, for the prim's owner (Scene.SetScriptEngine).</summary>
+        public int osSetScriptEngine(string scriptName, string target)
+        {
+            OsslCheck(TlHigh, "osSetScriptEngine");
+
+            TaskInventoryItem item = m_host.Inventory.GetInventoryItem(scriptName);
+            if (item == null || item.InvType != (int)InventoryType.LSL)
+            {
+                ScriptShoutError($"osSetScriptEngine: no script '{scriptName}' in this prim");
+                return 0;
+            }
+
+            ScriptEngineChoiceResult result = World.SetScriptEngine(m_host.OwnerID, m_host.UUID, item.ItemID, target, m_itemID);
+            if (result == ScriptEngineChoiceResult.Changed || result == ScriptEngineChoiceResult.Unchanged)
+                return 1;
+            ScriptShoutError($"osSetScriptEngine: {result} for '{scriptName}'");
+            return 0;
+        }
+
         /// <summary>OSSL_Api.cs:4208-4214 - VeryHigh.</summary>
         public void osForceAttachToOtherAvatarFromInventory(string rawAvatarId, string itemName, int attachmentPoint)
         {
@@ -12952,7 +13062,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             OsslCheck(TlModerate, "osRequestURL");
             IUrlModule urlMod = World?.RequestModuleInterface<IUrlModule>();
             if (urlMod == null) return UUID.Zero.ToString();
-            return urlMod.RequestURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, OsslUrlOptions(options)).ToString();
+            UUID reqID = UUID.Zero;
+            WhileOurs(() => reqID = urlMod.RequestURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, OsslUrlOptions(options)));
+            return reqID.ToString();
         }
 
         /// <summary>OSSL_Api.cs:4633-4647 - Moderate.</summary>
@@ -12961,7 +13073,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             OsslCheck(TlModerate, "osRequestSecureURL");
             IUrlModule urlMod = World?.RequestModuleInterface<IUrlModule>();
             if (urlMod == null) return UUID.Zero.ToString();
-            return urlMod.RequestSecureURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, OsslUrlOptions(options)).ToString();
+            UUID reqID = UUID.Zero;
+            WhileOurs(() => reqID = urlMod.RequestSecureURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, OsslUrlOptions(options)));
+            return reqID.ToString();
         }
 
         /// <summary>OSSL_Api.cs:2697-2710 - VeryLow. Regex replace of at most count matches from start (negative start counts from the end).</summary>
@@ -15028,9 +15142,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             var httpPlugin = m_ScriptEngine.AsyncCommands?.HttpRequestPlugin;
             UUID objectID = m_host.ParentGroup?.UUID ?? m_host.UUID;
             bool capped = false;
-            UUID reqID = httpPlugin != null
+            UUID reqID = UUID.Zero;
+            WhileOurs(() => reqID = httpPlugin != null
                 ? httpPlugin.Start(m_itemID, objectID, () => httpMod.StartHttpRequest(m_localID, m_itemID, url, paramList, headers, body), out capped)
-                : httpMod.StartHttpRequest(m_localID, m_itemID, url, paramList, headers, body);
+                : httpMod.StartHttpRequest(m_localID, m_itemID, url, paramList, headers, body));
             // Halcyon's in-flight caps refuse with NULL_KEY and no error; its llHTTPRequest sleeps ERROR_DELAY, 80 ms,
             // after any request that returns NULL_KEY (LSLSystemAPI.cs:13762, 13855-13856). HttpInFlightThrottle = false:
             // never capped, no sleep.
@@ -15252,7 +15367,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             IUrlModule urlMod = World.RequestModuleInterface<IUrlModule>();
             if (urlMod == null) return UUID.Zero.ToString();
-            UUID reqID = urlMod.RequestURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, null);
+            UUID reqID = UUID.Zero;
+            WhileOurs(() => reqID = urlMod.RequestURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, null));
             return reqID.ToString();
         }
 
@@ -15260,7 +15376,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             IUrlModule urlMod = World.RequestModuleInterface<IUrlModule>();
             if (urlMod == null) return UUID.Zero.ToString();
-            UUID reqID = urlMod.RequestSecureURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, null);
+            UUID reqID = UUID.Zero;
+            WhileOurs(() => reqID = urlMod.RequestSecureURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, null));
             return reqID.ToString();
         }
 
@@ -15345,11 +15462,15 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 IXMLRPC xmlrpcMod = World?.RequestModuleInterface<IXMLRPC>();
                 if (xmlrpcMod == null || !xmlrpcMod.IsEnabled()) return;
 
-                UUID channelID = xmlrpcMod.OpenXMLRPCChannel(m_localID, m_itemID, UUID.Zero);
-                IXmlRpcRouter xmlRpcRouter = World?.RequestModuleInterface<IXmlRpcRouter>();
-                if (xmlRpcRouter != null)
-                    xmlRpcRouter.RegisterNewReceiver(m_ScriptEngine.ScriptModule, channelID, m_host.UUID, m_itemID,
-                        "http://" + System.Environment.MachineName + ":" + xmlrpcMod.Port.ToString() + "/");
+                UUID channelID = UUID.Zero;
+                if (!WhileOurs(() =>
+                {
+                    channelID = xmlrpcMod.OpenXMLRPCChannel(m_localID, m_itemID, UUID.Zero);
+                    IXmlRpcRouter xmlRpcRouter = World?.RequestModuleInterface<IXmlRpcRouter>();
+                    if (xmlRpcRouter != null)
+                        xmlRpcRouter.RegisterNewReceiver(m_ScriptEngine.ScriptModule, channelID, m_host.UUID, m_itemID,
+                            "http://" + System.Environment.MachineName + ":" + xmlrpcMod.Port.ToString() + "/");
+                })) return;
 
                 object[] resobj = new object[] { 1, channelID.ToString(), UUID.Zero.ToString(), string.Empty, 0, string.Empty };
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams("remote_data", resobj, new DetectParams[0]));
@@ -15373,7 +15494,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 if (!OutboundAllowed(World.RequestModuleInterface<IHttpRequestModule>(), "llSendRemoteData", dest))
                     return string.Empty;
                 ScriptSleep(3000);
-                return xmlrpcMod.SendRemoteData(m_localID, m_itemID, channel, dest, idata, sdata).ToString();
+                UUID reqID = UUID.Zero;
+                WhileOurs(() => reqID = xmlrpcMod.SendRemoteData(m_localID, m_itemID, channel, dest, idata, sdata));
+                return reqID.ToString();
             }
             catch (Exception e)
             {
@@ -18718,7 +18841,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
             IBotManager manager = GetBotManager();
             if (manager != null)
-                manager.BotRegisterForPathUpdateEvents(id, m_itemID, m_host.OwnerID);
+                WhileOurs(() => manager.BotRegisterForPathUpdateEvents(id, m_itemID, m_host.OwnerID));
         }
 
         public void botDeregisterFromNavigationEvents(string botID)
@@ -19170,7 +19293,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (manager == null || !manager.CheckPermission(botUUID, m_host.OwnerID)) return;
 
             ScenePresence botSP = World.GetScenePresence(botUUID);
-            if (botSP == null) return;
+            if (botSP == null || !IsOurs()) return;
 
             m_ScriptEngine.AsyncCommands?.SensorRepeatPlugin.SenseOnce(
                 m_localID, m_itemID, name, keyID, type, range, arc, botSP);
@@ -19188,7 +19311,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (manager == null || !manager.CheckPermission(botUUID, m_host.OwnerID)) return;
 
             ScenePresence botSP = World.GetScenePresence(botUUID);
-            if (botSP == null) return;
+            if (botSP == null || !IsOurs()) return;
 
             m_ScriptEngine.AsyncCommands?.SensorRepeatPlugin.SetSenseRepeatEvent(
                 m_localID, m_itemID, name, keyID, type, range, arc, rate, botSP);

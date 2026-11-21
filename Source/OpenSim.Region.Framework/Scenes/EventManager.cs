@@ -1815,7 +1815,7 @@ public class EventManager
     /// </summary>
     /// <remarks>
     /// <para>Every handler hears every rez, and each engine decides from the script's first line whether the script is its own.
-    /// A script saved with a Luau target is the exception: the region has already chosen its engine
+    /// A script saved with a Luau target or an engine (<see cref="ScriptEngineChoices"/>) is the exception: the region has already chosen its engine
     /// (<see cref="Scene.ResolveScriptEngine"/>), the first line does not count, and exactly one engine may start it.</para>
     /// <para>An engine that implements <see cref="IScriptEngineSelection"/> can read the target itself, so it hears the rez,
     /// starts the script only if it is the engine named in <paramref name="engine"/>, and lets go of one that is not its own.
@@ -1828,7 +1828,7 @@ public class EventManager
         NewRezScript handlerRezScript = OnRezScript;
         if (handlerRezScript != null)
         {
-            bool carriesTarget = item is not null && ScriptCompileTargets.FromFlags(item.Flags) != ScriptCompileTarget.Unspecified;
+            bool carriesTarget = item is not null && ScriptCompileTargets.CarriesChoice(item.Flags);
             foreach (NewRezScript d in handlerRezScript.GetInvocationList())
             {
                 if (carriesTarget && d.Target is IScriptModule module

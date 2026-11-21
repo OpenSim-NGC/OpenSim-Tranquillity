@@ -428,7 +428,7 @@ namespace Phlox.ScriptEngine
                 return;
             }
             m_WorldComm = worldComm;
-            m_ExeScheduler = new PhloxExecutionScheduler(WorkArrived, this, worldComm);
+            m_ExeScheduler = new PhloxExecutionScheduler(WorkArrived, this);
             m_ScriptLoader = new PhloxScriptLoader(scene.AssetService, m_ExeScheduler, WorkArrived, this);
             m_MasterScheduler = new PhloxMasterScheduler(m_ExeScheduler, m_ScriptLoader, SchedulerThreadPriority);
             ListenManager = new PhloxListenManager(m_ExeScheduler, scene,
@@ -783,18 +783,23 @@ namespace Phlox.ScriptEngine
         public bool HasSavedScriptState(UUID itemID, UUID assetID)
             => StateManager != null && StateManager.HasSavedState(itemID, assetID);
 
+        /// <summary>The item's engine changed: its row goes, and so does any save of it queued before its next load here.</summary>
+        public void DiscardSavedScriptState(UUID itemID) => StateManager?.Discard(itemID);
+
         private void OnRezScript(uint localID, UUID itemID, string script,
             int startParam, bool postOnRez, string engine, int stateSource)
         {
             // Every engine receives the selected engine name; the first-line header still takes priority.
             // Phlox runs it exactly when YEngine's rule picks Phlox, so on a region running
-            // both a script runs in one. A script that is not Phlox's has no Phlox instance or load (Disown); its saved state is kept.
-            // A script saved with a viewer's Luau target (the item carries it) belongs to the engine the region chose for
-            // it, whatever its first line says: the region puts that target ahead of the first line.
+            // both a script runs in one. A script that is not Phlox's has no Phlox instance or load (Disown); its saved state is kept, unless the region
+            // changed its engine and discarded it (DiscardSavedScriptState).
+            // A script saved with a viewer's Luau target or with an engine (the item carries it) belongs to the engine the
+            // region chose for it, whatever its first line says: the region puts that choice ahead of the first line.
             TaskInventoryItem rezItem = m_Scene?.GetSceneObjectPart(localID)?.Inventory?.GetInventoryItem(itemID);
-            bool chosenByTarget = rezItem is not null && ScriptCompileTargets.FromFlags(rezItem.Flags) != ScriptCompileTarget.Unspecified;
+            bool chosenByTarget = rezItem is not null && ScriptCompileTargets.CarriesChoice(rezItem.Flags);
             if (chosenByTarget ? engine != Name : !IsPhloxScript(script, engine))
             {
+                m_Scene?.ScriptItemHolders.Leave(itemID, Name);
                 m_ScriptLoader?.Disown(localID, itemID);
                 return;
             }
@@ -808,6 +813,10 @@ namespace Phlox.ScriptEngine
 
             m_log.LogDebug("[PhloxEngine]: OnRezScript {0} in prim {1}", itemID, localID);
 
+            // Phlox holds the item from now on, so another engine's cleanup leaves what this instance sets up. Taken here, on
+            // the region's thread, before the load is queued: any unload of an earlier Phlox instance is queued ahead of
+            // this load and runs first, so it can release only what that earlier instance set up.
+            m_Scene.ScriptItemHolders.Take(itemID, Name);
             m_ScriptLoader.PostLoadRequest(new PhloxLoadRequest
             {
                 LocalID = localID,
@@ -834,8 +843,94 @@ namespace Phlox.ScriptEngine
         private void OnRemoveScript(uint localID, UUID itemID)
         {
             m_log.LogDebug("[PhloxEngine]: OnRemoveScript {0}", itemID);
-            m_ScriptLoader.PostUnloadRequest(localID, itemID);
+            // Phlox lets the item go now, on the region's thread; its loader unloads the instance later. An engine that
+            // takes the item in between holds it, and that unload then releases nothing the core keeps by item id for it
+            // (LSLSystemAPI.WhileHeld). So what the core keeps for this instance is released here first, while Phlox still
+            // holds the item and before the region can start it in another engine.
+            // From now until that unload, the instance runs nothing from its next timeslice on and sets nothing up under
+            // the item's id (HasLetGo). The mark is set under the lock its set-ups take (LSLSystemAPI.WhileOurs), so each
+            // set-up is made either before it, as by any live instance, or not at all. Only an item Phlox has or is
+            // loading is marked: the region tells every engine of every removal.
+            ScriptItemHolders holders = m_Scene?.ScriptItemHolders;
+            bool letGo = HasOrIsLoading(itemID), marked = false;
+            holders?.ReleaseWhileHeld(itemID, Name, () =>
+            {
+                if (letGo) { LetGo(itemID); marked = true; }
+                if (holders.HolderOf(itemID) == Name) ReleaseCoreHoldsOnRemove(localID, itemID);
+            });
+            // Another engine holds the item, so the guard refuses these set-ups already; the mark stops the instance and
+            // keeps the count in step with the unload posted below.
+            if (letGo && !marked) LetGo(itemID);
+            holders?.Leave(itemID, Name);
+            m_ScriptLoader.PostUnloadRequest(localID, itemID, letGo);
             OnScriptRemoved?.Invoke(itemID);
+        }
+
+        /// <summary>
+        /// Items whose instance the region has let go (<see cref="OnRemoveScript"/>) and whose unload has not run yet, with
+        /// the number of such unloads queued. A save, or a switch away and back, can queue a second removal before the
+        /// first unload runs.
+        /// </summary>
+        private readonly Dictionary<UUID, int> m_LetGo = new();
+        private int m_LetGoCount;
+
+        private void LetGo(UUID itemID)
+        {
+            lock (m_LetGo)
+            {
+                m_LetGo[itemID] = m_LetGo.TryGetValue(itemID, out int n) ? n + 1 : 1;
+                Volatile.Write(ref m_LetGoCount, m_LetGo.Count);
+            }
+        }
+
+        /// <summary>The loader has run an unload that <see cref="OnRemoveScript"/> queued.</summary>
+        internal void LetGoUnloaded(UUID itemID)
+        {
+            lock (m_LetGo)
+            {
+                if (!m_LetGo.TryGetValue(itemID, out int n)) return;
+                if (n <= 1) m_LetGo.Remove(itemID);
+                else m_LetGo[itemID] = n - 1;
+                Volatile.Write(ref m_LetGoCount, m_LetGo.Count);
+            }
+        }
+
+        /// <summary>
+        /// The region removed the item's script from Phlox and Phlox's loader has not unloaded the instance yet. The
+        /// scheduler runs nothing more of it, and its API sets nothing up under the item's id (LSLSystemAPI.WhileOurs).
+        /// Any thread; one volatile read while no instance is let go.
+        /// </summary>
+        public bool HasLetGo(UUID itemID)
+        {
+            if (Volatile.Read(ref m_LetGoCount) == 0) return false;
+            lock (m_LetGo) return m_LetGo.ContainsKey(itemID);
+        }
+
+        /// <summary>
+        /// What the core keeps for a script by its item id and the region's removal does not release itself: taken controls,
+        /// HTTP requests in flight, XML-RPC channels and remote data requests. (The core drops the item's event mask in
+        /// SceneObjectPartInventory.RemoveScriptInstance, and the URL module drops its URLs on OnScriptRemoved.) The unload
+        /// releases them again, when no other engine holds the item by then, for anything the instance set up meanwhile.
+        /// </summary>
+        private void ReleaseCoreHoldsOnRemove(uint localID, UUID itemID)
+        {
+            m_Scene.ForEachRootScenePresence(sp =>
+            {
+                if (!sp.HasScriptControls(itemID)) return;
+                using (OwnControlChange())
+                    sp.UnRegisterControlEventsToScript(localID, itemID);
+            });
+            m_Scene.RequestModuleInterface<IHttpRequestModule>()?.StopHttpRequest(localID, itemID);
+            IXMLRPC xmlrpc = m_Scene.RequestModuleInterface<IXMLRPC>();
+            xmlrpc?.DeleteChannels(itemID);
+            xmlrpc?.CancelSRDRequests(itemID);
+        }
+
+        /// <summary>Whether another engine holds the item now (Scene.ScriptItemHolders).</summary>
+        internal bool HeldByAnotherEngine(UUID itemID)
+        {
+            string holder = m_Scene?.ScriptItemHolders.HolderOf(itemID);
+            return holder != null && holder != Name;
         }
 
         private void OnScriptReset(uint localID, UUID itemID)
@@ -2019,6 +2114,13 @@ namespace Phlox.ScriptEngine
 
         /// <summary>Is a load of this item in flight (so its early events are worth holding)?</summary>
         internal bool IsLoading(UUID itemID) => m_ScriptLoader?.IsLoading(itemID) ?? false;
+
+        /// <summary>
+        /// Phlox runs the item's script, or is loading it, and no other engine holds the item. Until Phlox's loader unloads
+        /// an instance the region let go, Phlox still has it while another engine may run the script. The pumps of the
+        /// core's shared HTTP and XML-RPC queues ask this, so an answer for the other engine's instance reaches it.
+        /// </summary>
+        internal bool RunsLive(UUID itemID) => HasOrIsLoading(itemID) && !HeldByAnotherEngine(itemID);
 
         /// <summary>
         /// A dataserver answer goes to every script in the asking script's prim, as

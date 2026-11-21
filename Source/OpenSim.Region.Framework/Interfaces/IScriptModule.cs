@@ -54,6 +54,13 @@ public interface IScriptModule: INonSharedRegionModule
 
     string ScriptEngineName { get; }
 
+    /// <summary>
+    /// Whether this engine is early access: it may not keep script state across future updates until it is declared
+    /// final. The region lists early-access engines in OpenSimExtras["ScriptEngineEarlyAccess"]. False unless the engine
+    /// says otherwise.
+    /// </summary>
+    bool EarlyAccess => false;
+
     string GetXMLState(UUID itemID);
     bool SetXMLState(UUID itemID, string xml);
 

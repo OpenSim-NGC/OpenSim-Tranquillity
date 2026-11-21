@@ -10,4 +10,10 @@ public interface IScriptStateProvider
     /// An unreadable state store must retain ownership and report the error, not send the script to another engine.
     /// </summary>
     bool HasSavedScriptState(UUID itemID, UUID assetID);
+
+    /// <summary>
+    /// Forget the state this engine saved for the item: called when the item's engine changes, so the script starts fresh
+    /// wherever it runs next. The script's own instance in this engine, if any, has already been asked to unload.
+    /// </summary>
+    void DiscardSavedScriptState(UUID itemID) { }
 }

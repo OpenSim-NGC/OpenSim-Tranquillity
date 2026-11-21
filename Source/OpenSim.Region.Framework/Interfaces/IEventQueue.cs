@@ -114,6 +114,16 @@ public interface IEventQueue
     /// </summary>
     void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target)
         => ScriptRunningEvent(objectID, itemID, running, avatarID);
+
+    /// <summary>
+    /// ScriptRunningReply with the compile target and, for a viewer that asked for them, the script's engines: "Engine"
+    /// (the engine that runs it, empty when none does) and "EngineChoice" (the engine saved with it, empty when none).
+    /// When <paramref name="engine"/> is null the two fields are left out and the reply is the one sent before they existed.
+    /// The default leaves them out, so an implementation written before this member existed keeps working.
+    /// </summary>
+    void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target,
+            string engine, string engineChoice)
+        => ScriptRunningEvent(objectID, itemID, running, avatarID, target);
     byte[] BuildEvent(string eventName, OSD eventBody);
     void partPhysicsProperties(uint localID, byte physhapetype, float density, float friction, float bounce, float gravmod, UUID avatarID);
     void WindlightRefreshEvent(int interpolate, UUID avatarID);

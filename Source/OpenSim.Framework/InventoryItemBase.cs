@@ -457,6 +457,15 @@ public class InventoryItemBase : InventoryNodeBase, ICloneable
             LLSDxmlEncode2.AddElem("desc", Description, lsl);
             LLSDxmlEncode2.AddElem("created_at", CreationDate, lsl);
 
+            // A script's runtime as Second Life's viewer reads it ("script": {"runtime": ...}, LLInventoryItem::fromLLSD)
+            string runtime = InvType == (int)InventoryType.LSL ? ScriptCompileTargets.ViewerRuntime(Flags) : null;
+            if (runtime is not null)
+            {
+                LLSDxmlEncode2.AddMap("script", lsl);
+                    LLSDxmlEncode2.AddElem("runtime", runtime, lsl);
+                LLSDxmlEncode2.AddEndMap(lsl);
+            }
+
         LLSDxmlEncode2.AddEndMap(lsl);
     }
 }

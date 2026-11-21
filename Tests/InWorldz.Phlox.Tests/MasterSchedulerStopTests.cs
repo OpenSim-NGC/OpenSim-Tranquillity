@@ -63,7 +63,7 @@ public class MasterSchedulerStopTests
             for (int cycle = 0; cycle < CyclesPerLane; cycle++)
             {
                 PhloxMasterScheduler ms = null;
-                var exe = new PhloxExecutionScheduler(() => ms?.WorkArrived(), null, null);
+                var exe = new PhloxExecutionScheduler(() => ms?.WorkArrived(), null);
                 ms = new PhloxMasterScheduler(exe, StoppedLoader());
                 ms.Start();
                 var thread = ThreadOf(ms);

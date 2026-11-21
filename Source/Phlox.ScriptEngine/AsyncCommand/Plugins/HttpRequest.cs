@@ -215,7 +215,7 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
                 if (m_Forgotten.Remove(req.ReqID)) return Owner.Dropped;   // its Phlox script was reset or removed since
             }
 
-            if (m_CmdManager.m_ScriptEngine is global::Phlox.ScriptEngine.PhloxEngine phlox && phlox.HasOrIsLoading(req.ItemID))
+            if (m_CmdManager.m_ScriptEngine is global::Phlox.ScriptEngine.PhloxEngine phlox && phlox.RunsLive(req.ItemID))
                 return Owner.Dropped;   // a Phlox script that has been reset since it asked
             SceneObjectPart part = m_CmdManager.m_ScriptEngine.World?.GetSceneObjectPart(req.LocalID);
             return part?.Inventory?.GetInventoryItem(req.ItemID) != null
@@ -225,9 +225,10 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
 
         /// <summary>
         /// The script is reset or removed. Its requests are forgotten and the core stops the ones still in flight
-        /// (Halcyon AsyncCommandManager.RemoveScript: iHttpReq.StopHttpRequest(localID, itemID)).
+        /// (Halcyon AsyncCommandManager.RemoveScript: iHttpReq.StopHttpRequest(localID, itemID)). With
+        /// <paramref name="stopInCore"/> false the core is not asked: the caller stops the item's requests there itself.
         /// </summary>
-        public void RemoveEvents(uint localID, OpenMetaverse.UUID itemID)
+        public void RemoveEvents(uint localID, OpenMetaverse.UUID itemID, bool stopInCore = true)
         {
             lock (m_TrackLock)
             {
@@ -250,7 +251,8 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
                         foreach (UUID id in old) m_Forgotten.Remove(id);
                 }
             }
-            m_CmdManager.m_ScriptEngine.World?.RequestModuleInterface<IHttpRequestModule>()?.StopHttpRequest(localID, itemID);
+            if (stopInCore)
+                m_CmdManager.m_ScriptEngine.World?.RequestModuleInterface<IHttpRequestModule>()?.StopHttpRequest(localID, itemID);
         }
 
         /// <summary>

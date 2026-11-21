@@ -258,6 +258,12 @@ public partial class BunchOfCaps
                 m_HostCapsObj.RegisterSimpleHandler("UpdateScriptTaskInventory", oreq, true); //legacy
             }
 
+            if (m_Scene.ScriptEngineChoiceEnabled)
+            {
+                m_HostCapsObj.RegisterSimpleHandler("SetScriptEngine",
+                    new SimpleOSDMapHandler("POST", GetNewCapPath(), SetScriptEngineRequest));
+            }
+
             m_HostCapsObj.RegisterSimpleHandler("CopyInventoryFromNotecard",
                 new SimpleOSDMapHandler("POST", GetNewCapPath(), CopyInventoryFromNotecard));
 
@@ -285,6 +291,14 @@ public partial class BunchOfCaps
             m_log.LogError("[CAPS]: Error " + e.Message);
         }
     }
+    /// <summary>
+    /// The seed flag a viewer sets by listing a capability in its seed request, for the capabilities that also change
+    /// what the region sends it: SetScriptEngine adds the script's engines to ScriptRunningReply
+    /// (<see cref="Caps.CapsFlags.ScriptEngineChoice"/>). <see cref="Caps.CapsFlags.None"/> for any other name.
+    /// </summary>
+    public static Caps.CapsFlags FlagForRequestedCap(string capName)
+        => capName == "SetScriptEngine" ? Caps.CapsFlags.ScriptEngineChoice : Caps.CapsFlags.None;
+
     /// <summary>
     /// Construct a client response detailing all the capabilities this server can provide.
     /// </summary>
@@ -370,6 +384,7 @@ public partial class BunchOfCaps
                     m_HostCapsObj.Flags |= Caps.CapsFlags.PBR;
                     break;
                 default:
+                    m_HostCapsObj.Flags |= FlagForRequestedCap(cstr);
                     break;
             }
             validCaps.Add(cstr);

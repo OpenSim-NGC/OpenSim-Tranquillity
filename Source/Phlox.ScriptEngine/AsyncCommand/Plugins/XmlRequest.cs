@@ -30,17 +30,21 @@
 
 using System;
 using System.Collections.Generic;
+using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.CoreModules.Scripting.XMLRPC;
 using OpenSim.Region.ScriptEngine.Shared;
 using LSL_Types = OpenSim.Region.ScriptEngine.Shared.LSL_Types;
+using Microsoft.Extensions.Logging;
 
 namespace Phlox.ScriptEngine.AsyncCommand.Plugins
 {
     public class XmlRequest
     {
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
         public AsyncCommandManager m_CmdManager;
 
         public XmlRequest(AsyncCommandManager CmdManager)
@@ -117,7 +121,7 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
         private void PostRemoteData(OpenMetaverse.UUID itemID, object[] resobj)
         {
             IScriptEngine own = m_CmdManager.m_ScriptEngine;
-            if (own is not global::Phlox.ScriptEngine.PhloxEngine phlox || phlox.HasOrIsLoading(itemID))
+            if (own is not global::Phlox.ScriptEngine.PhloxEngine phlox || phlox.RunsLive(itemID))
             {
                 own.PostScriptEvent(itemID, new EventParams("remote_data", resobj, Array.Empty<DetectParams>()));
                 return;
@@ -133,8 +137,12 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
                     if (m is IScriptEngine e && !ReferenceEquals(e, own) && !others.Contains(e))
                         others.Add(e);
 
+            // One engine that throws does not keep the request from the engine that runs the script.
             foreach (IScriptEngine e in others)
-                e.PostScriptEvent(itemID, new EventParams("remote_data", (object[])resobj.Clone(), Array.Empty<DetectParams>()));
+            {
+                try { e.PostScriptEvent(itemID, new EventParams("remote_data", (object[])resobj.Clone(), Array.Empty<DetectParams>())); }
+                catch (Exception ex) { m_log.LogWarning(ex, "[Phlox XMLRPC]: an engine refused remote_data for {0}", itemID); }
+            }
         }
 
         /// <summary>

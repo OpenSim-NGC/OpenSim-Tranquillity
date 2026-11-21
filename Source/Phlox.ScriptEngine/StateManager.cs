@@ -107,6 +107,11 @@ namespace Phlox.ScriptEngine
         private SQLiteConnection m_Writer;
         private SQLiteConnection m_Reader;
         private readonly HashSet<UUID> m_LoadFailed = new HashSet<UUID>();
+        /// <summary>
+        /// Items whose engine changed (<see cref="Discard"/>): no save of them is queued until this engine loads them again.
+        /// Guarded by m_Lock.
+        /// </summary>
+        private readonly HashSet<UUID> m_Discarded = new HashSet<UUID>();
 
         /// <summary>Test seam: make LoadState fail for an item as the database would. Null in production.</summary>
         internal static Func<UUID, bool> FailLoadForTest;
@@ -399,7 +404,8 @@ namespace Phlox.ScriptEngine
         /// The script leaves this engine and its item stays where it is (a derez, take or crossing, a recompile, another
         /// engine taking it). Called on the scheduler thread: the state is captured here and the row written later by the
         /// state thread. The row is kept until state travels with objects, so a crossing inside this simulator and a
-        /// switch back from another engine still restore it.
+        /// switch back from another engine by its first line still restore it. When the region changes the item's engine
+        /// (<see cref="Discard"/>) no save is queued: the row goes and the script starts fresh.
         /// </summary>
         public void QueueUnloadSave(Interpreter interp)
         {
@@ -455,6 +461,7 @@ namespace Phlox.ScriptEngine
                 m_Live.Remove(itemId);
                 m_CaptureFailing.Remove(itemId);
                 m_LoadFailed.Remove(itemId);
+                m_Discarded.Remove(itemId);   // the item left its prim: no later load of it here will clear the mark
             }
             ForgetLive(itemId);
             Queue(new WriteOp { Kind = WriteKind.Delete, ItemId = itemId });
@@ -506,6 +513,8 @@ namespace Phlox.ScriptEngine
         /// object rather than from this simulator's database, and is to be checked as input from outside.</summary>
         public SerializedRuntimeState LoadState(UUID itemId, UUID assetId, out bool carried)
         {
+            // A load here after an engine change: from now on the item's saves are this new instance's.
+            lock (m_Lock) m_Discarded.Remove(itemId);
             FinishPendingWrites(itemId);
             NoteLive(itemId);
 
@@ -679,6 +688,27 @@ namespace Phlox.ScriptEngine
             m_WakeEvent.Set();
         }
 
+        /// <summary>
+        /// The item's engine changed, so it starts fresh wherever it runs next: its row and any state carried for it go, and
+        /// no save of it is queued until this engine loads it again. The instance this engine may still hold is unloaded later
+        /// on the loader thread, and a region stop may come first; neither its unload save nor the final save may bring the
+        /// row back. The loader takes loads and unloads in the order they were posted, so a load that clears the mark comes
+        /// after the unload of the instance from before the change.
+        /// </summary>
+        public void Discard(UUID itemId)
+        {
+            lock (m_Lock)
+            {
+                m_Discarded.Add(itemId);
+                m_Dirty.Remove(itemId);
+                m_LoadFailed.Remove(itemId);
+                m_CaptureFailing.Remove(itemId);
+                m_Carried.Remove(itemId);
+            }
+            Queue(new WriteOp { Kind = WriteKind.Delete, ItemId = itemId });
+            m_WakeEvent.Set();
+        }
+
         /// <summary>A reset: the row goes. Queued, so a reset on the scheduler thread does not wait on the database.</summary>
         public void DeleteState(UUID itemId)
         {
@@ -696,6 +726,7 @@ namespace Phlox.ScriptEngine
             lock (m_Lock)
             {
                 if (op.Kind == WriteKind.Save && m_LoadFailed.Contains(op.ItemId)) return;   // Never overwrite an unread row
+                if (op.Kind == WriteKind.Save && m_Discarded.Contains(op.ItemId)) return;    // State from before an engine change
                 op.Seq = Interlocked.Increment(ref s_WriteSeq);
                 m_Writes.Enqueue(op);
                 m_WritesQueued++;

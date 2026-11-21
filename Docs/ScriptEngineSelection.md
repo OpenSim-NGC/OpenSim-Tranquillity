@@ -28,6 +28,21 @@ the engine in this order and stops at the first step that gives an answer:
 An engine that is not a script-selection participant is unaffected: it is chosen by name, by saved state or as
 the default.
 
+## Early access engines
+
+A script engine may mark itself early access (`IScriptModule.EarlyAccess`; an engine is not early access unless it
+says so). The region lists the early-access engines it runs, by engine name, in the `SimulatorFeatures` capability
+as `OpenSimExtras["ScriptEngineEarlyAccess"]`, an array of strings, beside `OpenSimExtras["ScriptEngines"]`, which
+still lists every engine. A region that runs no early-access engine does not send the key.
+
+**An early-access engine may not keep script state across future updates until it is declared final.** After an
+update of the region, scripts that run on such an engine may start fresh: their global variables and current state
+are not guaranteed to survive.
+
+For this list, the Lua compile targets (`luau` and `lsl-luau`) count as the engine named `SLua`: when `SLua` is
+listed as early access, a viewer can treat both targets as early access. The region does not tie the targets to an
+engine name; a target goes to whichever loaded engine accepts it (see "The viewer's compile target").
+
 ## The viewer's compile target
 
 Second Life's script editor has a compiler list: LSL Legacy (`lsl2`), LSL on Mono (`mono`), LSL on Lua

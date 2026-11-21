@@ -37,5 +37,7 @@ namespace Phlox.ScriptEngine
     {
         public uint LocalID;
         public UUID ItemID;
+        /// <summary>Posted by the region's removal of the script (OnRemoveScript), which let the instance go.</summary>
+        public bool LetGo;
     }
 }

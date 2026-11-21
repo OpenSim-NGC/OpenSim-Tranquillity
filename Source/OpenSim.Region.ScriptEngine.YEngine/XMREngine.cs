@@ -1273,6 +1273,25 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     //  defEngine   = engine selected by the scene (saved-state owner or default)
     //  stateSource = post this event to script on load
 
+    /// <summary>
+    /// The item's engine changed: its .state file goes, as OnRemoveScript removes it, so a script that comes back to this
+    /// engine starts fresh.
+    /// </summary>
+    public void DiscardSavedScriptState(UUID itemID)
+    {
+        try
+        {
+            File.Delete(XMRInstance.GetStateFileName(m_ScriptBasePath, itemID));
+        }
+        catch (DirectoryNotFoundException)
+        {
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            m_log.LogError("[YEngine]: Cannot remove the saved state of {0} under {1}: {2}", itemID, m_ScriptBasePath, e.Message);
+        }
+    }
+
     public bool HasSavedScriptState(UUID itemID, UUID assetID)
     {
         try
@@ -1315,9 +1334,15 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         // Assume script uses the default engine
         string engineName = defEngine;
 
+        // A script saved with an engine or a compile target (the item's flags carry it) was placed by the region ahead of
+        // its first line (Scene.ResolveScriptEngine), and the region tells only the engine it chose of such a script
+        // (EventManager.TriggerRezScript); its first line does not count.
+        TaskInventoryItem rezItem = m_Scene.GetSceneObjectPart(localID)?.Inventory.GetInventoryItem(itemID);
+        bool chosenByRegion = rezItem is not null && ScriptCompileTargets.CarriesChoice(rezItem.Flags);
+
         // Very first line might contain // scriptengine : language
         string langsrt = "";
-        if (script.StartsWith("//"))
+        if (!chosenByRegion && script.StartsWith("//"))
         {
             int lineEnd = script.IndexOf('\n');
             if(lineEnd > 5)
@@ -1385,6 +1410,10 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         instance.m_DescName = part.Name + ":" + item.Name;
         instance.m_IState = XMRInstState.CONSTRUCT;
         instance.m_Running = item.ScriptRunning;
+
+        // YEngine holds the item from now on, before its instance sets anything up, so another engine that lets the item
+        // go later (Phlox unloads on its own thread) leaves this instance's event mask, URLs, channels and requests alone.
+        m_Scene.ScriptItemHolders.Take(itemID, ScriptEngineName);
 
         lock (m_InstancesDict)
         {
@@ -1521,6 +1550,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     public void OnRemoveScript(uint localID, UUID itemID)
     {
         TraceCalls("[YEngine]: OnRemoveScript(...,{0})", itemID.ToString());
+        m_Scene.ScriptItemHolders.Leave(itemID, ScriptEngineName);
 
         // Remove from our list of known scripts.
         // After this, no more events can queue because we won't be

@@ -212,6 +212,14 @@ public interface IOSSL_Api
           void osForceAttachToAvatarFromInventory(string itemName, int attachment);
 
     /// <summary>
+    /// Chooses the script engine of another script in the same prim, for the prim's owner, without saving its text.
+    /// </summary>
+    /// <param name="scriptName">a script in this prim, not the calling script</param>
+    /// <param name="target">an engine's name or alias ("YEngine", "Phlox", or "engine:Phlox"), or "" to clear the choice</param>
+    /// <returns>1 when the choice is in place (the script restarted in its engine, or already had it), 0 otherwise</returns>
+    LSL_Integer osSetScriptEngine(string scriptName, string target);
+
+    /// <summary>
     /// Attach an inventory item in the object containing this script to any avatar in the region without asking for PERMISSION_ATTACH
     /// </summary>
     /// <remarks>

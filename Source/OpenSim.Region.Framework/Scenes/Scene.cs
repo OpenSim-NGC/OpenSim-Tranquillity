@@ -419,12 +419,18 @@ public partial class Scene : SceneBase
 
     // TODO: Possibly stop other classes being able to manipulate this directly.
     private readonly SceneGraph m_sceneGraph;
+
+    /// <summary>Which script engine holds each script item, for the releases core modules keep by item id.</summary>
+    public ScriptItemHolders ScriptItemHolders { get; } = new();
+
     private readonly Timer m_restartTimer = new(15000); // Wait before firing
     private volatile bool m_backingup;
     private readonly Dictionary<UUID, ReturnInfo> m_returns = new();
     private readonly HashSet<UUID> m_groupsWithTargets = new();
 
     private readonly string m_defaultScriptEngine;
+    private bool m_scriptEngineChoice = true;
+    private bool m_scriptEngineChoiceNoMod = false;
 
     private int m_unixStartTime;
     public int UnixStartTime
@@ -1069,6 +1075,8 @@ public partial class Scene : SceneBase
 
             m_defaultScriptEngine = startupConfig.GetString("DefaultScriptEngine", "YEngine");
             m_log.LogInformation("[SCENE]: Default script engine {0}", m_defaultScriptEngine);
+            m_scriptEngineChoice = startupConfig.GetBoolean("ScriptEngineChoice", m_scriptEngineChoice);
+            m_scriptEngineChoiceNoMod = startupConfig.GetBoolean("ScriptEngineChoiceNoMod", m_scriptEngineChoiceNoMod);
 
             m_strictAccessControl = startupConfig.GetBoolean("StrictAccessControl", m_strictAccessControl);
             m_seeIntoBannedRegion = startupConfig.GetBoolean("SeeIntoBannedRegion", m_seeIntoBannedRegion);
