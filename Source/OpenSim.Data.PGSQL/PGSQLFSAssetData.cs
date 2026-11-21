@@ -151,15 +151,15 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
     {
         try
         {
-            bool found = false;
             string oldhash;
             AssetMetadata existingAsset = Get(meta.ID, out oldhash);
 
+            // An id that already has a row is stored: as on MySQL, the row is kept and the store succeeds, or
+            // the caller would be told it failed and store it again.
             string query = String.Format("UPDATE {0} SET \"access_time\" = :access_time WHERE \"id\" = :id", m_Table);
             if (existingAsset == null)
             {
                query = String.Format("insert into {0} (\"id\", \"type\", \"hash\", \"asset_flags\", \"create_time\", \"access_time\") values ( :id, :type, :hash, :asset_flags, :create_time, :access_time)", m_Table);
-               found = true;
             }
 
             using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
@@ -175,7 +175,7 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
                 cmd.Parameters.Add(m_database.CreateParameter("access_time", now));
                 cmd.ExecuteNonQuery();
             }
-            return found;
+            return true;
         }
         catch(Exception e)
         {
