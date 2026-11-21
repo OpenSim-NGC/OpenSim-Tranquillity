@@ -66,7 +66,7 @@ public class PGSQLMuteListMigrationTests : IDisposable
 
         _ = new PGSQLMuteListData(conn);
 
-        Assert.Equal(1, Scalar(conn, "SELECT version FROM migrations WHERE name = 'MuteListStore'"));
+        Assert.Equal(2, Scalar(conn, "SELECT version FROM migrations WHERE name = 'MuteListStore'"));
         Assert.Equal(1L, Scalar(conn, "SELECT count(*) FROM information_schema.tables WHERE table_name = 'mutelist'"));
     }
 
