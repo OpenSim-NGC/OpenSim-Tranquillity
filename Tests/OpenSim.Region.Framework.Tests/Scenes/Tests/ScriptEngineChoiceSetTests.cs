@@ -27,7 +27,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests;
 /// </summary>
 public class ScriptEngineChoiceSetTests : OpenSimTestCase
 {
-    private const string YEngine = "YEngine", Phlox = "InWorldz.Phlox";
+    private const string YEngine = "YEngine", Phlox = "InWorldz.Phlox", LuauEngine = "Example.Luau";
 
     private sealed class Engine : MockScriptEngine, IScriptModule, IScriptStateProvider, IScriptEngineSelection
     {
@@ -47,6 +47,9 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         public Engine(string name) { ScriptEngineName = name; }
 
         public bool ClaimsScript(string scriptSource) => false;
+        /// <summary>The Lua target this engine takes (a Luau engine's); <see cref="ScriptCompileTarget.Unspecified"/> for none.</summary>
+        public ScriptCompileTarget Takes { get; init; } = ScriptCompileTarget.Unspecified;
+        public bool AcceptsCompileTarget(ScriptCompileTarget target) => target != ScriptCompileTarget.Unspecified && target == Takes;
         public ArrayList GetScriptErrors(UUID itemID) => new();
         public bool SuspendScript(UUID itemID) => true;
         public bool ResumeScript(UUID itemID) => true;
@@ -103,11 +106,13 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         public Scene Scene;
         public Engine Y = new(YEngine);
         public Engine P = new(Phlox) { HeaderAliases = new[] { "Phlox" } };
+        /// <summary>An engine that takes the "LSL on Lua" target, loaded only when the rig asks for it.</summary>
+        public Engine L = new(LuauEngine) { Takes = ScriptCompileTarget.LslOnLuau };
         public UUID Owner = UUID.Random();
         public SceneObjectPart Part;
         public TaskInventoryItem Item;
 
-        public Rig(string choiceSetting = null, uint itemPerms = (uint)PermissionMask.All)
+        public Rig(string choiceSetting = null, uint itemPerms = (uint)PermissionMask.All, bool withPhlox = true, bool withLuau = false)
         {
             var config = new IniConfigSource();
             IConfig startup = config.AddConfig("Startup");
@@ -118,10 +123,16 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
             Scene = new SceneHelpers().SetupScene("Unit test region", UUID.Random(), 1000, 1000, config);
             SceneHelpers.SetupSceneModules(Scene, config, new DefaultPermissionsModule());
             Scene.StackModuleInterface<IScriptModule>(Y);
-            Scene.StackModuleInterface<IScriptModule>(P);
-            P.Events = Y.Events;
+            if (withPhlox)
+                Scene.StackModuleInterface<IScriptModule>(P);
+            if (withLuau)
+                Scene.StackModuleInterface<IScriptModule>(L);
+            P.Events = L.Events = Y.Events;
             Y.Attach(Scene);
-            P.Attach(Scene);
+            if (withPhlox)
+                P.Attach(Scene);
+            if (withLuau)
+                L.Attach(Scene);
             Part = SceneHelpers.AddSceneObject(Scene, "Example Object", Owner).RootPart;
             Item = TaskInventoryHelpers.AddScript(Scene.AssetService, Part, "target script", "default { state_entry() { } }");
             Item.OwnerID = Owner;
@@ -430,5 +441,109 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
 
         Assert.False(rig.Stored.ScriptRunning);
+    }
+
+    [Fact]
+    public void ALuaTargetMovesTheScriptToTheEngineThatTakesItAlsoWhenItsOldEngineSavedState()
+    {
+        var rig = new Rig(withLuau: true);
+        UUID item = rig.Item.ItemID, asset = rig.Stored.AssetID;
+        rig.Y.HoldsState = (i, a) => i == item && a == asset;
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("lsl-luau"));
+
+        Assert.Equal(ScriptCompileTarget.LslOnLuau, ScriptCompileTargets.FromFlags(rig.Stored.Flags));
+        Assert.Equal(new[] { item }, rig.L.Started);
+        Assert.Empty(rig.Y.Started);
+        Assert.Equal(new[] { "remove YEngine", "discard YEngine", "discard InWorldz.Phlox", "discard Example.Luau", "start Example.Luau" }, rig.Y.Events);
+        Assert.Empty(rig.L.Resets);
+    }
+
+    [Fact]
+    public void ALuaTargetNoEngineHereTakesIsRefusedAndTheScriptStaysWhereItRuns()
+    {
+        var rig = new Rig();
+        uint flags = rig.Stored.Flags;
+
+        Assert.Equal(ScriptEngineChoiceResult.NotSwitched, rig.Set("lsl-luau"));
+
+        Assert.Equal(flags, rig.Stored.Flags);
+        Assert.Empty(rig.Y.Events);
+        Assert.Contains(rig.Item.ItemID, rig.Y.Holds);
+    }
+
+    [Fact]
+    public void AnEngineOfTheTableThatIsNotLoadedHereIsRefusedAndTheScriptStaysWhereItRuns()
+    {
+        var rig = new Rig(withPhlox: false);
+        uint flags = rig.Stored.Flags;
+
+        Assert.Equal(ScriptEngineChoiceResult.NotSwitched, rig.Set("Phlox"));
+
+        Assert.Equal(flags, rig.Stored.Flags);
+        Assert.Equal(ScriptEngineChoices.None, rig.Choice);
+        Assert.Empty(rig.Y.Events);
+        Assert.Contains(rig.Item.ItemID, rig.Y.Holds);
+    }
+
+    [Fact]
+    public void AnOldEngineThatKeepsItsStateWhenAskedToDiscardItKeepsTheScriptAndTheLuaTargetIsRefused()
+    {
+        var rig = new Rig(withLuau: true);
+        UUID item = rig.Item.ItemID, asset = rig.Stored.AssetID;
+        uint flags = rig.Stored.Flags;
+        rig.Y.ForgetsOnDiscard = false;
+        rig.Y.HoldsState = (i, a) => i == item && a == asset;
+
+        Assert.Equal(ScriptEngineChoiceResult.NotSwitched, rig.Set("lsl-luau"));
+
+        // the old engine still holds the script's state, so the script starts again there with it, and nothing is stored
+        Assert.Equal(flags, rig.Stored.Flags);
+        Assert.Empty(rig.L.Started);
+        Assert.Equal(new[] { item }, rig.Y.Started);
+        Assert.Contains(item, rig.Y.Holds);
+        // it is back in the engine it ran in, with the state that engine kept: no reset
+        Assert.Empty(rig.Y.Resets);
+    }
+
+    [Fact]
+    public void WhenTheStateThatHoldsTheScriptBackIsAnotherEnginesTheScriptIsResetWhereItStartsAgain()
+    {
+        var rig = new Rig(withLuau: true);
+        UUID item = rig.Item.ItemID, asset = rig.Stored.AssetID;
+        // the script runs on Phlox with no choice: chosen there, then the choice cleared while Phlox holds its state
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
+        rig.P.HoldsState = (i, a) => i == item && a == asset;
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set(""));
+        Assert.Contains(item, rig.P.Holds);
+        // the default engine holds older state for it and keeps it when asked to discard it
+        rig.Y.ForgetsOnDiscard = false;
+        rig.Y.HoldsState = (i, a) => i == item && a == asset;
+        rig.Y.Started.Clear();
+        uint flags = rig.Stored.Flags;
+
+        Assert.Equal(ScriptEngineChoiceResult.NotSwitched, rig.Set("lsl-luau"));
+
+        Assert.Equal(flags, rig.Stored.Flags);
+        Assert.Empty(rig.L.Started);
+        Assert.Equal(new[] { item }, rig.Y.Started);
+        // not the engine it ran in: the older state there does not come back
+        Assert.Equal(new[] { item }, rig.Y.Resets);
+    }
+
+    [Fact]
+    public void AScriptThatAlreadyCarriesTheLuaTargetButRunsElsewhereIsMovedToTheEngineThatTakesIt()
+    {
+        var rig = new Rig(withLuau: true);
+        UUID item = rig.Item.ItemID, asset = rig.Stored.AssetID;
+        // placed with the target while YEngine held its state, so the target yielded and the script runs in YEngine
+        rig.Stored.Flags = ScriptCompileTargets.WithTarget(rig.Stored.Flags, ScriptCompileTarget.LslOnLuau);
+        rig.Y.HoldsState = (i, a) => i == item && a == asset;
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("lsl-luau"));
+
+        Assert.Equal(new[] { item }, rig.L.Started);
+        Assert.Contains(item, rig.Y.Removed);
+        Assert.Empty(rig.Y.Started);
     }
 }

@@ -30,4 +30,11 @@ public enum ScriptEngineChoiceResult
 
     /// <summary>A script may not change its own engine: the change restarts the script it would be running in.</summary>
     OwnScript,
+
+    /// <summary>
+    /// The script cannot run on the engine the request asks for: no engine loaded in this region is that engine or takes
+    /// that Lua target, or another engine still holds the script's saved state for a Lua target. The script keeps the flags
+    /// it had, and the region log says why (see <see cref="Scene.SetScriptEngine"/> for where the script runs then).
+    /// </summary>
+    NotSwitched,
 }

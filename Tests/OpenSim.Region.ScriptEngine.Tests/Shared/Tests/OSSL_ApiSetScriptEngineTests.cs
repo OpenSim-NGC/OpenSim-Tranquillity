@@ -152,6 +152,18 @@ public class OSSL_ApiSetScriptEngineTests : OpenSimTestCase
     }
 
     [Fact]
+    public void AnswersZeroWhenNoEngineHereRunsTheTargetAndStoresNothing()
+    {
+        OSSL_Api api = Api("High");
+        uint flags = m_object.RootPart.Inventory.GetInventoryItem(m_other.ItemID).Flags;
+
+        // no engine of this region takes the "LSL on Lua" target
+        Assert.Equal(0, (int)api.osSetScriptEngine("other", "lsl-luau"));
+
+        Assert.Equal(flags, m_object.RootPart.Inventory.GetInventoryItem(m_other.ItemID).Flags);
+    }
+
+    [Fact]
     public void ItIsAHighThreatFunction()
     {
         OSSL_Api api = Api("Moderate");
