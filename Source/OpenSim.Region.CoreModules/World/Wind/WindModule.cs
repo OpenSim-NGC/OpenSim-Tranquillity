@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Globalization;
 using System.Reflection;
 using Nini.Config;
 using OpenMetaverse;
@@ -409,7 +410,8 @@ public class WindModule : IWindModule
 
 
     /// <summary>
-    /// Reads the [Weather] section. Every key falls back to its default when absent or out of range; the section
+    /// Reads the [Weather] section. Every key falls back to its default when absent, or (with a warning) when enabled is
+    /// not true or false or a cap is not a finite number; a negative cap counts as 0. The section
     /// absent, or enabled left false, gives a store that accepts nothing.
     /// </summary>
     public static IWindVolumeStore CreateWindVolumes(IConfig weather, Func<long> clockMs = null)
@@ -419,19 +421,64 @@ public class WindModule : IWindModule
         var defaults = new WindVolumeLimits();
         var limits = new WindVolumeLimits
         {
-            MaxVolumesRegion = Math.Max(0, weather.GetInt("max_volumes_region", defaults.MaxVolumesRegion)),
-            MaxVolumesObject = Math.Max(0, weather.GetInt("max_volumes_object", defaults.MaxVolumesObject)),
-            MaxRadius = Math.Max(0f, weather.GetFloat("max_radius", defaults.MaxRadius)),
-            MaxHeight = Math.Max(0f, weather.GetFloat("max_height", defaults.MaxHeight)),
-            MaxSpeed = Math.Max(0f, weather.GetFloat("max_speed", defaults.MaxSpeed)),
-            MaxLifetimeSeconds = Math.Max(0f, weather.GetFloat("max_lifetime", defaults.MaxLifetimeSeconds)),
+            MaxVolumesRegion = Math.Max(0, ReadCount(weather, "max_volumes_region", defaults.MaxVolumesRegion)),
+            MaxVolumesObject = Math.Max(0, ReadCount(weather, "max_volumes_object", defaults.MaxVolumesObject)),
+            MaxRadius = Math.Max(0f, ReadNumber(weather, "max_radius", defaults.MaxRadius)),
+            MaxHeight = Math.Max(0f, ReadNumber(weather, "max_height", defaults.MaxHeight)),
+            MaxSpeed = Math.Max(0f, ReadNumber(weather, "max_speed", defaults.MaxSpeed)),
+            MaxLifetimeSeconds = Math.Max(0f, ReadNumber(weather, "max_lifetime", defaults.MaxLifetimeSeconds)),
         };
-        bool enabled = weather.GetBoolean("enabled", false);
+        bool enabled = ReadSwitch(weather, "enabled", false);
         if (enabled)
             m_log.LogInformation(
                 "[WEATHER] Enabled: at most {0} wind volumes per region and {1} per object, radius {2} m, height {3} m, speed {4} m/s, lifetime {5} s.",
                 limits.MaxVolumesRegion, limits.MaxVolumesObject, limits.MaxRadius, limits.MaxHeight, limits.MaxSpeed, limits.MaxLifetimeSeconds);
         return new WindVolumeStore(enabled, limits, clockMs);
+    }
+
+    // Nini's GetInt and GetFloat throw on text that is not a number, which would leave the region without a wind module.
+    // A value that is not a whole number takes the key's default instead, with a warning.
+    private static int ReadCount(IConfig weather, string key, int fallback)
+    {
+        string text = weather.GetString(key, null);
+        if (text == null)
+            return fallback;
+
+        if (int.TryParse(text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value))
+            return value;
+
+        m_log.LogWarning("[WEATHER] [Weather] {0} = {1} is not a whole number; using {2}.", key, text, fallback);
+        return fallback;
+    }
+
+    // Nini's GetBoolean throws on a word it has no alias for (such as a misspelt "true"). Nini still reads the value, so
+    // every spelling it accepts keeps working; any other takes the default, with a warning.
+    private static bool ReadSwitch(IConfig weather, string key, bool fallback)
+    {
+        try
+        {
+            return weather.GetBoolean(key, fallback);
+        }
+        catch (ArgumentException)
+        {
+            m_log.LogWarning("[WEATHER] [Weather] {0} = {1} is not true or false; using {2}.", key, weather.GetString(key, ""), fallback);
+            return fallback;
+        }
+    }
+
+    // As ReadCount, for a number of metres, metres per second or seconds. NaN and infinity are refused too: a cap that
+    // is not a finite number would make every comparison with it false, so it would cap nothing.
+    private static float ReadNumber(IConfig weather, string key, float fallback)
+    {
+        string text = weather.GetString(key, null);
+        if (text == null)
+            return fallback;
+
+        if (float.TryParse(text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float value) && float.IsFinite(value))
+            return value;
+
+        m_log.LogWarning("[WEATHER] [Weather] {0} = {1} is not a finite number; using {2}.", key, text, fallback);
+        return fallback;
     }
 
     #region Weather volumes
