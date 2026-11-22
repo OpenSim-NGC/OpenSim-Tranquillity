@@ -8,6 +8,8 @@
 using System;
 using System.Data.SQLite;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using OpenMetaverse;
 using Phlox.ScriptEngine;
 using Xunit;
@@ -90,6 +92,47 @@ public class StateWriteRetryTests
         Assert.False(m.HasSavedState(script.ItemId, compiled.AssetId));
         Assert.True(HasRow(db, script.ItemId));
         Assert.True(m.WaitForWrites());
+    }
+
+    [Fact]
+    public void AfterADiscardNoSavedStateIsReportedWhileTheRemovalIsBeingWritten()
+    {
+        string db = NewDb();
+        var compiled = Compiled();
+        using var m = new StateManager(null, db, ShortBusyMs);
+        var script = Script(compiled);
+        m.QueueUnloadSave(script);
+        Assert.True(m.WaitForWrites());
+        Assert.True(m.HasSavedState(script.ItemId, compiled.AssetId));
+
+        // The removal is held after the state thread has taken it off the queue and before it is written: the row is
+        // still in the database then, and only the discard says the state is gone.
+        using var inWrite = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        m.FailWriteForTest = id =>
+        {
+            if (id == script.ItemId)
+            {
+                inWrite.Set();
+                release.Wait(TimeSpan.FromSeconds(30));
+            }
+            return false;
+        };
+        m.Discard(script.ItemId);
+        Task<bool> written = Task.Run(() => m.WaitForWrites());
+        Assert.True(inWrite.Wait(TimeSpan.FromSeconds(30)), "the removal was never written");
+        try
+        {
+            Assert.True(HasRow(db, script.ItemId));
+            Assert.False(m.HasSavedState(script.ItemId, compiled.AssetId));
+        }
+        finally
+        {
+            release.Set();
+        }
+        Assert.True(written.Wait(TimeSpan.FromSeconds(30)) && written.Result);
+        Assert.False(HasRow(db, script.ItemId));
+        Assert.False(m.HasSavedState(script.ItemId, compiled.AssetId));
     }
 
     [Fact]
