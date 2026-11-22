@@ -79,7 +79,7 @@ public class SetScriptEngineCapTests
         public SceneObjectPart Part;
         public TaskInventoryItem Item;
 
-        public Region(string choiceSetting = null)
+        public Region(string choiceSetting = null, bool withPhlox = true)
         {
             var config = new IniConfigSource();
             IConfig startup = config.AddConfig("Startup");
@@ -88,7 +88,8 @@ public class SetScriptEngineCapTests
                 startup.Set("ScriptEngineChoice", choiceSetting);
             Scene = new SceneHelpers().SetupScene("Example Region", UUID.Random(), 1000, 1000, config);
             Scene.StackModuleInterface<IScriptModule>(new Engine("YEngine"));
-            Scene.StackModuleInterface<IScriptModule>(new Engine("InWorldz.Phlox"));
+            if (withPhlox)
+                Scene.StackModuleInterface<IScriptModule>(new Engine("InWorldz.Phlox"));
             UUID agent = UUID.Random();
             Caps = new Caps(Listener, "example.org", 9000, "/CAPS/" + UUID.Random(), agent, "Example Region");
             _ = new BunchOfCaps(Scene, agent, Caps, new BunchOfCapsConfigOptions());
@@ -164,6 +165,35 @@ public class SetScriptEngineCapTests
         Assert.Equal("UnknownEngine", reply["result"].AsString());
         Assert.False(string.IsNullOrEmpty(reply["error"].AsString()));
         Assert.Equal(ScriptEngineChoices.None, region.Choice);
+    }
+
+    // A request the region cannot meet is answered with the same error shape as NotAllowed, Disabled and UnknownEngine:
+    // state "error", result naming the refusal, error text. The script keeps the choice it had.
+    [Fact]
+    public void AnEngineThatIsNotLoadedHereIsAnErrorNotSwitchedAndChangesNothing()
+    {
+        var region = new Region(withPhlox: false);
+
+        OSDMap reply = region.Ask("engine:Phlox");
+
+        Assert.Equal("error", reply["state"].AsString());
+        Assert.Equal("NotSwitched", reply["result"].AsString());
+        Assert.False(string.IsNullOrEmpty(reply["error"].AsString()));
+        Assert.False(reply.ContainsKey("EngineChoice"));
+        Assert.Equal(ScriptEngineChoices.None, region.Choice);
+    }
+
+    [Fact]
+    public void ALuaTargetNoLoadedEngineTakesIsAnErrorNotSwitchedAndChangesNothing()
+    {
+        var region = new Region();
+
+        OSDMap reply = region.Ask("lsl-luau");
+
+        Assert.Equal("error", reply["state"].AsString());
+        Assert.Equal("NotSwitched", reply["result"].AsString());
+        Assert.False(string.IsNullOrEmpty(reply["error"].AsString()));
+        Assert.Equal(ScriptCompileTarget.Unspecified, ScriptCompileTargets.FromFlags(region.Part.Inventory.GetInventoryItem(region.Item.ItemID).Flags));
     }
 
     [Fact]
