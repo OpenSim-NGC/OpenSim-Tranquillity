@@ -1297,6 +1297,11 @@
     ;; Every setting and its default is listed in RegionServerDefaults.ini; see Docs/PhloxSetup.md.
     Enabled = true
 
+    ; The time zone llGetWallclock reports (seconds since midnight, whole seconds). Unset: [YEngine] GetWallclockTimeZone
+    ; if that is set, so one setting governs both engines; with neither set, Phlox uses UTC. An unknown id is logged once
+    ; and UTC is used. Second Life uses Pacific time: "America/Los_Angeles" (Linux, Mac) or "Pacific Standard Time" (Windows).
+    ; GetWallclockTimeZone = "America/Los_Angeles"
+
 [YEngine]
     ;; implements non preemptive microthreading, so fixing problems like llSleep or long events handlers
     ;; but those will suffer from timeslicing, so will be slower.
