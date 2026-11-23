@@ -97,7 +97,10 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
     {
         hash = String.Empty;
         AssetMetadata meta = null;
-        UUID uuid = new UUID(id);
+
+        // The id column is a uuid: an id that is not a UUID names no row.
+        if (!UUID.TryParse(id, out UUID uuid))
+            return null;
 
         string query = String.Format("select \"id\", \"type\", \"hash\", \"create_time\", \"access_time\", \"asset_flags\" from {0} where \"id\" = :id", m_Table);
         using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
