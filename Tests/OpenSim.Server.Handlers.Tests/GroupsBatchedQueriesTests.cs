@@ -340,6 +340,47 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     public void PGSQLSearchTreatsTheTextAsText() => SearchTreatsTheTextAsText(PGSQL());
 
     /// <summary>
+    /// The group search matches the text as written: a % or _ in it is not a wildcard, and neither the backslash nor
+    /// the escape character "!" changes what follows.
+    /// </summary>
+    private static void SearchWildcardsAreText(Backend b)
+    {
+        string tag = Guid.NewGuid().ToString("N")[..8];
+        string founder = UUID.Random().ToString();
+        Dictionary<UUID, string> ours = new();
+        foreach (string suffix in new[] { "100% off", "a_b", "axb", @"back\slash", "backslash", "wow!", "!_x", "z_x" })
+        {
+            string name = tag + " " + suffix;
+            UUID id = b.Service.CreateGroup(founder, name, "", true, UUID.Zero, 0, true, true, false, new UUID(founder), out string reason);
+            Assert.True(id.IsNotZero(), reason);
+            ours[id] = suffix;
+        }
+
+        string[] Found(string text) => b.Service.FindGroups(founder, text)
+            .Where(g => ours.ContainsKey(g.groupID)).Select(g => ours[g.groupID]).OrderBy(n => n, StringComparer.Ordinal).ToArray();
+
+        Assert.Equal(8, Found(tag).Length);
+        Assert.Equal(new[] { "100% off" }, Found("%"));
+        Assert.Equal(new[] { "100% off" }, Found(tag + " 100%"));
+        Assert.Equal(new[] { "!_x", "a_b", "z_x" }, Found("_"));
+        Assert.Equal(new[] { "a_b" }, Found(tag + " a_b"));
+        Assert.Equal(new[] { @"back\slash" }, Found(@"\"));
+        Assert.Equal(new[] { @"back\slash" }, Found(@"k\s"));
+        Assert.Equal(new[] { "!_x", "wow!" }, Found("!"));
+        Assert.Equal(new[] { "!_x" }, Found("!_"));
+        Assert.Empty(Found(tag + " %"));
+    }
+
+    [Fact]
+    public void SQLiteSearchWildcardsAreText() => SearchWildcardsAreText(SQLite());
+
+    [MySQLServerFact]
+    public void MySQLSearchWildcardsAreText() => SearchWildcardsAreText(MySQL());
+
+    [PGSQLServerFact]
+    public void PGSQLSearchWildcardsAreText() => SearchWildcardsAreText(PGSQL());
+
+    /// <summary>
     /// Bans (GroupAPIv1): only someone with "Manage ban list" sees or changes them (owners have it, officers do not by
     /// default); an owner and oneself are never banned; a banned avatar cannot join, cannot be invited, and loses a
     /// pending invitation; lifting the ban lets them join.
