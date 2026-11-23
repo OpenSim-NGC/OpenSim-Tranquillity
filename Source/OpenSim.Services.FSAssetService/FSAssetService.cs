@@ -396,10 +396,20 @@ public class FSAssetConnector : ServiceBase, IAssetService
         return GetCheckedFsData(hash, type) != null;
     }
 
+    /// <summary>
+    /// Whether each asset is there to be served: it has a row, and its file holds its content. Hypergrid and
+    /// region archive loads do not send or store again an asset that is there, so one whose file is missing or
+    /// damaged must not count.
+    /// </summary>
     public virtual bool[] AssetsExist(string[] ids)
     {
         UUID[] uuid = Array.ConvertAll(ids, id => UUID.Parse(id));
-        return m_DataConnector.AssetsExist(uuid);
+        (string Hash, sbyte Type)[] rows = m_DataConnector.GetHashes(uuid);
+
+        bool[] exist = new bool[ids.Length];
+        for (int i = 0; i < ids.Length; i++)
+            exist[i] = rows[i].Hash != null && GetCheckedFsData(rows[i].Hash, rows[i].Type) != null;
+        return exist;
     }
 
     public string HashToFile(string hash)

@@ -219,6 +219,44 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
         return results;
     }
 
+    /// <summary>For each id, the hash and type of its row, or a null hash when it has none.</summary>
+    public (string Hash, sbyte Type)[] GetHashes(UUID[] uuids)
+    {
+        (string Hash, sbyte Type)[] results = new (string Hash, sbyte Type)[uuids.Length];
+        if (uuids.Length == 0)
+            return results;
+
+        Dictionary<UUID, (string Hash, sbyte Type)> rows = new Dictionary<UUID, (string Hash, sbyte Type)>();
+
+        // each id is a parameter, never part of the statement
+        string[] names = new string[uuids.Length];
+        for (int i = 0; i < uuids.Length; i++)
+            names[i] = ":id" + i.ToString();
+        string query = string.Format("select \"id\", \"hash\", \"type\" from {1} where id in ({0})", string.Join(",", names), m_Table);
+        using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand(query, dbcon))
+        {
+            for (int i = 0; i < uuids.Length; i++)
+                cmd.Parameters.Add(m_database.CreateParameter("id" + i.ToString(), uuids[i]));
+            dbcon.Open();
+            using (NpgsqlDataReader reader = cmd.ExecuteReader(CommandBehavior.Default))
+            {
+                while (reader.Read())
+                {
+                    UUID id = DBGuid.FromDB(reader["id"]);
+                    rows[id] = (reader["hash"].ToString(), (sbyte)Convert.ToInt32(reader["type"]));
+                }
+            }
+        }
+
+        for (int i = 0; i < uuids.Length; i++)
+        {
+            if (rows.TryGetValue(uuids[i], out (string Hash, sbyte Type) row))
+                results[i] = row;
+        }
+        return results;
+    }
+
     public int Count()
     {
         int count = 0;

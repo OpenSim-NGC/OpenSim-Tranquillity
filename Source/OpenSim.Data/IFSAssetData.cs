@@ -42,4 +42,23 @@ public interface IFSAssetDataPlugin : IPlugin
     bool            Store(AssetMetadata metadata, string hash);
     void            Import(string conn, string table, int start, int count, bool force, FSStoreDelegate store);
     int             Count();
+
+    /// <summary>
+    /// For each id, the hash of its file and its type, from its row; a null hash when it has no row. The
+    /// service checks the files of those that have one.
+    /// </summary>
+    /// <remarks>
+    /// This default asks <see cref="Get"/> once for each id, which may also update its access time; the stores
+    /// in this repository answer with one query.
+    /// </remarks>
+    (string Hash, sbyte Type)[] GetHashes(UUID[] uuids)
+    {
+        (string Hash, sbyte Type)[] rows = new (string Hash, sbyte Type)[uuids.Length];
+        for (int i = 0; i < uuids.Length; i++)
+        {
+            AssetMetadata meta = Get(uuids[i].ToString(), out string hash);
+            rows[i] = meta == null ? (null, 0) : (hash, meta.Type);
+        }
+        return rows;
+    }
 }
