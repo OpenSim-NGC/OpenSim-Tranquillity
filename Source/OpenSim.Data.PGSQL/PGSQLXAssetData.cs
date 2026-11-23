@@ -517,7 +517,8 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                 dbcon.Open();
                 using(NpgsqlCommand cmd = new NpgsqlCommand(@"SELECT name, description, access_time, ""AssetType"", temporary, id, asset_flags, creatorid
                                             FROM XAssetsMeta
-                                            LIMIT :start, :count", dbcon))
+                                            ORDER BY id
+                                            LIMIT :count OFFSET :start", dbcon))
                 {
                     cmd.Parameters.Add(m_database.CreateParameter("start", start));
                     cmd.Parameters.Add(m_database.CreateParameter("count", count));
