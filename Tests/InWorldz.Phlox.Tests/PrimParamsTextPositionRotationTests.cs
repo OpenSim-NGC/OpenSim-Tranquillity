@@ -62,9 +62,9 @@ public class PrimParamsTextPositionRotationTests
     /// <summary>A viewer in the scene, so moved and turned prims queue their updates for it.</summary>
     private static void Viewer(SchedulerHarness h) => SceneHelpers.AddScenePresence(h.Scene, UUID.Random());
 
-    private static void WaitFor(SchedulerHarness h, Func<IReadOnlyList<string>, bool> done, double seconds = 30)
+    private static void WaitFor(SchedulerHarness h, Func<IReadOnlyList<string>, bool> done, double seconds = TestWait.DefaultSeconds)
     {
-        var until = DateTime.UtcNow.AddSeconds(seconds);
+        var until = DateTime.UtcNow.AddSeconds(TestWait.Cap(seconds));
         while (DateTime.UtcNow < until && !done(h.Said)) h.PumpOnce();
     }
 

@@ -116,7 +116,7 @@ public class AgentDataRowsTests
         UserAccount acct = Account(h.Scene, "Titled", "Person", "Example Title");
         h.RezScript("default { state_entry() { llRequestAgentData(\"" + acct.PrincipalID + "\", DATA_ACCOUNT_TYPE); }"
             + " dataserver(key q, string d) { llSay(0, \"type=\" + d); } }");
-        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("type=")), TimeSpan.FromSeconds(30)));
+        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("type=")), TestWait.Default));
         Assert.Contains("type=Example Title", h.Said);
     }
 
@@ -135,7 +135,7 @@ public class AgentDataRowsTests
         using var h = new SchedulerHarness();
         h.RezScript("default { state_entry() { llRequestAgentData(\"" + UUID.Random() + "\", DATA_BORN); }"
             + " dataserver(key q, string d) { llSay(0, \"born=\" + d); } }");
-        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("born=")), TimeSpan.FromSeconds(30)));
+        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("born=")), TestWait.Default));
         Assert.Contains("born=1970-01-01", h.Said);
     }
 
@@ -146,7 +146,7 @@ public class AgentDataRowsTests
         h.RezScript("key q; default { state_entry() { q = llRequestAgentData(\"not a key\", DATA_NAME);"
             + " llSay(0, \"null=\" + (string)(q == NULL_KEY)); }"
             + " dataserver(key k, string d) { llSay(0, \"answer=\" + (string)(k == q) + \"[\" + d + \"]\"); } }");
-        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("answer=")), TimeSpan.FromSeconds(30)),
+        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("answer=")), TestWait.Default),
             string.Join(" | ", h.Said));
         Assert.Contains("null=0", h.Said);
         Assert.Contains("answer=1[]", h.Said);

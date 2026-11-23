@@ -49,7 +49,7 @@ public class DataOnlinePrivacyTests
     {
         h.RezScript($"default {{ state_entry() {{ llRequestAgentData(\"{who}\", DATA_ONLINE); }} dataserver(key q, string d) {{ llSay(0, \"online=\" + d); }} }}");
         // 30 s, not 5 s: under a full parallel run the script had not yet answered once at 5 s.
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("online=")), TimeSpan.FromSeconds(30)), string.Join(" | ", h.Said));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("online=")), TestWait.Default), string.Join(" | ", h.Said));
         string line = h.Said.First(s => s.StartsWith("online="));
         _out.WriteLine(line);
         return line.Substring("online=".Length);

@@ -75,9 +75,9 @@ public class AntiAbuseSlowdownTests
             return item;
         }
 
-        public bool PumpUntil(Func<bool> done, int seconds = 30)
+        public bool PumpUntil(Func<bool> done, int seconds = TestWait.DefaultSeconds)
         {
-            var until = DateTime.UtcNow.AddSeconds(seconds);
+            var until = DateTime.UtcNow.AddSeconds(TestWait.Cap(seconds));
             while (!done())
             {
                 if (DateTime.UtcNow >= until) return false;

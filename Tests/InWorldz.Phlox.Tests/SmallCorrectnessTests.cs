@@ -158,7 +158,7 @@ public class SmallCorrectnessTests
         };
 
         h.RezScript("default { state_entry() { llSetInventoryPermMask(\"tex\", " + mask + ", PERM_COPY); llSay(0, \"done\"); } }");
-        Assert.True(PumpUntil(h, () => h.Said.Contains("done"), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Contains("done"), TestWait.Default), Said(h));
 
         var after = new Dictionary<string, uint>
         {
@@ -223,7 +223,7 @@ public class SmallCorrectnessTests
         var client = h.AddClient();
         h.RezScript($"default {{ state_entry() {{ llSay(0, \"r=\" + (string)llManageEstateAccess(ESTATE_ACCESS_ALLOWED_AGENT_ADD, \"{client.AgentId}\")); }} }}");
         // Under full-suite load the said line can come after a fixed 2 s, so pump until it is said.
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("r=")), TimeSpan.FromSeconds(30)),
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("r=")), TestWait.Default),
             "nothing said within 30 s: [" + Said(h) + "]");
         Assert.True(h.Said.Contains("r=0"), Said(h));
     }

@@ -120,7 +120,7 @@ public class DroppedChecksTests
         RezAsCreator(h,
             "default { state_entry() { llSay(0, \"inv=\" + (string)iwGroupInvite(\"" + group + "\", \"" + user + "\", \"" + role + "\")); " +
             "llSay(0, \"ej=\" + (string)iwGroupEject(\"" + group + "\", \"" + user + "\")); } }", h.Prim.OwnerID);
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("ej=")), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("ej=")), TestWait.Default), Said(h));
         return (h.Said.First(s => s.StartsWith("inv=")), h.Said.First(s => s.StartsWith("ej=")));
     }
 
@@ -210,7 +210,7 @@ public class DroppedChecksTests
         h.PumpUntil(() => wearer.ScriptQuestions.Count >= 1);
         Assert.Single(wearer.ScriptQuestions);
         wearer.FireScriptAnswer(h.Prim.UUID, item, ATTACH);
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("owner=")), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("owner=")), TestWait.Default), Said(h));
 
         Assert.Equal(wearerId, h.Prim.OwnerID);
         Assert.Equal(wearerId, h.Prim.ParentGroup.OwnerID);
@@ -238,7 +238,7 @@ public class DroppedChecksTests
         var item = h.RezScript(TempAttacher(wearerId));
         h.PumpUntil(() => wearer.ScriptQuestions.Count >= 1);
         wearer.FireScriptAnswer(h.Prim.UUID, item, ATTACH);
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("owner=")), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("owner=")), TestWait.Default), Said(h));
 
         Assert.Contains(h.Said, s => s.EndsWith("llAttachToAvatarTemp: No permission to transfer"));
         Assert.Equal(owner, h.Prim.OwnerID);
@@ -255,7 +255,7 @@ public class DroppedChecksTests
         var item = h.RezScript(TempAttacher(owner));
         h.PumpUntil(() => client.ScriptQuestions.Count >= 1);
         client.FireScriptAnswer(h.Prim.UUID, item, ATTACH);
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("owner=")), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("owner=")), TestWait.Default), Said(h));
 
         Assert.Equal(owner, h.Prim.OwnerID);
         Assert.Contains("perms=" + ATTACH, h.Said);
@@ -279,7 +279,7 @@ public class DroppedChecksTests
         sp.AddAttachment(sog);
         // The wearer's ATTACH is an implicit grant, so run_time_permissions arrives without a dialog.
         h.RezScript(TempAttacher(owner));
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("owner=")), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("owner=")), TestWait.Default), Said(h));
 
         Assert.DoesNotContain("AttachObject", rec.Calls);
         Assert.DoesNotContain(h.Said, s => s.Contains("llAttachToAvatarTemp"));
@@ -305,7 +305,7 @@ public class DroppedChecksTests
         var item = h.RezScript(Linker(h.Prim.OwnerID, target.UUID));
         h.PumpUntil(() => client.ScriptQuestions.Count >= 1);
         client.FireScriptAnswer(h.Prim.UUID, item, CHANGE_LINKS);
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("prims=")), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("prims=")), TestWait.Default), Said(h));
     }
 
     [Fact]
@@ -410,7 +410,7 @@ public class DroppedChecksTests
         var item = h.RezScript(Linker(h.Prim.OwnerID, UUID.Random()));
         h.PumpUntil(() => client.ScriptQuestions.Count >= 1);
         client.FireScriptAnswer(h.Prim.UUID, item, CHANGE_LINKS);
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("prims=")), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("prims=")), TestWait.Default), Said(h));
         Assert.Contains("prims=1", h.Said);
         Assert.Contains(h.Said, s => s.EndsWith(NoTargetText));
     }
@@ -425,7 +425,7 @@ public class DroppedChecksTests
         var item = h.RezScript(Linker(otherId, target.UUID));
         h.PumpUntil(() => other.ScriptQuestions.Count >= 1);
         other.FireScriptAnswer(h.Prim.UUID, item, CHANGE_LINKS);
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("prims=")), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("prims=")), TestWait.Default), Said(h));
         Assert.Contains("prims=1", h.Said);
         Assert.Contains(h.Said, s => s.EndsWith(NotOwnerText));
     }
@@ -436,7 +436,7 @@ public class DroppedChecksTests
         using var h = new SchedulerHarness();
         var target = SceneHelpers.AddSceneObject(h.Scene, "link target", h.Prim.OwnerID);
         h.RezScript(Linker(h.Prim.OwnerID, target.UUID, ask: false));
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("prims=")), TimeSpan.FromSeconds(30)), Said(h));
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("prims=")), TestWait.Default), Said(h));
         Assert.Contains("prims=1", h.Said);
         Assert.Contains(h.Said, s => s.EndsWith(NoPermissionText));
     }

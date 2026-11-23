@@ -119,7 +119,7 @@ public class CompileErrorsToEditorTests : IDisposable
             using var h = new SchedulerHarness(cfg => cfg.Configs["InWorldz.Phlox"].Set("ChatThrottle", "false"));
             h.RezScript("default { state_entry() { llSetTimerEvent(0.1); } timer() { llSay(0, \"tick\"); } }");
             int Ticks() => h.Said.Count(s => s == "tick");
-            Assert.True(h.PumpUntil(() => Ticks() >= 1, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+            Assert.True(h.PumpUntil(() => Ticks() >= 1, TestWait.Default), string.Join(" | ", h.Said));
 
             // From here no tick falls due unless the test moves the clock.
             now = (ulong)Environment.TickCount64;
@@ -135,14 +135,14 @@ public class CompileErrorsToEditorTests : IDisposable
             for (int i = 1; i <= 5; i++)
             {
                 now += 100;
-                Assert.True(h.PumpUntil(() => Ticks() == before + i, TimeSpan.FromSeconds(10)),
+                Assert.True(h.PumpUntil(() => Ticks() == before + i, TestWait.Default),
                     $"tick {i} did not come while the Save waited: the wait blocked the scheduler ({Ticks() - before} ticks)");
             }
             for (int i = 0; i < 20; i++) h.PumpOnce();
             Assert.Equal(before + 5, Ticks());
             Assert.False(save.IsCompleted, "the Save returned while its compile was still held");
             held.Set();
-            Assert.True(h.PumpUntil(() => save.IsCompleted, TimeSpan.FromSeconds(30)), "the Save did not return");
+            Assert.True(h.PumpUntil(() => save.IsCompleted, TestWait.Default), "the Save did not return");
             var answer = await save;
             _out.WriteLine($"while waiting: {Ticks() - before} ticks; answer [{string.Join(" | ", answer.Cast<object>())}]");
             Assert.Empty(answer);

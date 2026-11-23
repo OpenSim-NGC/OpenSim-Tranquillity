@@ -93,9 +93,9 @@ public class ReturnObjectsTests
         string body = string.Concat(calls.Select(c => "llSay(0, \"rc=\" + (string)(" + c + ")); "));
         var item = r.H.RezScript("default { state_entry() { llRequestPermissions(" + Str(granter.ToString()) +
             ", PERMISSION_RETURN_OBJECTS); } run_time_permissions(integer p) { llSay(0, \"rtp=\" + (string)p); " + body + "} }");
-        Assert.True(PumpUntil(r.H, () => client.ScriptQuestions.Count > 0, TimeSpan.FromSeconds(30)), "no permission question reached the granter");
+        Assert.True(PumpUntil(r.H, () => client.ScriptQuestions.Count > 0, TestWait.Default), "no permission question reached the granter");
         client.FireScriptAnswer(r.H.Prim.UUID, item, PERMISSION_RETURN_OBJECTS);
-        Assert.True(PumpUntil(r.H, () => r.H.Said.Count(s => s.StartsWith("rc=")) >= calls.Length, TimeSpan.FromSeconds(30)),
+        Assert.True(PumpUntil(r.H, () => r.H.Said.Count(s => s.StartsWith("rc=")) >= calls.Length, TestWait.Default),
             "the calls never finished: " + string.Join(" | ", r.H.Said));
         Assert.Contains("rtp=" + PERMISSION_RETURN_OBJECTS, r.H.Said);
         _out.WriteLine(string.Join("\n", r.H.Said));
@@ -104,7 +104,7 @@ public class ReturnObjectsTests
 
     private int Rc(Rig r)
     {
-        Assert.True(PumpUntil(r.H, () => r.H.Said.Any(s => s.StartsWith("rc=")), TimeSpan.FromSeconds(30)),
+        Assert.True(PumpUntil(r.H, () => r.H.Said.Any(s => s.StartsWith("rc=")), TestWait.Default),
             "the script never finished: " + string.Join(" | ", r.H.Said));
         _out.WriteLine(string.Join("\n", r.H.Said));
         return int.Parse(r.H.Said.First(s => s.StartsWith("rc=")).Substring(3));
@@ -134,7 +134,7 @@ public class ReturnObjectsTests
     /// <summary>Returned, not deleted: gone from the scene AND an item of that name in the owner's Lost and Found.</summary>
     private static void AssertReturned(Rig r, SceneObjectGroup g, UUID owner)
     {
-        Assert.True(PumpUntil(r.H, () => LostAndFound(r, owner).Contains(g.Name), TimeSpan.FromSeconds(30)),
+        Assert.True(PumpUntil(r.H, () => LostAndFound(r, owner).Contains(g.Name), TestWait.Default),
             $"'{g.Name}' never reached its owner's Lost and Found (has: {string.Join(", ", LostAndFound(r, owner))})");
         Assert.False(InScene(r, g), $"'{g.Name}' is in Lost and Found but still in the scene");
     }
@@ -473,9 +473,9 @@ public class ReturnObjectsTests
         var client = (TestClient)SceneHelpers.AddScenePresence(r.H.Scene, r.ScriptOwner).ControllingClient;
         var item = r.H.RezScript("default { state_entry() { llRequestPermissions(llGetOwner(), PERMISSION_RETURN_OBJECTS); } " +
             "run_time_permissions(integer p) { llReturnObjectsByID([llGetKey()]); } }");
-        Assert.True(PumpUntil(r.H, () => client.ScriptQuestions.Count > 0, TimeSpan.FromSeconds(30)));
+        Assert.True(PumpUntil(r.H, () => client.ScriptQuestions.Count > 0, TestWait.Default));
         client.FireScriptAnswer(r.H.Prim.UUID, item, PERMISSION_RETURN_OBJECTS);
-        Assert.True(PumpUntil(r.H, () => LostAndFound(r, r.ScriptOwner).Contains(self.Name), TimeSpan.FromSeconds(15)),
+        Assert.True(PumpUntil(r.H, () => LostAndFound(r, r.ScriptOwner).Contains(self.Name), TestWait.Default),
             "the scripted object never reached its owner's Lost and Found");
         Assert.False(InScene(r, self));
     }

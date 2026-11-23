@@ -174,7 +174,7 @@ public class EngineHeaderTests
         item.AssetID = asset.FullID;
         h.Prim.Inventory.UpdateInventoryItem(item);
         var save = Task.Run(() => h.Prim.Inventory.CreateScriptInstanceEr(itemId, 0, false, defaultEngine, 1));
-        Assert.True(h.PumpUntil(() => save.IsCompleted, TimeSpan.FromSeconds(30)), "the Save did not return");
+        Assert.True(h.PumpUntil(() => save.IsCompleted, TestWait.Default), "the Save did not return");
         h.Prim.ParentGroup.ResumeScripts();
         return save.Result;
     }

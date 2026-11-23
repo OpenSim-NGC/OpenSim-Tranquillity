@@ -73,7 +73,7 @@ public class ArrivalChangedTests
                                                bool postOnRez, int stateSource, string marker = "n=6")
     {
         SavedStateRig.Rez(h, part, Src, asset, item, 0, postOnRez, stateSource);
-        Assert.True(h.PumpUntil(() => h.InterpreterFor(item) != null, TimeSpan.FromSeconds(15)), "not loaded: " + h.StatusOf(item));
+        Assert.True(h.PumpUntil(() => h.InterpreterFor(item) != null, TestWait.Default), "not loaded: " + h.StatusOf(item));
         h.PumpUntilIdle(TimeSpan.FromSeconds(10));
         h.PostTouch(item);
         Assert.True(h.PumpUntil(() => h.Said.Contains(marker)), SavedStateRig.SaidText(h));
@@ -187,7 +187,7 @@ public class ArrivalChangedTests
         using var h = new SchedulerHarness();
         if (worn) Wear(h.Prim.ParentGroup, UUID.Random());
         SavedStateRig.Rez(h, h.Prim, Sleeper, asset, item, 0, false, stateSource);
-        Assert.True(h.PumpUntil(() => h.Said.Contains(expected), TimeSpan.FromSeconds(15)), SavedStateRig.SaidText(h) + " " + h.StatusOf(item));
+        Assert.True(h.PumpUntil(() => h.Said.Contains(expected), TestWait.Default), SavedStateRig.SaidText(h) + " " + h.StatusOf(item));
         h.PostTouch(item);
         Assert.True(h.PumpUntil(() => h.Said.Count(s => s == "woke") == 2), SavedStateRig.SaidText(h));
         Assert.True(new[] { "woke", expected, "asleep", "woke" }.SequenceEqual(h.Said), SavedStateRig.SaidText(h));
@@ -223,7 +223,7 @@ public class ArrivalChangedTests
         }
         using var h = new SchedulerHarness(noThrottle);
         SavedStateRig.Rez(h, h.Prim, Busy, asset, item, 0, false, PrimCrossing);
-        Assert.True(h.PumpUntil(() => h.Said.Contains("changed 256"), TimeSpan.FromSeconds(15)), SavedStateRig.SaidText(h) + " " + h.StatusOf(item));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("changed 256"), TestWait.Default), SavedStateRig.SaidText(h) + " " + h.StatusOf(item));
         h.PumpUntilIdle(TimeSpan.FromSeconds(10));
         Assert.True(new[] { "end 200000", "changed 256" }.SequenceEqual(h.Said), SavedStateRig.SaidText(h));
     }
@@ -302,9 +302,9 @@ public class ArrivalChangedTests
         return r;
     }
 
-    private static bool WaitFor(Func<bool> done, double seconds = 30)
+    private static bool WaitFor(Func<bool> done, double seconds = TestWait.DefaultSeconds)
     {
-        var until = DateTime.UtcNow.AddSeconds(seconds);
+        var until = DateTime.UtcNow.AddSeconds(TestWait.Cap(seconds));
         while (DateTime.UtcNow < until)
         {
             if (done()) return true;

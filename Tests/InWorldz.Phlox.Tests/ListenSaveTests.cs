@@ -64,7 +64,7 @@ public class ListenSaveTests
     {
         h ??= Ossl();
         h.RezScript(src, asset, item);
-        Assert.True(h.PumpUntil(() => h.InterpreterFor(item) != null, TimeSpan.FromSeconds(15)), "not loaded: " + h.StatusOf(item));
+        Assert.True(h.PumpUntil(() => h.InterpreterFor(item) != null, TestWait.Default), "not loaded: " + h.StatusOf(item));
         h.PumpUntilIdle(TimeSpan.FromSeconds(5));
         Assert.DoesNotContain("up", h.Said);
         return h;
@@ -209,7 +209,7 @@ public class ListenSaveTests
         speaker.AbsolutePosition = there + new Vector3(0, 1, 0);
 
         h.Engine.ListenManager.DeliverChat(ChatTypeEnum.Say, 8, "Test User", speaker.UUID, "ping", Vector3.Zero, UUID.Zero);
-        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("heard 8 ", StringComparison.Ordinal)), TimeSpan.FromSeconds(10)),
+        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("heard 8 ", StringComparison.Ordinal)), TestWait.Default),
             SavedStateRig.SaidText(h));
         Assert.Contains("heard 8 ping by " + bot, h.Said);
     }
@@ -254,7 +254,7 @@ public class ListenRegexTimeoutSaveTests
 
         using var h = Ossl();
         h.RezScript(Src, asset, item);
-        Assert.True(h.PumpUntil(() => h.InterpreterFor(item) != null, TimeSpan.FromSeconds(15)), "not loaded: " + h.StatusOf(item));
+        Assert.True(h.PumpUntil(() => h.InterpreterFor(item) != null, TestWait.Default), "not loaded: " + h.StatusOf(item));
         h.PumpUntilIdle(TimeSpan.FromSeconds(5));
         Assert.DoesNotContain("up", h.Said);
         Assert.False(h.Engine.ListenManager.IsActive(item, 1));   // registered, and off

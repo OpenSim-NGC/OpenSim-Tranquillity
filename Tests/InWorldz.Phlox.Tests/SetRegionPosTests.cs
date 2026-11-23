@@ -190,9 +190,9 @@ public class SetRegionPosTests
         return new LSLSystemAPI(engine, part, part.LocalId, UUID.Random());
     }
 
-    private static bool WaitFor(Func<bool> done, double seconds = 20)
+    private static bool WaitFor(Func<bool> done, double seconds = TestWait.DefaultSeconds)
     {
-        var until = DateTime.UtcNow.AddSeconds(seconds);
+        var until = DateTime.UtcNow.AddSeconds(TestWait.Cap(seconds));
         while (DateTime.UtcNow < until)
         {
             if (done()) return true;

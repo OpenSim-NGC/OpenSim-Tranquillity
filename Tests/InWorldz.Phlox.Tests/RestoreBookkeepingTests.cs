@@ -72,7 +72,7 @@ public class RestoreBookkeepingTests
         }
         using var h2 = new SchedulerHarness();
         SavedStateRig.Rez(h2, h2.Prim, src, asset, item, startParam, postOnRez, stateSource);
-        Assert.True(h2.PumpUntil(() => h2.InterpreterFor(item) != null, TimeSpan.FromSeconds(15)), "not loaded: " + h2.StatusOf(item));
+        Assert.True(h2.PumpUntil(() => h2.InterpreterFor(item) != null, TestWait.Default), "not loaded: " + h2.StatusOf(item));
         h2.PumpUntilIdle(TimeSpan.FromSeconds(10));
         h2.PostTouch(item);
         Assert.True(h2.PumpUntil(() => h2.Said.Any(s => s.StartsWith("p="))), SavedStateRig.SaidText(h2));
@@ -126,7 +126,7 @@ public class RestoreBookkeepingTests
             Freeze();
             ulong restoredAt = m_now;
             h2.RezScript(src, asset, item);
-            Assert.True(h2.PumpUntil(() => h2.InterpreterFor(item) != null, TimeSpan.FromSeconds(15)), "not loaded: " + h2.StatusOf(item));
+            Assert.True(h2.PumpUntil(() => h2.InterpreterFor(item) != null, TestWait.Default), "not loaded: " + h2.StatusOf(item));
             Assert.True(h2.PumpUntilIdle(TimeSpan.FromSeconds(10)));
 
             // 1 ms short of the 3 s it had left: no timer() yet. Firing here is a restore that lost the phase forwards.
@@ -137,7 +137,7 @@ public class RestoreBookkeepingTests
 
             // At +4 s, well short of a full 10 s interval, exactly one timer().
             m_now = restoredAt + 4000;
-            Assert.True(h2.PumpUntil(() => h2.Said.Contains("tick"), TimeSpan.FromSeconds(10)),
+            Assert.True(h2.PumpUntil(() => h2.Said.Contains("tick"), TestWait.Default),
                 "no timer() 4 s after the restore; a full 10 s interval was waited again. said " + SavedStateRig.SaidText(h2));
             Assert.True(h2.PumpUntilIdle(TimeSpan.FromSeconds(10)));
             _out.WriteLine($"at +4000 ms: said {SavedStateRig.SaidText(h2)}");
@@ -285,7 +285,7 @@ public class RestoreBookkeepingTests
 
         using var h = new SchedulerHarness();
         h.RezScript(src, asset, item);
-        Assert.True(h.PumpUntil(() => h.Said.Contains("up"), TimeSpan.FromSeconds(10)), "the script did not start fresh: " + h.StatusOf(item));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("up"), TestWait.Default), "the script did not start fresh: " + h.StatusOf(item));
         SavedStateRig.WaitForWrites(h);
         Assert.Equal(1, SavedStateRig.RejectedRows(item));
     }

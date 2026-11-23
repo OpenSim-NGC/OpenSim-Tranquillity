@@ -49,7 +49,7 @@ public class SavedStateCompatTests
 
         using var h = new SchedulerHarness();
         h.RezScript(Src, AssetId, item);
-        Assert.True(h.PumpUntil(() => h.InterpreterFor(item) != null, TimeSpan.FromSeconds(15)), "not loaded: " + h.StatusOf(item));
+        Assert.True(h.PumpUntil(() => h.InterpreterFor(item) != null, TestWait.Default), "not loaded: " + h.StatusOf(item));
         h.PumpUntilIdle(TimeSpan.FromSeconds(10));
         Assert.DoesNotContain("up", h.Said);   // restored, not started fresh
 

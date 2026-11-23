@@ -30,7 +30,7 @@ public class MinEventDelayResetTests
 
         r.H.Engine.ResetScript(r.Item);
 
-        Assert.True(r.H.PumpUntil(() => r.State.TimerInterval == 0, TimeSpan.FromSeconds(30)), "the reset did not happen");
+        Assert.True(r.H.PumpUntil(() => r.State.TimerInterval == 0, TestWait.Default), "the reset did not happen");
         Assert.Equal(1000, r.State.MinEventDelayMs);
         Assert.True(r.State.NextEventAllowedOn >= waitsUntil, "the time the next handler waits for was cleared: " + r.State.NextEventAllowedOn);
     }

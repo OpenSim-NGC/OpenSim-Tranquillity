@@ -101,9 +101,9 @@ public class VehicleCrossingStateTests
         return (Start(a, dir), Start(b, dir));
     }
 
-    internal static bool WaitFor(Func<bool> done, double seconds = 30)
+    internal static bool WaitFor(Func<bool> done, double seconds = TestWait.DefaultSeconds)
     {
-        var until = DateTime.UtcNow.AddSeconds(seconds);
+        var until = DateTime.UtcNow.AddSeconds(TestWait.Cap(seconds));
         while (DateTime.UtcNow < until)
         {
             if (done()) return true;

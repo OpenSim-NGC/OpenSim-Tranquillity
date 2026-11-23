@@ -38,7 +38,7 @@ internal sealed class ApiCallRig : IDisposable
     {
         H = new SchedulerHarness(configure);
         Item = H.RezScript(source);
-        Assert.True(H.PumpUntil(() => H.RunStateOf(Item) == "Waiting", TimeSpan.FromSeconds(30)),
+        Assert.True(H.PumpUntil(() => H.RunStateOf(Item) == "Waiting", TestWait.Default),
             "the script never loaded: " + H.RunStateOf(Item));
     }
 

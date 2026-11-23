@@ -432,7 +432,7 @@ public sealed class SchedulerHarness : IDisposable
     {
         var loaderDoWork = m_loader.GetType().GetMethod("DoWork");
         var exeDoWork = m_exe.GetType().GetMethod("DoWork");
-        var until = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        var until = DateTime.UtcNow + TestWait.Default;
         while (DateTime.UtcNow < until)
         {
             var l = loaderDoWork!.Invoke(m_loader, null);
@@ -440,7 +440,7 @@ public sealed class SchedulerHarness : IDisposable
             if (!Pending(l) && !AnyLoadOutstanding()) break;
             System.Threading.Thread.Sleep(1);
         }
-        PumpUntilIdle(TimeSpan.FromSeconds(30));
+        PumpUntilIdle(TestWait.Default);
     }
 
     /// <summary>Probe: the interpreter's RuntimeState, by reflection.</summary>
@@ -577,7 +577,7 @@ public sealed class SchedulerHarness : IDisposable
     }
 
     /// <summary>
-    /// Pump both schedulers until <paramref name="done"/> holds, or <paramref name="cap"/> (30 s by default)
+    /// Pump both schedulers until <paramref name="done"/> holds, or <paramref name="cap"/> (the TestWait ceiling by default)
     /// passes; false on the cap. The shape of every "wait for the result" in this project: a fixed window followed by
     /// an assert that something DID happen fails when a loaded machine is slower than the window, so the window
     /// becomes this. A window that proves something did NOT happen stays a fixed window.
@@ -586,7 +586,7 @@ public sealed class SchedulerHarness : IDisposable
     {
         var loaderDoWork = m_loader.GetType().GetMethod("DoWork");
         var exeDoWork = m_exe.GetType().GetMethod("DoWork");
-        var until = DateTime.UtcNow + (cap ?? TimeSpan.FromSeconds(30));
+        var until = DateTime.UtcNow + (cap ?? TestWait.Default);
         while (!done())
         {
             if (DateTime.UtcNow >= until) return false;

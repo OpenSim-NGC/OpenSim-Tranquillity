@@ -185,7 +185,7 @@ public class OsMakeNotecardTests
         string body = "osMakeNotecard(\"made\", " + contents + "); llSay(0, \"done\");";
         SchedulerHarnessYEngine.Rez(h, yPart, "default { state_entry() { " + body + " } }");
         h.RezScript("default { state_entry() { " + body + " } }");
-        Assert.True(h.PumpUntil(() => h.Said.Count(s => s == "done") == 2, TimeSpan.FromSeconds(30)),
+        Assert.True(h.PumpUntil(() => h.Said.Count(s => s == "done") == 2, TestWait.Default),
             "said: " + string.Join(" | ", h.Said) + " errors: " + Errors(h));
 
         var y = Assert.Single(Notecards(yPart));
@@ -217,7 +217,7 @@ public class OsMakeNotecardTests
             osMakeNotecard(""made"", s); llSay(0, ""done"");";
         SchedulerHarnessYEngine.Rez(h, yPart, "default { state_entry() { " + body + " } }");
         h.RezScript("default { state_entry() { " + body + " } }");
-        Assert.True(h.PumpUntil(() => h.Said.Count(s => s == "done") == 2 || Errors(h).Length > 0, TimeSpan.FromSeconds(30)),
+        Assert.True(h.PumpUntil(() => h.Said.Count(s => s == "done") == 2 || Errors(h).Length > 0, TestWait.Default),
             "said: " + string.Join(" | ", h.Said) + " errors: " + Errors(h));
         Assert.True(Errors(h).Length == 0, Errors(h));
         var y = h.Scene.AssetService.Get(Assert.Single(Notecards(yPart)).AssetID.ToString()).Data;

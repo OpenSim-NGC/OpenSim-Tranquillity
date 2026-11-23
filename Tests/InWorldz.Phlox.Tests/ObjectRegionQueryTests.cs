@@ -53,11 +53,11 @@ public class ObjectRegionQueryTests
         using var r = new ApiCallRig();
         UUID other = r.H.RezScript("default { state_entry() { } }");
         string name = r.H.Prim.Inventory.GetInventoryItem(other).Name;
-        Assert.True(r.H.PumpUntil(() => r.H.RunStateOf(other) == "Waiting", TimeSpan.FromSeconds(30)));
+        Assert.True(r.H.PumpUntil(() => r.H.RunStateOf(other) == "Waiting", TestWait.Default));
         Assert.Equal(1, r.Api.llGetScriptState(name));
 
         r.Api.llSetScriptState(name, 0);
-        Assert.True(r.H.PumpUntil(() => !r.H.Engine.GetScriptState(other), TimeSpan.FromSeconds(10)));
+        Assert.True(r.H.PumpUntil(() => !r.H.Engine.GetScriptState(other), TestWait.Default));
         Assert.Equal(0, r.Api.llGetScriptState(name));
         Assert.False(r.H.Prim.Inventory.GetInventoryItem(other).ScriptRunning);   // the Running flag is saved too
     }
@@ -69,9 +69,9 @@ public class ObjectRegionQueryTests
     {
         using var r = new ApiCallRig();
         UUID stopped = r.H.RezScript("default { state_entry() { } }");
-        Assert.True(r.H.PumpUntil(() => r.H.RunStateOf(stopped) == "Waiting", TimeSpan.FromSeconds(30)));
+        Assert.True(r.H.PumpUntil(() => r.H.RunStateOf(stopped) == "Waiting", TestWait.Default));
         r.Api.llSetScriptState(r.H.Prim.Inventory.GetInventoryItem(stopped).Name, 0);
-        Assert.True(r.H.PumpUntil(() => !r.H.Engine.GetScriptState(stopped), TimeSpan.FromSeconds(10)));
+        Assert.True(r.H.PumpUntil(() => !r.H.Engine.GetScriptState(stopped), TestWait.Default));
 
         var d = r.Api.llGetObjectDetails(r.H.Prim.UUID.ToString(), ApiCallRig.L(OBJECT_RUNNING_SCRIPT_COUNT,
             OBJECT_TOTAL_SCRIPT_COUNT, OBJECT_SCRIPT_MEMORY, IW_OBJECT_SCRIPT_MEMORY_USED, OBJECT_SCRIPT_TIME));
@@ -153,7 +153,7 @@ public class ObjectRegionQueryTests
         using var h = new SchedulerHarness();
         h.RezScript("default { state_entry() { llRequestSimulatorData(\"No Such Region\", " + code + "); }"
             + " dataserver(key q, string d) { llSay(0, \"sim=\" + d); } }");
-        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("sim=")), TimeSpan.FromSeconds(30)));
+        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("sim=")), TestWait.Default));
         Assert.Contains("sim=" + expected, h.Said);
     }
 
@@ -232,7 +232,7 @@ public class ObjectRegionQueryTests
         g.IsAttachment = true;
         g.AttachedAvatar = UUID.Random();
         h.RezScript("default { state_entry() { llDie(); llSay(0, \"still here\"); } }");
-        Assert.True(h.PumpUntil(() => h.Said.Contains("still here"), TimeSpan.FromSeconds(30)));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("still here"), TestWait.Default));
         Assert.False(g.IsDeleted);
     }
 
@@ -241,8 +241,8 @@ public class ObjectRegionQueryTests
     {
         using var h = new SchedulerHarness();
         UUID item = h.RezScript("default { state_entry() { llSay(0, \"before\"); llDie(); llSay(0, \"after\"); } }");
-        Assert.True(h.PumpUntil(() => h.Said.Contains("before"), TimeSpan.FromSeconds(30)));
-        Assert.True(h.PumpUntil(() => h.Prim.ParentGroup.IsDeleted, TimeSpan.FromSeconds(10)));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("before"), TestWait.Default));
+        Assert.True(h.PumpUntil(() => h.Prim.ParentGroup.IsDeleted, TestWait.Default));
         h.Pump(50);
         Assert.DoesNotContain("after", h.Said);
     }

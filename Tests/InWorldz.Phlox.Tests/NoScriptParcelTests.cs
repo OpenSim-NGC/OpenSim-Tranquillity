@@ -113,9 +113,9 @@ public class NoScriptParcelTests
         }
 
         /// <summary>Pump until the condition holds, up to <paramref name="maxMs"/>.</summary>
-        public bool PumpUntil(Func<bool> condition, int maxMs = 30000)
+        public bool PumpUntil(Func<bool> condition, int maxMs = TestWait.DefaultSeconds * 1000)
         {
-            var until = DateTime.UtcNow.AddMilliseconds(maxMs);
+            var until = DateTime.UtcNow.AddMilliseconds(TestWait.Cap(maxMs / 1000.0) * 1000);
             while (!condition())
             {
                 if (DateTime.UtcNow > until) return false;

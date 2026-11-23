@@ -159,7 +159,7 @@ default
     }
 }");
         var sw = Stopwatch.StartNew();
-        Assert.True(PumpUntil(h, () => h.Said.Any(m => m.StartsWith("A got")), TimeSpan.FromSeconds(30)), "A never answered: " + string.Join(",", h.Said.TakeLast(5)));
+        Assert.True(PumpUntil(h, () => h.Said.Any(m => m.StartsWith("A got")), TestWait.Default), "A never answered: " + string.Join(",", h.Said.TakeLast(5)));
         var waited = sw.Elapsed;
 
         var said = h.Said.ToList();
@@ -185,7 +185,7 @@ default
         InstallAccountGate(h, id => id == slow ? gate : null);
 
         h.RezScript(@"default { state_entry() { llSetTimerEvent(0.1); } timer() { llSay(0, ""B tick""); } }");
-        Assert.True(PumpUntil(h, () => h.Said.Contains("B tick"), TimeSpan.FromSeconds(30)), "B never ticked");
+        Assert.True(PumpUntil(h, () => h.Said.Contains("B tick"), TestWait.Default), "B never ticked");
 
         int saidAtEntry = -1;
         gate.OnEnter = () => saidAtEntry = h.Said.Count;
@@ -199,7 +199,7 @@ default
         llSay(0, ""A got ["" + n + ""]"");
     }
 }");
-        Assert.True(PumpUntil(h, () => gate.Entered > 0, TimeSpan.FromSeconds(30)), "A's lookup never reached the service: " + string.Join(",", h.Said.TakeLast(5)));
+        Assert.True(PumpUntil(h, () => gate.Entered > 0, TestWait.Default), "A's lookup never reached the service: " + string.Join(",", h.Said.TakeLast(5)));
 
         int TicksSinceEntry() => h.Said.Skip(saidAtEntry).Count(m => m == "B tick");
         PumpUntil(h, () => TicksSinceEntry() >= TicksWhileWaiting || gate.Inside == 0, TimeSpan.FromSeconds(30));
@@ -208,7 +208,7 @@ default
         bool answeredEarly = h.Said.Any(m => m.StartsWith("A got"));
 
         gate.Open();
-        Assert.True(PumpUntil(h, () => h.Said.Any(m => m.StartsWith("A got")), TimeSpan.FromSeconds(30)), "A never answered: " + string.Join(",", h.Said.TakeLast(5)));
+        Assert.True(PumpUntil(h, () => h.Said.Any(m => m.StartsWith("A got")), TestWait.Default), "A never answered: " + string.Join(",", h.Said.TakeLast(5)));
         return (ticks, stillHeld, answeredEarly, h.Said.First(m => m.StartsWith("A got")));
     }
 
@@ -268,14 +268,14 @@ default
     }
 }");
         // The first call is held past its deadline: the script resumes with the failure value and parks in the second.
-        Assert.True(PumpUntil(h, () => h.Said.Any(m => m.StartsWith("T1")) && secondGate.Inside > 0, TimeSpan.FromSeconds(30)), string.Join(",", h.Said));
+        Assert.True(PumpUntil(h, () => h.Said.Any(m => m.StartsWith("T1")) && secondGate.Inside > 0, TestWait.Default), string.Join(",", h.Said));
         Assert.Equal(1, firstGate.Inside);
         // The first answer arrives now, while the script waits on the second; its thread is idle once that answer is handled.
         firstGate.Open();
-        Assert.True(PumpUntil(h, () => firstGate.Inside == 0 && IdleServiceThreads(h) > 0, TimeSpan.FromSeconds(30)), "the first call's thread never finished");
+        Assert.True(PumpUntil(h, () => firstGate.Inside == 0 && IdleServiceThreads(h) > 0, TestWait.Default), "the first call's thread never finished");
         Assert.Equal(1, secondGate.Inside);
         secondGate.Open();
-        Assert.True(PumpUntil(h, () => h.Said.Contains("done"), TimeSpan.FromSeconds(30)), string.Join(",", h.Said));
+        Assert.True(PumpUntil(h, () => h.Said.Contains("done"), TestWait.Default), string.Join(",", h.Said));
         h.PumpFor(TimeSpan.FromMilliseconds(500));
         var said = h.Said.Where(m => m.StartsWith("T") || m == "done").ToList();
         _out.WriteLine("said: " + string.Join(" | ", said));
@@ -307,16 +307,16 @@ default
         llSay(0, ""got ["" + n + ""]"");
     }
 }");
-        Assert.True(PumpUntil(h, () => firstGate.Inside > 0, TimeSpan.FromSeconds(30)), "never parked in the first call: " + string.Join(",", h.Said));
+        Assert.True(PumpUntil(h, () => firstGate.Inside > 0, TestWait.Default), "never parked in the first call: " + string.Join(",", h.Said));
         h.Prim.Description = second.ToString();
         h.Scene.EventManager.TriggerScriptReset(h.Prim.LocalId, item);
-        Assert.True(PumpUntil(h, () => secondGate.Inside > 0, TimeSpan.FromSeconds(30)), "the reset run never parked in its own call: " + string.Join(",", h.Said));
+        Assert.True(PumpUntil(h, () => secondGate.Inside > 0, TestWait.Default), "the reset run never parked in its own call: " + string.Join(",", h.Said));
         // The first run's answer arrives now, while the reset run waits on its own call; its thread is idle once that answer is handled.
         firstGate.Open();
-        Assert.True(PumpUntil(h, () => firstGate.Inside == 0 && IdleServiceThreads(h) > 0, TimeSpan.FromSeconds(30)), "the first call's thread never finished");
+        Assert.True(PumpUntil(h, () => firstGate.Inside == 0 && IdleServiceThreads(h) > 0, TestWait.Default), "the first call's thread never finished");
         Assert.Equal(1, secondGate.Inside);
         secondGate.Open();
-        Assert.True(PumpUntil(h, () => h.Said.Any(m => m.StartsWith("got")), TimeSpan.FromSeconds(30)), string.Join(",", h.Said));
+        Assert.True(PumpUntil(h, () => h.Said.Any(m => m.StartsWith("got")), TestWait.Default), string.Join(",", h.Said));
         h.PumpFor(TimeSpan.FromMilliseconds(500));
         var got = h.Said.Where(m => m.StartsWith("got")).ToList();
         _out.WriteLine("said: " + string.Join(" | ", got));
@@ -342,7 +342,7 @@ default
         var count = exe.GetType().GetProperty("ServiceThreadCount", BindingFlags.NonPublic | BindingFlags.Instance)!;
         int max = 0;
         void Sample() => max = Math.Max(max, (int)count.GetValue(exe)!);
-        Assert.True(PumpUntil(h, () => { Sample(); return gate.Inside >= 3; }, TimeSpan.FromSeconds(30)), $"only {gate.Inside} calls reached the service");
+        Assert.True(PumpUntil(h, () => { Sample(); return gate.Inside >= 3; }, TestWait.Default), $"only {gate.Inside} calls reached the service");
         gate.Open();
         PumpUntil(h, () => { Sample(); return h.Said.Count(m => m.StartsWith("storm")) == ids.Count; }, TimeSpan.FromSeconds(30));
         _out.WriteLine($"answered {h.Said.Count(m => m.StartsWith("storm"))}/{ids.Count}; service threads peaked at {max}");

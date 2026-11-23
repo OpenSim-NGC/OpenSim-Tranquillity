@@ -91,7 +91,7 @@ public class BotRespawnKeyTests
             UUID bot = PersistentBot(h, bots, owner);
             bots = Restart(h, bots);
 
-            Assert.True(h.PumpUntil(() => BackAndRecorded(bots), TimeSpan.FromSeconds(20)), "the bot never came back");
+            Assert.True(h.PumpUntil(() => BackAndRecorded(bots), TestWait.Default), "the bot never came back");
             Assert.Equal(bot, bots.GetAllBots().Single());
             Assert.True(bots.IsBot(bot));
             Assert.NotNull(h.Scene.GetScenePresence(bot));
@@ -111,7 +111,7 @@ public class BotRespawnKeyTests
             // Before the bots load, an avatar holding the bot's key is in the region.
             bots = Restart(h, bots, () => SceneHelpers.AddScenePresence(h.Scene, bot));
 
-            Assert.True(h.PumpUntil(() => BackAndRecorded(bots), TimeSpan.FromSeconds(20)), "the bot never came back");
+            Assert.True(h.PumpUntil(() => BackAndRecorded(bots), TestWait.Default), "the bot never came back");
             UUID back = bots.GetAllBots().Single();
             Assert.NotEqual(bot, back);
             Assert.NotNull(h.Scene.GetScenePresence(back));

@@ -182,9 +182,9 @@ public class IwStringCodecTests
 
     // ── what a script sees ──────────────────────────────────────────────────────────────────
 
-    private static bool PumpUntil(SchedulerHarness h, Func<bool> done, int seconds = 30)
+    private static bool PumpUntil(SchedulerHarness h, Func<bool> done, int seconds = TestWait.DefaultSeconds)
     {
-        var until = DateTime.UtcNow.AddSeconds(seconds);
+        var until = DateTime.UtcNow.AddSeconds(TestWait.Cap(seconds));
         while (!done())
         {
             if (DateTime.UtcNow >= until) return false;

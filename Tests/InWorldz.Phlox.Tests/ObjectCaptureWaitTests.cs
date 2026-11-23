@@ -40,7 +40,7 @@ public class ObjectCaptureWaitTests
         var h = new SchedulerHarness();
         var asset = UUID.Random();
         for (int i = 0; i < Scripts; i++) h.RezScript(Busy, asset, UUID.Random());
-        Assert.True(h.PumpUntil(() => CountOf(h, "entry") == Scripts, TimeSpan.FromSeconds(60)), "not all scripts started");
+        Assert.True(h.PumpUntil(() => CountOf(h, "entry") == Scripts, TestWait.Default), "not all scripts started");
         return h;
     }
 
