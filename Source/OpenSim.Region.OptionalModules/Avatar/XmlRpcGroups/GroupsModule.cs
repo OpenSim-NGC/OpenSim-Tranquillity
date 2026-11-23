@@ -1279,6 +1279,15 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         // The connector does not say whether the service refused, so read the membership back.
         bool removed = m_groupData.GetAgentGroupMembership(agentID, ejecteeID, groupID) == null;
 
+        // A refused ejection is answered as refused, and nobody is told of an ejection that did not happen. Until
+        // now the requester was told it worked, the member was sent "You have been ejected" and their viewer was
+        // told to drop the group, whatever the service decided.
+        if (!removed)
+        {
+            (remoteClient ?? GetActiveClient(agentID))?.SendEjectGroupMemberReply(agentID, groupID, false);
+            return false;
+        }
+
         string agentName;
         RegionInfo regionInfo;
 
