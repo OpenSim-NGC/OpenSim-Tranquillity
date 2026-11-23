@@ -27,6 +27,7 @@
     <EmbeddedResource Include="Resources/IM_Store.migrations" />
     <EmbeddedResource Include="Resources/InventoryStore.migrations" />
     <EmbeddedResource Include="Resources/LogStore.migrations" />
+    <EmbeddedResource Include="Resources/MuteListStore.migrations" />
     <EmbeddedResource Include="Resources/os_groups_Store.migrations" />
     <EmbeddedResource Include="Resources/Presence.migrations" />
     <EmbeddedResource Include="Resources/RegionStore.migrations" />
