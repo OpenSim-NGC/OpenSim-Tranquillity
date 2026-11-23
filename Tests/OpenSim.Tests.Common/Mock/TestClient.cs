@@ -1355,8 +1355,12 @@ public class TestClient : IClientAPI, IClientCore
     {
     }
 
+    /// <summary>The groups the client was told to drop (AgentDropGroup).</summary>
+    public event Action<UUID> OnReceivedAgentDropGroup;
+
     public void SendAgentDropGroup(UUID groupID)
     {
+        OnReceivedAgentDropGroup?.Invoke(groupID);
     }
 
     public void SendAvatarNotesReply(UUID targetID, string text)
