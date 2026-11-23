@@ -79,6 +79,42 @@ public class XAssetStoreTests : IDisposable
         Check(store, () => Convert.ToInt32(PGSQLScalar(conn, "SELECT COUNT(*) FROM xassetsdata")));
     }
 
+    [MySQLServerFact]
+    public void MySQL_StoredData_IsTheAssetsOwnBytes()
+    {
+        string conn = NewMySQLDatabase();
+        MySQLXAssetData store = new();
+        store.Initialise(conn);
+
+        CheckRaw(store, hash => (byte[])MySQLScalar(conn, $"SELECT Data FROM XAssetsData WHERE Hash = 0x{Convert.ToHexString(hash)}"));
+    }
+
+    [PGSQLServerFact]
+    public void PGSQL_StoredData_IsTheAssetsOwnBytes()
+    {
+        string conn = NewPGSQLDatabase();
+        PGSQLXAssetData store = new();
+        store.Initialise(conn);
+
+        CheckRaw(store, hash => (byte[])PGSQLScalar(conn, $"SELECT data FROM xassetsdata WHERE hash = '\\x{Convert.ToHexString(hash)}'::bytea"));
+    }
+
+    /// <summary>
+    /// The data row holds the asset's bytes as given, keyed by their SHA-256, and reads back unchanged. The stores
+    /// once carried a gzip option that nothing switched on; this pins the format every existing database has.
+    /// </summary>
+    private static void CheckRaw(IXAssetDataPlugin store, Func<byte[], byte[]> dataByHash)
+    {
+        byte[] content = new byte[4096];
+        new Random(4).NextBytes(content);
+        AssetBase asset = Asset("raw", content);
+
+        store.StoreAsset(asset);
+
+        Assert.Equal(content, dataByHash(System.Security.Cryptography.SHA256.HashData(content)));
+        Assert.Equal(content, store.GetAsset(asset.FullID)?.Data);
+    }
+
     /// <summary>
     /// Two assets with the same content share one data row; storing an id again replaces its metadata.
     /// </summary>
