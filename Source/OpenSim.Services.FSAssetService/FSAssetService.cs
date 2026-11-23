@@ -908,11 +908,10 @@ public class FSAssetConnector : ServiceBase, IAssetService
 //            return true;
     }
 
+    /// <summary>Deletes the asset's row and answers what the store answers. The file stays: other rows may share it.</summary>
     public virtual bool Delete(string id)
     {
-        m_DataConnector.Delete(id);
-
-        return true;
+        return m_DataConnector.Delete(id);
     }
 
     private void HandleShowAssets(string module, string[] args)
