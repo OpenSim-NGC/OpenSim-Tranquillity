@@ -102,7 +102,7 @@ public class PGSQLFriendsData : PGSQLGenericTableHandler<FriendsData>, IFriendsD
 
     public FriendsData[] GetFriends(Guid principalID)
     {
-        return GetFriends(principalID);
+        return GetFriends(new UUID(principalID));
     }
 
 }
