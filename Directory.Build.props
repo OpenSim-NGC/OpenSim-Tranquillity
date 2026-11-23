@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
   </PropertyGroup>
+  <PropertyGroup>
     <!-- Enable modern .NET 10 analyzers without turning on the most aggressive style rules -->
     <AnalysisLevel>10-recommended</AnalysisLevel>
 
