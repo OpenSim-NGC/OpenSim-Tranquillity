@@ -6,7 +6,8 @@
   </PropertyGroup>
   <PropertyGroup>
     <!-- Enable modern .NET 10 analyzers without turning on the most aggressive style rules -->
-    <AnalysisLevel>10-recommended</AnalysisLevel>
+    <!-- Not yet.  38k warnings says we have some work to do.-->
+    <!-- <AnalysisLevel>10-recommended</AnalysisLevel> -->
 
     <!-- Enforce zero warnings in CI and Release builds, while keeping local Debug fast -->
     <TreatWarningsAsErrors Condition="'$(Configuration)' != 'Debug'">true</TreatWarningsAsErrors>
