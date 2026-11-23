@@ -255,52 +255,44 @@ public class GroupsService : GroupsServiceBase
 
     public List<ExtendedGroupMembersData> GetGroupMembers(string RequestingAgentID, UUID GroupID)
     {
+        // A fixed number of statements whatever the group's size: the group, its roles, its members, their roles,
+        // and their grid user rows in batches. It used to be two statements per member.
         List<ExtendedGroupMembersData> members = new List<ExtendedGroupMembersData>();
 
         GroupData group = m_Database.RetrieveGroup(GroupID);
         if (group == null)
             return members;
 
-        // Unfortunately this doesn't quite work on legacy group data because of a bug
-        // that's also being fixed here on CreateGroup. The OwnerRoleID sent to the DB was wrong.
-        // See how to find the ownerRoleID a few lines below.
-        UUID ownerRoleID = new UUID(group.Data["OwnerRoleID"]);
-
         RoleData[] roles = m_Database.RetrieveRoles(GroupID);
         if (roles == null)
             // something wrong with this group
             return members;
-        List<RoleData> rolesList = new List<RoleData>(roles);
-
-        // The owners role is the one the group names, whatever its stored powers.
-        ownerRoleID = OwnerRoleOf(m_Database.RetrieveGroup(GroupID));
-        List<RoleData> allRoles = new List<RoleData>(roles);
-
-        // Check visibility?
-        // When we don't want to check visibility, we pass it "all" as the requestingAgentID
-        bool checkVisibility = !RequestingAgentID.Equals(UUID.Zero.ToString());
-
-        if (checkVisibility)
-        {
-            // Is the requester a member of the group?
-            bool isInGroup = false;
-            if (m_Database.RetrieveMember(GroupID, RequestingAgentID) != null)
-                isInGroup = true;
-
-            if (!isInGroup) // reduce the roles to the visible ones
-                rolesList = rolesList.FindAll(r => (UInt64.Parse(r.Data["Powers"]) & (ulong)GroupPowers.MemberVisible) != 0);
-        }
 
         MembershipData[] datas = m_Database.RetrieveMembers(GroupID);
-        if (datas == null || (datas != null && datas.Length == 0))
+        if (datas == null || datas.Length == 0)
             return members;
 
-        // OK, we have everything we need
+        // The owners role is the one the group names, whatever its stored powers.
+        UUID ownerRoleID = OwnerRoleOf(group);
+        List<RoleData> allRoles = new List<RoleData>(roles);
+        List<RoleData> rolesList = new List<RoleData>(roles);
+
+        // Check visibility? When we don't want to check visibility, we pass it "all" as the requestingAgentID.
+        // A requester outside the group sees only the titles of roles whose members are visible.
+        bool checkVisibility = !RequestingAgentID.Equals(UUID.Zero.ToString());
+        if (checkVisibility && !datas.Any(d => SamePrincipal(d.PrincipalID, RequestingAgentID)))
+            rolesList = rolesList.FindAll(r => (UInt64.Parse(r.Data["Powers"]) & (ulong)GroupPowers.MemberVisible) != 0);
+
+        ILookup<string, RoleMembershipData> heldBy = (m_Database.RetrieveRolesMembers(GroupID) ?? [])
+            .ToLookup(r => r.PrincipalID, StringComparer.OrdinalIgnoreCase);
+
+        Dictionary<string, GridUserData> gridUsers = new Dictionary<string, GridUserData>(StringComparer.OrdinalIgnoreCase);
+        foreach (GridUserData gud in m_GridUserService.GetMany(datas.Select(d => d.PrincipalID).ToArray()) ?? [])
+            gridUsers.TryAdd(gud.UserID, gud);
 
         foreach (MembershipData d in datas)
         {
-            RoleMembershipData[] rolememberships = m_Database.RetrieveMemberRoles(GroupID, d.PrincipalID);
-            List<RoleMembershipData> rolemembershipsList = new List<RoleMembershipData>(rolememberships);
+            List<RoleMembershipData> rolemembershipsList = heldBy[d.PrincipalID].ToList();
 
             ExtendedGroupMembersData m = new ExtendedGroupMembersData();
 
@@ -318,8 +310,7 @@ public class GroupsService : GroupsServiceBase
             m.Contribution = Int32.Parse(d.Data["Contribution"]);
             m.ListInProfile = d.Data["ListInProfile"] == "1" ? true : false;
 
-            GridUserData gud = m_GridUserService.Get(d.PrincipalID);
-            if (gud != null)
+            if (gridUsers.TryGetValue(d.PrincipalID, out GridUserData gud))
             {
                 if (bool.Parse(gud.Data["Online"]))
                 {
@@ -334,13 +325,16 @@ public class GroupsService : GroupsServiceBase
             }
 
             // Is this person an owner of the group?
-            m.IsOwner = (rolemembershipsList.Find(r => r.RoleID == ownerRoleID) != null) ? true : false;
+            m.IsOwner = !ownerRoleID.IsZero() && rolemembershipsList.Exists(r => r.RoleID == ownerRoleID);
 
             members.Add(m);
         }
 
         return members;
     }
+
+    /// <summary>The same principal: ids compare as the stores' text columns do, without regard to case.</summary>
+    private static bool SamePrincipal(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
     public bool AddGroupRole(string RequestingAgentID, UUID groupID, UUID roleID, string name, string description, string title, ulong powers, out string reason)
     {
@@ -692,9 +686,19 @@ public class GroupsService : GroupsServiceBase
                 return null;
         }
 
+        return MembershipOf(group, membership, m_Database.RetrieveRoles(group.GroupID) ?? [],
+            m_Database.RetrieveMemberRoles(group.GroupID, AgentID) ?? []);
+    }
+
+    /// <summary>A member's view of one group, from rows already read: the group's roles and those the member holds.</summary>
+    private static ExtendedGroupMembershipData MembershipOf(GroupData group, MembershipData membership,
+        IEnumerable<RoleData> groupRoles, IEnumerable<RoleMembershipData> held)
+    {
+        List<RoleData> roles = groupRoles.ToList();
+
         // 4. get the active role
         UUID activeRoleID = new UUID(membership.Data["SelectedRoleID"]);
-        RoleData role = m_Database.RetrieveRole(group.GroupID, activeRoleID);
+        RoleData role = roles.Find(r => r.RoleID == activeRoleID);
 
         ExtendedGroupMembershipData data = new ExtendedGroupMembershipData();
         data.AcceptNotices = membership.Data["AcceptNotices"] == "1" ? true : false;
@@ -711,7 +715,7 @@ public class GroupsService : GroupsServiceBase
         if (role != null)
             data.GroupTitle = role.Data["Title"];
         // A member's powers are those of every role they hold, not only the one whose title they show; owners have all.
-        data.GroupPowers = MemberPowers(group.GroupID, AgentID, OwnerRoleOf(group));
+        data.GroupPowers = held.Any() ? PowersOf(held, roles, OwnerRoleOf(group)) : 0;
         data.ListInProfile = membership.Data["ListInProfile"] == "1" ? true : false;
         data.MaturePublish = group.Data["MaturePublish"] == "1" ? true : false;
         data.MembershipFee = Int32.Parse(group.Data["MembershipFee"]);
@@ -723,23 +727,27 @@ public class GroupsService : GroupsServiceBase
 
     public List<GroupMembershipData> GetAgentGroupMemberships(string RequestingAgentID, string AgentID)
     {
+        // Four statements whatever the number of groups (it used to be four per group): the avatar's memberships,
+        // those groups, their roles, and the roles the avatar holds in them.
         List<GroupMembershipData> memberships = new List<GroupMembershipData>();
 
         // 1. Get all the groups that this person is a member of
         MembershipData[] mdata = m_Database.RetrieveMemberships(AgentID);
-
-        if (mdata == null || (mdata != null && mdata.Length == 0))
+        if (mdata == null || mdata.Length == 0)
             return memberships;
+
+        UUID[] groupIDs = mdata.Select(d => d.GroupID).Distinct().ToArray();
+        Dictionary<UUID, GroupData> groups = new Dictionary<UUID, GroupData>();
+        foreach (GroupData g in m_Database.RetrieveGroupsByID(groupIDs) ?? [])
+            groups.TryAdd(g.GroupID, g);
+        ILookup<UUID, RoleData> roles = (m_Database.RetrieveRolesOfGroups(groupIDs) ?? []).ToLookup(r => r.GroupID);
+        ILookup<UUID, RoleMembershipData> held = (m_Database.RetrievePrincipalRoles(AgentID) ?? [])
+            .Where(r => SamePrincipal(r.PrincipalID, AgentID)).ToLookup(r => r.GroupID);
 
         foreach (MembershipData d in mdata)
         {
-            GroupMembershipData gmember = GetAgentGroupMembership(RequestingAgentID, AgentID, d.GroupID, d);
-            if (gmember != null)
-            {
-                memberships.Add(gmember);
-                //m_log.LogDebug("[XXX]: Member of {0} as {1}", gmember.GroupName, gmember.GroupTitle);
-                //Util.PrintCallStack();
-            }
+            if (groups.TryGetValue(d.GroupID, out GroupData group))
+                memberships.Add(MembershipOf(group, d, roles[d.GroupID], held[d.GroupID]));
         }
 
         return memberships;

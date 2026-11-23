@@ -137,5 +137,33 @@ public interface IGroupsData
     MembershipData RetrievePrincipalGroupMembership(string principalID, UUID groupID);
     MembershipData[] RetrievePrincipalGroupMemberships(string principalID);
 
-    // Misc
+    // Lookups of many rows at once. The stores answer each in a statement per GroupsBatch.Size keys, whatever the
+    // number of groups; these defaults, for a store that does not, ask once per group.
+
+    /// <summary>The groups with these ids that exist, in any order.</summary>
+    GroupData[] RetrieveGroupsByID(UUID[] groupIDs)
+        => (groupIDs ?? []).Select(RetrieveGroup).Where(g => g != null).ToArray();
+
+    /// <summary>Every role of these groups.</summary>
+    RoleData[] RetrieveRolesOfGroups(UUID[] groupIDs)
+        => (groupIDs ?? []).SelectMany(g => RetrieveRoles(g) ?? []).ToArray();
+
+    /// <summary>Every role this principal holds, in every group.</summary>
+    RoleMembershipData[] RetrievePrincipalRoles(string principalID)
+        => (RetrieveMemberships(principalID) ?? [])
+            .SelectMany(m => RetrieveMemberRoles(m.GroupID, principalID) ?? []).ToArray();
+}
+
+/// <summary>How many keys a groups store puts in one statement when it looks up a list.</summary>
+public static class GroupsBatch
+{
+    public const int Size = 500;
+
+    public static T[] Get<T>(IEnumerable<UUID> ids, Func<string[], T[]> lookup)
+    {
+        var rows = new List<T>();
+        foreach (string[] batch in ids.Select(id => id.ToString()).Distinct().Chunk(Size))
+            rows.AddRange(lookup(batch) ?? []);
+        return rows.ToArray();
+    }
 }

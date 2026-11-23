@@ -184,6 +184,17 @@ public class SQLiteGroupsData : IGroupsData
     public MembershipData[] RetrievePrincipalGroupMemberships(string principalID) => null;
     #endregion
 
+    #region lookups of many rows
+    public GroupData[] RetrieveGroupsByID(UUID[] groupIDs)
+        => GroupsBatch.Get(groupIDs ?? [], ids => m_Groups.Get("GroupID", ids));
+
+    public RoleData[] RetrieveRolesOfGroups(UUID[] groupIDs)
+        => GroupsBatch.Get(groupIDs ?? [], ids => m_Roles.Get("GroupID", ids));
+
+    public RoleMembershipData[] RetrievePrincipalRoles(string principalID)
+        => m_RoleMembership.Get("PrincipalID", principalID);
+    #endregion
+
     private static string EscapeLike(string s) => s.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }
 

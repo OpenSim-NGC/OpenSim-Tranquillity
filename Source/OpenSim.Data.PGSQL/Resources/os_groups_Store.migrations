@@ -209,3 +209,18 @@ ALTER TABLE IF EXISTS os_groups_notices
 ;
 
 COMMIT;
+
+:VERSION 5
+
+BEGIN;
+
+-- the roles of one member of one group, looked up for every member listed and every powers check
+CREATE INDEX IF NOT EXISTS os_groups_rolemembership_member ON os_groups_rolemembership ("GroupID", "PrincipalID");
+-- an avatar's groups and roles, looked up at every region arrival; MySQL has these as KEY `PrincipalID`
+CREATE INDEX IF NOT EXISTS os_groups_rolemembership_principal ON os_groups_rolemembership ("PrincipalID");
+CREATE INDEX IF NOT EXISTS os_groups_membership_principal ON os_groups_membership ("PrincipalID");
+-- a group's notices, and the daily clean-up of old ones; MySQL has KEY `GroupID` and KEY `TMStamp`
+CREATE INDEX IF NOT EXISTS os_groups_notices_group ON os_groups_notices ("GroupID");
+CREATE INDEX IF NOT EXISTS os_groups_notices_stamp ON os_groups_notices ("TMStamp");
+
+COMMIT;

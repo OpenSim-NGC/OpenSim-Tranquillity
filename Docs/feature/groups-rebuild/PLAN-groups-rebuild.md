@@ -1,6 +1,6 @@
 # Groups rebuild
 
-**Status: phase 0 in progress.** The plan for rebuilding the groups code on the existing Groups V2 data
+**Status: phase 0 built (PR #441); phase 1 built.** The plan for rebuilding the groups code on the existing Groups V2 data
 (`os_groups_*`), chosen over fixing the two current forks in place or rebuilding with a new schema.
 
 ## Why
@@ -85,3 +85,25 @@ The probe scenarios run before and after each phase.
   - It used to read `MessageOnlineUsersOnly`, a setting for the Flotsam module. `RegionServerDefaults.ini` sets it
     to false, so V2 group chat and notices were off.
   - It now also reads the documented `DebugMessagingEnabled`.
+
+## Phase 1, as built
+
+- **Member list:** five statements whatever the group's size (group, roles, members, role memberships, grid
+  users per 500); it was two per member.
+- **An avatar's memberships**, read at every region arrival: four statements whatever the number of groups (memberships,
+  groups, their roles, the avatar's roles); it was four per group.
+- **Powers checks** were already three statements and are unchanged.
+- **Store lookups added:** `IGroupsData.RetrieveGroupsByID`, `RetrieveRolesOfGroups`, `RetrievePrincipalRoles`, and
+  `IGridUserData.GetMany`. Each has a default implementation (one call per key) for stores outside the tree.
+- **Indexes:** `(GroupID, PrincipalID)` on role memberships for MySQL (version 4) and PostgreSQL (version 5).
+  PostgreSQL also gets the principal and notice indexes MySQL already had.
+
+Measured with `GroupsBatchedQueriesTests.TimingsAtScale` (`OPENSIM_TEST_GROUPS_SCALE=5000`): a 5001-member group, and an
+avatar in 26 groups. Local servers (MariaDB 11, PostgreSQL 17, SQLite file); a grid whose database is across a network
+pays a round trip per statement on top, so the old numbers grow with the latency and the new ones barely move.
+
+| Backend | Member list, before | Member list, after | Memberships, before | Memberships, after |
+|---|---|---|---|---|
+| SQLite | 1.9 – 2.1 s | 33 – 52 ms | 4 – 7 ms | 0.4 – 7 ms |
+| MySQL (MariaDB 11) | 1.4 – 1.9 s | 38 – 57 ms | 14 – 17 ms | 1.6 – 2.3 ms |
+| PostgreSQL 17 | 1.24 – 1.26 s | 17 – 26 ms | 4 – 6 ms | 0.6 – 1.1 ms |
