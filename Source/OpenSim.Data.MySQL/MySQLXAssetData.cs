@@ -402,7 +402,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
         HashSet<UUID> exists = new HashSet<UUID>();
 
         string ids = "'" + string.Join("','", uuids) + "'";
-        string sql = string.Format("SELECT ID FROM assets WHERE ID IN ({0})", ids);
+        string sql = string.Format("SELECT ID FROM XAssetsMeta WHERE ID IN ({0})", ids);
 
         using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
         {
