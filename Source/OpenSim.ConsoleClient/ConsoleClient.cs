@@ -43,6 +43,8 @@ public class OpenSimConsoleClient
     private static string m_User;
     private static string m_Pass;
     private static UUID m_SessionID;
+    private static string m_Prompt = String.Empty;
+    private static bool m_NewSession;
 
     static int Main(string[] args)
     {
@@ -244,6 +246,15 @@ public class OpenSimConsoleClient
             Environment.Exit(1);
         }
 
+        // The console's prompt; the first lines of the session are scrollback and do not say it (see ShowLines).
+        m_Prompt = String.Empty;
+        foreach (XmlNode part in rootNode.ChildNodes)
+        {
+            if (part is XmlElement promptNode && promptNode.Name == "Prompt")
+                m_Prompt = promptNode.InnerText;
+        }
+        m_NewSession = true;
+
         MainConsole.Instance.Commands.FromXml(helpNode, SendCommand);
 
         Requester.MakeRequest("http://"+m_Host+":"+m_Port.ToString()+"/ReadResponses/"+m_SessionID.ToString()+"/", String.Empty, ReadResponses);
@@ -262,14 +273,43 @@ public class OpenSimConsoleClient
             return;
         }
 
-        List<string> lines = new List<string>();
+        XmlElement session = (XmlElement)rootNodeL[0];
+        bool newSession = m_NewSession;
+        // The server sends the scrollback with the first reply that has any line in it.
+        if (session.GetElementsByTagName("Line").Count > 0)
+            m_NewSession = false;
 
-        foreach (XmlNode part in rootNodeL[0].ChildNodes)
+        m_Prompt = ShowLines(session, MainConsole.Instance, m_Prompt, newSession);
+
+        Requester.MakeRequest(requestUrl, requestData, ReadResponses);
+
+//            if (prompt.StartsWith("+++"))
+            MainConsole.Instance.ReadLine(m_Prompt, true, true);
+//            else if (prompt.StartsWith("-++"))
+//                SendCommand(String.Empty, new string[] { MainConsole.Instance.ReadLine(prompt.Substring(3), false, true) });
+    }
+
+    /// <summary>
+    /// Shows the Line elements of a ReadResponses reply on the console and answers the prompt to read with: the last
+    /// prompt among them, or <paramref name="prompt"/> when there is none. RemoteConsole.GetEvents sends each line's
+    /// text as it was said, with its level and whether it is a prompt as attributes. A line without a Number attribute
+    /// is in the older "number:level:text" form; a line of that kind that does not split in three is shown whole.
+    /// </summary>
+    /// <remarks>
+    /// The first lines of a session (<paramref name="newSession"/>) are the console's scrollback. For those,
+    /// GetEvents leaves out each line's own prompt flag and sets Prompt on the last line to whether the console is
+    /// waiting for input, whatever that line is: on a live region it is often a log line said after the prompt. That
+    /// line is the prompt only when its text is the prompt StartSession named (<paramref name="prompt"/>); any other
+    /// line is shown, and the prompt stays the one StartSession named.
+    /// </remarks>
+    public static string ShowLines(XmlElement session, ICommandConsole console, string prompt, bool newSession)
+    {
+        List<XmlElement> lines = new List<XmlElement>();
+
+        foreach (XmlNode part in session.ChildNodes)
         {
-            if (part.Name != "Line")
-                continue;
-
-            lines.Add(part.InnerText);
+            if (part is XmlElement line && line.Name == "Line")
+                lines.Add(line);
         }
 
         // Cut down scrollback to 100 lines (4 screens)
@@ -278,27 +318,36 @@ public class OpenSimConsoleClient
         while (lines.Count > 100)
             lines.RemoveAt(0);
 
-        string prompt = String.Empty;
-
-        foreach (string l in lines)
+        foreach (XmlElement line in lines)
         {
-            string[] parts = l.Split(new char[] {':'}, 3);
-            if (parts.Length != 3)
-                continue;
+            string text = line.InnerText;
+            string level = line.GetAttribute("Level");
+            bool isPrompt = line.GetAttribute("Prompt") == "true";
 
-            if (parts[2].StartsWith("+++") || parts[2].StartsWith("-++"))
-                prompt = parts[2];
+            if (line.HasAttribute("Number"))
+            {
+                if (isPrompt && newSession && text.Trim() != prompt.Trim())
+                    isPrompt = false;
+            }
             else
-                MainConsole.Instance.Output(parts[2].Trim(), parts[1]);
+            {
+                string[] parts = text.Split(new char[] {':'}, 3);
+                if (parts.Length == 3)
+                {
+                    level = parts[1];
+                    text = parts[2];
+                    isPrompt = text.StartsWith("+++") || text.StartsWith("-++");
+                }
+            }
+
+            if (isPrompt)
+                prompt = text;
+            else
+                // A ConsoleLevel, not a string: a string would be taken as a format argument for the text.
+                console.Output(text.Trim(), (ConsoleLevel)level);
         }
 
-
-        Requester.MakeRequest(requestUrl, requestData, ReadResponses);
-
-//            if (prompt.StartsWith("+++"))
-            MainConsole.Instance.ReadLine(prompt.Substring(0), true, true);
-//            else if (prompt.StartsWith("-++"))
-//                SendCommand(String.Empty, new string[] { MainConsole.Instance.ReadLine(prompt.Substring(3), false, true) });
+        return prompt;
     }
 
     public static void CommandReply(string requestUrl, string requestData, string replyData)
