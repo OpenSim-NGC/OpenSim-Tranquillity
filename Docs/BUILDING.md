@@ -126,21 +126,35 @@ independently. Do not mount over `/app/data`: the RegionServer image contains
 packaged resources there.
 
 # Configure #
+The steps below are for the RegionServer, in the directory it was published to (see above). Its settings
+come from `RegionServerDefaults.ini`, which holds every default and should not be edited, and the files you
+give it on top of that. Only settings you change go in your own files.
+
 ## Standalone mode ##
-Copy `OpenSim.ini.example` to `OpenSim.ini` in the `bin/` directory, and verify the `[Const]` section, correcting for your case.
+1. Copy `RegionServer.ini.example` to `RegionServer.ini`, and check the `[Const]` section for your case.
+2. In the `[Architecture]` section at the end of `RegionServer.ini`, keep `config-include/Standalone.ini`,
+   or use `config-include/StandaloneHypergrid.ini` instead if you want Hypergrid.
+3. Copy `config-include/StandaloneCommon.ini.example` to `config-include/StandaloneCommon.ini`. It sets the
+   database and the services the region uses. It uses SQLite by default, which needs no setup; MySQL,
+   MariaDB and PostgreSQL are optional. Experiences are stored only in MySQL or MariaDB, so with SQLite
+   the region runs but logs `Can't load experience service` at startup and experiences are unavailable.
+4. Start the region server with your file:
 
-On `[Architecture]` section uncomment only the line with Standalone.ini if you do now want HG, or the line with StandaloneHypergrid.ini if you do
+   ```sh
+   dotnet OpenSim.Server.RegionServer.dll --inifile RegionServer.ini
+   ```
 
-copy the `StandaloneCommon.ini.example` to `StandaloneCommon.ini` in the `bin/config-include` directory.
-
-The StandaloneCommon.ini file describes the database and backend services that OpenSim will use, and is set to use sqlite by default, which requires no setup.
-
+   `Scripts/region-start.sh` does the same for a config directory (see the Docker section above).
 
 ## Grid mode ##
-Each grid may have its own requirements, so FOLLOW your Grid instructions!
-in general:
-Copy `OpenSim.ini.example` to `OpenSim.ini` in the `bin/` directory, and verify the `[Const]` section, correcting for your case
- 
-On `[Architecture]` section uncomment only the line with Grid.ini if you do not want HG, or the line with GridHypergrid.ini if you do
+Each grid may have its own requirements, so follow your grid's instructions. In general:
 
-and copy the `GridCommon.ini.example` file to `GridCommon.ini` inside the `bin/config-include` directory and edit as necessary
+1. Copy `RegionServer.ini.example` to `RegionServer.ini`, and check the `[Const]` section for your case.
+2. In the `[Architecture]` section, use `config-include/Grid.ini`, or `config-include/GridHypergrid.ini` if
+   the grid uses Hypergrid.
+3. Copy `config-include/GridCommon.ini.example` to `config-include/GridCommon.ini` and set the grid's
+   service addresses as the grid tells you.
+4. Start it as in standalone mode.
+
+If the region server stops at startup with `No StorageProvider configured`, the `StandaloneCommon.ini` or
+`GridCommon.ini` file from step 3 is missing.
