@@ -435,10 +435,8 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
 
             cmd.Parameters.AddWithValue("?id", id);
 
-            ExecuteNonQuery(cmd);
+            return ExecuteNonQuery(cmd);
         }
-
-        return true;
     }
 
     public void Import(string conn, string table, int start, int count, bool force, FSStoreDelegate store)

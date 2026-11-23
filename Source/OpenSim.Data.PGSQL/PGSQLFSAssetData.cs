@@ -276,12 +276,16 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
 
     public bool Delete(string id)
     {
+        // id is a uuid column; an id that is not a UUID names no row.
+        if (!UUID.TryParse(id, out UUID assetID))
+            return false;
+
         string query = String.Format("delete from {0} where \"id\" = :id", m_Table);
         using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
         using (NpgsqlCommand cmd = new NpgsqlCommand(query, dbcon))
         {
             dbcon.Open();
-            cmd.Parameters.Add(m_database.CreateParameter("id", new UUID(id)));
+            cmd.Parameters.Add(m_database.CreateParameter("id", assetID));
             cmd.ExecuteNonQuery();
         }
 
