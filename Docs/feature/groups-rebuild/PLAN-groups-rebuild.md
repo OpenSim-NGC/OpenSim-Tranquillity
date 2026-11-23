@@ -1,6 +1,6 @@
 # Groups rebuild
 
-**Status: phase 0 built (PR #441); phase 1 built (PR #442); phase 2 built (PR #445); phase 3 in progress.** The plan for rebuilding the groups code on the existing Groups V2 data
+**Status: phases 0–3 built (PRs #441, #442, #445, #446); phase 4 partly (bans, #448); phase 5's import and rollout built.** The plan for rebuilding the groups code on the existing Groups V2 data
 (`os_groups_*`), chosen over fixing the two current forks in place or rebuilding with a new schema.
 
 ## Why
@@ -178,3 +178,24 @@ a change made through it does); one module in place of the V2 groups and messagi
 
 Still to do in phase 4: accepting and declining invitations through the capabilities, chat moderation and history,
 land contribution, notice attachments snapshotted when sent, groups that own land, ejecting Hypergrid members.
+
+## Phase 3, last steps
+
+- **Forgetting only what changed.** Each cache entry is noted under the groups and avatars it depends on; a change,
+  made through the region or told by Robust (whose notices now name the avatar too), forgets only those entries.
+  An avatar's list of groups is noted under every group in it, so a role's new powers reach its members' lists.
+- **One module instead of the V2 groups and messaging pair: not done, on purpose.** Grids configure the two by name
+  (`Module`, `MessagingModule`), the XmlRpcGroups module shares the messaging interfaces, and the rebuild's fixes
+  already live in the pieces both use (the rules, the notice sender, the cache). Merging them would change every
+  grid's config for no change players see.
+
+## Phase 5: moving grids to V2
+
+- **The import** (`FlotsamGroupsImport`, console `groups import flotsam [dry-run]`): a one-time copy from the Flotsam
+  tables into V2's store, any backend; nothing in V2 is overwritten, a second run copies only what is new, and it
+  repairs missing Everyone roles and memberships on the way. Checked on SQLite, MySQL and PostgreSQL targets, and on
+  the local grid's Robust.
+- **The rollout:** `ROLLOUT-groups-v2.md` (finding the backend, backup, upgrade, the key, the import, switching the
+  regions, checking with the probe, going back).
+- **Retiring XmlRpcGroups:** it stays in the tree for grids that use it, deprecated: the config says so and the module
+  logs it at start.

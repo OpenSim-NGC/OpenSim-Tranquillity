@@ -36,6 +36,7 @@ using OpenSim.Framework;
 using OpenSim.Groups;
 using Xunit;
 using Xunit.Abstractions;
+using V2Import = OpenSim.Groups.FlotsamGroupsImport;
 using Assert = Xunit.Assert;
 
 namespace OpenSim.Server.Handlers.Tests;
@@ -396,6 +397,190 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
 
     [PGSQLServerFact]
     public void PGSQLKeepsAndEnforcesBans() => BansAreKeptAndEnforced(PGSQL());
+
+    #region the Flotsam import
+    /// <summary>The Flotsam XmlRpcGroups server's tables (its groups.sql).</summary>
+    private const string FlotsamSchema = """
+        CREATE TABLE osagent (AgentID varchar(128) NOT NULL default '', ActiveGroupID varchar(128) NOT NULL default '',
+          PRIMARY KEY (AgentID));
+        CREATE TABLE osgroup (GroupID varchar(128) NOT NULL default '', Name varchar(255) NOT NULL default '',
+          Charter text NOT NULL, InsigniaID varchar(128) NOT NULL default '', FounderID varchar(128) NOT NULL default '',
+          MembershipFee int(11) NOT NULL default '0', OpenEnrollment varchar(255) NOT NULL default '',
+          ShowInList tinyint(1) NOT NULL default '0', AllowPublish tinyint(1) NOT NULL default '0',
+          MaturePublish tinyint(1) NOT NULL default '0', OwnerRoleID varchar(128) NOT NULL default '',
+          PRIMARY KEY (GroupID), UNIQUE KEY Name (Name));
+        CREATE TABLE osgroupinvite (InviteID varchar(128) NOT NULL default '', GroupID varchar(128) NOT NULL default '',
+          RoleID varchar(128) NOT NULL default '', AgentID varchar(128) NOT NULL default '',
+          TMStamp timestamp NOT NULL default CURRENT_TIMESTAMP, PRIMARY KEY (InviteID));
+        CREATE TABLE osgroupmembership (GroupID varchar(128) NOT NULL default '', AgentID varchar(128) NOT NULL default '',
+          SelectedRoleID varchar(128) NOT NULL default '', Contribution int(11) NOT NULL default '0',
+          ListInProfile int(11) NOT NULL default '1', AcceptNotices int(11) NOT NULL default '1',
+          PRIMARY KEY (GroupID, AgentID));
+        CREATE TABLE osgroupnotice (GroupID varchar(128) NOT NULL default '', NoticeID varchar(128) NOT NULL default '',
+          Timestamp int(10) unsigned NOT NULL default '0', FromName varchar(255) NOT NULL default '',
+          Subject varchar(255) NOT NULL default '', Message text NOT NULL, BinaryBucket text NOT NULL,
+          PRIMARY KEY (GroupID, NoticeID));
+        CREATE TABLE osgrouprolemembership (GroupID varchar(128) NOT NULL default '', RoleID varchar(128) NOT NULL default '',
+          AgentID varchar(128) NOT NULL default '', PRIMARY KEY (GroupID, RoleID, AgentID));
+        CREATE TABLE osrole (GroupID varchar(128) NOT NULL default '', RoleID varchar(128) NOT NULL default '',
+          Name varchar(255) NOT NULL default '', Description varchar(255) NOT NULL default '',
+          Title varchar(255) NOT NULL default '', Powers bigint(20) unsigned NOT NULL default '0',
+          PRIMARY KEY (GroupID, RoleID));
+        """;
+
+    /// <summary>A notice's bucket as XmlRpcGroups keeps it, in hex.</summary>
+    private static string Bucket(UUID group, UUID owner, UUID item, string name, byte type)
+    {
+        byte[] n = System.Text.Encoding.UTF8.GetBytes(name);
+        byte[] b = new byte[51 + n.Length];
+        b[0] = 1; b[1] = type;
+        group.ToBytes(b, 2); owner.ToBytes(b, 18); item.ToBytes(b, 34);
+        n.CopyTo(b, 50);
+        return Utils.BytesToHexString(b, "");
+    }
+
+    [Fact]
+    public void AFlotsamNoticeBucketIsRead()
+    {
+        UUID g = UUID.Random(), owner = UUID.Random(), item = UUID.Random();
+        var a = V2Import.AttachmentOf(Bucket(g, owner, item, "A landmark", 3));
+        Assert.True(a.Has);
+        Assert.Equal((byte)3, a.Type);
+        Assert.Equal(owner, a.Owner);
+        Assert.Equal(item, a.Item);
+        Assert.Equal("A landmark", a.Name);
+        Assert.False(V2Import.AttachmentOf("00000000").Has);
+        Assert.False(V2Import.AttachmentOf("").Has);
+        Assert.False(V2Import.AttachmentOf("not hex").Has);
+    }
+
+    /// <summary>A scratch database on the MySQL server with the Flotsam tables, filled by <paramref name="fill"/>.</summary>
+    private string FlotsamDatabase(Action<Action<string>> fill)
+    {
+        string server = Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar);
+        string name = "flotsam_" + Guid.NewGuid().ToString("N");
+        string admin = new MySqlConnectionStringBuilder(server) { Database = "", Pooling = false }.ConnectionString;
+        string conn = new MySqlConnectionStringBuilder(server) { Database = name, Pooling = false }.ConnectionString;
+        Admin(() => new MySqlConnection(admin), $"CREATE DATABASE `{name}`");
+        m_cleanup.Add(() => Admin(() => new MySqlConnection(admin), $"DROP DATABASE IF EXISTS `{name}`"));
+        Admin(() => new MySqlConnection(conn), FlotsamSchema);
+        fill(sql => Admin(() => new MySqlConnection(conn), sql));
+        return conn;
+    }
+
+    /// <summary>
+    /// Two groups to copy (one without an Everyone role, one with a member missing from Everyone), a group whose name
+    /// V2 already has, and rows of a group that does not exist: the dry run counts, the import copies, a second run
+    /// copies nothing more.
+    /// </summary>
+    private void FlotsamGroupsAreCopied(Backend b)
+    {
+        GroupsService s = b.Service;
+        string tag = Guid.NewGuid().ToString("N")[..8];
+        UUID a = UUID.Random(), bare = UUID.Random(), clash = UUID.Random(), gone = UUID.Random();
+        UUID officers = UUID.Random(), owners = UUID.Random();
+        string founder = UUID.Random().ToString(), member = UUID.Random().ToString(), officer = UUID.Random().ToString();
+        string invitee = UUID.Random().ToString();
+        UUID invite = UUID.Random(), withItem = UUID.Random(), plain = UUID.Random(), item = UUID.Random();
+
+        // a V2 group already has the name of the third
+        string v2owner = UUID.Random().ToString();
+        Assert.True(s.CreateGroup(v2owner, "Taken " + tag, "", true, UUID.Zero, 0, true, true, false, new UUID(v2owner), out string reason).IsNotZero(), reason);
+
+        string conn = FlotsamDatabase(sql =>
+        {
+            sql($"INSERT INTO osgroup VALUES ('{a}', 'Flotsam A {tag}', 'Our charter', '{UUID.Zero}', '{founder}', 5, '1', 1, 1, 0, '{owners}')");
+            sql($"INSERT INTO osgroup VALUES ('{bare}', 'Flotsam B {tag}', '', '{UUID.Zero}', '{founder}', 0, '0', 0, 0, 0, '{UUID.Zero}')");
+            sql($"INSERT INTO osgroup VALUES ('{clash}', 'Taken {tag}', '', '{UUID.Zero}', '{founder}', 0, '0', 1, 0, 0, '{UUID.Zero}')");
+            sql($"INSERT INTO osrole VALUES ('{a}', '{UUID.Zero}', 'Everyone', 'All', 'Member', {(ulong)GroupsService.DefaultEveryonePowers})");
+            sql($"INSERT INTO osrole VALUES ('{a}', '{officers}', 'Officers', 'Run it', 'Officer', {(ulong)GroupsService.OfficersPowers})");
+            sql($"INSERT INTO osrole VALUES ('{a}', '{owners}', 'Owners', 'Own it', 'Owner', {(ulong)GroupsService.OwnerPowers})");
+            sql($"INSERT INTO osgroupmembership VALUES ('{a}', '{founder}', '{owners}', 0, 1, 1)");
+            sql($"INSERT INTO osgroupmembership VALUES ('{a}', '{member}', '{UUID.Zero}', 0, 1, 0)");
+            sql($"INSERT INTO osgroupmembership VALUES ('{a}', '{officer}', '{officers}', 0, 0, 1)");
+            sql($"INSERT INTO osgroupmembership VALUES ('{bare}', '{founder}', '{UUID.Zero}', 0, 1, 1)");
+            sql($"INSERT INTO osgroupmembership VALUES ('{gone}', '{member}', '{UUID.Zero}', 0, 1, 1)");
+            sql($"INSERT INTO osgrouprolemembership VALUES ('{a}', '{UUID.Zero}', '{founder}')");
+            sql($"INSERT INTO osgrouprolemembership VALUES ('{a}', '{owners}', '{founder}')");
+            sql($"INSERT INTO osgrouprolemembership VALUES ('{a}', '{UUID.Zero}', '{member}')");
+            sql($"INSERT INTO osgrouprolemembership VALUES ('{a}', '{officers}', '{officer}')");   // not in Everyone
+            sql($"INSERT INTO osgroupinvite VALUES ('{invite}', '{a}', '{UUID.Zero}', '{invitee}', CURRENT_TIMESTAMP)");
+            sql($"INSERT INTO osgroupnotice VALUES ('{a}', '{withItem}', {Util.UnixTimeSinceEpoch()}, 'Founder', 'With item', 'Look', '{Bucket(a, new UUID(founder), item, "A landmark", 3)}')");
+            sql($"INSERT INTO osgroupnotice VALUES ('{a}', '{plain}', {Util.UnixTimeSinceEpoch()}, 'Founder', 'Plain', 'Hello', '0000')");
+            sql($"INSERT INTO osagent VALUES ('{founder}', '{a}')");
+        });
+
+        V2Import.Report dry = new V2Import(() => new MySqlConnection(conn), b.Groups).Run(dryRun: true);
+        Assert.Equal(2, dry.Groups);
+        Assert.Equal(1, dry.NameTaken);
+        Assert.Equal(1, dry.EveryoneRolesAdded);
+        Assert.Null(s.GetGroupRecord(founder, a));   // nothing written
+
+        V2Import.Report report = new V2Import(() => new MySqlConnection(conn), b.Groups).Run(dryRun: false);
+        m_out.WriteLine($"{b.Name}: {report}");
+        Assert.Equal(2, report.Groups);
+        Assert.Equal(4, report.Members);
+        Assert.Equal(1, report.Invites);
+        Assert.Equal(2, report.Notices);
+        Assert.Equal(1, report.Principals);
+        Assert.True(report.RowsWithoutGroup >= 1);
+
+        // the group, as V2 serves it
+        ExtendedGroupRecord rec = s.GetGroupRecord(founder, a);
+        Assert.Equal("Flotsam A " + tag, rec.GroupName);
+        Assert.Equal("Our charter", rec.Charter);
+        Assert.Equal(5, rec.MembershipFee);
+        Assert.True(rec.OpenEnrollment);
+        Assert.True(rec.ShowInList);
+        Assert.Equal(owners, rec.OwnerRoleID);
+        Assert.Null(s.GetGroupRecord(founder, clash));   // its name was taken
+
+        List<ExtendedGroupMembersData> members = s.GetGroupMembers(founder, a);
+        Assert.Equal(3, members.Count);
+        Assert.True(members.Single(m => m.AgentID.ToString() == founder).IsOwner);
+        Assert.False(members.Single(m => m.AgentID.ToString() == member).AcceptNotices);
+        Assert.Equal("Officer", members.Single(m => m.AgentID.ToString() == officer).Title);
+        // the officer was put in Everyone, which every V2 member holds
+        Assert.Contains(s.GetAgentGroupRoles(founder, officer, a), r => r.RoleID.IsZero());
+        // the founder, an owner, has every power; the group they were active in is active
+        Assert.Equal(GroupsService.AllPowers, s.GetAgentGroupMembership(founder, founder, a).GroupPowers);
+        Assert.Equal(a, s.GetAgentActiveMembership(founder, founder).GroupID);
+        // the group without an Everyone role has one
+        Assert.Contains(s.GetGroupRoles(founder, bare), r => r.RoleID.IsZero());
+
+        Assert.NotNull(s.GetAgentToGroupInvite(invitee, invite));
+        GroupNoticeInfo n = s.GetGroupNotice(founder, withItem);
+        Assert.True(n.noticeData.HasAttachment);
+        Assert.Equal("A landmark", n.noticeData.AttachmentName);
+        Assert.Equal(item, n.noticeData.AttachmentItemID);
+        Assert.False(s.GetGroupNotice(founder, plain).noticeData.HasAttachment);
+
+        // again: nothing more
+        V2Import.Report again = new V2Import(() => new MySqlConnection(conn), b.Groups).Run(dryRun: false);
+        Assert.Equal(0, again.Groups);
+        Assert.Equal(2, again.GroupsAlreadyThere);
+    }
+
+    [MySQLServerFact]
+    public void FlotsamGroupsAreCopiedIntoSQLite() => FlotsamGroupsAreCopied(SQLite());
+
+    [MySQLServerFact]
+    public void FlotsamGroupsAreCopiedIntoMySQL() => FlotsamGroupsAreCopied(MySQL());
+
+    /// <summary>Runs only with both OPENSIM_TEST_MYSQL (the Flotsam tables) and OPENSIM_TEST_PGSQL set.</summary>
+    public sealed class MySQLAndPGSQLServerFactAttribute : FactAttribute
+    {
+        public MySQLAndPGSQLServerFactAttribute()
+        {
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar))
+                || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(PGSQLServerFactAttribute.EnvVar)))
+                Skip = "Requires a MySQL server (the Flotsam tables) and a PostgreSQL server; set OPENSIM_TEST_MYSQL and OPENSIM_TEST_PGSQL to run.";
+        }
+    }
+
+    [MySQLAndPGSQLServerFact]
+    public void FlotsamGroupsAreCopiedIntoPostgreSQL() => FlotsamGroupsAreCopied(PGSQL());
+    #endregion
 
     #region at scale (opt-in)
     /// <summary>

@@ -106,6 +106,45 @@ public class GroupsService : GroupsServiceBase
     public GroupsService(IConfigSource config, string configName)
         : base(config, configName)
     {
+        RegisterImportCommand(config);
+    }
+
+    private static int s_importCommand;
+
+    /// <summary>
+    /// "groups import flotsam [dry-run]": copy a Flotsam XmlRpcGroups server's groups into this store (see
+    /// <see cref="FlotsamGroupsImport"/>), from the MySQL database [Groups] FlotsamImportConnectionString names (kept in
+    /// the config, so no password goes through the console). Once per process.
+    /// </summary>
+    private void RegisterImportCommand(IConfigSource config)
+    {
+        if (MainConsole.Instance == null || Interlocked.Exchange(ref s_importCommand, 1) == 1)
+            return;
+        MainConsole.Instance.Commands.AddCommand("Groups", false, "groups import flotsam",
+            "groups import flotsam [dry-run]",
+            "Copy the groups of a Flotsam XmlRpcGroups server's tables into Groups V2, from the database [Groups] " +
+            "FlotsamImportConnectionString names; groups V2 already has are left as they are. dry-run only counts.",
+            (module, args) =>
+            {
+                string conn = config.Configs["Groups"]?.GetString("FlotsamImportConnectionString", string.Empty) ?? string.Empty;
+                if (conn.Length == 0)
+                {
+                    MainConsole.Instance.Output("Set [Groups] FlotsamImportConnectionString to the database with the Flotsam tables (osgroup, ...).");
+                    return;
+                }
+                bool dry = args.Length > 3 && args[3].Equals("dry-run", StringComparison.OrdinalIgnoreCase);
+                try
+                {
+                    var report = new FlotsamGroupsImport(() => new MySqlConnector.MySqlConnection(conn), m_Database).Run(dry);
+                    MainConsole.Instance.Output((dry ? "Would copy: " : "Copied: ") + report);
+                    foreach (string skipped in report.Skipped.Take(20))
+                        MainConsole.Instance.Output("  " + skipped);
+                }
+                catch (Exception e)
+                {
+                    MainConsole.Instance.Output("The import stopped: " + e.Message);
+                }
+            });
     }
 
     public GroupsService(IConfigSource config)

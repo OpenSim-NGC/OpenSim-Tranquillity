@@ -1088,6 +1088,12 @@
     ;; [GridService] LocalServiceModule unless set here.
     ; GridService = "OpenSim.Services.GridService.dll:GridService"
 
+    ;; Moving off XmlRpcGroups: the MySQL database with the Flotsam groups
+    ;; server's tables (osgroup, osrole, osgroupmembership, ...). The console
+    ;; command "groups import flotsam [dry-run]" copies them into Groups V2,
+    ;; leaving the groups V2 already has as they are.
+    ; FlotsamImportConnectionString = "Data Source=localhost;Database=flotsam;User ID=flotsam;Password=*****;"
+
 
 [UserProfilesService]
     LocalServiceModule = "OpenSim.Services.UserProfilesService.dll:UserProfilesService"
