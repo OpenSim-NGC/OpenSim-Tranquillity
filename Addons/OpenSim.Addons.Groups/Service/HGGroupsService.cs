@@ -55,6 +55,17 @@ public class HGGroupsService : GroupsService
             m_HomeURI += "/";
     }
 
+    /// <summary>
+    /// Asks a group's own grid (at the location its proxy names) whether it sent a notice: VERIFYNOTICE, which every
+    /// grid's Hypergrid groups service answers. Replaced in tests.
+    /// </summary>
+    public Func<string, UUID, UUID, bool> NoticeIsFromOrigin { get; set; } =
+        (location, noticeID, groupID) => new GroupsServiceHGConnector(location).VerifyNotice(noticeID, groupID);
+
+    /// <summary>Two locations of the same Hypergrid groups service: compared without case or a trailing slash.</summary>
+    private static bool SameLocation(string a, string b)
+        => string.Equals((a ?? "").TrimEnd('/'), (b ?? "").TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+
 
     #region HG specific operations
 
@@ -72,10 +83,17 @@ public class HGGroupsService : GroupsService
             return false;
         }
 
-        // Check if it already exists
+        // Check if it already exists. A proxy names the grid its group lives on; another grid cannot take it over by
+        // sending the same group id with its own location (it used to replace the proxy).
         GroupData grec = m_Database.RetrieveGroup(groupID);
-        if (grec == null ||
-            (grec != null && grec.Data["Location"] != string.Empty && grec.Data["Location"].ToLower() != serviceLocation.ToLower()))
+        if (grec != null && grec.Data["Location"] != string.Empty && !SameLocation(grec.Data["Location"], serviceLocation))
+        {
+            m_log.LogWarning("[Groups.HGGroupsService]: refused a proxy for group {0} at {1}: it is already the proxy of {2}",
+                groupID, serviceLocation, grec.Data["Location"]);
+            reason = "This group is already known at another location";
+            return false;
+        }
+        if (grec == null)
         {
             // Create the group
             grec = new GroupData();
@@ -245,17 +263,25 @@ public class HGGroupsService : GroupsService
             return false;
         }
 
-        // This has good intentions (security) but it will potentially DDS the origin...
-        // We'll need to send a proof along with the message. Maybe encrypt the message
-        // using key pairs
-        //
-        //// check that the notice actually exists in the origin
-        //GroupsServiceHGConnector c = new GroupsServiceHGConnector(grec.ServiceLocation);
-        //if (!c.VerifyNotice(noticeID, groupID))
-        //{
-        //    m_log.LogDebug("[Groups.HGGroupsService]: notice does not exist at origin {0}", grec.ServiceLocation);
-        //    return false;
-        //}
+        // The notice must come from the group's own grid: anyone can call this, and the call carries no proof. The
+        // origin stores a notice before it sends it to the proxies, and every grid answers VERIFYNOTICE; it is asked
+        // once per notice and grid, not per member.
+        bool fromOrigin;
+        try
+        {
+            fromOrigin = NoticeIsFromOrigin(grec.ServiceLocation, noticeID, groupID);
+        }
+        catch (Exception e)
+        {
+            m_log.LogDebug("[Groups.HGGroupsService]: could not ask {0} about notice {1}: {2}", grec.ServiceLocation, noticeID, e.Message);
+            fromOrigin = false;
+        }
+        if (!fromOrigin)
+        {
+            m_log.LogWarning("[Groups.HGGroupsService]: refused notice {0} for group {1}: {2} did not confirm sending it",
+                noticeID, groupID, grec.ServiceLocation);
+            return false;
+        }
 
         // ok, we're good!
         return _AddNotice(groupID, noticeID, fromName, subject, message, hasAttachment, attType, attName, attItemID, attOwnerID);

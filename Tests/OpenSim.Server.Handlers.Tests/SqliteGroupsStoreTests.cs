@@ -49,7 +49,8 @@ public class SqliteGroupsStoreTests
     private static string ConnectionFor(string store) =>
         "Data Source=" + Path.Combine(s_dir, "groups-" + store + "-" + s_run + ".db") + ";Version=3";
 
-    private static readonly System.Lazy<GroupsService> s_service = new(() =>
+    /// <summary>The groups and grid user stores of these tests' database, for any groups service on it.</summary>
+    internal static IniConfigSource Config()
     {
         var config = new IniConfigSource();
         IConfig groups = config.AddConfig("Groups");
@@ -58,8 +59,10 @@ public class SqliteGroupsStoreTests
         IConfig users = config.AddConfig("GridUserService");
         users.Set("StorageProvider", "OpenSim.Data.SQLite.dll");
         users.Set("ConnectionString", ConnectionFor("griduser"));
-        return new GroupsService(config, "Groups");
-    });
+        return config;
+    }
+
+    private static readonly System.Lazy<GroupsService> s_service = new(() => new GroupsService(Config(), "Groups"));
 
     private static readonly System.Lazy<SQLiteGroupsData> s_store = new(() =>
     {

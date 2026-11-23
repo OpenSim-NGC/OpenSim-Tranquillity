@@ -307,6 +307,37 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
             "'os_groups_notices_stamp')")));
     }
 
+    /// <summary>
+    /// The group search: a listed group is found by part of its name, a hidden one is not, an empty search lists only
+    /// listed groups, and a quote in the text is text.
+    /// </summary>
+    private static void SearchTreatsTheTextAsText(Backend b)
+    {
+        string tag = Guid.NewGuid().ToString("N")[..8];
+        string founder = UUID.Random().ToString();
+        UUID listed = b.Service.CreateGroup(founder, "Searchable " + tag, "", true, UUID.Zero, 0, true, true, false, new UUID(founder), out string reason);
+        Assert.True(listed.IsNotZero(), reason);
+        UUID hidden = b.Service.CreateGroup(founder, "Hidden " + tag, "", false, UUID.Zero, 0, true, true, false, new UUID(founder), out reason);
+        Assert.True(hidden.IsNotZero(), reason);
+
+        Assert.Contains(b.Service.FindGroups(founder, "SEARCHABLE " + tag), g => g.groupID == listed);
+        Assert.DoesNotContain(b.Service.FindGroups(founder, "Hidden " + tag), g => g.groupID == hidden);
+        List<DirGroupsReplyData> all = b.Service.FindGroups(founder, string.Empty);
+        Assert.Contains(all, g => g.groupID == listed);
+        Assert.DoesNotContain(all, g => g.groupID == hidden);
+        Assert.Empty(b.Service.FindGroups(founder, "' OR '1'='1"));
+        Assert.Empty(b.Service.FindGroups(founder, tag + "' OR \"ShowInList\" = 0 OR '1'='1"));
+    }
+
+    [Fact]
+    public void SQLiteSearchTreatsTheTextAsText() => SearchTreatsTheTextAsText(SQLite());
+
+    [MySQLServerFact]
+    public void MySQLSearchTreatsTheTextAsText() => SearchTreatsTheTextAsText(MySQL());
+
+    [PGSQLServerFact]
+    public void PGSQLSearchTreatsTheTextAsText() => SearchTreatsTheTextAsText(PGSQL());
+
     #region at scale (opt-in)
     /// <summary>
     /// With OPENSIM_TEST_GROUPS_SCALE=n, a group of n members is seeded straight into each store named (SQLite

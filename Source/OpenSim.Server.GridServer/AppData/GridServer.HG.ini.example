@@ -1077,6 +1077,12 @@
     ;; Sets the maximum number of groups an agent may join
     ; MaxAgentGroups = 42
 
+    ;; A key Robust's groups service asks of every caller. The service takes the
+    ;; requesting avatar from the request, so without a key (or AuthType =
+    ;; BasicHttpAuthentication) anyone who can reach this port can act as any
+    ;; avatar in any group. Set the same key in [Groups] of every region.
+    ; SecretKey = ""
+
 
 [UserProfilesService]
     LocalServiceModule = "OpenSim.Services.UserProfilesService.dll:UserProfilesService"
