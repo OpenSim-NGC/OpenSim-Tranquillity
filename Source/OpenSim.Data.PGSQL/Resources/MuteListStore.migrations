@@ -15,3 +15,17 @@ CREATE TABLE IF NOT EXISTS MuteList (
 );
 
 COMMIT;
+
+:VERSION 2
+
+BEGIN TRANSACTION;
+
+-- MuteData, Delete and the MySQL table spell the column "MuteID"
+ALTER TABLE MuteList RENAME COLUMN "MuteId" TO "MuteID";
+
+-- An agent mutes many people: the key is the mute, not the agent, as on MySQL.
+-- unique_agent_2 follows the renamed column and stays the unique key.
+ALTER TABLE MuteList DROP CONSTRAINT pk_agent_id;
+CREATE INDEX ix_mutelist_agentid ON MuteList ("AgentID");
+
+COMMIT;
