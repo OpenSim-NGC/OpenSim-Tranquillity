@@ -1,0 +1,10 @@
+{
+  "about": "CI test jobs; see tools/ci-test-plan.py. A group with shards runs as that many jobs over the same projects, split by test class. The group with rest takes every test project no other group names, so a new test project always runs.",
+  "groups": [
+    { "name": "phlox", "projects": ["Tests/InWorldz.Phlox.Tests/*.csproj"], "shards": 3 },
+    { "name": "framework", "projects": ["Tests/OpenSim.Region.Framework.Tests/*.csproj"], "shards": 2 },
+    { "name": "coremodules", "projects": ["Tests/OpenSim.Region.CoreModules.Tests/*.csproj"] },
+    { "name": "jolt", "projects": ["Tests/OpenSim.Region.PhysicsModules.Jolt*/*.csproj"] },
+    { "name": "rest", "rest": true }
+  ]
+}

@@ -8,17 +8,61 @@ on:
       - 'release/*'
 
   pull_request:
-    branches: 
+    branches:
       - develop
       - 'release/*'
 
+# A new push to a pull request stops that pull request's older run. Pushes to develop, master and
+# release branches always run to the end.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+# The tests run as several jobs at once (tools/ci-test-groups.json, tools/ci-test-plan.py); the job
+# named "build" collects their results and is the one check to require. See Tests/README-CI.md.
 jobs:
-  build:
+  plan:
     runs-on: ubuntu-latest
+    outputs:
+      jobs: ${{ steps.plan.outputs.jobs }}
+      run_tests: ${{ steps.changes.outputs.run_tests }}
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Changed files
+      id: changes
+      run: |
+        if [ "${{ github.event_name }}" = pull_request ]; then
+          run=$(python3 tools/ci-test-plan.py needs-tests ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+        else
+          run=true
+        fi
+        echo "run_tests=$run" >> "$GITHUB_OUTPUT"
+        echo "Tests needed: $run"
+
+    - name: Test jobs
+      id: plan
+      run: echo "jobs=$(python3 tools/ci-test-plan.py groups)" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: plan
+    if: needs.plan.outputs.run_tests == 'true'
+    name: test (${{ matrix.job }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        job: ${{ fromJSON(needs.plan.outputs.jobs) }}
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4 
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -31,35 +75,94 @@ jobs:
       uses: dotnet/nbgv@v0.4.1
       id: nbgv # Instantiates environment arrays (e.g., \$NBGV_NuGetPackageVersion)
 
+    - name: NuGet package cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.Build.props', '**/Directory.Packages.props', 'nuget.config', 'global.json') }}
+        restore-keys: nuget-${{ runner.os }}-
+
+    - name: This job's test projects
+      run: python3 tools/ci-test-plan.py prepare ${{ matrix.job }}
+
     - name: Restore dependencies
       env:
         GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
-      run: dotnet restore ./Tranquillity.sln
+      run: dotnet restore ./ci-job.slnf
 
     - name: Build
       env:
         GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
-      run: dotnet build ./Tranquillity.sln --configuration Release --no-restore
+      run: dotnet build ./ci-job.slnf --configuration Release --no-restore
 
-    # Every test project in the solution runs. The job fails on a test that fails and is not in
-    # Tests/known-failures.txt, or on a test project that produced no results (a crashed test host);
-    # known failures that pass are listed so the file can be trimmed. See Tests/README-CI.md.
+    # A failing test does not fail this job; the "build" job compares every job's results with
+    # Tests/known-failures.txt. A failed build does fail it.
     - name: Test
       continue-on-error: true
-      run: >
-        dotnet test ./Tranquillity.sln --configuration Release --no-build
-        --logger "trx;LogFilePrefix=results" --results-directory TestResults
-        --blame-hang --blame-hang-timeout 15m
-
-    - name: Compare with known failures
-      run: python3 tools/check-test-results.py TestResults Tests/known-failures.txt Tranquillity.sln
+      run: |
+        filter=$(cat ci-job.filter)
+        dotnet test ./ci-job.slnf --configuration Release --no-build \
+          --logger "trx;LogFilePrefix=results-${{ matrix.job }}" --results-directory TestResults \
+          --blame-hang --blame-hang-timeout 15m \
+          ${filter:+--filter "$filter"}
 
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results
+        name: test-results-${{ matrix.job }}
         path: TestResults
+        retention-days: 1
+
+  build:
+    needs: [plan, test]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Documentation only
+      if: needs.plan.result == 'success' && needs.plan.outputs.run_tests == 'false'
+      run: echo "Only documentation changed, so the tests did not run."
+
+    - name: Every test job finished
+      if: needs.plan.outputs.run_tests != 'false'
+      run: |
+        echo "plan: ${{ needs.plan.result }}, test jobs: ${{ needs.test.result }}"
+        [ "${{ needs.plan.result }}" = success ] && [ "${{ needs.test.result }}" = success ]
+
+    - name: Checkout Repository
+      if: needs.plan.outputs.run_tests != 'false'
+      uses: actions/checkout@v4
+
+    - name: Download test results
+      if: needs.plan.outputs.run_tests != 'false'
+      uses: actions/download-artifact@v4
+      with:
+        pattern: test-results-*
+        path: TestResults
+
+    # Each shard's tests ran once and only once.
+    - name: Check the shards
+      if: needs.plan.outputs.run_tests != 'false'
+      run: python3 tools/ci-test-plan.py verify TestResults
+
+    - name: Compare with known failures
+      if: needs.plan.outputs.run_tests != 'false'
+      run: python3 tools/check-test-results.py TestResults Tests/known-failures.txt Tranquillity.sln
+
+    # The seconds each class of a split project took, to refresh tools/ci-test-times.json.
+    - name: Class times
+      if: always() && needs.plan.outputs.run_tests != 'false'
+      run: python3 tools/ci-test-plan.py times TestResults > ci-test-times.json
+
+    - name: Upload test results
+      if: always() && needs.plan.outputs.run_tests != 'false'
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          TestResults
+          ci-test-times.json
         retention-days: 14
 
 #   Conditional Execution: Triggers deployment pipelines strictly for production code signatures

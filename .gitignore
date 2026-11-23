@@ -273,3 +273,7 @@ Source/OpenSim.Server.RegionServer/AppData/config-include/storage/SQLiteStandalo
 TrustedHypergridSecret.ini
 **/TrustedHypergridSecret.ini
 **/ICan.md
+
+# CI test job files written by tools/ci-test-plan.py prepare
+ci-job.slnf
+ci-job.filter
