@@ -128,10 +128,14 @@ public class EventQueueDropLogTests : IDisposable
             touch_start(integer t) { llSay(0, ""C touched""); }
         }";
 
+    /// <summary>Every script Start() has returned; Warm() waits for all of them.</summary>
+    private readonly List<UUID> m_started = new();
+
     private UUID Start(string source, string tag)
     {
         UUID item = H.RezScriptInto(H.Prim, source);
         Assert.True(H.PumpUntil(() => H.Said.Contains(tag + " entry")), Said);
+        m_started.Add(item);
         return item;
     }
 
@@ -140,10 +144,17 @@ public class EventQueueDropLogTests : IDisposable
         AddNotecard(H, H.Prim, "card", "warm\n" + string.Join("\n", Enumerable.Range(1, 200).Select(i => "line " + i)));
     }
 
+    /// <summary>
+    /// Every script in the prim gets the warm-up answer, not only the one that asked. Wait until each script started has
+    /// handled it (queue empty, waiting): an answer that reached a slow script after its own flood began would be
+    /// dropped from a full queue and change its count.
+    /// </summary>
     private void Warm()
     {
         Say("warm");
         Assert.True(RunUntil(() => H.Said.Contains("A warm")), Said);
+        Assert.True(RunUntil(() => m_started.All(i =>
+            H.Engine.GetEventQueueFreeSpacePercentage(i) == 1.0f && H.RunStateOf(i) == "Waiting")), Said);
     }
 
     /// <summary>The count the script says, asked once its queue is empty and it waits (a full queue drops the ask).</summary>
