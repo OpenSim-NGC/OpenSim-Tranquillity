@@ -1842,6 +1842,16 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// <summary>Called by the client stack for an agent update that reached this presence while it is a child.</summary>
     public void AgentUpdateWhileChild()
     {
+        // The agent is on its way into this region: the region it comes from has sent its agent data here
+        // (UpdateChildAgent sets m_originRegionID; MakeChildAgent clears it when the agent leaves) and only then
+        // tells the viewer to come. Its updates here, before CompleteMovement makes it root, are the arrival,
+        // not a viewer that missed a crossing out of here.
+        lock (m_originRegionIDAccessLock)
+        {
+            if (!m_originRegionID.IsZero())
+                return;
+        }
+
         long now = System.Environment.TickCount64;
         if (now - m_lastAgentUpdateWhileChildMs < 1000)
             return;

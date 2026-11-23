@@ -154,4 +154,39 @@ public class LostCrossingResendTests : OpenSimTestCase
 
         Assert.Equal(1, rig.Crossings);
     }
+
+    [Fact]
+    public void AnAvatarThatCameBackToTheRegionIsNotSentTheCrossingAgain()
+    {
+        TestHelpers.InMethod();
+        Rig rig = CrossedIntoB(7660);
+        rig.EtmA.CrossedRegionResendAfterMs = 0;
+
+        // the avatar crossed back into A and is a root agent here again: the old crossing is no longer lost
+        rig.A.EventManager.TriggerOnMakeRootAgent(rig.Avatar);
+        ViewerStillSendsToA(rig);
+
+        Assert.Equal(1, rig.Crossings);
+    }
+
+    [Fact]
+    public void AViewerArrivingBackInTheRegionIsNotSentTheCrossingAgainBeforeItIsRootThere()
+    {
+        TestHelpers.InMethod();
+        Rig rig = CrossedIntoB(7680);
+        rig.EtmA.CrossedRegionResendAfterMs = 0;
+
+        // B crosses the avatar back: A receives its agent data first, and only then is the viewer told to come to A.
+        // Its agent updates reach A while A still holds it as a child agent, before CompleteMovement makes it root.
+        AgentData back = new();
+        rig.Avatar.CopyTo(back, true);
+        back.RegionID = rig.B.RegionInfo.RegionID;
+        back.SessionID = rig.Avatar.ControllingClient.SessionId;
+        Assert.True(rig.A.IncomingUpdateChildAgent(back));
+        Assert.True(rig.Avatar.IsChildAgent);
+
+        ViewerStillSendsToA(rig);
+
+        Assert.Equal(1, rig.Crossings);
+    }
 }
