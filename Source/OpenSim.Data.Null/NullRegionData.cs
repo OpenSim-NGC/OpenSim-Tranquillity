@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Text;
 using OpenMetaverse;
 using Microsoft.Extensions.Logging;
 using OpenSim.Framework;
@@ -87,30 +88,22 @@ public class NullRegionData : IRegionData
 
         // m_log.LogDebug("[NULL REGION DATA]: Getting region {0}, scope {1}", regionName, scopeID);
 
-        string cleanName = regionName.ToLower();
-
-        // Handle SQL wildcards
-        const string wildcard = "%";
+        // The name is a LIKE pattern from Util.EscapeForLike, optionally with a leading and a trailing "%": read it the
+        // way the SQL stores do, with a backslash escaping the character after it.
+        string pattern = regionName.ToLower();
         bool wildcardPrefix = false;
         bool wildcardSuffix = false;
-        if (cleanName.Equals(wildcard))
+        if (pattern.StartsWith('%'))
         {
-            wildcardPrefix = wildcardSuffix = true;
-            cleanName = string.Empty;
+            wildcardPrefix = true;
+            pattern = pattern.Substring(1);
         }
-        else
+        if (pattern.EndsWith('%') && !IsEscaped(pattern, pattern.Length - 1))
         {
-            if (cleanName.StartsWith(wildcard))
-            {
-                wildcardPrefix = true;
-                cleanName = cleanName.Substring(1);
-            }
-            if (regionName.EndsWith(wildcard))
-            {
-                wildcardSuffix = true;
-                cleanName = cleanName.Remove(cleanName.Length - 1);
-            }
+            wildcardSuffix = true;
+            pattern = pattern.Remove(pattern.Length - 1);
         }
+        string cleanName = UnescapeLike(pattern);
 
         Matcher queryMatch;
         if (wildcardPrefix && wildcardSuffix)
@@ -139,6 +132,31 @@ public class NullRegionData : IRegionData
             return ret;
 
         return null;
+    }
+
+    /// <summary>Whether the character at <paramref name="index"/> follows an odd number of backslashes.</summary>
+    private static bool IsEscaped(string pattern, int index)
+    {
+        int backslashes = 0;
+        for (int i = index - 1; i >= 0 && pattern[i] == '\\'; i--)
+            backslashes++;
+        return (backslashes & 1) == 1;
+    }
+
+    /// <summary>The text a LIKE pattern with backslash escapes and no wildcards matches.</summary>
+    private static string UnescapeLike(string pattern)
+    {
+        if (pattern.IndexOf('\\') < 0)
+            return pattern;
+
+        StringBuilder sb = new StringBuilder(pattern.Length);
+        for (int i = 0; i < pattern.Length; i++)
+        {
+            if (pattern[i] == '\\' && i + 1 < pattern.Length)
+                i++;
+            sb.Append(pattern[i]);
+        }
+        return sb.ToString();
     }
 
     public RegionData Get(int posX, int posY, UUID scopeID)

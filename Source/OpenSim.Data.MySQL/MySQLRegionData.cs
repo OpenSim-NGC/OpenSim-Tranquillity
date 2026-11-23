@@ -62,7 +62,10 @@ public class MySqlRegionData : MySqlFramework, IRegionData
 
     public List<RegionData> Get(string regionName, UUID scopeID)
     {
-        string command = "select * from `"+m_Realm+"` where regionName like ?regionName";
+        // The name comes escaped by Util.EscapeForLike, with a backslash. x'5C' is that backslash whether or not
+        // NO_BACKSLASH_ESCAPES is set. Without an ESCAPE clause the servers differ in that mode (MySQL 8.4 has no
+        // LIKE escape character, MariaDB 11 still uses the backslash); naming it makes both read the name the same way.
+        string command = "select * from `"+m_Realm+"` where regionName like ?regionName escape x'5C'";
         if (scopeID.IsNotZero())
             command += " and ScopeID = ?scopeID";
 

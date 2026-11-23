@@ -4504,14 +4504,16 @@ public static class Util
     #endregion
 
     /// <summary>
-    /// Escapes the special characters used in "LIKE".
+    /// Escapes the special characters used in "LIKE", with a backslash as the escape character: the backslash
+    /// itself, "_" and "%". The query must use the backslash as its LIKE escape: PostgreSQL does by default, MySQL
+    /// does only without NO_BACKSLASH_ESCAPES (so say <c>ESCAPE x'5C'</c>), SQLite only with an ESCAPE clause.
     /// </summary>
     /// <remarks>
-    /// For example: EscapeForLike("foo_bar%baz") = "foo\_bar\%baz"
+    /// For example: EscapeForLike(@"foo_bar%baz\") = @"foo\_bar\%baz\\"
     /// </remarks>
     public static string EscapeForLike(string str)
     {
-        return str.Replace("_", "\\_").Replace("%", "\\%");
+        return str.Replace("\\", "\\\\").Replace("_", "\\_").Replace("%", "\\%");
     }
 
     /// <summary>
