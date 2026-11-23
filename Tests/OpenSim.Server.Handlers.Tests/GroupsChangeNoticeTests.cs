@@ -95,6 +95,50 @@ public class GroupsChangeNoticeTests
     }
 
     [Fact]
+    public void AChangeToOneGroupKeepsWhatIsCachedAboutAnother()
+    {
+        var a = new CachedRegion();
+        var b = new CachedRegion();
+        GroupsChangeNotice.Forget(new[] { a.Group });
+        a.Read();
+        b.Read();
+        Assert.Equal(2, a.Fetches);   // fetched again
+        Assert.Equal(1, b.Fetches);   // still cached
+    }
+
+    [Fact]
+    public void AnAvatarsOwnGroupsAreForgottenWhenTheyChange()
+    {
+        // an avatar's list of groups, cached; they join a group that is not in it: only their name tells
+        var cache = new RemoteConnectorCacheWrapper(null);
+        string agent = UUID.Random() + ";http://elsewhere.example:8002/;Visiting Person";
+        UUID other = UUID.Random();
+        int fetches = 0;
+        List<GroupMembershipData> Fetch() { fetches++; return new List<GroupMembershipData>(); }
+
+        cache.GetAgentGroupMemberships(agent, Fetch);
+        GroupsChangeNotice.Forget(new[] { other });
+        cache.GetAgentGroupMemberships(agent, Fetch);
+        Assert.Equal(1, fetches);   // a group they are not in changed: kept
+
+        Assert.Equal(200, Notify(Key, GroupsChangeNotice.Body(new[] { other }, new[] { agent.ToUpperInvariant() })));
+        cache.GetAgentGroupMemberships(agent, Fetch);
+        Assert.Equal(2, fetches);   // they changed: fetched again
+    }
+
+    [Fact]
+    public void ANoticeNamesItsAvatarsToo()
+    {
+        UUID g = UUID.Random();
+        string visitor = UUID.Random() + ";http://elsewhere.example:8002/;Visiting Person";
+        string local = UUID.Random().ToString();
+        string body = GroupsChangeNotice.Body(new[] { g }, new[] { visitor, local });
+        Assert.Equal(new[] { g }, GroupsChangeNotice.Groups(body));
+        Assert.Equal(new[] { visitor, local }, GroupsChangeNotice.Agents(body));
+        Assert.Empty(GroupsChangeNotice.Agents(GroupsChangeNotice.Body(new[] { g })));
+    }
+
+    [Fact]
     public void ANoticeNamesItsGroupsAndNothingElse()
     {
         UUID a = UUID.Random(), b = UUID.Random();
@@ -147,7 +191,8 @@ public class GroupsChangeNoticeTests
     public void RobustsHandlerTellsOfAChangeAndNotOfAQuestion()
     {
         var told = new System.Collections.Concurrent.ConcurrentBag<UUID>();
-        var handler = new GroupsServicePostHandler(SqliteGroupsStoreTests.Service, null, string.Empty, new Recorder(told));
+        var recorder = new Recorder(told);
+        var handler = new GroupsServicePostHandler(SqliteGroupsStoreTests.Service, null, string.Empty, recorder);
         string owner = UUID.Random().ToString();
         UUID group = SqliteGroupsStoreTests.Service.CreateGroup(owner, "Notice " + Guid.NewGuid().ToString("N")[..8], "", true,
             UUID.Zero, 0, false, true, false, new UUID(owner), out string reason);
@@ -158,6 +203,7 @@ public class GroupsChangeNoticeTests
 
         Post(handler, $"METHOD=UPDATEMEMBERSHIP&RequestingAgentID={owner}&AgentID={owner}&GroupID={group}&AcceptNotices=False&ListInProfile=True");
         Assert.Equal(new[] { group }, told);
+        Assert.Equal(new[] { owner }, recorder.Agents);
     }
 
     [Fact]
@@ -245,7 +291,13 @@ public class GroupsChangeNoticeTests
     {
         private readonly System.Collections.Concurrent.ConcurrentBag<UUID> m_told;
         public Recorder(System.Collections.Concurrent.ConcurrentBag<UUID> told) => m_told = told;
-        public void Changed(UUID groupID) => m_told.Add(groupID);
+        public readonly System.Collections.Concurrent.ConcurrentBag<string> Agents = new();
+        public void Changed(UUID groupID, string agentID = null)
+        {
+            m_told.Add(groupID);
+            if (agentID != null)
+                Agents.Add(agentID);
+        }
     }
 
     private static void Post(GroupsServicePostHandler handler, string body)
