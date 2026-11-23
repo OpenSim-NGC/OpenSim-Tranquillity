@@ -41,6 +41,7 @@ public class MySQLGroupsData : IGroupsData
     private MySqlGroupsInvitesHandler m_Invites;
     private MySqlGroupsNoticesHandler m_Notices;
     private MySqlGroupsPrincipalsHandler m_Principals;
+    private MySqlGroupsBansHandler m_Bans;
 
     public MySQLGroupsData(string connectionString, string realm)
     {
@@ -51,6 +52,7 @@ public class MySQLGroupsData : IGroupsData
         m_Invites = new MySqlGroupsInvitesHandler(connectionString, realm + "_invites");
         m_Notices = new MySqlGroupsNoticesHandler(connectionString, realm + "_notices");
         m_Principals = new MySqlGroupsPrincipalsHandler(connectionString, realm + "_principals");
+        m_Bans = new MySqlGroupsBansHandler(connectionString, realm + "_bans");
     }
 
     #region groups table
@@ -343,6 +345,21 @@ public class MySQLGroupsData : IGroupsData
         return null;
     }
 
+    #region bans table
+    public BanData[] RetrieveBans(UUID groupID) => m_Bans.Get("GroupID", groupID.ToString());
+
+    public BanData RetrieveBan(UUID groupID, string principalID)
+    {
+        BanData[] bans = m_Bans.Get(new string[] { "GroupID", "PrincipalID" }, new string[] { groupID.ToString(), principalID });
+        return bans.Length > 0 ? bans[0] : null;
+    }
+
+    public bool StoreBan(BanData data) => m_Bans.Store(data);
+
+    public bool DeleteBan(UUID groupID, string principalID)
+        => m_Bans.Delete(new string[] { "GroupID", "PrincipalID" }, new string[] { groupID.ToString(), principalID });
+    #endregion
+
     #region lookups of many rows
     public GroupData[] RetrieveGroupsByID(UUID[] groupIDs)
         => GroupsBatch.Get(groupIDs ?? [], ids => m_Groups.Get("GroupID", ids));
@@ -481,6 +498,16 @@ public class MySqlGroupsPrincipalsHandler : MySQLGenericTableHandler<PrincipalDa
     }
 
     public MySqlGroupsPrincipalsHandler(string connectionString, string realm)
+        : base(connectionString, realm, string.Empty)
+    {
+    }
+}
+
+public class MySqlGroupsBansHandler : MySQLGenericTableHandler<BanData>
+{
+    protected override Assembly Assembly => GetType().Assembly;
+
+    public MySqlGroupsBansHandler(string connectionString, string realm)
         : base(connectionString, realm, string.Empty)
     {
     }

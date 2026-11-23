@@ -90,6 +90,9 @@ internal sealed class GroupRules
 
     public bool RoleExists(UUID roleID) => Roles.Any(r => r.RoleID == roleID);
 
+    /// <summary>May see and change the group's ban list ("Manage ban list", GP_GROUP_BAN_ACCESS).</summary>
+    public bool CanManageBans => Has(GroupPowers.GroupBanAccess);
+
     /// <summary>
     /// May put a member in the role: anyone may for Everyone; only an owner for the owners role ("Assign Members to
     /// Any Role" reaches the other roles); otherwise "Assign Members to Any Role" (AssignMember), or "Assign Members

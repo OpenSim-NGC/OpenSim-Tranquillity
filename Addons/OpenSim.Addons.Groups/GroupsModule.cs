@@ -703,6 +703,23 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
 
     public event NewGroupNotice OnNewGroupNotice;
 
+    public List<GroupBanData> GroupBanList(IClientAPI client, UUID groupID)
+    {
+        List<ExtendedGroupBanData> bans = m_groupData.GetGroupBans(GetRequestingAgentIDStr(client), groupID);
+        if (bans == null)
+            return null;
+        // the viewer knows avatars by UUID: a hypergrid visitor's universal identifier gives its UUID
+        List<GroupBanData> list = new List<GroupBanData>();
+        foreach (ExtendedGroupBanData b in bans)
+            if (Util.ParseUniversalUserIdentifier(b.AgentID, out UUID id) && id.IsNotZero())
+                list.Add(new GroupBanData { AgentID = id, BanTime = b.BanTime });
+        return list;
+    }
+
+    public bool GroupBanChange(IClientAPI client, UUID groupID, bool ban, UUID[] agentIDs)
+        => m_groupData.ChangeGroupBans(GetRequestingAgentIDStr(client), groupID, ban,
+            (agentIDs ?? []).Select(a => a.ToString()).ToArray());
+
     public GroupRecord GetGroupRecord(UUID GroupID)
     {
         return m_groupData.GetGroupRecord(UUID.Zero.ToString(), GroupID, null);

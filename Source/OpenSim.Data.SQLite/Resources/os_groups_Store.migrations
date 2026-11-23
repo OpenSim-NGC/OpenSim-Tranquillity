@@ -88,3 +88,17 @@ CREATE TABLE os_groups_principals (
 );
 
 COMMIT;
+
+:VERSION 2         # --------------------------
+-- the avatars banned from each group (GroupAPIv1)
+
+BEGIN TRANSACTION;
+
+CREATE TABLE os_groups_bans (
+  GroupID char(36) NOT NULL DEFAULT '',
+  PrincipalID varchar(255) NOT NULL DEFAULT '',
+  BanTime int(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (GroupID, PrincipalID)
+);
+
+COMMIT;

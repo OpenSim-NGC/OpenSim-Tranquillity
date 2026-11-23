@@ -338,6 +338,65 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     [PGSQLServerFact]
     public void PGSQLSearchTreatsTheTextAsText() => SearchTreatsTheTextAsText(PGSQL());
 
+    /// <summary>
+    /// Bans (GroupAPIv1): only someone with "Manage ban list" sees or changes them (owners have it, officers do not by
+    /// default); an owner and oneself are never banned; a banned avatar cannot join, cannot be invited, and loses a
+    /// pending invitation; lifting the ban lets them join.
+    /// </summary>
+    private static void BansAreKeptAndEnforced(Backend b)
+    {
+        GroupsService s = b.Service;
+        string tag = Guid.NewGuid().ToString("N")[..8];
+        string owner = UUID.Random().ToString();
+        UUID group = s.CreateGroup(owner, "Bans " + tag, "", true, UUID.Zero, 0, true, true, false, new UUID(owner), out string reason);
+        Assert.True(group.IsNotZero(), reason);
+        UUID officers = s.GetGroupRoles(owner, group).Single(r => r.Name == "Officers").RoleID;
+        string officer = UUID.Random().ToString(), member = UUID.Random().ToString();
+        string stranger = UUID.Random().ToString(), invited = UUID.Random().ToString();
+        Assert.True(s.AddAgentToGroup(owner, officer, group, officers, string.Empty, out reason), reason);
+        Assert.True(s.AddAgentToGroup(member, member, group, UUID.Zero, string.Empty, out reason), reason);
+        UUID invite = UUID.Random();
+        Assert.True(s.AddAgentToGroupInvite(owner, invite, group, UUID.Zero, invited));
+
+        // nobody but someone who may manage bans sees or changes them
+        Assert.Empty(s.GetGroupBans(owner, group));
+        Assert.Null(s.GetGroupBans(officer, group));
+        Assert.Null(s.GetGroupBans(member, group));
+        Assert.False(s.BanAgents(officer, group, new[] { stranger }, out _));
+        Assert.False(s.BanAgents(member, group, new[] { stranger }, out _));
+
+        // the owner bans: not themself, not an owner
+        Assert.False(s.BanAgents(owner, group, new[] { owner }, out _));
+        Assert.True(s.BanAgents(owner, group, new[] { stranger, invited, member }, out reason), reason);
+        Assert.Equal(new[] { invited, member, stranger }.OrderBy(x => x),
+            s.GetGroupBans(owner, group).Select(x => x.PrincipalID).OrderBy(x => x));
+        Assert.All(s.GetGroupBans(owner, group), x => Assert.True(int.Parse(x.Data["BanTime"]) > 0));
+
+        // banned: no joining an open group, no invitation, the pending one withdrawn
+        Assert.False(s.AddAgentToGroup(stranger, stranger, group, UUID.Zero, string.Empty, out reason));
+        Assert.Contains("banned", reason);
+        Assert.False(s.AddAgentToGroupInvite(owner, UUID.Random(), group, UUID.Zero, stranger));
+        Assert.Null(s.GetAgentToGroupInvite(invited, invite));
+        Assert.False(s.AddAgentToGroup(owner, stranger, group, UUID.Zero, string.Empty, out _));   // nor added by the owner
+        // a banned member stays one until ejected (the viewer ejects them itself)
+        Assert.NotNull(s.GetAgentGroupMembership(member, member, group));
+
+        // lifted: they may join again
+        Assert.False(s.UnbanAgents(member, group, new[] { stranger }));
+        Assert.True(s.UnbanAgents(owner, group, new[] { stranger }));
+        Assert.DoesNotContain(s.GetGroupBans(owner, group), x => x.PrincipalID == stranger);
+        Assert.True(s.AddAgentToGroup(stranger, stranger, group, UUID.Zero, string.Empty, out reason), reason);
+    }
+
+    [Fact]
+    public void SQLiteKeepsAndEnforcesBans() => BansAreKeptAndEnforced(SQLite());
+
+    [MySQLServerFact]
+    public void MySQLKeepsAndEnforcesBans() => BansAreKeptAndEnforced(MySQL());
+
+    [PGSQLServerFact]
+    public void PGSQLKeepsAndEnforcesBans() => BansAreKeptAndEnforced(PGSQL());
+
     #region at scale (opt-in)
     /// <summary>
     /// With OPENSIM_TEST_GROUPS_SCALE=n, a group of n members is seeded straight into each store named (SQLite

@@ -130,3 +130,17 @@ BEGIN;
 ALTER TABLE `os_groups_rolemembership` ADD INDEX `GroupPrincipal` (`GroupID`, `PrincipalID`);
 
 COMMIT;
+
+:VERSION 5         # --------------------------
+
+BEGIN;
+
+-- the avatars banned from each group (GroupAPIv1)
+CREATE TABLE `os_groups_bans` (
+  `GroupID` char(36) NOT NULL default '',
+  `PrincipalID` VARCHAR(255) NOT NULL default '',
+  `BanTime` int(11) NOT NULL default '0',
+  PRIMARY KEY  (`GroupID`,`PrincipalID`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+COMMIT;

@@ -457,6 +457,21 @@ public class GroupsServiceHGConnectorModule : ISharedRegionModule, IGroupsServic
             return false;
     }
 
+    public List<ExtendedGroupBanData> GetGroupBans(string RequestingAgentID, UUID GroupID)
+    {
+        // a group of another grid keeps its bans there; this grid has none for it
+        if (!IsLocal(GroupID, out _, out _))
+            return null;
+        return m_LocalGroupsConnector.GetGroupBans(AgentUUI(RequestingAgentID), GroupID);
+    }
+
+    public bool ChangeGroupBans(string RequestingAgentID, UUID GroupID, bool ban, string[] AgentIDs)
+    {
+        if (!IsLocal(GroupID, out _, out _))
+            return false;
+        return m_LocalGroupsConnector.ChangeGroupBans(AgentUUI(RequestingAgentID), GroupID, ban, AgentIDs);
+    }
+
     public GroupInviteInfo GetAgentToGroupInvite(string RequestingAgentID, UUID inviteID)
     {
         return m_LocalGroupsConnector.GetAgentToGroupInvite(AgentUUI(RequestingAgentID), inviteID);

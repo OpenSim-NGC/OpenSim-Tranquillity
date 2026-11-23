@@ -27,6 +27,7 @@
 
 using System.Reflection;
 using Nini.Config;
+using OpenSim.Data;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
@@ -233,6 +234,10 @@ public class GroupsServicePostHandler : BaseStreamHandler
                     return HandleGetNotices(request);
                 case "FINDGROUPS":
                     return HandleFindGroups(request);
+                case "GETBANS":
+                    return HandleGetBans(request);
+                case "BAN":
+                    return HandleBan(request);
             }
             m_log.LogDebug("[GROUPS HANDLER]: unknown method request: {0}", method);
         }
@@ -521,6 +526,53 @@ public class GroupsServicePostHandler : BaseStreamHandler
         }
 
         //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
+        return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
+    }
+
+    byte[] HandleGetBans(Dictionary<string, object> request)
+    {
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        if (!request.ContainsKey("RequestingAgentID") || !request.ContainsKey("GroupID"))
+            NullResult(result, "Bad network data");
+        else
+        {
+            List<BanData> bans = m_GroupsService.GetGroupBans(request["RequestingAgentID"].ToString(),
+                new UUID(request["GroupID"].ToString()));
+            if (bans == null)
+                NullResult(result, "Insufficient permission");
+            else
+            {
+                Dictionary<string, object> dict = new Dictionary<string, object>();
+                int i = 0;
+                foreach (BanData b in bans)
+                    dict["b-" + i++] = new Dictionary<string, object>
+                    {
+                        ["AgentID"] = b.PrincipalID,
+                        ["BanTime"] = b.Data != null && b.Data.TryGetValue("BanTime", out string t) ? t : "0",
+                    };
+                result["RESULT"] = "OK";
+                result["BANS"] = dict;
+            }
+        }
+        return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
+    }
+
+    byte[] HandleBan(Dictionary<string, object> request)
+    {
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        if (!request.ContainsKey("RequestingAgentID") || !request.ContainsKey("GroupID") || !request.ContainsKey("OP")
+            || !request.ContainsKey("AgentIDs"))
+            NullResult(result, "Bad network data");
+        else
+        {
+            string requester = request["RequestingAgentID"].ToString();
+            UUID groupID = new UUID(request["GroupID"].ToString());
+            string[] agents = request["AgentIDs"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            bool done = request["OP"].ToString() == "ADD"
+                ? m_GroupsService.BanAgents(requester, groupID, agents, out _)
+                : m_GroupsService.UnbanAgents(requester, groupID, agents);
+            result["RESULT"] = done.ToString().ToLowerInvariant();
+        }
         return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
     }
 

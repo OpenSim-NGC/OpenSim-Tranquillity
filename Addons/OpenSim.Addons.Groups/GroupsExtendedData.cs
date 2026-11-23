@@ -30,6 +30,13 @@ using OpenMetaverse;
 
 namespace OpenSim.Groups;
 
+/// <summary>An avatar banned from a group, and since when (Unix seconds).</summary>
+public class ExtendedGroupBanData
+{
+    public string AgentID = string.Empty;
+    public int BanTime;
+}
+
 public class ExtendedGroupRecord : GroupRecord
 {
     public int MemberCount;

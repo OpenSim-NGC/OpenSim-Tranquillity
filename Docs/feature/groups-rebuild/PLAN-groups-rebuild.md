@@ -165,3 +165,16 @@ to the Hypergrid groups path on the two-grid rig.
 
 Still to do in phase 3: forgetting only the groups a notice names (today a region forgets its whole groups cache, as
 a change made through it does); one module in place of the V2 groups and messaging pair.
+
+## Phase 4, first step: group bans
+
+- **Storage:** `os_groups_bans` on MySQL (version 5), PostgreSQL (version 6) and SQLite (version 2).
+- **Rules:** "Manage ban list" (`GroupBanAccess`) sees and changes them; owners and oneself are never banned; at most
+  500; a banned avatar cannot join, be invited or be added, and a pending invitation is withdrawn. The viewer ejects
+  a banned member itself.
+- **Viewer:** the `GroupAPIv1` capability (`Cap_GroupAPIv1`, on by default): GET the list, POST a ban or unban.
+- **Grid:** Robust's `GETBANS` and `BAN`; another grid's groups keep their bans there.
+- **Checked live** on a two-server grid with Ferrobot's `group-admin` (ban, no invitation while banned, unban).
+
+Still to do in phase 4: accepting and declining invitations through the capabilities, chat moderation and history,
+land contribution, notice attachments snapshotted when sent, groups that own land, ejecting Hypergrid members.

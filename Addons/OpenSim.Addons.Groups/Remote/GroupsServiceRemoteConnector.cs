@@ -362,6 +362,40 @@ public class GroupsServiceRemoteConnector
         MakeRequest("REMOVEROLE", sendData);
     }
 
+    public List<ExtendedGroupBanData> GetGroupBans(string RequestingAgentID, UUID GroupID)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["GroupID"] = GroupID.ToString();
+        sendData["RequestingAgentID"] = RequestingAgentID;
+        Dictionary<string, object> ret = MakeRequest("GETBANS", sendData);
+
+        // RESULT is OK with BANS (perhaps empty), or NULL when the requester may not see them
+        if (ret == null || !ret.TryGetValue("RESULT", out object result) || result.ToString() != "OK")
+            return null;
+
+        List<ExtendedGroupBanData> bans = new List<ExtendedGroupBanData>();
+        if (ret.TryGetValue("BANS", out object list) && list is Dictionary<string, object> entries)
+            foreach (object v in entries.Values)
+                if (v is Dictionary<string, object> b && b.TryGetValue("AgentID", out object id))
+                    bans.Add(new ExtendedGroupBanData
+                    {
+                        AgentID = id.ToString(),
+                        BanTime = b.TryGetValue("BanTime", out object t) && int.TryParse(t.ToString(), out int n) ? n : 0,
+                    });
+        return bans;
+    }
+
+    public bool ChangeGroupBans(string RequestingAgentID, UUID GroupID, bool ban, string[] AgentIDs)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["GroupID"] = GroupID.ToString();
+        sendData["RequestingAgentID"] = RequestingAgentID;
+        sendData["OP"] = ban ? "ADD" : "DELETE";
+        sendData["AgentIDs"] = string.Join(",", AgentIDs ?? []);
+        Dictionary<string, object> ret = MakeRequest("BAN", sendData);
+        return ret != null && ret.TryGetValue("RESULT", out object result) && result.ToString() == "true";
+    }
+
     public List<GroupRolesData> GetGroupRoles(string RequestingAgentID, UUID GroupID)
     {
         List<GroupRolesData> roles = new List<GroupRolesData>();

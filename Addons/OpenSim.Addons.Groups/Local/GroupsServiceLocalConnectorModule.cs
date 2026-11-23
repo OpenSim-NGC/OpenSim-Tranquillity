@@ -232,6 +232,19 @@ public class GroupsServiceLocalConnectorModule : ISharedRegionModule, IGroupsSer
         return m_GroupsService.AddAgentToGroupInvite(RequestingAgentID, inviteID, groupID, roleID, agentID);
     }
 
+    public List<ExtendedGroupBanData> GetGroupBans(string RequestingAgentID, UUID GroupID)
+        => m_GroupsService.GetGroupBans(RequestingAgentID, GroupID)?
+            .Select(b => new ExtendedGroupBanData
+            {
+                AgentID = b.PrincipalID,
+                BanTime = b.Data != null && b.Data.TryGetValue("BanTime", out string t) && int.TryParse(t, out int v) ? v : 0,
+            })
+            .ToList();
+
+    public bool ChangeGroupBans(string RequestingAgentID, UUID GroupID, bool ban, string[] AgentIDs)
+        => ban ? m_GroupsService.BanAgents(RequestingAgentID, GroupID, AgentIDs, out _)
+               : m_GroupsService.UnbanAgents(RequestingAgentID, GroupID, AgentIDs);
+
     public GroupInviteInfo GetAgentToGroupInvite(string RequestingAgentID, UUID inviteID)
     {
         return m_GroupsService.GetAgentToGroupInvite(RequestingAgentID, inviteID);

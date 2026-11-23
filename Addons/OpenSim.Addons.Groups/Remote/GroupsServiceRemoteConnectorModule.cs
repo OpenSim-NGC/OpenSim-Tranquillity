@@ -350,6 +350,12 @@ public class GroupsServiceRemoteConnectorModule : ISharedRegionModule, IGroupsSe
         return m_GroupsService.AddAgentToGroupInvite(RequestingAgentID, inviteID, groupID, roleID, agentID);
     }
 
+    public List<ExtendedGroupBanData> GetGroupBans(string RequestingAgentID, UUID GroupID)
+        => m_GroupsService.GetGroupBans(RequestingAgentID, GroupID);
+
+    public bool ChangeGroupBans(string RequestingAgentID, UUID GroupID, bool ban, string[] AgentIDs)
+        => m_GroupsService.ChangeGroupBans(RequestingAgentID, GroupID, ban, AgentIDs);
+
     public GroupInviteInfo GetAgentToGroupInvite(string RequestingAgentID, UUID inviteID)
     {
         return m_GroupsService.GetAgentToGroupInvite(RequestingAgentID, inviteID);
