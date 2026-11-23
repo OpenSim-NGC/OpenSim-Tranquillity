@@ -185,6 +185,7 @@ public partial class BunchOfCaps
                     ScriptEngineChoiceResult.NotAllowed => "no permission to choose this script's engine",
                     ScriptEngineChoiceResult.Disabled => "this region keeps no script engine choices",
                     ScriptEngineChoiceResult.UnknownEngine => "no such script engine",
+                    ScriptEngineChoiceResult.NotSwitched => "the script cannot run on that engine in this region",
                     _ => result.ToString(),
                 };
             }

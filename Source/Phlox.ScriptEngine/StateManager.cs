@@ -468,12 +468,20 @@ namespace Phlox.ScriptEngine
             m_WakeEvent.Set();
         }
 
-        /// <summary>Non-consuming ownership check, including carried state and saves/deletes not yet written.</summary>
+        /// <summary>
+        /// Non-consuming ownership check, including carried state and saves/deletes not yet written. A discarded item has no
+        /// saved state until this engine loads it again (<see cref="Discard"/>), also while its removal is being written: the
+        /// state thread takes a batch off the queue before it commits it, and the row is still in the database meanwhile.
+        /// </summary>
         internal bool HasSavedState(UUID itemId, UUID assetId)
         {
             lock (m_Lock)
+            {
+                if (m_Discarded.Contains(itemId))
+                    return false;
                 if (m_Carried.TryGetValue(itemId, out var carried) && carried.AssetId == assetId)
                     return true;
+            }
 
             if (UnwrittenFor(itemId) is WriteOp pending)
                 return pending.Kind == WriteKind.Save && pending.AssetId == assetId;
