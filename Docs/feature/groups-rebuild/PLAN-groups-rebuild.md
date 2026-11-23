@@ -1,6 +1,6 @@
 # Groups rebuild
 
-**Status: phase 0 built (PR #441); phase 1 built (PR #442); phase 2 in progress.** The plan for rebuilding the groups code on the existing Groups V2 data
+**Status: phase 0 built (PR #441); phase 1 built (PR #442); phase 2 built (PR #445); phase 3 in progress.** The plan for rebuilding the groups code on the existing Groups V2 data
 (`os_groups_*`), chosen over fixing the two current forks in place or rebuilding with a new schema.
 
 ## Why
@@ -139,3 +139,29 @@ Robust and Hypergrid (phase 2, second step):
 
 The probe's `group-admin` scenario covers an officer's changes (Ferrobot). Still to do in phase 2: the probe extended
 to the Hypergrid groups path on the two-grid rig.
+
+## Phase 3, first steps
+
+- **Calls side by side.** The region's connectors to Robust's groups service and to other grids' Hypergrid groups
+  services made every request inside one lock, so a region's groups calls ran one at a time behind the slowest. The
+  locks are gone (six half-second calls: 3.0 s before, about 0.5 s now), and the region's cache keeps its set of
+  fetches under way under its own lock.
+- **Notices a few at a time.** A notice to members outside the process goes to the message transfer module through
+  `GroupNoticeSender`, four messages at a time, so the region's other instant messages wait behind at most those
+  few instead of one job per member. The members reached are unchanged.
+
+- **Changes seen by everyone on the region.** On a grid the region caches answers for 30 s, member lists per
+  requester. A role given or taken, a member leaving, notices turned off or a title chosen used to drop only the
+  requester's and the member's entries, so other avatars on the region kept the old answer (and notices and chat
+  still went to a member who had left, or had turned notices off). Every change now clears the region's cache.
+- **Group chat** already goes once per region to members online elsewhere (the receiving region fans it out), so it
+  needs no sender.
+
+- **Other regions told of a change.** With `[Groups] SecretKey` set, Robust's groups service tells every region server
+  online (from the grid service; each server once, however many regions it runs) of the groups each change touched,
+  gathered over a quarter of a second: `POST /groups-changed` with `GroupIDs=…` and the key. The region servers take
+  it only with the key, and their groups caches forget those groups at once. Nothing is sent again: a server that
+  misses a notice keeps its answers until its cache's 30 s are up. Without a key, both sides behave as before.
+
+Still to do in phase 3: forgetting only the groups a notice names (today a region forgets its whole groups cache, as
+a change made through it does); one module in place of the V2 groups and messaging pair.

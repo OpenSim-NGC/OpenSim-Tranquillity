@@ -38,7 +38,7 @@ using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Groups;
 
-public class GroupsServiceRobustConnector : ServiceConnector
+public partial class GroupsServiceRobustConnector : ServiceConnector
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -73,7 +73,40 @@ public class GroupsServiceRobustConnector : ServiceConnector
             m_log.LogWarning("[Groups.RobustConnector]: [{0}] has no SecretKey and no AuthType: the groups service believes " +
                 "any caller about who is asking. Set the same [Groups] SecretKey here and on the regions.", m_ConfigName);
 
-        server.AddStreamHandler(new GroupsServicePostHandler(m_GroupsService, auth, key));
+        server.AddStreamHandler(new GroupsServicePostHandler(m_GroupsService, auth, key, ChangeNotifier(config, groupsConfig, key)));
+    }
+}
+
+public partial class GroupsServiceRobustConnector
+{
+    /// <summary>
+    /// The notifier telling the region servers of group changes (<see cref="GroupsChangeNotice"/>), when a key is set:
+    /// the regions take the notices only with it. It lists the region servers through the grid service named by
+    /// <c>[Groups] GridService</c>, or else <c>[GridService] LocalServiceModule</c>.
+    /// </summary>
+    private static IGroupsChangeNotifier ChangeNotifier(IConfigSource config, IConfig groupsConfig, string key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return null;
+
+        string gridDll = groupsConfig?.GetString("GridService", string.Empty) ?? string.Empty;
+        if (gridDll.Length == 0)
+            gridDll = config.Configs["GridService"]?.GetString("LocalServiceModule", string.Empty) ?? string.Empty;
+        if (gridDll.Length == 0)
+        {
+            m_log.LogWarning("[Groups.RobustConnector]: no grid service to list the region servers: regions will not be told of group changes");
+            return null;
+        }
+
+        var grid = ServerUtils.LoadPlugin<OpenSim.Services.Interfaces.IGridService>(gridDll, new object[] { config });
+        if (grid == null)
+        {
+            m_log.LogWarning("[Groups.RobustConnector]: could not load {0}: regions will not be told of group changes", gridDll);
+            return null;
+        }
+
+        m_log.LogInformation("[Groups.RobustConnector]: telling the region servers of group changes");
+        return new GroupsChangeNotifier(GroupsChangeNotifier.ServersOf(grid), key);
     }
 }
 
@@ -83,6 +116,7 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
     private GroupsService m_GroupsService;
     private readonly string m_secretKey;
+    private readonly IGroupsChangeNotifier m_changes;
 
     public GroupsServicePostHandler(GroupsService service, IServiceAuth auth) : this(service, auth, string.Empty)
     {
@@ -90,10 +124,17 @@ public class GroupsServicePostHandler : BaseStreamHandler
 
     /// <param name="secretKey">When set, a request must carry it (<see cref="GroupsSecretKey.Header"/>).</param>
     public GroupsServicePostHandler(GroupsService service, IServiceAuth auth, string secretKey) :
+        this(service, auth, secretKey, null)
+    {
+    }
+
+    /// <param name="changes">Told of each group a request changes, to tell the region servers.</param>
+    public GroupsServicePostHandler(GroupsService service, IServiceAuth auth, string secretKey, IGroupsChangeNotifier changes) :
         base("POST", "/groups", auth)
     {
         m_GroupsService = service;
         m_secretKey = secretKey ?? string.Empty;
+        m_changes = changes;
     }
 
     protected override byte[] ProcessRequest(string path, Stream requestData,
@@ -127,6 +168,33 @@ public class GroupsServicePostHandler : BaseStreamHandler
             request.Remove("METHOD");
 
 //                m_log.LogDebug("[Groups.Handler]: {0}", method);
+            // what the region servers cache about the group is out of date after a change: tell them
+            if (m_changes != null && ChangesAGroup(method) && request.TryGetValue("GroupID", out object gid)
+                && UUID.TryParse(gid?.ToString(), out UUID changed) && changed.IsNotZero())
+            {
+                byte[] reply = Dispatch(method, request);
+                m_changes.Changed(changed);
+                return reply;
+            }
+            return Dispatch(method, request);
+        }
+        catch (Exception e)
+        {
+            m_log.LogError(e, string.Format("[GROUPS HANDLER]: Exception {0} ", e.Message));
+        }
+
+        return FailureResult();
+    }
+
+    /// <summary>The methods that change what a region caches about a group (invitations are not cached).</summary>
+    private static bool ChangesAGroup(string method) => method is "PUTGROUP" or "ADDAGENTTOGROUP" or
+        "REMOVEAGENTFROMGROUP" or "PUTROLE" or "REMOVEROLE" or "AGENTROLE" or "SETACTIVE" or "UPDATEMEMBERSHIP" or
+        "ADDNOTICE";
+
+    private byte[] Dispatch(string method, Dictionary<string, object> request)
+    {
+        try
+        {
             switch (method)
             {
                 case "PUTGROUP":

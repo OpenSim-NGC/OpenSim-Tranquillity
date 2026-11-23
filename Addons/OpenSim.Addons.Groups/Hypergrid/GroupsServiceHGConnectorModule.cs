@@ -135,7 +135,12 @@ public class GroupsServiceHGConnectorModule : ISharedRegionModule, IGroupsServic
 
             }
             else
+            {
                 m_LocalGroupsConnector = new GroupsServiceRemoteConnectorModule(m_Config, m_UserManagement);
+                // Robust tells this region server of group changes, so its caches forget them at once
+                GroupsChangeNotice.Listen(MainServer.Instance.DefaultServer,
+                    m_Config.Configs["Groups"]?.GetString("SecretKey", string.Empty));
+            }
 
             m_CacheWrapper = new RemoteConnectorCacheWrapper(m_UserManagement);
         }

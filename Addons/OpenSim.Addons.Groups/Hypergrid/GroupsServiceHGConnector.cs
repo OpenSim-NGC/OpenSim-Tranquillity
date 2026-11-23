@@ -40,7 +40,6 @@ public class GroupsServiceHGConnector
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI;
-    private object m_Lock = new object();
 
     public GroupsServiceHGConnector(string url)
     {
@@ -266,8 +265,8 @@ public class GroupsServiceHGConnector
         string reply = string.Empty;
         try
         {
-            lock (m_Lock)
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
+            // no lock: each request is its own (see GroupsServiceRemoteConnector.MakeRequest)
+            reply = SynchronousRestFormsRequester.MakeRequest("POST",
                      m_ServerURI + "hg-groups",
                      ServerUtils.BuildQueryString(sendData));
         }

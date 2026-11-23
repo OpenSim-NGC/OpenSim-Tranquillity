@@ -68,7 +68,15 @@ public class RemoteConnectorCacheWrapper
     public RemoteConnectorCacheWrapper(IUserManagement uman)
     {
         m_ForeignImporter = new ForeignImporter(uman);
+        GroupsChangeNotice.Register(this);
     }
+
+    /// <summary>
+    /// A group changed elsewhere (Robust's <see cref="GroupsChangeNotice"/>): forget what is cached about it. The
+    /// memberships cached per avatar carry every group the avatar is in, so for now this forgets everything, as a
+    /// change made through this region does.
+    /// </summary>
+    public void ForgetGroup(UUID groupID) => ForgetEverything();
 
     public UUID CreateGroup(UUID RequestingAgentID, GroupRecordDelegate d)
     {
@@ -92,10 +100,12 @@ public class RemoteConnectorCacheWrapper
 
     public bool UpdateGroup(UUID groupID, GroupRecordDelegate d)
     {
-        //reason = string.Empty;
-        //ExtendedGroupRecord group = m_GroupsService.UpdateGroup(RequestingAgentID, groupID, charter, showInList, insigniaID, membershipFee, openEnrollment, allowPublish, maturePublish);
         ExtendedGroupRecord group = d();
+        if (group == null)
+            return false;   // the groups service did not answer
 
+        // every member's memberships carry the group's settings
+        ForgetEverything();
         if (!group.GroupID.IsZero())
             m_Cache.AddOrUpdate("group-" + group.GroupID.ToString(), group, GROUPS_CACHE_TIMEOUT);
 
@@ -150,7 +160,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -179,22 +191,8 @@ public class RemoteConnectorCacheWrapper
     {
         d();
 
-        string AgentIDToString = AgentID.ToString();
-        string cacheKey = "active-" + AgentIDToString;
-        m_Cache.Remove(cacheKey);
-
-        cacheKey = "memberships-" + AgentIDToString;
-        m_Cache.Remove(cacheKey);
-
-        string GroupIDToString = GroupID.ToString();
-        cacheKey = "membership-" + AgentIDToString + "-" + GroupIDToString;
-        m_Cache.Remove(cacheKey);
-
-        cacheKey = "members-" + RequestingAgentID.ToString() + "-" + GroupIDToString;
-        m_Cache.Remove(cacheKey);
-
-        cacheKey = "roles-" + "-" + GroupIDToString + "-" + AgentIDToString;
-        m_Cache.Remove(cacheKey);
+        // the member is gone from every member list of the group, not only the requester's
+        ForgetEverything();
     }
 
     public void SetAgentActiveGroup(string AgentID, GroupMembershipDelegate d)
@@ -240,7 +238,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -285,7 +285,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -329,7 +331,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -380,7 +384,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -458,16 +464,14 @@ public class RemoteConnectorCacheWrapper
     }
 
     /// <summary>
-    /// Forget what is cached about one member: their roles change their powers, which their memberships and the
-    /// group's member lists carry.
+    /// Forget everything cached. A change to a group's members, roles or settings shows in member lists, role lists
+    /// and memberships cached for every requester, so the region forgets them all rather than some: changes are rare,
+    /// and the lists come back in a few statements. Other regions keep theirs up to GROUPS_CACHE_TIMEOUT.
     /// </summary>
-    private void ForgetMember(string RequestingAgentID, string AgentID, UUID GroupID)
+    private void ForgetEverything()
     {
-        m_Cache.Remove("membership-" + AgentID + "-" + GroupID.ToString());
-        m_Cache.Remove("memberships-" + AgentID);
-        m_Cache.Remove("active-" + AgentID);
-        m_Cache.Remove("members-" + RequestingAgentID + "-" + GroupID.ToString());
-        m_Cache.Remove("members-" + AgentID + "-" + GroupID.ToString());
+        lock (m_Cache)
+            m_Cache.Clear();
     }
 
     public List<GroupRolesData> GetGroupRoles(string RequestingAgentID, UUID GroupID, GroupRolesListDelegate d)
@@ -504,7 +508,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -559,7 +565,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -569,76 +577,15 @@ public class RemoteConnectorCacheWrapper
 
     public void AddAgentToGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID, BooleanDelegate d)
     {
+        // the member's powers and title change in every member list, role list and membership of the group
         if (d())
-        {
-            lock (m_Cache)
-            {
-                // update the cached role
-                string cacheKey = "role-" + RoleID.ToString();
-                object obj;
-                if (m_Cache.TryGetValue(cacheKey, out obj))
-                {
-                    GroupRolesData r = (GroupRolesData)obj;
-                    r.Members++;
-                }
-
-                // add this agent to the list of role members
-                cacheKey = "rolemembers-" + RequestingAgentID.ToString() + "-" + GroupID.ToString();
-                if (m_Cache.TryGetValue(cacheKey, out obj))
-                {
-                    try
-                    {
-                        // This may throw an exception, in which case the agentID is not a UUID but a full ID
-                        // In that case, let's just remove the whoe things from the cache
-                        UUID id = new UUID(AgentID);
-                        List<ExtendedGroupRoleMembersData> xx = (List<ExtendedGroupRoleMembersData>)obj;
-                        List<GroupRoleMembersData> rmlist = xx.ConvertAll<GroupRoleMembersData>(m_ForeignImporter.ConvertGroupRoleMembersData);
-                        GroupRoleMembersData rm = new GroupRoleMembersData();
-                        rm.MemberID = id;
-                        rm.RoleID = RoleID;
-                        rmlist.Add(rm);
-                    }
-                    catch
-                    {
-                        m_Cache.Remove(cacheKey);
-                    }
-                }
-
-                // Remove the cached info about this agent's roles
-                // because we don't have enough local info about the new role
-                cacheKey = "roles-" + GroupID.ToString() + "-" + AgentID.ToString();
-                if (m_Cache.Contains(cacheKey))
-                    m_Cache.Remove(cacheKey);
-
-                ForgetMember(RequestingAgentID, AgentID, GroupID);
-            }
-        }
+            ForgetEverything();
     }
 
     public void RemoveAgentFromGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID, BooleanDelegate d)
     {
         if (d())
-        {
-            lock (m_Cache)
-            {
-                // update the cached role
-                string cacheKey = "role-" + RoleID.ToString();
-                object obj;
-                if (m_Cache.TryGetValue(cacheKey, out obj))
-                {
-                    GroupRolesData r = (GroupRolesData)obj;
-                    r.Members--;
-                }
-
-                cacheKey = "roles-" + GroupID.ToString() + "-" + AgentID.ToString();
-                 m_Cache.Remove(cacheKey);
-
-                cacheKey = "rolemembers-" + RequestingAgentID.ToString() + "-" + GroupID.ToString();
-                m_Cache.Remove(cacheKey);
-
-                ForgetMember(RequestingAgentID, AgentID, GroupID);
-            }
-        }
+            ForgetEverything();
     }
 
     public List<GroupRolesData> GetAgentGroupRoles(string RequestingAgentID, string AgentID, UUID GroupID, GroupRolesListDelegate d)
@@ -677,7 +624,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -689,39 +638,16 @@ public class RemoteConnectorCacheWrapper
     {
         d();
 
-        lock (m_Cache)
-        {
-            // Invalidate cached info, because it has ActiveRoleID and Powers
-            string cacheKey = "membership-" + AgentID.ToString() + "-" + GroupID.ToString();
-            m_Cache.Remove(cacheKey);
-
-            cacheKey = "memberships-" + AgentID.ToString();
-            m_Cache.Remove(cacheKey);
-        }
+        // the title the member shows is in every member list of the group
+        ForgetEverything();
     }
 
     public void UpdateMembership(string AgentID, UUID GroupID, bool AcceptNotices, bool ListInProfile, VoidDelegate d)
     {
         d();
 
-        lock (m_Cache)
-        {
-            string cacheKey = "membership-" + AgentID.ToString() + "-" + GroupID.ToString();
-            if (m_Cache.Contains(cacheKey))
-                m_Cache.Remove(cacheKey);
-
-            cacheKey = "memberships-" + AgentID.ToString();
-            m_Cache.Remove(cacheKey);
-
-            cacheKey = "active-" + AgentID.ToString();
-            object m = null;
-            if (m_Cache.TryGetValue(cacheKey, out m))
-            {
-                GroupMembershipData membership = (GroupMembershipData)m;
-                membership.ListInProfile = ListInProfile;
-                membership.AcceptNotices = AcceptNotices;
-            }
-        }
+        // whether the member takes notices is in every member list of the group, and notices are sent from it
+        ForgetEverything();
     }
 
     public bool AddGroupNotice(UUID groupID, UUID noticeID, GroupNoticeInfo notice, BooleanDelegate d)
@@ -774,7 +700,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -819,7 +747,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else

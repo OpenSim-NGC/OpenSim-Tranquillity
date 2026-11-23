@@ -745,6 +745,11 @@
     ;; BasicHttpAuthentication) anyone who can reach this port can act as any
     ;; avatar in any group. Set the same key in [Groups] of every region.
     ; SecretKey = ""
+    ;; With a SecretKey set, Robust also tells every region server online (from
+    ;; the grid service) of each change to a group, so the regions forget what
+    ;; they cache about it at once instead of after 30 s. The grid service is
+    ;; [GridService] LocalServiceModule unless set here.
+    ; GridService = "OpenSim.Services.GridService.dll:GridService"
 
 
 [UserProfilesService]
