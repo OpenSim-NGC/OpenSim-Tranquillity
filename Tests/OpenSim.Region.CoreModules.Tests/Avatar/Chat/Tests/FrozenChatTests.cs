@@ -29,6 +29,8 @@ using System.Collections.Generic;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Region.CoreModules.World.Land;
+using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 using Xunit;
@@ -36,8 +38,10 @@ using Xunit;
 namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests;
 
 /// <summary>
-/// While an avatar is in the chat module's freeze list, its chat is not delivered and it is told
-/// "You may not talk as you are frozen."; its typing start and stop are not delivered either, and say nothing.
+/// While an avatar is frozen on its parcel (the land module's freeze, which stops its movement), its chat is not
+/// delivered and it is told "You may not talk as you are frozen."; its typing start and stop are not delivered either,
+/// and say nothing. The chat module once kept a freeze list of its own that nothing filled, so a frozen avatar could
+/// still talk.
 /// </summary>
 public class FrozenChatTests : OpenSimTestCase
 {
@@ -46,6 +50,7 @@ public class FrozenChatTests : OpenSimTestCase
     private sealed class Rig
     {
         public ChatModule Chat = null!;
+        public LandManagementModule Land = null!;
         public ScenePresence Frozen = null!, Other = null!;
         public TestClient FrozenClient = null!;
         public List<string> Alerts = new(), OtherHeard = new();
@@ -58,7 +63,12 @@ public class FrozenChatTests : OpenSimTestCase
         IConfigSource config = new IniConfigSource();
         config.AddConfig("Chat");
         r.Chat = new ChatModule();
-        SceneHelpers.SetupSceneModules(scene, config, r.Chat);
+        r.Land = new LandManagementModule();
+        SceneHelpers.SetupSceneModules(scene, config, r.Chat, r.Land);
+        // One parcel over the whole region. No PermissionsModule is loaded, so anyone may freeze on it.
+        ILandObject parcel = new LandObject(TestHelpers.ParseTail(0x1), false, scene);
+        parcel.SetLandBitmap(parcel.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
+        r.Land.AddLandObject(parcel);
 
         r.Frozen = SceneHelpers.AddScenePresence(scene, TestHelpers.ParseTail(0x11));
         r.Other = SceneHelpers.AddScenePresence(scene, TestHelpers.ParseTail(0x22));
@@ -73,7 +83,7 @@ public class FrozenChatTests : OpenSimTestCase
     }
 
     private static void Freeze(Rig r, bool frozen)
-        => r.Chat.ParcelFreezeUser(r.Other.ControllingClient, r.Other.UUID, frozen ? 0u : 1u, r.Frozen.UUID);
+        => r.Land.ClientOnParcelFreezeUser(r.Other.ControllingClient, r.Other.UUID, frozen ? 0u : 1u, r.Frozen.UUID);
 
     [Fact]
     public void TypingWhileFrozenSaysNothing()
@@ -101,6 +111,7 @@ public class FrozenChatTests : OpenSimTestCase
         Freeze(r, true);
         try
         {
+            Assert.False(r.Frozen.AllowMovement);
             r.FrozenClient.Chat(0, ChatTypeEnum.StartTyping, "");
             r.FrozenClient.Chat(0, ChatTypeEnum.Say, "hello");
             r.FrozenClient.Chat(0, ChatTypeEnum.StopTyping, "");
@@ -120,6 +131,20 @@ public class FrozenChatTests : OpenSimTestCase
         var r = Build();
         Freeze(r, true);
         Freeze(r, false);
+
+        r.FrozenClient.Chat(0, ChatTypeEnum.Say, "hello");
+
+        Assert.Empty(r.Alerts);
+        Assert.Equal(new[] { "Say:hello" }, r.OtherHeard);
+    }
+
+    [Fact]
+    public void TheObsoleteChatModuleFreezeDoesNotMuteByItself()
+    {
+        var r = Build();
+#pragma warning disable CS0618 // kept for callers outside the tree; it does nothing now
+        r.Chat.ParcelFreezeUser(r.Other.ControllingClient, r.Other.UUID, 0u, r.Frozen.UUID);
+#pragma warning restore CS0618
 
         r.FrozenClient.Chat(0, ChatTypeEnum.Say, "hello");
 
