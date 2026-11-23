@@ -820,13 +820,9 @@ public class FSAssetConnector : ServiceBase, IAssetService
                     asset.Data = Utils.StringToBytes(xml);
                 }
 
-                FileStream fs = File.Create(tempFile);
-
-                fs.Write(asset.Data, 0, asset.Data.Length);
-
-                fs.Close();
-
-                File.Move(tempFile, finalFile);
+                // Without its file the asset cannot be served: no row is written for it.
+                if (!WriteSpoolFile(asset.Data, tempFile, finalFile))
+                    return UUID.Zero.ToString();
             }
         }
 
@@ -861,6 +857,35 @@ public class FSAssetConnector : ServiceBase, IAssetService
         else
         {
             return asset.ID;
+        }
+    }
+
+    /// <summary>
+    /// Writes <paramref name="data"/> to the spool as <paramref name="spoolFile"/>, where the writer takes it to the
+    /// store. It is written to a temporary file in the spool's own folder, named after <paramref name="tempFile"/>
+    /// and not ending in .asset, forced to disk and renamed into place, so the writer never takes a file part
+    /// written. A write that fails, as on a full disk, leaves no file behind and answers false.
+    /// </summary>
+    private static bool WriteSpoolFile(byte[] data, string tempFile, string spoolFile)
+    {
+        // Unique, as two stores of the same content can run at once.
+        string partFile = tempFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using (FileStream fs = new FileStream(partFile, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                fs.Write(data, 0, data.Length);
+                fs.Flush(true);
+            }
+            // The same hash is the same content, so a spool file another store wrote meanwhile can be replaced.
+            File.Move(partFile, spoolFile, true);
+            return true;
+        }
+        catch (Exception e)
+        {
+            try { File.Delete(partFile); } catch { /* the write's error is the one to report */ }
+            m_log.LogError("[FSASSETS]: Could not write {0} to the spool, the asset is not stored: {1}", spoolFile, e.Message);
+            return false;
         }
     }
 
