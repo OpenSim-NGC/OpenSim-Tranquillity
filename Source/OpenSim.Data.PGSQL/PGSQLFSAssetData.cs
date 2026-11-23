@@ -298,7 +298,9 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
         string limit = String.Empty;
         if(count != -1)
         {
-            limit = String.Format(" limit {0} offset {1}", start, count);
+            // A page is count rows from row start. The rows are in id order so that the pages of one import,
+            // run one after another, neither skip nor repeat a row.
+            limit = " order by \"id\" limit :count offset :start";
         }
         string query = String.Format("select * from {0}{1}", table, limit);
         try
@@ -306,6 +308,11 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
             using (NpgsqlConnection remote = new NpgsqlConnection(conn))
             using (NpgsqlCommand cmd = new NpgsqlCommand(query, remote))
             {
+                if (count != -1)
+                {
+                    cmd.Parameters.Add(m_database.CreateParameter("count", count));
+                    cmd.Parameters.Add(m_database.CreateParameter("start", start));
+                }
                 remote.Open();
                 MainConsole.Instance.Output("Querying database");
                 MainConsole.Instance.Output("Reading data");
