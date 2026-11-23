@@ -496,12 +496,16 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
                 }
             }
 
+            // the group keeps its own copy of the attachment, as SL's notices do, so a member who opens the notice
+            // later still gets it when the sender has since deleted or changed theirs
+            InventoryItemBase attached = item == null ? null : HoldNoticeAttachment(scene, GroupID, item) ?? item;
+
             if (m_groupData.AddGroupNotice(remoteAgentIDstr, GroupID, NoticeID, im.fromAgentName, Subject, Message,
                 hasAttachment,
-                (byte)(item == null ? 0 : item.AssetType),
-                item == null ? null : item.Name,
-                item == null ? UUID.Zero : item.ID,
-                item == null ? UUID.Zero.ToString() : item.Owner.ToString()))
+                (byte)(attached == null ? 0 : attached.AssetType),
+                attached == null ? null : attached.Name,
+                attached == null ? UUID.Zero : attached.ID,
+                attached == null ? UUID.Zero.ToString() : attached.Owner.ToString()))
             {
                 OnNewGroupNotice?.Invoke(GroupID, NoticeID);
 
@@ -667,6 +671,51 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
 
         if (groupID.IsNotZero())
             ejectee.SendAgentDropGroup(groupID);
+    }
+
+    /// <summary>The name of the inventory folder, owned by the group, that holds its notices' attachments.</summary>
+    public const string NoticeAttachmentsFolder = "Group notice attachments";
+
+    /// <summary>
+    /// A copy of a notice's attachment owned by the group, in a folder of its own whose id is the group's (no viewer
+    /// sees it), with the item's permissions as the sender had them: giving it to a member later applies the sender's
+    /// next-owner permissions, as giving the sender's item did. Null when the inventory service would not take it;
+    /// the notice then carries the sender's item, as before.
+    /// </summary>
+    private InventoryItemBase HoldNoticeAttachment(Scene scene, UUID groupID, InventoryItemBase item)
+    {
+        try
+        {
+            IInventoryService inventory = scene.InventoryService;
+            if (inventory.GetFolder(groupID, groupID) == null
+                && !inventory.AddFolder(new InventoryFolderBase(groupID, NoticeAttachmentsFolder, groupID, (short)FolderType.None, UUID.Zero, 1)))
+                return null;
+
+            InventoryItemBase held = new InventoryItemBase(UUID.Random(), groupID)
+            {
+                Folder = groupID,
+                AssetID = item.AssetID,
+                AssetType = item.AssetType,
+                InvType = item.InvType,
+                Name = item.Name,
+                Description = item.Description,
+                CreatorId = item.CreatorId,
+                CreatorData = item.CreatorData,
+                Flags = item.Flags,
+                BasePermissions = item.BasePermissions,
+                CurrentPermissions = item.CurrentPermissions,
+                NextPermissions = item.NextPermissions,
+                EveryOnePermissions = item.EveryOnePermissions,
+                GroupPermissions = item.GroupPermissions,
+                CreationDate = Util.UnixTimeSinceEpoch(),
+            };
+            return inventory.AddItem(held) ? held : null;
+        }
+        catch (Exception e)
+        {
+            m_log.LogDebug("[Groups]: could not keep a copy of notice attachment {0} for group {1}: {2}", item.ID, groupID, e.Message);
+            return null;
+        }
     }
 
     private void OnGridInstantMessage(GridInstantMessage msg)

@@ -199,3 +199,16 @@ land contribution, notice attachments snapshotted when sent, groups that own lan
   regions, checking with the probe, going back).
 - **Retiring XmlRpcGroups:** it stays in the tree for grids that use it, deprecated: the config says so and the module
   logs it at start.
+
+## Phase 4: where each item stands
+
+| Item | State |
+|---|---|
+| Ban lists (`GroupAPIv1`) | done (#448) |
+| Hypergrid members ejected (and given roles) | done: a bare UUID finds the member stored by universal identifier |
+| A member ejected through another region server | done (#447) |
+| Notice attachments snapshotted when sent | done: the group keeps its own copy (an inventory folder owned by the group), so the attachment outlives the sender's item; and a notice carries only the sender's own item (both modules; also on its own from develop) |
+| `ChatSessionRequest` (accepting an invitation, text mute, history) | to do, its own PR after review, with the voice module: WebRtcVoice registers `ChatSessionRequest` and answers 400 to the methods it does not know ("accept invitation", "mute update"). The groups messaging module should take the group sessions' methods through it (an interface the voice module calls for a session that is a group's, or the groups module registering the capability when no voice module does), with "mute update" for text needing `ModerateChat` and honoured in group chat. |
+| `AcceptGroupInvite` / `DeclineGroupInvite` capabilities | not needed: without them the viewer answers an invitation by IM, which works. |
+| Land contribution | left out: OpenSim keeps no land tier to contribute. |
+| A group that owns land cannot be deleted | nothing to do: Groups V2 has no way to delete a group. |
