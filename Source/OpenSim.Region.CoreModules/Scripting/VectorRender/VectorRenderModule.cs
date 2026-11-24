@@ -182,21 +182,24 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
             return new SKColor((uint)hex);
         }
         
-        // Try to parse named colors
-        switch (value.ToLower())
-        {
-            case "white": return SKColors.White;
-            case "black": return SKColors.Black;
-            case "red": return SKColors.Red;
-            case "green": return SKColors.Green;
-            case "blue": return SKColors.Blue;
-            case "yellow": return SKColors.Yellow;
-            case "cyan": return SKColors.Cyan;
-            case "magenta": return SKColors.Magenta;
-            case "gray": return SKColors.Gray;
-            default: return defaultColor;
-        }
+        if (s_namedColors.TryGetValue(value.Trim(), out SKColor named))
+            return named;
+
+        return defaultColor;
     }
+
+    /// <summary>
+    /// The colour names a draw list may use, ignoring case: every named colour in SKColors.
+    /// </summary>
+    /// <remarks>
+    /// Upstream OpenSimulator took the name with System.Drawing's Color.FromName. SKColors has the same 141
+    /// web colours under the same names; it lacks RebeccaPurple (added to System.Drawing in .NET 8) and the
+    /// Windows system colours (Control, Window...), which name a desktop theme rather than a colour.
+    /// </remarks>
+    private static readonly Dictionary<string, SKColor> s_namedColors = typeof(SKColors)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Where(field => field.FieldType == typeof(SKColor))
+        .ToDictionary(field => field.Name, field => (SKColor)field.GetValue(null), StringComparer.OrdinalIgnoreCase);
 
     #endregion
 
