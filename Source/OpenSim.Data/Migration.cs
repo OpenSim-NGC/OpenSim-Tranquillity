@@ -120,8 +120,26 @@ public class Migration
         if (ver <= 0)   // -1 = no table, 0 = no version record
         {
             if (ver < 0)
-                ExecuteScript("create table migrations(name varchar(100), version int)");
-            InsertVersion("migrations", 1);
+            {
+                // Several servers can start at once on a new shared database, and another one may create the table
+                // between the check above and this statement. MySQL/MariaDB, PostgreSQL and SQLite all accept
+                // IF NOT EXISTS. PostgreSQL can still refuse a CREATE that runs at the same moment as another one
+                // (a duplicate key in its catalog), so a failure is only an error if the table is still missing.
+                // Then look again, so that the record the other server added is not doubled.
+                try
+                {
+                    ExecuteScript("create table if not exists migrations(name varchar(100), version int)");
+                }
+                catch (Exception e)
+                {
+                    if (FindVersion(_conn, "migrations") < 0)
+                        throw;
+                    m_log.LogDebug("[MIGRATIONS]: migrations table was created by another server: {0}", e.Message);
+                }
+                ver = FindVersion(_conn, "migrations");
+            }
+            if (ver <= 0)
+                InsertVersion("migrations", 1);
         }
     }
 
