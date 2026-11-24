@@ -432,9 +432,24 @@ public class MySQLSimulationData : ISimulationDataStore
                     {
                         while (itemReader.Read())
                         {
-                            if (!(itemReader["primID"] is DBNull))
+                            object primIdValue;
+                            try
                             {
-                                UUID primID = DBGuid.FromDB(itemReader["primID"].ToString());
+                                primIdValue = itemReader["primID"];
+                            }
+                            catch (FormatException e)
+                            {
+                                // A connection that reads CHAR(36) as a Guid (Old Guids=false) throws on text that is
+                                // not a uuid. No prim has that id, so its items could not load anyway; skip the row.
+                                m_log.LogWarning(
+                                    "[REGION DB]: A prim inventory row has a prim id that is not a uuid; its items are not loaded: {0}",
+                                    e.Message);
+                                continue;
+                            }
+
+                            if (!(primIdValue is DBNull))
+                            {
+                                UUID primID = DBGuid.FromDB(primIdValue.ToString());
                                 if (prims.ContainsKey(primID))
                                     primsWithInventory.Add(prims[primID]);
                             }
@@ -480,7 +495,19 @@ public class MySQLSimulationData : ISimulationDataStore
                     {
                         while (reader.Read())
                         {
-                            TaskInventoryItem item = BuildItem(reader);
+                            TaskInventoryItem item;
+                            try
+                            {
+                                item = BuildItem(reader);
+                            }
+                            catch (Exception e)
+                            {
+                                // Leave this row out. The prim keeps its other items and the region its other objects.
+                                m_log.LogWarning(
+                                    "[REGION DB]: Task inventory item {0} in prim {1} cannot be read and is not loaded: {2}",
+                                    ItemIdText(reader), prim.UUID, e.Message);
+                                continue;
+                            }
 
                             item.ParentID = prim.UUID; // Values in database are often wrong
                             inventory.Add(item);
@@ -491,6 +518,19 @@ public class MySQLSimulationData : ISimulationDataStore
             }
 
             prim.Inventory.RestoreInventoryItems(inventory);
+        }
+    }
+
+    /// <summary>The item id of a primitems row as text, for a log line, even when the id cannot be read.</summary>
+    private static string ItemIdText(IDataReader row)
+    {
+        try
+        {
+            return row["itemID"].ToString();
+        }
+        catch (Exception)
+        {
+            return "(unreadable id)";
         }
     }
 
@@ -1149,10 +1189,22 @@ public class MySQLSimulationData : ISimulationDataStore
                 );
         }
 
+        prim.DynAttrs = null;
         if (row["DynAttrs"] is not System.DBNull)
-            prim.DynAttrs = DAMap.FromXml((string)row["DynAttrs"]);
-        else
-            prim.DynAttrs = null;
+        {
+            try
+            {
+                prim.DynAttrs = DAMap.FromXml((string)row["DynAttrs"]);
+            }
+            catch (Exception e)
+            {
+                // A document that is not a map of namespaces (or not LLSD at all) has nothing a module can use.
+                // The prim loads without dynamic attributes instead of stopping the region's load.
+                m_log.LogWarning(
+                    "[REGION DB]: Dynamic attributes of prim {0} cannot be read and are not loaded: {1}",
+                    prim.UUID, e.Message);
+            }
+        }
 
         if (row["KeyframeMotion"] is not DBNull)
         {
@@ -1250,7 +1302,7 @@ public class MySQLSimulationData : ISimulationDataStore
             taskItem.EveryonePermissions  = Convert.ToUInt32(row["everyonePermissions"]);
             taskItem.GroupPermissions     = Convert.ToUInt32(row["groupPermissions"]);
             taskItem.Flags         = Convert.ToUInt32(row["flags"]);
-            taskItem.ExperienceID  = DBGuid.FromDB(row["experienceID"]);
+            taskItem.ExperienceID  = ExperienceId(row, taskItem.ItemID);
 
             return taskItem;
         }
@@ -1258,6 +1310,24 @@ public class MySQLSimulationData : ISimulationDataStore
         {
             m_log.LogError("[MYSQL DB]: Error reading task inventory: itemID was {0}, primID was {1}", row["itemID"].ToString(), row["primID"].ToString());
             throw;
+        }
+    }
+
+    /// <summary>
+    /// The item's experience id. Text that is not a uuid is the zero id. A connection that reads CHAR(36) as text
+    /// (Old Guids=true) already gives the zero id; one that reads it as a Guid throws on that text.
+    /// </summary>
+    private static UUID ExperienceId(IDataReader row, UUID itemID)
+    {
+        try
+        {
+            return DBGuid.FromDB(row["experienceID"]);
+        }
+        catch (FormatException)
+        {
+            m_log.LogWarning(
+                "[REGION DB]: Experience id of task inventory item {0} is not a uuid; it loads as the zero id", itemID);
+            return UUID.Zero;
         }
     }
 
