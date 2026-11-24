@@ -762,7 +762,10 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
     /// <param name="password"></param>
     /// <param name="email"></param>
     /// <param name="model"></param>
-    public UserAccount CreateUser(UUID scopeID, UUID principalID, string firstName, string lastName, string password, string email, string model = "")
+    /// <param name="homeRegionIfNoDefault">The region that is the account's home when the grid has no default region
+    /// online, or UUID.Zero to leave the home unset then</param>
+    public UserAccount CreateUser(UUID scopeID, UUID principalID, string firstName, string lastName, string password, string email, string model = "",
+        UUID homeRegionIfNoDefault = default)
     {
         firstName = firstName.Trim();
         lastName = lastName.Trim();
@@ -806,10 +809,14 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
                     if (defaultRegions != null && defaultRegions.Count >= 1)
                         home = defaultRegions[0];
 
-            if (home != null)
-                        m_GridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                    else
-                m_log.LogWarning($"[USER ACCOUNT SERVICE]: Unable to set home for account {firstName} {lastName}");
+                    // The home is the grid's default region, as in OpenSimulator. A caller that creates the account
+                    // for a region that is not registered yet (the estate owner at a simulator's first start) names
+                    // that region, so the account is not left without a home: Teleport Home fails for one.
+                    UUID homeRegionID = home?.RegionID ?? homeRegionIfNoDefault;
+                    if (homeRegionID.IsZero())
+                        m_log.LogWarning($"[USER ACCOUNT SERVICE]: Unable to set home for account {firstName} {lastName}: no region flagged DefaultRegion is online ([GridService] Region_<name> = \"DefaultRegion\")");
+                    else if (m_GridUserService == null || !m_GridUserService.SetHome(account.PrincipalID.ToString(), homeRegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0)))
+                        m_log.LogWarning($"[USER ACCOUNT SERVICE]: Unable to set home {homeRegionID} for account {firstName} {lastName}");
                 }
                 else
                 {

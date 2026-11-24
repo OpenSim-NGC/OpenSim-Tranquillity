@@ -1196,25 +1196,19 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 Scene scene = m_application.SceneManager.CurrentOrFirstScene;
                 UUID scopeID = scene.RegionInfo.ScopeID;
 
-                UserAccount account = CreateUser(scopeID, firstName, lastName, password, email);
+                // The home is the region at start_region_x, start_region_y. 0, 0 names none unless a region is
+                // there; for any other place without a region the default home is used, with a warning.
+                GridRegion home = scene.GridService.GetRegionByPosition(scopeID,
+                                    (int)Util.RegionToWorldLoc(regionXLocation), (int)Util.RegionToWorldLoc(regionYLocation));
+                if (home == null && (regionXLocation != 0 || regionYLocation != 0))
+                    m_log.LogWarning("[RADMIN]: No region at {0},{1} for the home of new user account {2} {3}; the default home is used",
+                        regionXLocation, regionYLocation, firstName, lastName);
+
+                UserAccount account = CreateUser(scopeID, firstName, lastName, password, email, home);
 
                 if (null == account)
                     throw new Exception(String.Format("failed to create new user {0} {1}",
                                                       firstName, lastName));
-
-                // Set home position
-
-                GridRegion home = scene.GridService.GetRegionByPosition(scopeID,
-                                    (int)Util.RegionToWorldLoc(regionXLocation), (int)Util.RegionToWorldLoc(regionYLocation));
-                if (null == home)
-                {
-                    m_log.LogWarning("[RADMIN]: Unable to set home region for newly created user account {0} {1}", firstName, lastName);
-                }
-                else
-                {
-                    scene.GridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                    m_log.LogDebug("[RADMIN]: Set home region {0} for updated user account {1} {2}", home.RegionID, firstName, lastName);
-                }
 
                 // Establish the avatar's initial appearance
 
@@ -2563,7 +2557,8 @@ public class RemoteAdminPlugin : IApplicationPlugin
     /// <param name="lastName"></param>
     /// <param name="password"></param>
     /// <param name="email"></param>
-    private UserAccount CreateUser(UUID scopeID, string firstName, string lastName, string password, string email)
+    /// <param name="home">The region to make the account's home, or null for the default home</param>
+    private UserAccount CreateUser(UUID scopeID, string firstName, string lastName, string password, string email, GridRegion home = null)
     {
         Scene scene = m_application.SceneManager.CurrentOrFirstScene;
         IUserAccountService userAccountService = scene.UserAccountService;
@@ -2595,22 +2590,22 @@ public class RemoteAdminPlugin : IApplicationPlugin
                             firstName, lastName);
                 }
 
-                GridRegion home = null;
-                if (gridService != null)
+                // The default home is the grid's default region, as in OpenSimulator's UserAccountService. When
+                // no region is flagged DefaultRegion it is the region this request was made to, rather than none:
+                // Teleport Home fails for an account without a home.
+                UUID homeRegionID = home?.RegionID ?? UUID.Zero;
+                if (homeRegionID.IsZero() && gridService != null)
                 {
                     List<GridRegion> defaultRegions = gridService.GetDefaultRegions(UUID.Zero);
                     if (defaultRegions != null && defaultRegions.Count >= 1)
-                        home = defaultRegions[0];
-
-                    if (gridUserService != null && home != null)
-                        gridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
-                    else
-                        m_log.LogWarning("[RADMIN]: Unable to set home for account {0} {1}.",
-                           firstName, lastName);
+                        homeRegionID = defaultRegions[0].RegionID;
                 }
-                else
-                    m_log.LogWarning("[RADMIN]: Unable to retrieve home region for account {0} {1}.",
-                       firstName, lastName);
+                if (homeRegionID.IsZero())
+                    homeRegionID = scene.RegionInfo.RegionID;
+
+                if (gridUserService == null || !gridUserService.SetHome(account.PrincipalID.ToString(), homeRegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0)))
+                    m_log.LogWarning("[RADMIN]: Unable to set home {0} for account {1} {2}.",
+                       homeRegionID, firstName, lastName);
 
                 if (inventoryService != null)
                 {
