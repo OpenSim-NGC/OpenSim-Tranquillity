@@ -50,6 +50,14 @@
 ; * [[<ConfigName>@]<port>/]<dll name>[:<class name>]
 ; *
 [Startup]
+    ; The garbage collector and thread pool are not set in this file. The server starts with server GC
+    ; (heaps sized to the load) and the .NET thread pool defaults; to choose otherwise, set these
+    ; environment variables before starting it
+    ; (Docs/BUILDING.md, "Garbage collector and thread pool"):
+    ;   DOTNET_gcServer=0            ; workstation GC: one heap
+    ;   DOTNET_GCConserveMemory=5    ; 0 (default) to 9: compact harder to keep the heap small
+    ;   DOTNET_ThreadPool_ForceMinWorkerThreads=0x40   ; thread pool: at least 64 worker threads (hexadecimal)
+
     ; Place to create a PID file
     ; If no path if specified then a PID file is not created.
     ; PIDFile = "/tmp/Robust.exe.pid"

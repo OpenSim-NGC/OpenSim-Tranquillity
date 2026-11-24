@@ -125,6 +125,60 @@ separately where persistence is needed, and back up external databases
 independently. Do not mount over `/app/data`: the RegionServer image contains
 packaged resources there.
 
+### Garbage collector and thread pool
+
+Each server's `runtimeconfig.template.json` turns on server GC, concurrent GC
+and tiered compilation. The build writes these into the published
+`<server>.runtimeconfig.json` under `runtimeOptions.configProperties`, where
+the runtime reads them. The thread pool is left at the .NET defaults. The
+RegionServer logs the settings in force at startup, for example on a
+16-thread machine:
+
+```
+[OPENSIM MAIN] Running GC in server mode: concurrent True, dynamic adaptation on, up to 16 heaps, conserve memory 0; thread pool 16 to 1000 worker threads
+```
+
+Server GC is the default. Since .NET 9 it runs with dynamic adaptation: it
+starts with one heap and adds heaps, up to one per core, as the load grows.
+Workstation GC always uses one heap; it can suit small machines and hosts that
+run many server processes. These .NET environment variables choose at start,
+without editing a file:
+
+```bash
+export DOTNET_gcServer=0                  # 0: workstation GC, 1: server GC
+export DOTNET_GCConserveMemory=5          # 0 (default) to 9: compact harder to keep the heap small
+export DOTNET_GCHeapCount=0x4             # server GC: a fixed number of heaps (hexadecimal); turns dynamic adaptation off
+export DOTNET_GCDynamicAdaptationMode=0   # server GC: dynamic adaptation off, one heap per core
+```
+
+Server GC without dynamic adaptation keeps a heap per core from the start and
+uses noticeably more memory (about 90 MiB more for one idle region on a
+16-thread machine). `DOTNET_gcConcurrent` does not override
+`System.GC.Concurrent` from `runtimeconfig.json`; to turn concurrent GC off,
+change it in the published `runtimeconfig.json`. With Compose, put the
+variables under the service's `environment:` (commented examples are in
+`compose.yaml`); with `docker run`, pass them with `-e`.
+
+The thread pool starts with as many worker threads as the machine has
+processors and adds more under load; the RegionServer caps its worker threads
+at 1000 when it starts. To fix other bounds, add
+`System.Threading.ThreadPool.MinThreads` and
+`System.Threading.ThreadPool.MaxThreads` (plain integers) to
+`configProperties` in the template before building or in the published
+`runtimeconfig.json`, or set these environment variables (.NET 10;
+hexadecimal):
+
+```bash
+export DOTNET_ThreadPool_ForceMinWorkerThreads=0x40    # at least 64 worker threads
+export DOTNET_ThreadPool_ForceMaxWorkerThreads=0x3E8   # at most 1000 worker threads
+```
+
+A minimum below the processor count makes bursts of work wait for threads to
+be added. While a bound is set this way, the program cannot change it: the
+console's `debug threadpool set worker` fails for it, and with a maximum above
+1000 the RegionServer logs "Unable to set thread pool max threads" at start and
+keeps yours.
+
 # Configure #
 ## Standalone mode ##
 Copy `OpenSim.ini.example` to `OpenSim.ini` in the `bin/` directory, and verify the `[Const]` section, correcting for your case.

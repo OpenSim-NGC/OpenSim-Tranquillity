@@ -4,6 +4,11 @@ services:
     stdin_open: true
     tty: true
     stop_grace_period: 60s
+    # GC and thread pool choice at start (Docs/BUILDING.md, "Garbage collector and thread pool"):
+    # environment:
+    #   DOTNET_gcServer: "0"            # workstation GC: one heap
+    #   DOTNET_GCConserveMemory: "5"    # 0 (default) to 9: compact harder
+    #   DOTNET_ThreadPool_ForceMinWorkerThreads: "0x40"   # thread pool: at least 64 worker threads (hexadecimal)
     build:
       context: .
       dockerfile: Source/OpenSim.Server.MoneyServer/Dockerfile
@@ -16,6 +21,11 @@ services:
     stdin_open: true
     tty: true
     stop_grace_period: 60s
+    # GC and thread pool choice at start (Docs/BUILDING.md, "Garbage collector and thread pool"):
+    # environment:
+    #   DOTNET_gcServer: "0"            # workstation GC: one heap
+    #   DOTNET_GCConserveMemory: "5"    # 0 (default) to 9: compact harder
+    #   DOTNET_ThreadPool_ForceMinWorkerThreads: "0x40"   # thread pool: at least 64 worker threads (hexadecimal)
     command: ["${GRID_SERVICE_NAME:-}"]
     build:
       context: .
@@ -29,6 +39,11 @@ services:
     stdin_open: true
     tty: true
     stop_grace_period: 60s
+    # GC and thread pool choice at start (Docs/BUILDING.md, "Garbage collector and thread pool"):
+    # environment:
+    #   DOTNET_gcServer: "0"            # workstation GC: one heap
+    #   DOTNET_GCConserveMemory: "5"    # 0 (default) to 9: compact harder
+    #   DOTNET_ThreadPool_ForceMinWorkerThreads: "0x40"   # thread pool: at least 64 worker threads (hexadecimal)
     command: ["${REGION_NAME:-}"]
     build:
       context: .

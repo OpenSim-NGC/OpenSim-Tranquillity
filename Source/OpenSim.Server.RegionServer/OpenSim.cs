@@ -136,7 +136,23 @@ public class OpenSim : OpenSimBase
 
         m_log.LogInformation("[OPENSIM MAIN]: Using async_call_method " + Util.FireAndForgetMethod);
 
-        m_log.LogInformation("[OPENSIM MAIN] Running GC in {0} mode", GCSettings.IsServerGC ? "server":"workstation");
+        // What the GC and the thread pool run with, after runtimeconfig.json and any DOTNET_* environment variables.
+        IReadOnlyDictionary<string, object> gc = GC.GetConfigurationVariables();
+        string Gc(string name) => gc.TryGetValue(name, out object value) ? value.ToString() : "unknown";
+        string heaps = string.Empty;
+        if (GCSettings.IsServerGC)
+        {
+            // With dynamic adaptation the GC starts small and adds heaps under load, up to HeapCount.
+            heaps = Gc("GCDynamicAdaptationMode") == "1"
+                ? ", dynamic adaptation on, up to " + Gc("HeapCount") + " heaps"
+                : ", dynamic adaptation off, " + Gc("HeapCount") + " heaps";
+        }
+        ThreadPool.GetMinThreads(out int minWorkers, out _);
+        ThreadPool.GetMaxThreads(out int maxWorkers, out _);
+        m_log.LogInformation(
+            "[OPENSIM MAIN] Running GC in {0} mode: concurrent {1}{2}, conserve memory {3}; thread pool {4} to {5} worker threads",
+            GCSettings.IsServerGC ? "server" : "workstation", Gc("ConcurrentGC"), heaps, Gc("GCConserveMem"),
+            minWorkers, maxWorkers);
     }
 
     /// <summary>

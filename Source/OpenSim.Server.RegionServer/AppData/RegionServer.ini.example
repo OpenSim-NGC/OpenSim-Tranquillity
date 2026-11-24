@@ -79,6 +79,14 @@
 
 
 [Startup]
+    ;; The garbage collector and thread pool are not set in this file. The region starts with server GC
+    ;; (heaps sized to the load) and the .NET thread pool defaults; to choose otherwise, set these
+    ;; environment variables before starting it (Docs/BUILDING.md, "Garbage collector and thread pool").
+    ;; The startup log line "[OPENSIM MAIN] Running GC in ... mode" shows the settings in force.
+    ;;   DOTNET_gcServer=0            ; workstation GC: one heap
+    ;;   DOTNET_GCConserveMemory=5    ; 0 (default) to 9: compact harder to keep the heap small
+    ;;   DOTNET_ThreadPool_ForceMinWorkerThreads=0x40   ; thread pool: at least 64 worker threads (hexadecimal)
+
     ;# {ChildPresenceWaitSeconds} {} {Seconds a region waits for a crossing avatar's viewer to connect} {} 30
     ;; When an avatar crosses into this region, the region waits this long for the viewer to connect before
     ;; refusing the crossing. After a refused crossing the neighbouring region that sent it does not try the
