@@ -158,8 +158,11 @@ public class HGInstantMessageService : IInstantMessage
             success = TrySendInstantMessage(im, "", true, false);
         }
 
-        if (!success && m_InGatekeeper) // we do this only in the Gatekeeper IM service
-            UndeliveredMessage(im);
+        // Only the gatekeeper keeps messages for offline residents. A message it has kept is
+        // delivered as far as the sending grid is concerned, so the sender is not told the
+        // resident is not logged in; one it could not keep is still answered as undelivered.
+        if (!success && m_InGatekeeper)
+            success = UndeliveredMessage(im);
 
         return success;
     }
