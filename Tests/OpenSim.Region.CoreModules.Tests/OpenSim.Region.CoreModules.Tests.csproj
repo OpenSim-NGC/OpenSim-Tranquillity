@@ -30,6 +30,7 @@
     <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
     <ProjectReference Include="..\..\Addons\OpenSim.Addons.Groups\OpenSim.Addons.Groups.csproj" />
     <ProjectReference Include="..\..\Addons\Gloebit.GloebitMoneyModule\Gloebit.GloebitMoneyModule.csproj" />
+    <ProjectReference Include="..\..\Addons\OpenSimSearch\OpenSimSearch.Modules.csproj" />
     <ProjectReference Include="..\..\Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
   </ItemGroup>
 
