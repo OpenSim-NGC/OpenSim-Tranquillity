@@ -1,0 +1,17 @@
+:VERSION 1         # --------------------------
+# The offline IM table, as MySQL's IM_Store has it, for SQLite standalones.
+
+BEGIN TRANSACTION;
+
+CREATE TABLE IF NOT EXISTS im_offline (
+  ID integer PRIMARY KEY AUTOINCREMENT,
+  PrincipalID char(36) NOT NULL DEFAULT '',
+  FromID char(36) NOT NULL DEFAULT '',
+  Message text NOT NULL,
+  TMStamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS im_offline_principal ON im_offline (PrincipalID);
+CREATE INDEX IF NOT EXISTS im_offline_from ON im_offline (FromID);
+
+COMMIT;

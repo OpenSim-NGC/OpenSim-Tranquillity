@@ -989,7 +989,11 @@
     ;; Module to handle offline messaging. The core module requires an external
     ;; web service to do this. See OpenSim wiki.
     ; OfflineMessageModule = OfflineMessageModule
-    ;; Or, alternatively, use this one, which works for both standalones and grids
+    ;; Or, alternatively, use this one, which works for both standalones and grids.
+    ;; On a grid, set OfflineMessageURL to the grid's offline IM service. Without OfflineMessageURL the region keeps
+    ;; the messages itself, in the database of [DatabaseService] (SQLite, MySQL or PostgreSQL), or in the one that
+    ;; StorageProvider and ConnectionString below name. If that database has no offline IM store, the region logs
+    ;; an error and runs without offline messages.
     ; OfflineMessageModule = "Offline Message Module V2"
 
     ;# {OfflineMessageURL} {OfflineMessageModule:OfflineMessageModule Offline Message Module V2:Offline Message Module V2} {URL of offline messaging service} {}
@@ -997,9 +1001,16 @@
     ; OfflineMessageURL = ${Const|BaseURL}/Offline.php
     ; OfflineMessageURL = ${Const|PrivURL}:${Const|PrivatePort}
 
-    ;# {StorageProvider} {Offline Message Module V2:Offline Message Module V2} {DLL that provides the storage interface} {OpenSim.Data.MySQL.dll}
-    ;; For standalones, this is the storage dll.
+    ;# {StorageProvider} {Offline Message Module V2:Offline Message Module V2} {DLL that provides the storage interface} {}
+    ;; For a local store only: the storage dll and its connection string, when they are not those of
+    ;; [DatabaseService].
     ; StorageProvider = OpenSim.Data.MySQL.dll
+    ; ConnectionString = ""
+
+    ;# {MaxOfflineIMs} {Offline Message Module V2:Offline Message Module V2} {Offline messages kept per recipient} {} 25
+    ;; For a local store only: how many offline messages a user can have waiting; later ones are refused, and the
+    ;; sender is told the message was not saved. Messages older than two weeks are deleted when the region starts.
+    ; MaxOfflineIMs = 25
 
     ; Mute list handler
     ;# {MuteListModule} {MuteListModule:MuteListModule} {} {} None

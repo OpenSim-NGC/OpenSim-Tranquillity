@@ -22,6 +22,7 @@
     <EmbeddedResource Include="Resources/EstateStore.migrations" />
     <EmbeddedResource Include="Resources/FriendsStore.migrations" />
     <EmbeddedResource Include="Resources/HGTravelStore.migrations" />
+    <EmbeddedResource Include="Resources/IM_Store.migrations" />
     <EmbeddedResource Include="Resources/TrustedGrid.migrations" />
     <EmbeddedResource Include="Resources/MuteListStore.migrations" />
     <EmbeddedResource Include="Resources/os_groups_Store.migrations" />
