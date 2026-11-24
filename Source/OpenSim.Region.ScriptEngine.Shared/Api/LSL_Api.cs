@@ -3479,9 +3479,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
             foreach (SceneObjectGroup group in new_groups)
             {
-                // objects rezzed with this method are die_at_edge by default.
-                group.RootPart.SetDieAtEdge(true);
-
+                // Scene.RezObject applies [EntityTransfer] ScriptRezzedObjectsDieAtEdge, as it does for Phlox.
                 group.ResumeScripts();
 
                 m_ScriptEngine.PostObjectEvent(m_host.LocalId, new EventParams(
@@ -3934,8 +3932,10 @@ public class LSL_Api : ILSL_Api, IScriptApi
             if(groot.PhysActor != null)
                 groot.PhysActor.Building = true;
 
-            // objects rezzed with this method are die_at_edge by default.
-            groot.SetDieAtEdge(true);
+            // As Scene.RezObject does for llRezObject: an object rezzed by a script dies at a void edge only when
+            // [EntityTransfer] ScriptRezzedObjectsDieAtEdge says so.
+            if (World.ScriptRezzedObjectsDieAtEdge)
+                sog.DieAtVoidEdge = true;
 
             if((flags & ScriptBaseClass.REZ_FLAG_TEMP) != 0)
                 groot.AddFlag(PrimFlags.TemporaryOnRez);
@@ -18046,13 +18046,15 @@ public void llDetachFromAvatar()
 
         group.ResetIDs();
 
+        // As Scene.RezObject does for llRezObject: an object rezzed by a script dies at a void edge only when
+        // [EntityTransfer] ScriptRezzedObjectsDieAtEdge says so.
+        if (World.ScriptRezzedObjectsDieAtEdge)
+            group.DieAtVoidEdge = true;
+
         Vector3 llpos = new((float)pos.x, (float)pos.y, (float)pos.z);
         World.AddNewSceneObject(group, true, llpos, Quaternion.Identity, Vector3.Zero);
         group.CreateScriptInstances(0, true, World.DefaultScriptEngine, 3);
         group.ScheduleGroupForFullUpdate();
-
-        // objects rezzed with this method are die_at_edge by default.
-        group.RootPart.SetDieAtEdge(true);
 
         group.ResumeScripts();
 
