@@ -589,3 +589,10 @@ COMMIT;
 BEGIN;
 ALTER TABLE `prims` ADD COLUMN `SitTargetActive` TINYINT(3) NULL DEFAULT NULL;
 COMMIT;
+
+:VERSION 71         #----- index the land access lists by parcel and the parcels by region
+# The store reads and replaces each parcel's access list by LandUUID, and loads a region's parcels by RegionUUID.
+BEGIN;
+CREATE INDEX `landaccesslist_landuuid` ON `landaccesslist` (`LandUUID`);
+CREATE INDEX `land_regionuuid` ON `land` (`RegionUUID`);
+COMMIT;

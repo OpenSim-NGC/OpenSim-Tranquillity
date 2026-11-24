@@ -460,3 +460,11 @@ UPDATE prims SET LinkNumber = CASE WHEN EXISTS (SELECT 1 FROM prims c WHERE c.Sc
 UPDATE prims SET LinkNumber = 1 + (SELECT count(*) FROM prims c WHERE c.SceneGroupID = prims.SceneGroupID AND c.RegionUUID = prims.RegionUUID AND c.UUID <> c.SceneGroupID AND c.rowid <= prims.rowid) WHERE UUID <> SceneGroupID;
 DROP INDEX prims_linknumber_backfill;
 COMMIT;
+
+:VERSION 48         #----- index the land access lists by parcel and the parcels by region
+# The store deletes and updates access list rows by LandUUID; land by RegionUUID is the column the MySQL and
+# PostgreSQL stores load a region's parcels by, indexed here alike.
+BEGIN;
+CREATE INDEX IF NOT EXISTS landaccesslist_landuuid ON landaccesslist(LandUUID);
+CREATE INDEX IF NOT EXISTS land_regionuuid ON land(RegionUUID);
+COMMIT;
