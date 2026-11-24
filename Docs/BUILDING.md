@@ -20,9 +20,20 @@ get or update source from git
 If no configuration is specified the default is a release build. If no platform is specified default 
 is the platform being used for the compilation.
 
-The output from the publish will be in build/<Configuration>/net10.0/<platform>/
+Publishing the solution publishes every project except the test projects, each to its own project folder.
+The servers, which include all the libraries and plugins they need, land in:
+
+ Source/OpenSim.Server.RegionServer/bin/<Configuration>/net10.0/<platform>/publish/
+ Source/OpenSim.Server.GridServer/bin/<Configuration>/net10.0/<platform>/publish/
+ Source/OpenSim.Server.MoneyServer/bin/<Configuration>/net10.0/<platform>/publish/
 
 Where Configuration is either Debug or Release and Platform is either linux-x64 or win-x64 as shown above.
+Run a server, and configure it (see below), from its publish folder.
+
+To publish one server to a folder of your choice, publish its project with `-o`, as
+[tools/publish.sh](../tools/publish.sh) and the Dockerfiles do:
+
+ dotnet publish Source/OpenSim.Server.RegionServer/OpenSim.Server.RegionServer.csproj --configuration Release -r linux-x64 -o publish/linux-x64/OpenSim.Server.RegionServer
 
 For running and writing tests (including YEngine state-load telemetry), see [TESTING.md](TESTING.md).
 

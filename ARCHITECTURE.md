@@ -14,6 +14,8 @@ services, which hold users, inventory, assets and the region directory.
   [Directory.Build.props](Directory.Build.props) sets `net10.0`, `ImplicitUsings` on and `Nullable` off for every
   project, and adds Nerdbank.GitVersioning ([version.json](version.json)), `nini-core` (INI configuration) and
   the `UtopiaSkye.OpenMetaverse*` packages (viewer protocol types and packets).
+  [Directory.Build.targets](Directory.Build.targets) marks test projects as not publishable, so publishing the
+  solution leaves them out.
 - Each server project references its libraries and plugins, so they land in its output folder, where plugins are
   found at run time (see [Plugin discovery](#plugin-discovery)).
 
