@@ -60,11 +60,13 @@ public class AppearanceService : ServiceBase, IAppearanceService
         // fetch is a 404: the old example config named the plain AssetService here, which on an FSAssets grid
         // reads a table the bakes never reach.
         string gridAssets = config.Configs["AssetService"]?.GetString("LocalServiceModule", string.Empty) ?? string.Empty;
+        // Message template placeholders are filled by position, not by name: {Section} appears twice, so the section
+        // name is passed twice.
         if (!string.IsNullOrWhiteSpace(gridAssets) && !string.Equals(assetService, gridAssets, StringComparison.Ordinal))
             m_log.LogWarning(
                 "[APPEARANCE SERVICE]: [{Section}] AssetService is {Ours}, but the grid stores assets through {Grid}. "
                 + "Bakes stored there cannot be served from here; remove AssetService from [{Section}] to use the grid's.",
-                serviceConfig.Name, assetService, gridAssets);
+                serviceConfig.Name, assetService, gridAssets, serviceConfig.Name);
 
         if (string.IsNullOrWhiteSpace(avatarService))
             throw new Exception($"[{configName}] AvatarService not set, nor [AvatarService] LocalServiceModule; the appearance service has no bake index to read");

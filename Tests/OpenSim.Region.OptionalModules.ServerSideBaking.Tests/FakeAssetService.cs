@@ -5,6 +5,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
@@ -18,6 +19,11 @@ namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 /// </summary>
 public sealed class FakeAssetService : IAssetService
 {
+    public FakeAssetService() { }
+
+    /// <summary>The constructor ServerUtils.LoadPlugin calls, so a config can name this class as a service.</summary>
+    public FakeAssetService(IConfigSource config) { }
+
     public readonly Dictionary<string, AssetBase> Assets = new(StringComparer.OrdinalIgnoreCase);
     public readonly List<AssetBase> Stored = new();
     public readonly List<string> Ops = new();

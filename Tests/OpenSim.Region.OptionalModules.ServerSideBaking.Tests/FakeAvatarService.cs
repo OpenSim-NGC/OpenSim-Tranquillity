@@ -5,6 +5,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
@@ -23,6 +24,11 @@ namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 /// </summary>
 public sealed class FakeAvatarService : IAvatarService
 {
+    public FakeAvatarService() { }
+
+    /// <summary>The constructor ServerUtils.LoadPlugin calls, so a config can name this class as a service.</summary>
+    public FakeAvatarService(IConfigSource config) { }
+
     public readonly Dictionary<UUID, Dictionary<string, string>> Records = new();
     public int SetItemsCalls;
 
