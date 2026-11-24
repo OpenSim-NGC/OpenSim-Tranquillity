@@ -475,6 +475,9 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
             }
         }
 
+        foreach (UserData ud in TakeResidentsAwaitingAccount(untried, missing))
+            ret[ud.Id] = ud.FirstName + " " + ud.LastName;
+
         if (missing.Count == 0 || m_gridUserService == null)
             return ret;
 
@@ -608,6 +611,9 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
             }
         }
 
+        foreach (UserData ud in TakeResidentsAwaitingAccount(untried, missing))
+            ret[ud.Id] = ud.FirstName + " " + ud.LastName;
+
         if (missing.Count == 0 || m_gridUserService == null)
             return ret;
 
@@ -726,6 +732,9 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                 }
             }
         }
+
+        foreach (UserData ud in TakeResidentsAwaitingAccount(untried, missing))
+            ret.Add(ud);
 
         if (missing.Count == 0 || m_gridUserService == null)
             return ret;
@@ -1024,6 +1033,8 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                 userdata.DisplayName = account.DisplayName;
                 userdata.NameChanged = Utils.UnixTimeToDateTime(account.NameChanged);
             }
+            else if (IsResidentAwaitingAccount(userdata))
+                return true;
         }
 
         if (!userdata.HasGridUserTried)
@@ -1083,7 +1094,42 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
         user.IsUnknownUser = false;
         user.HasGridUserTried = true;
         user.IsLocal = local;
+        user.DisplayName = account.DisplayName;
+        user.NameChanged = Utils.UnixTimeToDateTime(account.NameChanged);
         m_userCacheByID.Add(id, user, local ? LOCALEXPIRE : HGEXPIRE);
+    }
+
+    /// <summary>
+    /// A resident of this grid whose names came with their arrival and whose account has not been
+    /// read yet, so their display name is not known.
+    /// </summary>
+    private static bool IsResidentAwaitingAccount(UserData ud)
+    {
+        return ud.IsLocal && !ud.IsUnknownUser && !ud.HasGridUserTried;
+    }
+
+    /// <summary>
+    /// Takes out of a batch lookup the residents of this grid whose account it did not return.
+    /// Every resident here has an account, so the lookup failed for them: they are answered with
+    /// the names from their arrival and left to be asked again, instead of being settled for half
+    /// an hour without their display name or looked up in the grid user service, which has none.
+    /// </summary>
+    private static List<UserData> TakeResidentsAwaitingAccount(Dictionary<UUID, UserData> untried, List<string> missing)
+    {
+        List<UserData> residents = new List<UserData>();
+        foreach (UserData ud in untried.Values)
+        {
+            if (IsResidentAwaitingAccount(ud))
+                residents.Add(ud);
+        }
+
+        foreach (UserData ud in residents)
+        {
+            untried.Remove(ud.Id);
+            missing.Remove(ud.Id.ToString());
+        }
+
+        return residents;
     }
 
     public void AddSystemUser(UUID uuid, string first, string last)
@@ -1149,7 +1195,8 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                 oldUser.LastName = last;
                 oldUser.IsLocal = true;
                 oldUser.HomeURL = string.Empty;
-                oldUser.HasGridUserTried = true;
+                // The arrival gives the names but not the display name: leave the account to
+                // be read by the first lookup that needs it.
                 m_userCacheByID.Add(uuid, oldUser, LOCALEXPIRE);
             }
             else
@@ -1278,9 +1325,9 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
 
         UserAccount account = m_userAccountService.GetUserAccount(m_Scenes[0].RegionInfo.ScopeID, uuid);
         if (account == null)
-            return false;
+            return u != null && IsResidentAwaitingAccount(u);
 
-        if(u == null)
+        if(u == null || u.IsLocal)
             AddUser(account);
         else
             u.HasGridUserTried = true;
