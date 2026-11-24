@@ -50,6 +50,23 @@ public class LandmarkTeleportTests : OpenSimTestCase
     }
 
     [Theory]
+    // No region_handle line: the viewer itself reads only region_id and local_pos.
+    [InlineData("Landmark version 2\nregion_id {0}\nlocal_pos 10 20 30\n")]
+    // A region_handle line cut short.
+    [InlineData("Landmark version 2\nregion_id {0}\nlocal_pos 10 20 30\nregion_handle\n")]
+    [InlineData("Landmark version 2\r\nregion_id {0}\r\nlocal_pos 10 20 30\r\nregion_handle 1099511628032000\r\n")]
+    public void AShortLandmarkStillTeleports(string format)
+    {
+        UUID region = UUID.Random();
+        AssetLandmark lm = Request(string.Format(format, region), out bool failed);
+
+        Assert.False(failed);
+        Assert.NotNull(lm);
+        Assert.Equal(region, lm.RegionID);
+        Assert.Equal(new Vector3(10, 20, 30), lm.Position);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("not a landmark")]
     [InlineData("Landmark version 2\nregion_id 1234\n")]
