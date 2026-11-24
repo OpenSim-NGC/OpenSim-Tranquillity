@@ -46,8 +46,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests;
 
 /// <summary>
 /// A migration step that fails. Some shipped steps copy rows out of tables from older versions and fail on every new
-/// database (PostgreSQL AuthStore, FriendsStore and UserAccount 2; MySQL os_groups_Store 2; SQLite AgentPrefs,
-/// AuthStore, FriendsStore, UserAccount and XInventoryStore 2), and the versions after them must still run, so the
+/// database (PostgreSQL AuthStore, FriendsStore and UserAccount 2; MySQL os_groups_Store 2; SQLite AuthStore,
+/// FriendsStore, UserAccount and XInventoryStore 2), and the versions after them must still run, so the
 /// failed version is still recorded. The failure is logged as a warning that names the store, the version and the
 /// database's error; it used to be logged at Debug only, and on MySQL and PostgreSQL without the error.
 ///

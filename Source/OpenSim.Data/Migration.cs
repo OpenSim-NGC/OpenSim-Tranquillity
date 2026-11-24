@@ -201,10 +201,9 @@ public class Migration
             catch (Exception e)
             {
                 // Some steps copy rows out of tables from older versions (users, userfriends, diva_groups_*,
-                // an attached old inventory), and SQLite AgentPrefs 2 creates the table version 1 made. These
-                // fail on every new database, and the versions after them must still run, so the failed version
-                // is still recorded. The failure is a warning so that an operator upgrading an existing database
-                // can see which change was not made.
+                // an attached old inventory). These fail on every new database, and the versions after them must
+                // still run, so the failed version is still recorded. The failure is a warning so that an operator
+                // upgrading an existing database can see which change was not made.
                 m_log.LogWarning("[MIGRATIONS]: {0} version {1} failed and is recorded as done: {2}", _type, newversion, e.Message.Replace("\r", " ").Replace("\n", " "));
                 m_log.LogWarning("[MIGRATIONS]: On a new database this is expected for steps that copy data out of tables from older versions. On an existing database the change in {0} version {1} was not made and must be fixed by hand. Continuing.", _type, newversion);
                 ExecuteScript("ROLLBACK;");
