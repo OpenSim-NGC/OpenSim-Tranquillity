@@ -806,13 +806,27 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
     public string LocateUser(UUID userID)
     {
-        HGTravelingData[] hgts = m_Database.GetSessions(userID);
-        if (hgts == null)
+        return ForeignGridOf(m_Database.GetSessions(userID), m_GridName);
+    }
+
+    /// <summary>
+    /// The grid named by the first of these travel sessions that is not this grid, or an empty
+    /// string when every session is on this grid. A local login stores the gatekeeper URI as it
+    /// was configured, so it is compared with <see cref="IsLocalGridURI"/> rather than as a raw
+    /// string: a stored "http://Grid.example:8002" is this grid, not a grid elsewhere.
+    /// </summary>
+    public static string ForeignGridOf(HGTravelingData[] sessions, string localGridURI)
+    {
+        if (sessions == null)
             return string.Empty;
 
-        foreach (HGTravelingData t in hgts)
-            if (t.Data.ContainsKey("GridExternalName") && !m_GridName.Equals(t.Data["GridExternalName"]))
-                return t.Data["GridExternalName"];
+        foreach (HGTravelingData t in sessions)
+        {
+            if (t?.Data == null || !t.Data.TryGetValue("GridExternalName", out string grid) || string.IsNullOrEmpty(grid))
+                continue;
+            if (!IsLocalGridURI(localGridURI, grid))
+                return grid;
+        }
 
         return string.Empty;
     }
