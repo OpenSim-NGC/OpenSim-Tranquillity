@@ -26,6 +26,7 @@
  */
 
 using System.Data;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using MySqlConnector;
@@ -1007,85 +1008,82 @@ public class MySQLSimulationData : ISimulationDataStore
 
         // explicit conversion of integers is required, which sort
         // of sucks.  No idea if there is a shortcut here or not.
-        prim.CreationDate = (int)row["CreationDate"];
-        if (row["Name"] != DBNull.Value)
-            prim.Name = (string)row["Name"];
-        else
-            prim.Name = String.Empty;
+        prim.CreationDate = Column(row, "CreationDate", 0);
+        prim.Name = Column(row, "Name", string.Empty);
         // Various text fields
-        prim.Text = (string)row["Text"];
+        prim.Text = Column(row, "Text", string.Empty);
         // Construct uint ARGB color: 0xAARRGGBB
         int a = (int)row["ColorA"];
         int r = (int)row["ColorR"];
         int g = (int)row["ColorG"];
         int b = (int)row["ColorB"];
         prim.Color = (uint)((a << 24) | (r << 16) | (g << 8) | b);
-        prim.Description = (string)row["Description"];
-        prim.SitName = (string)row["SitName"];
-        prim.TouchName = (string)row["TouchName"];
-        // Permissions
-        prim.Flags = (PrimFlags)(int)row["ObjectFlags"];
-        prim.OwnerMask = (uint)(int)row["OwnerMask"];
-        prim.NextOwnerMask = (uint)(int)row["NextOwnerMask"];
-        prim.GroupMask = (uint)(int)row["GroupMask"];
-        prim.EveryoneMask = (uint)(int)row["EveryoneMask"];
-        prim.BaseMask = (uint)(int)row["BaseMask"];
+        prim.Description = Column(row, "Description", string.Empty);
+        prim.SitName = Column(row, "SitName", string.Empty);
+        prim.TouchName = Column(row, "TouchName", string.Empty);
+        // Permissions. A NULL mask grants nothing.
+        prim.Flags = (PrimFlags)Column(row, "ObjectFlags", 0);
+        prim.OwnerMask = (uint)Column(row, "OwnerMask", 0);
+        prim.NextOwnerMask = (uint)Column(row, "NextOwnerMask", 0);
+        prim.GroupMask = (uint)Column(row, "GroupMask", 0);
+        prim.EveryoneMask = (uint)Column(row, "EveryoneMask", 0);
+        prim.BaseMask = (uint)Column(row, "BaseMask", 0);
 
         // Vectors
         prim.OffsetPosition = new Vector3(
-            (float)row["PositionX"],
-            (float)row["PositionY"],
-            (float)row["PositionZ"]
+            Column(row, "PositionX", 0f),
+            Column(row, "PositionY", 0f),
+            Column(row, "PositionZ", 0f)
             );
         prim.GroupPosition = new Vector3(
-            (float)row["GroupPositionX"],
-            (float)row["GroupPositionY"],
-            (float)row["GroupPositionZ"]
+            Column(row, "GroupPositionX", 0f),
+            Column(row, "GroupPositionY", 0f),
+            Column(row, "GroupPositionZ", 0f)
             );
         prim.Velocity = new Vector3(
-            (float)row["VelocityX"],
-            (float)row["VelocityY"],
-            (float)row["VelocityZ"]
+            Column(row, "VelocityX", 0f),
+            Column(row, "VelocityY", 0f),
+            Column(row, "VelocityZ", 0f)
             );
         prim.AngularVelocity = new Vector3(
-            (float)row["AngularVelocityX"],
-            (float)row["AngularVelocityY"],
-            (float)row["AngularVelocityZ"]
+            Column(row, "AngularVelocityX", 0f),
+            Column(row, "AngularVelocityY", 0f),
+            Column(row, "AngularVelocityZ", 0f)
             );
         prim.Acceleration = new Vector3(
-            (float)row["AccelerationX"],
-            (float)row["AccelerationY"],
-            (float)row["AccelerationZ"]
+            Column(row, "AccelerationX", 0f),
+            Column(row, "AccelerationY", 0f),
+            Column(row, "AccelerationZ", 0f)
             );
-        // quaternions
+        // quaternions: a NULL reads as the identity's component
         prim.RotationOffset = new Quaternion(
-            (float)row["RotationX"],
-            (float)row["RotationY"],
-            (float)row["RotationZ"],
-            (float)row["RotationW"]
+            Column(row, "RotationX", 0f),
+            Column(row, "RotationY", 0f),
+            Column(row, "RotationZ", 0f),
+            Column(row, "RotationW", 1f)
             );
         prim.SitTargetPositionLL = new Vector3(
-            (float)row["SitTargetOffsetX"],
-            (float)row["SitTargetOffsetY"],
-            (float)row["SitTargetOffsetZ"]
+            Column(row, "SitTargetOffsetX", 0f),
+            Column(row, "SitTargetOffsetY", 0f),
+            Column(row, "SitTargetOffsetZ", 0f)
             );
         prim.SitTargetOrientationLL = new Quaternion(
-            (float)row["SitTargetOrientX"],
-            (float)row["SitTargetOrientY"],
-            (float)row["SitTargetOrientZ"],
-            (float)row["SitTargetOrientW"]
+            Column(row, "SitTargetOrientX", 0f),
+            Column(row, "SitTargetOrientY", 0f),
+            Column(row, "SitTargetOrientZ", 0f),
+            Column(row, "SitTargetOrientW", 1f)
             );
         // NULL (every row saved before the column existed): the state follows the offset and rotation, as before.
         if (row["SitTargetActive"] is not DBNull)
             prim.SitTargetActive = Convert.ToInt32(row["SitTargetActive"]) != 0;
 
         prim.StandOffset = new Vector3(
-            (float)row["standtargetx"],
-            (float)row["standtargety"],
-            (float)row["standtargetz"]
+            Column(row, "standtargetx", 0f),
+            Column(row, "standtargety", 0f),
+            Column(row, "standtargetz", 0f)
             );
 
-        prim.SitActiveRange = (float)row["sitactrange"];
+        prim.SitActiveRange = Column(row, "sitactrange", 0f);
 
         prim.PayPrice[0] = (int)row["PayPrice"];
         prim.PayPrice[1] = (int)row["PayButton1"];
@@ -1094,7 +1092,7 @@ public class MySQLSimulationData : ISimulationDataStore
         prim.PayPrice[4] = (int)row["PayButton4"];
 
         prim.Sound = DBGuid.FromDB(row["LoopedSound"].ToString());
-        prim.SoundGain = (float)row["LoopedSoundGain"];
+        prim.SoundGain = Column(row, "LoopedSoundGain", 0f);
         if (prim.Sound.IsZero())
             prim.SoundFlags = 0;
         else
@@ -1106,15 +1104,15 @@ public class MySQLSimulationData : ISimulationDataStore
             prim.ParticleSystem = (byte[])row["ParticleSystem"];
 
         prim.SetCameraEyeOffset(new Vector3(
-            (float)row["CameraEyeOffsetX"],
-            (float)row["CameraEyeOffsetY"],
-            (float)row["CameraEyeOffsetZ"]
+            Column(row, "CameraEyeOffsetX", 0f),
+            Column(row, "CameraEyeOffsetY", 0f),
+            Column(row, "CameraEyeOffsetZ", 0f)
             ));
 
         prim.SetCameraAtOffset(new Vector3(
-            (float)row["CameraAtOffsetX"],
-            (float)row["CameraAtOffsetY"],
-            (float)row["CameraAtOffsetZ"]
+            Column(row, "CameraAtOffsetX", 0f),
+            Column(row, "CameraAtOffsetY", 0f),
+            Column(row, "CameraAtOffsetZ", 0f)
             ));
 
         prim.SetForceMouselook((sbyte)row["ForceMouselook"] != 0);
@@ -1144,8 +1142,8 @@ public class MySQLSimulationData : ISimulationDataStore
         {
             prim.AttachedPos = new Vector3(
                 (float)row["AttachedPosX"],
-                (float)row["AttachedPosY"],
-                (float)row["AttachedPosZ"]
+                Column(row, "AttachedPosY", 0f),
+                Column(row, "AttachedPosZ", 0f)
                 );
         }
 
@@ -1168,10 +1166,11 @@ public class MySQLSimulationData : ISimulationDataStore
         }
 
         prim.PhysicsShapeType = (byte)Convert.ToInt32(row["PhysicsShapeType"].ToString());
-        prim.Density = (float)row["Density"];
-        prim.GravityModifier = (float)row["GravityModifier"];
-        prim.Friction = (float)row["Friction"];
-        prim.Restitution = (float)row["Restitution"];
+        // a NULL reads as the column's default, which is a new part's
+        prim.Density = Column(row, "Density", 1000f);
+        prim.GravityModifier = Column(row, "GravityModifier", 1f);
+        prim.Friction = Column(row, "Friction", 0.6f);
+        prim.Restitution = Column(row, "Restitution", 0.5f);
         prim.RotationAxisLocks = (byte)Convert.ToInt32(row["RotationAxisLocks"].ToString());
 
         if (row["Vehicle"].ToString() != String.Empty)
@@ -1199,9 +1198,9 @@ public class MySQLSimulationData : ISimulationDataStore
             prim.Animations = null;
         }
 
-        prim.SitActiveRange = (float)row["sitactrange"];
+        prim.SitActiveRange = Column(row, "sitactrange", 0f);
 
-        int pseudocrc = (int)row["pseudocrc"];
+        int pseudocrc = Column(row, "pseudocrc", 0);
         if(pseudocrc != 0)
             prim.PseudoCRC = pseudocrc;
         
@@ -1211,10 +1210,25 @@ public class MySQLSimulationData : ISimulationDataStore
             prim.LinksetData = LinksetData.DeserializeLinksetData((string)row["linksetdata"]);
         }
 
-        prim.AllowUnsit = ((sbyte)row["AllowUnsit"] != 0);
-        prim.ScriptedSitOnly = ((sbyte)row["ScriptedSitOnly"] != 0);
+        prim.AllowUnsit = Column(row, "AllowUnsit", (sbyte)1) != 0;
+        prim.ScriptedSitOnly = Column(row, "ScriptedSitOnly", (sbyte)0) != 0;
 
         return prim;
+    }
+
+    /// <summary>
+    /// The value of a column, or <paramref name="fallback"/> when it is NULL. Most prims, primshapes and primitems
+    /// columns are nullable in the schema. The region writes all of them, but rows written by other tools can hold
+    /// NULL, and a NULL cast to a string or a number threw and stopped the region's whole load.
+    /// </summary>
+    private static T Column<T>(IDataReader row, string column, T fallback)
+    {
+        object value = row[column];
+        if (value is T typed)
+            return typed;
+        if (value is DBNull)
+            return fallback;
+        return (T)Convert.ChangeType(value, typeof(T), CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -1233,22 +1247,23 @@ public class MySQLSimulationData : ISimulationDataStore
             taskItem.AssetID       = DBGuid.FromDB(row["assetID"]);
             taskItem.ParentID      = DBGuid.FromDB(row["parentFolderID"]);
 
-            taskItem.InvType       = Convert.ToInt32(row["invType"]);
-            taskItem.Type          = Convert.ToInt32(row["assetType"]);
+            taskItem.InvType       = Column(row, "invType", (int)InventoryType.Unknown);
+            taskItem.Type          = Column(row, "assetType", (int)AssetType.Unknown);
 
-            taskItem.Name          = (String)row["name"];
-            taskItem.Description   = (String)row["description"];
-            taskItem.CreationDate  = Convert.ToUInt32(row["creationDate"]);
+            taskItem.Name          = Column(row, "name", string.Empty);
+            taskItem.Description   = Column(row, "description", string.Empty);
+            taskItem.CreationDate  = Column(row, "creationDate", 0u);
             taskItem.CreatorIdentification = (String)row["creatorID"];
             taskItem.OwnerID       = DBGuid.FromDB(row["ownerID"]);
             taskItem.LastOwnerID   = DBGuid.FromDB(row["lastOwnerID"]);
             taskItem.GroupID       = DBGuid.FromDB(row["groupID"]);
 
-            taskItem.NextPermissions = Convert.ToUInt32(row["nextPermissions"]);
-            taskItem.CurrentPermissions     = Convert.ToUInt32(row["currentPermissions"]);
-            taskItem.BasePermissions      = Convert.ToUInt32(row["basePermissions"]);
-            taskItem.EveryonePermissions  = Convert.ToUInt32(row["everyonePermissions"]);
-            taskItem.GroupPermissions     = Convert.ToUInt32(row["groupPermissions"]);
+            // A NULL permission grants nothing.
+            taskItem.NextPermissions = Column(row, "nextPermissions", 0u);
+            taskItem.CurrentPermissions     = Column(row, "currentPermissions", 0u);
+            taskItem.BasePermissions      = Column(row, "basePermissions", 0u);
+            taskItem.EveryonePermissions  = Column(row, "everyonePermissions", 0u);
+            taskItem.GroupPermissions     = Column(row, "groupPermissions", 0u);
             taskItem.Flags         = Convert.ToUInt32(row["flags"]);
             taskItem.ExperienceID  = DBGuid.FromDB(row["experienceID"]);
 
@@ -1856,38 +1871,41 @@ public class MySQLSimulationData : ISimulationDataStore
     /// <returns></returns>
     private PrimitiveBaseShape BuildShape(IDataReader row)
     {
-        PrimitiveBaseShape s = new PrimitiveBaseShape();
+        // A NULL path, profile or state column keeps the value of the default box's shape.
+        PrimitiveBaseShape s = PrimitiveBaseShape.CreateBox();
         s.Scale = new Vector3(
             (float)(double)row["ScaleX"],
             (float)(double)row["ScaleY"],
             (float)(double)row["ScaleZ"]
         );
         // paths
-        s.PCode = (byte)(int)row["PCode"];
-        s.PathBegin = (ushort)(int)row["PathBegin"];
-        s.PathEnd = (ushort)(int)row["PathEnd"];
-        s.PathScaleX = (byte)(int)row["PathScaleX"];
-        s.PathScaleY = (byte)(int)row["PathScaleY"];
-        s.PathShearX = (byte)(int)row["PathShearX"];
-        s.PathShearY = (byte)(int)row["PathShearY"];
-        s.PathSkew = (sbyte)(int)row["PathSkew"];
-        s.PathCurve = (byte)(int)row["PathCurve"];
-        s.PathRadiusOffset = (sbyte)(int)row["PathRadiusOffset"];
-        s.PathRevolutions = (byte)(int)row["PathRevolutions"];
-        s.PathTaperX = (sbyte)(int)row["PathTaperX"];
-        s.PathTaperY = (sbyte)(int)row["PathTaperY"];
-        s.PathTwist = (sbyte)(int)row["PathTwist"];
-        s.PathTwistBegin = (sbyte)(int)row["PathTwistBegin"];
+        s.PCode = (byte)Column(row, "PCode", (int)s.PCode);
+        s.PathBegin = (ushort)Column(row, "PathBegin", (int)s.PathBegin);
+        s.PathEnd = (ushort)Column(row, "PathEnd", (int)s.PathEnd);
+        s.PathScaleX = (byte)Column(row, "PathScaleX", (int)s.PathScaleX);
+        s.PathScaleY = (byte)Column(row, "PathScaleY", (int)s.PathScaleY);
+        s.PathShearX = (byte)Column(row, "PathShearX", (int)s.PathShearX);
+        s.PathShearY = (byte)Column(row, "PathShearY", (int)s.PathShearY);
+        s.PathSkew = (sbyte)Column(row, "PathSkew", (int)s.PathSkew);
+        s.PathCurve = (byte)Column(row, "PathCurve", (int)s.PathCurve);
+        s.PathRadiusOffset = (sbyte)Column(row, "PathRadiusOffset", (int)s.PathRadiusOffset);
+        s.PathRevolutions = (byte)Column(row, "PathRevolutions", (int)s.PathRevolutions);
+        s.PathTaperX = (sbyte)Column(row, "PathTaperX", (int)s.PathTaperX);
+        s.PathTaperY = (sbyte)Column(row, "PathTaperY", (int)s.PathTaperY);
+        s.PathTwist = (sbyte)Column(row, "PathTwist", (int)s.PathTwist);
+        s.PathTwistBegin = (sbyte)Column(row, "PathTwistBegin", (int)s.PathTwistBegin);
         // profile
-        s.ProfileBegin = (ushort)(int)row["ProfileBegin"];
-        s.ProfileEnd = (ushort)(int)row["ProfileEnd"];
-        s.ProfileCurve = (byte)(int)row["ProfileCurve"];
-        s.ProfileHollow = (ushort)(int)row["ProfileHollow"];
-        s.TextureEntry = (byte[])row["Texture"];
+        s.ProfileBegin = (ushort)Column(row, "ProfileBegin", (int)s.ProfileBegin);
+        s.ProfileEnd = (ushort)Column(row, "ProfileEnd", (int)s.ProfileEnd);
+        s.ProfileCurve = (byte)Column(row, "ProfileCurve", (int)s.ProfileCurve);
+        s.ProfileHollow = (ushort)Column(row, "ProfileHollow", (int)s.ProfileHollow);
+        if (row["Texture"] is not DBNull)
+            s.TextureEntry = (byte[])row["Texture"];
 
-        s.ExtraParams = (byte[])row["ExtraParams"];
+        if (row["ExtraParams"] is not DBNull)
+            s.ExtraParams = (byte[])row["ExtraParams"];
 
-        s.State = (byte)(int)row["State"];
+        s.State = (byte)Column(row, "State", (int)s.State);
         s.LastAttachPoint = (byte)(int)row["LastAttachPoint"];
 
         if (row["Media"] is not System.DBNull)
