@@ -86,15 +86,22 @@ public class EstateConnector
         sendData["EstateID"] = EstateID.ToString();
 
         // Handle local regions locally
-        //
-        foreach (Scene s in m_EstateModule.Scenes)
-        {
-            if (s.RegionInfo.EstateSettings.EstateID == EstateID)
-                s.RegionInfo.RegionSettings.Covenant = CovenantID;
-//                    s.ReloadEstateData();
-        }
+        m_EstateModule.SetLocalCovenant(EstateID, CovenantID);
 
-        SendToEstate(EstateID, sendData);
+        // One POST per other simulator of the estate, each waiting for its reply or its timeout: do not hold up
+        // the caller (a viewer request or a console command) while they are made.
+        Util.FireAndForget(_ =>
+        {
+            try
+            {
+                SendToEstate(EstateID, sendData);
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[ESTATE CONNECTOR]: Could not send the covenant of estate {0} to its other regions: {1}",
+                    EstateID, e.Message);
+            }
+        }, null, "EstateConnector.SendUpdateCovenant");
 
         return true;
     }

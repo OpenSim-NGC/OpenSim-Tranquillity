@@ -257,11 +257,7 @@ public class EstateSimpleRequestHandler :SimpleStreamHandler
         if (!Int32.TryParse(request["EstateID"].ToString(), out EstateID))
             return FailureResult();
 
-        foreach (Scene s in m_EstateModule.Scenes)
-        {
-            if (s.RegionInfo.EstateSettings.EstateID == (uint)EstateID)
-                s.RegionInfo.RegionSettings.Covenant = CovenantID;
-        }
+        m_EstateModule.SetLocalCovenant((uint)EstateID, CovenantID);
 
         return SuccessResult();
     }
