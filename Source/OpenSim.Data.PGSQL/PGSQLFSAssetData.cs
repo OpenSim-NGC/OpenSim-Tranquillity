@@ -150,7 +150,9 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
         }
     }
 
-    public bool Store(AssetMetadata meta, string hash)
+    public bool Store(AssetMetadata meta, string hash) => Store(meta, hash, false);
+
+    public bool Store(AssetMetadata meta, string hash, bool force)
     {
         try
         {
@@ -160,7 +162,12 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
             // An id that already has a row is stored: as on MySQL, the row is kept and the store succeeds, or
             // the caller would be told it failed and store it again.
             string query = String.Format("UPDATE {0} SET \"access_time\" = :access_time WHERE \"id\" = :id", m_Table);
-            if (existingAsset == null)
+            if (existingAsset != null && force)
+            {
+                // "force import": the row points at the new content; its type, flags and creation time stay.
+                query = String.Format("UPDATE {0} SET \"hash\" = :hash, \"access_time\" = :access_time WHERE \"id\" = :id", m_Table);
+            }
+            else if (existingAsset == null)
             {
                query = String.Format("insert into {0} (\"id\", \"type\", \"hash\", \"asset_flags\", \"create_time\", \"access_time\") values ( :id, :type, :hash, :asset_flags, :create_time, :access_time)", m_Table);
             }

@@ -847,7 +847,7 @@ public class FSAssetConnector : ServiceBase, IAssetService
             }
         }
 
-        if (!m_DataConnector.Store(asset.Metadata, hash))
+        if (!m_DataConnector.Store(asset.Metadata, hash, force))
         {
             if (asset.Metadata.Type == -2)
                 return asset.ID;
