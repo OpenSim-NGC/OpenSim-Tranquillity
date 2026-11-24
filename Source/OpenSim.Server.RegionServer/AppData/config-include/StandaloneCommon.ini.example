@@ -81,7 +81,10 @@
     ;; Warning this is required for several region features
 
     AssetCaching = "FlotsamAssetCache"
-    Include-FlotsamCache = "config-include/FlotsamCache.ini"
+    ;; The cache's settings ([AssetCache]) have defaults in RegionServerDefaults.ini. To change
+    ;; them, copy FlotsamCache.ini.example to FlotsamCache.ini, keep what you change, and
+    ;; uncomment this line.
+    ; Include-FlotsamCache = "config-include/FlotsamCache.ini"
 
     ;; Authorization is not on by default, as it depends on external php
     ;AuthorizationServices = "LocalAuthorizationServicesConnector"
