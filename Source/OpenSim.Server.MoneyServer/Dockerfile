@@ -2,6 +2,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 EXPOSE 8008
 RUN mkdir -p /app/config /app/data /app/logdata && chown app:app /app/logdata
+
+ENV CONFIGDIR=/app/config
 ENV LOGDIR=/app/logdata
 
 USER app
@@ -19,5 +21,17 @@ RUN dotnet publish "Source/OpenSim.Server.MoneyServer/OpenSim.Server.MoneyServer
 
 FROM base AS opensim.server.moneyserver
 WORKDIR /app
+
+USER root
+
+# Install additional apt packages and clean up cache
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libgdiplus \
+    libfontconfig1 \
+    && rm -rf /var/lib/apt/lists/*
+
+USER app
+
 COPY --from=publish /app/publish .
 ENTRYPOINT ["/app/Scripts/service-start.sh"]
