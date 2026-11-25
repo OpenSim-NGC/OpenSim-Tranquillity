@@ -700,6 +700,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 // The body left the engine (CrossingStart on another thread) after this state was taken.
                 if (_away != Away.None || !_body.IsValid)
                     return;
+                _drained = true;
+                if (!double.IsNaN(_arrivalAge))
+                    _arrivalStepped += _module.DrainCoversSeconds;
                 if (_isPhysical && (newPos.Z < MinBodyZ || newPos.Z > MaxBodyZ))
                 {
                     LeaveOutOfBounds(newPos, newRot);
@@ -773,6 +776,89 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 
         public override void KeepInsideBorder(bool keep) => _keptInsideBorder = keep && InWorldzBasicForces;
 
+        // ---------------------------------------------------------------------
+        // Arriving across a border. The object comes with the position and velocity the region it left took at the border,
+        // some tens of milliseconds ago, and is placed here at that position. A heartbeat steps every body for the whole
+        // time since the last heartbeat, so the arriving body's first heartbeat moved it as if it had been here all that
+        // time, while only the sample's age had passed: a viewer extrapolating the object at its old velocity saw it jump
+        // ahead when the first update from this region came. Told the sample's age (CrossedIn), the body's movement over
+        // its first heartbeat here is scaled to the time that has really passed since the sample, at the end of that
+        // heartbeat, before anything is reported for it. A correction that would put it back across the region's edge is
+        // not made (the engine's own step stands), so it can never cross back because of it. Nor is one made for a body
+        // whose first heartbeat comes more than MaxArrivalAgeSeconds after it was taken in, or that is no longer physical.
+        // A hand-over longer than the heartbeat moves the body on by at most MaxArrivalShare times its own step, along the
+        // way it went, so that it is never carried far past what the engine checked for collisions.
+        // ---------------------------------------------------------------------
+        internal const double MaxArrivalAgeSeconds = 1.0;   // the most time an arrival is placed by
+        internal const float MaxArrivalShare = 3f;          // the most an arrival's first heartbeat is stretched
+        private double _arrivalAge = double.NaN;            // seconds, at _arrivalAt; NaN when nothing waits
+        private double _arrivalAt;                          // ArrivalClock when CrossedIn was called
+        private Vector3 _arrivalFrom;                       // where the body was placed
+        private double _arrivalStepped;                     // seconds of steps the body has had since
+        private bool _drained;                              // the engine has reported this body at least once
+
+        public override void CrossedIn(float sampleAgeSeconds)
+        {
+            if (!(sampleAgeSeconds >= 0f) || float.IsInfinity(sampleAgeSeconds))
+                return;
+            lock (_awayLock)
+            {
+                // a body already stepped here has moved since it was placed: its first heartbeat is past
+                if (_drained || !_isPhysical || !_body.IsValid)
+                {
+                    if (JoltScene.m_log.IsEnabled(LogLevel.Debug))
+                        JoltScene.m_log.LogDebug($"{JoltScene.LogHeader} [crossing] arrival of {LocalID} not placed: already stepped {_drained}, physical {_isPhysical}");
+                    return;
+                }
+                _arrivalAge = Math.Min(sampleAgeSeconds, MaxArrivalAgeSeconds);
+                _arrivalAt = _module.ArrivalClock();
+                _arrivalFrom = _position;
+                _arrivalStepped = 0;
+            }
+            _module.NoteArrival(this);
+        }
+
+        // At the end of the heartbeat (JoltScene.FinishArrivals). True when nothing more is to be done for the arrival.
+        internal bool FinishArrival()
+        {
+            lock (_awayLock)
+            {
+                if (double.IsNaN(_arrivalAge))
+                    return true;
+                if (_away != Away.None || !_body.IsValid)
+                {
+                    _arrivalAge = double.NaN;
+                    return true;
+                }
+                double sinceTakenIn = _module.ArrivalClock() - _arrivalAt;
+                if (!_isPhysical || sinceTakenIn > MaxArrivalAgeSeconds)
+                {
+                    _arrivalAge = double.NaN;
+                    if (JoltScene.m_log.IsEnabled(LogLevel.Debug))
+                        JoltScene.m_log.LogDebug($"{JoltScene.LogHeader} [crossing] arrival of {LocalID} not placed: physical {_isPhysical}, first heartbeat {sinceTakenIn:0.000} s after it came");
+                    return true;
+                }
+                if (_arrivalStepped <= 0)
+                    return false;   // not stepped yet (it came in during this heartbeat's steps): the next heartbeat
+
+                double elapsed = Math.Max(0.0, _arrivalAge + sinceTakenIn);
+                float share = Math.Min((float)(elapsed / _arrivalStepped), MaxArrivalShare);
+                _arrivalAge = double.NaN;
+
+                Vector3 engine = _position;
+                Vector3 target = _arrivalFrom + (engine - _arrivalFrom) * share;
+                bool inside = InRegion(target);
+                if (JoltScene.m_log.IsEnabled(LogLevel.Debug))
+                    JoltScene.m_log.LogDebug($"{JoltScene.LogHeader} [crossing] arrival of {LocalID}: placed at {_arrivalFrom}, sample {elapsed * 1000:0.0} ms old after {_arrivalStepped * 1000:0.0} ms of steps, engine {engine}, {(inside ? "moved to " + target : "left: the time elapsed is past the edge")}");
+                if (!inside)
+                    return true;
+                _position = target;
+                _backend.SetBodyTransform(_body, ToS(_position), BodyOrientationOf(_orientation), activate: true);
+            }
+            RequestPhysicsterseUpdate();
+            return true;
+        }
+
         private const float BorderKeepMargin = 0.5f;
 
         private void KeepAtBorder(Vector3 pos, Quaternion rot, Vector3 velocity, Vector3 angularVelocity)
@@ -807,10 +893,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private void LeaveAcrossEdge(Vector3 pos, Quaternion rot, Vector3 velocity, Vector3 angularVelocity)
         {
             float sx = _module.RegionSizeX, sy = _module.RegionSizeY;
-            if (pos.X < 0f) pos.X = Math.Clamp(pos.X, -EdgeWaitMax, -EdgeWaitMin);
-            else if (pos.X >= sx) pos.X = Math.Clamp(pos.X, sx + EdgeWaitMin, sx + EdgeWaitMax);
-            if (pos.Y < 0f) pos.Y = Math.Clamp(pos.Y, -EdgeWaitMax, -EdgeWaitMin);
-            else if (pos.Y >= sy) pos.Y = Math.Clamp(pos.Y, sy + EdgeWaitMin, sy + EdgeWaitMax);
+            // An object faster than 2 m a heartbeat waits as far out as its last step took it: the place it waits at is the
+            // place a crossing sends it with, and one pulled back would arrive behind where it was.
+            float stepped = (float)_module.DrainCoversSeconds;
+            float maxX = Math.Max(EdgeWaitMax, Math.Abs(velocity.X) * stepped + EdgeWaitMin);
+            float maxY = Math.Max(EdgeWaitMax, Math.Abs(velocity.Y) * stepped + EdgeWaitMin);
+            if (pos.X < 0f) pos.X = Math.Clamp(pos.X, -maxX, -EdgeWaitMin);
+            else if (pos.X >= sx) pos.X = Math.Clamp(pos.X, sx + EdgeWaitMin, sx + maxX);
+            if (pos.Y < 0f) pos.Y = Math.Clamp(pos.Y, -maxY, -EdgeWaitMin);
+            else if (pos.Y >= sy) pos.Y = Math.Clamp(pos.Y, sy + EdgeWaitMin, sy + maxY);
             _position = pos;
             _orientation = rot;
             _velocity = velocity;

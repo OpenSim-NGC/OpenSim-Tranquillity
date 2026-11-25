@@ -166,6 +166,57 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // they read the wall clock; the test harness sets a simulated one so it can step faster than real time.
         internal Func<DateTime> VehicleClock;
 
+        // The clock (seconds) an arriving object's sample age is counted on from the moment it is handed to its prim
+        // (JoltPrim.CrossedIn) until its first heartbeat here has run: this process's own monotonic clock. Tests set theirs.
+        internal Func<double> ArrivalClock = () => System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
+
+        // The physics time the step report being drained covers: one step on the single-step path, all of the heartbeat's
+        // steps when substepping (only the last one is reported). The drain's own step length is the heartbeat's there.
+        internal double DrainCoversSeconds { get; private set; }
+
+        // Prims that crossed in and wait for the end of their first heartbeat here (JoltPrim.FinishArrival)
+        private readonly List<JoltPrim> _arrivals = new List<JoltPrim>();
+
+        internal void NoteArrival(JoltPrim prim)
+        {
+            lock (_arrivals)
+            {
+                if (!_arrivals.Contains(prim))
+                    _arrivals.Add(prim);
+            }
+        }
+
+        // At the end of a heartbeat, after all of its steps: each arrival that has been stepped is moved back (or on) to
+        // where the time that has really passed since its sample puts it.
+        private void FinishArrivals()
+        {
+            JoltPrim[] pending;
+            lock (_arrivals)
+            {
+                if (_arrivals.Count == 0)
+                    return;
+                pending = _arrivals.ToArray();
+            }
+            foreach (JoltPrim prim in pending)
+            {
+                bool done;
+                try
+                {
+                    done = prim.FinishArrival();
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(e, $"{LogHeader} placing the arrived prim {prim.LocalID} failed: {e.Message}");
+                    done = true;
+                }
+                if (done)
+                {
+                    lock (_arrivals)
+                        _arrivals.Remove(prim);
+                }
+            }
+        }
+
         // [Jolt] PhysicsStepRate: null = one backend step per heartbeat (PhysicsStepRate = 0). Otherwise each heartbeat runs
         // the steps this accumulator hands out, each 1 / rate seconds long. Set once, in InitialiseRegion.
         private SubstepAccumulator _substeps;
@@ -2811,7 +2862,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             SimTime += timeStep;
             backend.BeginRayCastBudget();   // [Jolt] RayCastBudgetMs and RayCastSimulatorBudgetMs are per heartbeat, at every PhysicsStepRate
             if (_substeps != null)
-                return SimulateSubsteps(timeStep);
+            {
+                float result = SimulateSubsteps(timeStep);
+                FinishArrivals();
+                return result;
+            }
 
             // (Re)build changed linkset compounds ONCE per frame, here on the step thread before
             // the step. link()/unlink() only mark the root dirty (they do not rebuild inline); this
@@ -2845,7 +2900,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // avatar bounce/jitter and a performance cost), but by CollisionSteps=6 set at Initialize: Jolt sub-
             // steps the RIGID-BODY solver INSIDE _system.Update without re-running the character step, so a
             // dropped prim integrates in solver sub-slices and rests, while the avatar stays at 1 step/frame.
+            DrainCoversSeconds = timeStep;
             StepOnce(timeStep, backend);
+            FinishArrivals();
 
             TraceCharFrame(backend);
             return 1f;
@@ -3169,6 +3226,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 physicsMs += r.PhysicsMilliseconds;
                 timing.Add(in r);
             }
+            DrainCoversSeconds = n * (double)dt;
             ReportStep(backend, in r, timeStep, contactCount, contactsOverflowed, physicsMs, mergeSubsteps: true, in timing);
             TraceCharFrame(backend);
             return 1f;

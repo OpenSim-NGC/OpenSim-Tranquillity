@@ -320,6 +320,14 @@ public abstract class PhysicsActor
     /// </summary>
     public virtual void KeepInsideBorder(bool keep) { }
 
+    /// <summary>
+    /// Tells the actor of an object that has just crossed into the region that the position and velocity it was given
+    /// were taken <paramref name="sampleAgeSeconds"/> ago, by the region it came from. An engine whose next step would
+    /// move the object as if it had been in the region for the whole step can use this to move it only as far as the time
+    /// that has really passed. The default does nothing: the object moves as before.
+    /// </summary>
+    public virtual void CrossedIn(float sampleAgeSeconds) { }
+
     public abstract void link(PhysicsActor obj);
 
     public abstract void delink();

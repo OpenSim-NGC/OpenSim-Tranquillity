@@ -509,6 +509,7 @@ public class SimulationServiceConnector : ISimulationService
             args["destination_name"] = OSD.FromString(destination.RegionName);
             args["destination_uuid"] = OSD.FromString(destination.RegionID.ToString());
 
+            AddSampleAge(args, sog);
             OSDMap result = PostObjectMessage(uri, args, 40000);
 
             if (result == null)
@@ -524,6 +525,18 @@ public class SimulationServiceConnector : ISimulationService
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Adds how old the position and velocity the object is sent with are, as a duration (ms) measured by this region:
+    /// the receiving region adds its own handling time and never compares this region's clock with its own. Left out when
+    /// it is not known, so the message is then the one an older region sends.
+    /// </summary>
+    private static void AddSampleAge(OSDMap args, ISceneObject sog)
+    {
+        double sampleAgeMs = sog.CrossingSampleAgeMs;
+        if (double.IsFinite(sampleAgeMs))
+            args["sample_age_ms"] = OSD.FromReal(sampleAgeMs);
     }
 
     /// <summary>Sends one object message to a region's object handler. A test replaces it to take the place of the network.</summary>
@@ -615,6 +628,7 @@ public class SimulationServiceConnector : ISimulationService
                 riders.Add(OSD.FromUUID(rider));
             args["hold_riders"] = riders;
 
+            AddSampleAge(args, sog);
             OSDMap result = PostObjectMessage(uri, args, 40000);
             return result is not null && result["success"].AsBoolean();
         }

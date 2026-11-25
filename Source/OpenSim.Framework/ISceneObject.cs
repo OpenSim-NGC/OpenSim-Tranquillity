@@ -47,4 +47,11 @@ public interface ISceneObject
     string GetStateSnapshot();
     void SetState(string xmlstr, IScene s);
     bool HasGroupChanged { get; set; }
+
+    /// <summary>
+    /// For an object crossing to another region: how long ago (ms) the position and velocity it is sent with were taken.
+    /// While the sending region holds the object it is measured on that region's own clock; the region that takes it in
+    /// is given it as a duration, so no two clocks are ever compared. NaN when not known.
+    /// </summary>
+    double CrossingSampleAgeMs { get; set; }
 }

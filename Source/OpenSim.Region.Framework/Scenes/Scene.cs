@@ -3100,6 +3100,9 @@ public partial class Scene : SceneBase
         // (IncomingCreateObject with a hold) sets the stamp after this
         newObject.ArrivedWithRidersAtMs = double.NaN;
 
+        // when the object was handed to this region, for the age of its position and velocity (GiveArrivalAge)
+        newObject.CrossingHandedOverAtMs = double.IsFinite(newObject.CrossingSampleAgeMs) ? CrossingClock() : double.NaN;
+
         bool taken;
         try
         {
@@ -3107,12 +3110,18 @@ public partial class Scene : SceneBase
         }
         catch (Exception e)
         {
+            newObject.CrossingSampleAgeMs = double.NaN;
+            newObject.CrossingHandedOverAtMs = double.NaN;
             // The object may be in the region already, half taken in. The sending region keeps its original when this
             // answers false, so the copy here goes: two copies of one object must not be left.
             m_log.LogError(e, $"[INTERREGION]: Taking in {newObject.Name} {newObject.UUID} failed with {e.GetType().Name}: {e.Message}");
             DiscardIncomingObject(newObject);
             return false;
         }
+
+        // an age that was not given to an engine is not kept for later
+        newObject.CrossingSampleAgeMs = double.NaN;
+        newObject.CrossingHandedOverAtMs = double.NaN;
 
         if (!taken)
             return false;
@@ -3240,10 +3249,31 @@ public partial class Scene : SceneBase
                 return false;
             }
             // false when an object with this id is already here: the caller must not go on as if this one had been added
-            return AddRestoredSceneObject(sceneObject, true, false);
+            if (!AddRestoredSceneObject(sceneObject, true, false))
+                return false;
+            GiveArrivalAge(sceneObject);
+            return true;
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Tells the engine of an object that has just crossed in how old its position and velocity are, so that its next
+    /// step moves it only as far as the time that has really passed (PhysicsActor.CrossedIn). This is done as soon as
+    /// its physics actor exists, before its scripts are started, so that no step runs in between. An object held for its
+    /// riders is held still and is not told.
+    /// </summary>
+    private void GiveArrivalAge(SceneObjectGroup so)
+    {
+        double ageMs = so.CrossingSampleAgeMs;
+        double handedOverAtMs = so.CrossingHandedOverAtMs;
+        if (!double.IsFinite(ageMs) || !double.IsFinite(handedOverAtMs))
+            return;
+        so.CrossingSampleAgeMs = double.NaN;
+        so.CrossingHandedOverAtMs = double.NaN;
+        if (!so.HeldForRiders && so.UsesPhysics && so.RootPart.PhysActor is PhysicsActor actor)
+            actor.CrossedIn((float)((ageMs + Math.Max(0.0, CrossingClock() - handedOverAtMs)) / 1000.0));
     }
 
     private int GetStateSource(SceneObjectGroup sog)

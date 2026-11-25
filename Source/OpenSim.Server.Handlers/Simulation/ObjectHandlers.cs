@@ -101,6 +101,8 @@ public class ObjectSimpleHandler : SimpleStreamHandler
 
     protected void DoObjectPost(OSDMap args, IOSHttpResponse httpResponse)
     {
+        double receivedAtMs = NowMs();
+
         // retrieve the input arguments
         int x = 0, y = 0;
         UUID uuid = UUID.Zero;
@@ -189,6 +191,16 @@ public class ObjectSimpleHandler : SimpleStreamHandler
             }
         }
 
+        // How old the object's position and velocity were when the other region sent it (ms, a duration on that region's
+        // clock), plus the time this message has been handled here: never a comparison of the two simulators' clocks.
+        // An age that is not a number, negative or above the limit is ignored, as is a message without one.
+        if (args.ContainsKey("sample_age_ms") && args["sample_age_ms"] is OSD sampleAge)
+        {
+            double ageMs = sampleAge.AsReal();
+            if (ageMs >= 0 && ageMs <= MaxSampleAgeMs)
+                sog.CrossingSampleAgeMs = ageMs + Math.Max(0.0, NowMs() - receivedAtMs);
+        }
+
         // Riders listed: the object is to be held until they have arrived
         CrossingHoldRequest hold = null;
         if (args.ContainsKey("hold_riders") && args["hold_riders"] is OSDArray riders && riders.Count > 0)
@@ -219,6 +231,15 @@ public class ObjectSimpleHandler : SimpleStreamHandler
 
         RespondWithBool(httpResponse, result);
     }
+
+    /// <summary>The clock (ms) this handler times its own handling of a message on: this process's monotonic clock.</summary>
+    protected virtual double NowMs()
+    {
+        return Util.GetTimeStampMS();
+    }
+
+    /// <summary>The oldest sample age (ms) a crossing object message is taken with.</summary>
+    private const double MaxSampleAgeMs = 10000;
 
     private static void RespondWithBool(IOSHttpResponse httpResponse, bool result)
     {

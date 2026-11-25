@@ -329,6 +329,8 @@ public class LocalSimulationConnectorModule : ISharedRegionModule, ISimulationSe
                 // We need to make a local copy of the object
                 ISceneObject sogClone = sog.CloneForNewScene();
                 sogClone.SetState(sog.GetStateSnapshot(), s);
+                // the age of the position and velocity it crosses with, on this process's own clock
+                sogClone.CrossingSampleAgeMs = sog.CrossingSampleAgeMs;
                 return s.IncomingCreateObject(newPosition, sogClone);
             }
             else
@@ -360,6 +362,7 @@ public class LocalSimulationConnectorModule : ISharedRegionModule, ISimulationSe
         {
             ISceneObject sogClone = sog.CloneForNewScene();
             sogClone.SetState(sog.GetStateSnapshot(), s);
+            sogClone.CrossingSampleAgeMs = sog.CrossingSampleAgeMs;
             return s.IncomingCreateObject(newPosition, sogClone, hold);
         }
 

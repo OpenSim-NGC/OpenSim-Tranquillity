@@ -848,6 +848,37 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
     /// </summary>
     public double ArrivedWithRidersAtMs { get; set; } = double.NaN;
 
+    // When this region took the position and velocity a crossing sends the object with (Scene.CrossingClock, ms); NaN
+    // when it has not. Only this region's clock is read against it.
+    private double m_crossSampleAtMs = double.NaN;
+
+    // The age (ms) an object that crossed in was handed over with, until the region gives it to the object's engine
+    private double m_crossSampleAgeMs = double.NaN;
+
+    /// <summary>When (the receiving region's Scene.CrossingClock, ms) an object that crossed in was handed to the region,
+    /// until its age is given to its engine; NaN otherwise.</summary>
+    public double CrossingHandedOverAtMs { get; set; } = double.NaN;
+
+    /// <summary>
+    /// For a crossing: how long ago (ms) the position and velocity the object is sent with were taken. While this region
+    /// holds the sample it is measured on this region's clock; set, it is the age the object was handed over with (and
+    /// the sample of this region is forgotten). NaN when not known.
+    /// </summary>
+    public double CrossingSampleAgeMs
+    {
+        get
+        {
+            if (!double.IsNaN(m_crossSampleAtMs) && m_scene is not null)
+                return Math.Max(0.0, m_scene.CrossingClock() - m_crossSampleAtMs);
+            return m_crossSampleAgeMs;
+        }
+        set
+        {
+            m_crossSampleAgeMs = value;
+            m_crossSampleAtMs = double.NaN;
+        }
+    }
+
     /// <summary>
     /// Set on the frozen original of an object this region sent to another region, from the moment that region took it
     /// until it reports the crossing complete (the object is then deleted) or gives it back (see <see cref="ShowToViewers"/>):
@@ -897,6 +928,8 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                 if (!inTransit)
                 {
                     inTransit = true;
+                    // the position and velocity the object crosses with are the ones its engine reports now
+                    m_crossSampleAtMs = Scene.CrossingClock();
                     StartCrossing(val, null, "ObjCross-" + UUID.ToString());
                 }
                 return;
@@ -970,6 +1003,9 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             {
                 SceneObjectGroup stayed = CrossAsync(sog, val, tpdata);
                 crossed = stayed is null;
+                // an object that stays keeps no sample: a later teleport or crossing must not send it with this one's age
+                if (stayed is not null)
+                    stayed.m_crossSampleAtMs = double.NaN;
                 CrossAsyncCompleted(stayed);
             }
             finally
@@ -1952,6 +1988,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             sourceID = sourceID
         };
 
+        m_crossSampleAtMs = double.NaN;   // an object teleport is not sent with a crossing's sample age
         StartCrossing(targetPosition, tdata, "ObjTeleport-" + UUID.ToString());
         return 0;
     }
@@ -3352,6 +3389,9 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
         // a copy is not in transit hopefully
         dupe.inTransit = false;
+        dupe.m_crossSampleAtMs = double.NaN;
+        dupe.m_crossSampleAgeMs = double.NaN;
+        dupe.CrossingHandedOverAtMs = double.NaN;
 
         // a copy is not being dragged: the drag belongs to the original's actor and to the subscriptions it made
         dupe.m_grabLock = new object();
