@@ -47,8 +47,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// </remarks>
     public class OSSL_ApiAttachmentTests : OpenSimTestCase
     {
-        protected Scene m_scene;
-        protected MockScriptEngine m_engine;
+        protected Scene m_scene = null!;
+        protected MockScriptEngine m_engine = null!;
 
         public override void SetUp()
         {
@@ -107,7 +107,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             // Check scene presence status
             Assert.True(sp.HasAttachments());
             List<SceneObjectGroup> attachments = sp.GetAttachments();
-            Assert.Equal(1, attachments.Count);
+            Assert.Single(attachments);
             SceneObjectGroup attSo = attachments[0];
             Assert.Equal(taskInvObjItemName, attSo.Name);
             Assert.Equal((uint)attachPoint, attSo.AttachmentPoint);
@@ -117,7 +117,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Check appearance status
             List<AvatarAttachment> attachmentsInAppearance = sp.Appearance.GetAttachments();
-            Assert.Equal(1, attachmentsInAppearance.Count);
+            Assert.Single(attachmentsInAppearance);
             Assert.Equal((int)attachPoint, sp.Appearance.GetAttachpoint(attachmentsInAppearance[0].ItemID));
         }
 
@@ -165,11 +165,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             // Check scene presence status
             Assert.False(sp.HasAttachments());
             List<SceneObjectGroup> attachments = sp.GetAttachments();
-            Assert.Equal(0, attachments.Count);
+            Assert.Empty(attachments);
 
             // Check appearance status
             List<AvatarAttachment> attachmentsInAppearance = sp.Appearance.GetAttachments();
-            Assert.Equal(0, attachmentsInAppearance.Count);
+            Assert.Empty(attachmentsInAppearance);
         }
 
         [Fact]
@@ -206,11 +206,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             // Check scene presence status
             Assert.False(sp.HasAttachments());
             List<SceneObjectGroup> attachments = sp.GetAttachments();
-            Assert.Equal(0, attachments.Count);
+            Assert.Empty(attachments);
 
             Assert.True(sp2.HasAttachments());
             List<SceneObjectGroup> attachments2 = sp2.GetAttachments();
-            Assert.Equal(1, attachments2.Count);
+            Assert.Single(attachments2);
             SceneObjectGroup attSo = attachments2[0];
             Assert.Equal(taskInvObjItemName, attSo.Name);
             Assert.Equal(ua2.PrincipalID, attSo.OwnerID);
@@ -221,10 +221,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Check appearance status
             List<AvatarAttachment> attachmentsInAppearance = sp.Appearance.GetAttachments();
-            Assert.Equal(0, attachmentsInAppearance.Count);
+            Assert.Empty(attachmentsInAppearance);
 
             List<AvatarAttachment> attachmentsInAppearance2 = sp2.Appearance.GetAttachments();
-            Assert.Equal(1, attachmentsInAppearance2.Count);
+            Assert.Single(attachmentsInAppearance2);
             Assert.Equal((int)attachPoint, sp2.Appearance.GetAttachpoint(attachmentsInAppearance2[0].ItemID));
         }
     }
