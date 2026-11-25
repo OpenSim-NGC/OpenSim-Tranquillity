@@ -95,7 +95,7 @@ public class StateWriteRetryTests
     }
 
     [Fact]
-    public void AfterADiscardNoSavedStateIsReportedWhileTheRemovalIsBeingWritten()
+    public async Task AfterADiscardNoSavedStateIsReportedWhileTheRemovalIsBeingWritten()
     {
         string db = NewDb();
         var compiled = Compiled();
@@ -120,7 +120,7 @@ public class StateWriteRetryTests
         };
         m.Discard(script.ItemId);
         Task<bool> written = Task.Run(() => m.WaitForWrites());
-        Assert.True(inWrite.Wait(TimeSpan.FromSeconds(30)), "the removal was never written");
+        Assert.True(await Task.Run(() => inWrite.Wait(TimeSpan.FromSeconds(30))), "the removal was never written");
         try
         {
             Assert.True(HasRow(db, script.ItemId));
@@ -130,7 +130,7 @@ public class StateWriteRetryTests
         {
             release.Set();
         }
-        Assert.True(written.Wait(TimeSpan.FromSeconds(30)) && written.Result);
+        Assert.True(await written.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.False(HasRow(db, script.ItemId));
         Assert.False(m.HasSavedState(script.ItemId, compiled.AssetId));
     }
