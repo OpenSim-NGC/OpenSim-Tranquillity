@@ -49,7 +49,7 @@ public class AppearanceServiceAssetMismatchTests
         Assert.Equal(LogLevel.Warning, log.LevelOf("the grid stores assets through"));
         Assert.Equal(
             $"[APPEARANCE SERVICE]: [AppearanceService] AssetService is {ours}, but the grid stores assets through {grid}. "
-            + "Bakes stored there cannot be served from here; remove AssetService from [AppearanceService] to use the grid's.",
+            + "Bakes stored there cannot be served from here; remove the AssetService override to use the grid's.",
             warning);
     }
 
