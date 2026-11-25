@@ -22,7 +22,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -32,7 +32,7 @@
 
   <!-- SkiaSharp brings its Windows and macOS natives along; the Linux one is a separate package, which the region server also references. -->
   <ItemGroup>
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.153.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.157.0" />
   </ItemGroup>
 
   <!-- The joltc arrives from the JoltPhysics.Native package, under runtimes/<rid>/native/, as in the region server. -->

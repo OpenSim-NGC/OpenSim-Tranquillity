@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.13" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.15" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
