@@ -1006,6 +1006,18 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Vehicles
             _hostBody.KeepAwake();
         }
 
+        /// <summary>
+        /// The body has been moved by <paramref name="delta"/> outside the engine's steps: an object that has just crossed
+        /// in is set back, at the end of its first heartbeat, to where the time since its border sample puts it. The stall
+        /// check's last position moves with it, so that the check's next reading of the position's rate of change is the
+        /// vehicle's own motion over the step. Read across the move, a set-back is a short or backward step, which the check
+        /// takes for the vehicle being held, and that ends a linear motor carried over the border.
+        /// </summary>
+        public void BodyMovedBy(Vector3 delta)
+        {
+            _sp.Dynamics.LastPosition += delta;
+        }
+
         private static bool IsFinite(MotorRunningState s)
             => float.IsFinite(s.Age) && float.IsFinite(s.Direction.X) && float.IsFinite(s.Direction.Y) && float.IsFinite(s.Direction.Z)
             && float.IsFinite(s.Target.X) && float.IsFinite(s.Target.Y) && float.IsFinite(s.Target.Z);

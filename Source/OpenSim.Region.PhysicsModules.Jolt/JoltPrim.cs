@@ -854,6 +854,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     return true;
                 _position = target;
                 _backend.SetBodyTransform(_body, ToS(_position), BodyOrientationOf(_orientation), activate: true);
+                // a vehicle's stall check must not read the move as the vehicle's own motion (VehicleController.BodyMovedBy)
+                _vehicle?.BodyMovedBy(target - engine);
             }
             RequestPhysicsterseUpdate();
             return true;
