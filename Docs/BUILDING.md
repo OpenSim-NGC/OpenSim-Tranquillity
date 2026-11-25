@@ -144,3 +144,25 @@ Copy `OpenSim.ini.example` to `OpenSim.ini` in the `bin/` directory, and verify 
 On `[Architecture]` section uncomment only the line with Grid.ini if you do not want HG, or the line with GridHypergrid.ini if you do
 
 and copy the `GridCommon.ini.example` file to `GridCommon.ini` inside the `bin/config-include` directory and edit as necessary
+
+# Runtime memory settings (opt-in) #
+
+RegionServer, GridServer and MoneyServer run with workstation GC, concurrent GC and the
+.NET runtime's default thread-pool limits; that is today's behaviour and it stays the
+default. An operator on a small host can opt in to the knobs below without editing any
+shipped file (`runtimeconfig.template.json` and the built `*.runtimeconfig.json` included):
+the .NET runtime reads these as process environment variables, which take effect for a
+single deployment (a container's `environment:`/`-e`, a systemd unit's `Environment=`, or
+the shell that starts the binary) and override the compiled-in configuration. See
+[.NET runtime configuration settings](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/).
+
+| setting | variable | what it costs or saves |
+|---|---|---|
+| Server GC | `DOTNET_gcServer=1` | A separate GC heap and thread per CPU core instead of one shared heap. Raises throughput on a busy, many-core host; on a small host it raises GC-committed memory (observed on a running region server process: 148 MiB committed for its one workstation heap; a per-core server-GC heap budget would add to that on every core). Leave at the default (`0`, workstation GC) on a small host. |
+| Conserve memory | `DOTNET_GCConserveMemory=<0-9>` | Trades GC pause time and throughput for a smaller heap budget on workstation GC. `0` (default) favours throughput; higher values shrink the committed-but-not-resident portion of the heap (measured 21 to 54 MiB of GC memory committed but not resident across a region server, Robust and a scratch region process, which this knob can reclaim) at the cost of more frequent, longer collections. See [GCConserveMemory](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/garbage-collector#conserve-memory). |
+| Heap hard limit | `DOTNET_GCHeapHardLimit=<bytes, hex>` or `DOTNET_GCHeapHardLimitPercent=<1-100>` | Caps committed GC memory instead of leaving it unbounded (today: no hard limit; an observed region server process reserved far more virtual memory than it committed). Protects a small host from a runaway heap at the cost of an `OutOfMemoryException` instead of growth if the limit is too low. See [GCHeapHardLimit](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/garbage-collector#heap-limit). |
+| Invariant globalization | `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` | Skips loading ICU (`icudtl.dat`, about 30 MiB mapped in every process today) and switches all culture-sensitive string comparison and formatting to ordinal/invariant rules. Saves that memory (shared file pages on Windows; a real process cost on Linux, where ICU is not already resident) but changes string sorting, casing and formatting for any culture-sensitive text. See [Invariant mode](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/globalization#invariant-mode). |
+
+These are runtime knobs, not `OpenSim.ini`/`GridServer.ini`/`MoneyServer.ini` settings: they
+take effect before OpenSimulator's own configuration is read, and `config show` on the
+console does not list them.
