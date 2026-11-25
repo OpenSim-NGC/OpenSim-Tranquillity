@@ -114,7 +114,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
     protected float m_recoilScaleFactor = 0.0f;
     protected bool m_AllowGodFunctions;
 
-    protected string m_GetWallclockTimeZone = String.Empty;     // Defaults to UTC
+    protected string m_GetWallclockTimeZone = String.Empty;     // Empty: llGetWallclock uses the server's local time (not UTC)
     protected double m_timer = Util.GetTimeStamp();
     
     protected bool m_waitingForScriptAnswer = false;

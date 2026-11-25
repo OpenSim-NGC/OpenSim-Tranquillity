@@ -132,9 +132,9 @@ internal sealed class EstateRig : IDisposable
 
     public EstateSettings Estate => H.Scene.RegionInfo.EstateSettings;
 
-    public bool PumpUntil(Func<bool> done, int seconds = 20)
+    public bool PumpUntil(Func<bool> done, int seconds = TestWait.DefaultSeconds)
     {
-        var until = DateTime.UtcNow + TimeSpan.FromSeconds(seconds);
+        var until = DateTime.UtcNow + TimeSpan.FromSeconds(TestWait.Cap(seconds));
         while (!done())
         {
             if (DateTime.UtcNow >= until) return false;

@@ -48,7 +48,7 @@ public class StateSaveThreadingTests
         Assert.Equal(selfBefore, (int)SavedStateRig.Member(sm, "SelfCaptures"));
 
         Assert.True(h.PumpUntil(() => (int)SavedStateRig.Member(sm, "SchedulerCaptures") > 0 && SavedStateRig.Row(item) != null,
-            TimeSpan.FromSeconds(15)), "no snapshot and row after the scheduler ran");
+            TestWait.Default), "no snapshot and row after the scheduler ran");
     }
 
     /// <summary>
@@ -178,7 +178,7 @@ public class StateSaveThreadingTests
 
         var live = h.RezScript(UpSrc, UUID.Random(), UUID.Random());
         Assert.True(h.PumpUntil(() => h.Said.Contains("up")), SavedStateRig.SaidText(h));
-        Assert.True(h.PumpUntil(() => SavedStateRig.Row(live) != null, TimeSpan.FromSeconds(15)), "the live script was never saved");
+        Assert.True(h.PumpUntil(() => SavedStateRig.Row(live) != null, TestWait.Default), "the live script was never saved");
         SavedStateRig.SetSavedAt(live, longAgo);
 
         var sm = SavedStateRig.States(h);

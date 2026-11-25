@@ -4,6 +4,27 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- Enable modern .NET 10 analyzers without turning on the most aggressive style rules -->
+    <!-- Not yet.  38k warnings says we have some work to do.-->
+    <!-- <AnalysisLevel>10-recommended</AnalysisLevel> -->
+
+    <!-- Enforce zero warnings in CI and Release builds, while keeping local Debug fast -->
+    <TreatWarningsAsErrors Condition="'$(Configuration)' != 'Debug'">true</TreatWarningsAsErrors>
+
+    <!-- Keep high-severity NuGet package vulnerabilities as build errors even in Debug -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>high</NuGetAuditLevel>
+
+    <!-- Temporarily exempt noisy legacy codes (they still show as yellow warnings, not red errors) -->
+    <WarningsNotAsErrors>
+      $(WarningsNotAsErrors);
+      CS0618; <!-- Obsolete member usage -->
+      CS1591; <!-- Missing XML documentation comments -->
+      CS8600;CS8601;CS8602;CS8603;CS8604 <!-- Existing nullable reference type warnings -->
+    </WarningsNotAsErrors>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Nerdbank.GitVersioning" Condition="!Exists('packages.config')">
       <PrivateAssets>all</PrivateAssets>

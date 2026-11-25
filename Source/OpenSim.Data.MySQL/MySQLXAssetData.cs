@@ -248,7 +248,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                         new MySqlCommand(
                             "replace INTO XAssetsMeta(ID, Hash, Name, Description, AssetType, Local, Temporary, CreateTime, AccessTime, AssetFlags, CreatorID)" +
                             "VALUES(?ID, ?Hash, ?Name, ?Description, ?AssetType, ?Local, ?Temporary, ?CreateTime, ?AccessTime, ?AssetFlags, ?CreatorID)",
-                            dbcon))
+                            dbcon, transaction))
                     {
                         // create unix epoch time
                         int now = (int)Utils.DateTimeToUnixTime(DateTime.UtcNow);
@@ -283,7 +283,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                         using (MySqlCommand cmd =
                             new MySqlCommand(
                                 "INSERT INTO XAssetsData(Hash, Data) VALUES(?Hash, ?Data)",
-                                dbcon))
+                                dbcon, transaction))
                         {
                             cmd.Parameters.AddWithValue("?Hash", hash);
                             cmd.Parameters.AddWithValue("?Data", data);
@@ -350,9 +350,9 @@ public class MySQLXAssetData : IXAssetDataPlugin
     }
 
     /// <summary>
-    /// We assume we already have the m_dbLock.
+    /// Whether the data for <paramref name="hash"/> is stored, read on <paramref name="transaction"/>: MySqlConnector
+    /// refuses a command that is not on the connection's active transaction.
     /// </summary>
-    /// TODO: need to actually use the transaction.
     /// <param name="dbcon"></param>
     /// <param name="transaction"></param>
     /// <param name="hash"></param>
@@ -363,7 +363,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
 
         bool exists = false;
 
-        using (MySqlCommand cmd = new MySqlCommand("SELECT Hash FROM XAssetsData WHERE Hash=?Hash", dbcon))
+        using (MySqlCommand cmd = new MySqlCommand("SELECT Hash FROM XAssetsData WHERE Hash=?Hash", dbcon, transaction))
         {
             cmd.Parameters.AddWithValue("?Hash", hash);
 
@@ -402,7 +402,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
         HashSet<UUID> exists = new HashSet<UUID>();
 
         string ids = "'" + string.Join("','", uuids) + "'";
-        string sql = string.Format("SELECT ID FROM assets WHERE ID IN ({0})", ids);
+        string sql = string.Format("SELECT ID FROM XAssetsMeta WHERE ID IN ({0})", ids);
 
         using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
         {

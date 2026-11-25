@@ -94,9 +94,9 @@ public class CrossEngineChatTests
     private static void Listen(SchedulerHarness h, string engine, SceneObjectPart part, string tag, params int[] channels)
         => Rez(h, engine, part, Listener(tag, channels));
 
-    private static void WaitFor(SchedulerHarness h, Func<IReadOnlyList<string>, bool> done, double seconds = 20)
+    private static void WaitFor(SchedulerHarness h, Func<IReadOnlyList<string>, bool> done, double seconds = TestWait.DefaultSeconds)
     {
-        var until = DateTime.UtcNow.AddSeconds(seconds);
+        var until = DateTime.UtcNow.AddSeconds(TestWait.Cap(seconds));
         while (DateTime.UtcNow < until && !done(h.Said)) h.PumpOnce();
     }
 

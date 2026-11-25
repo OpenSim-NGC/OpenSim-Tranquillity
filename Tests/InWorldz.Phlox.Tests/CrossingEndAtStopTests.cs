@@ -74,7 +74,7 @@ public class CrossingEndAtStopTests
 
         int expected = 3 + unpumped;
         using var h2 = Region(item, script);
-        Assert.True(h2.PumpUntil(() => h2.Said.Count(s => s.StartsWith("lm ")) >= expected, TimeSpan.FromSeconds(15)),
+        Assert.True(h2.PumpUntil(() => h2.Said.Count(s => s.StartsWith("lm ")) >= expected, TestWait.Default),
             "the queued events did not all run: " + SavedStateRig.SaidText(h2));
         h2.PumpUntilIdle(TimeSpan.FromSeconds(3));
         string[] ran = h2.Said.Where(s => s.StartsWith("lm ")).ToArray();

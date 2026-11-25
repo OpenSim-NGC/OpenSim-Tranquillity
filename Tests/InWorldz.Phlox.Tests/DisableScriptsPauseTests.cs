@@ -57,7 +57,7 @@ public class DisableScriptsPauseTests
         Assert.True(HasScript(h, item), "the script was removed while disabled");
 
         Enable(h);
-        Assert.True(h.PumpUntil(() => Counts(h).Last() > last, TimeSpan.FromSeconds(30)), "the script never counted again");
+        Assert.True(h.PumpUntil(() => Counts(h).Last() > last, TestWait.Default), "the script never counted again");
         int[] after = Counts(h);
         // it carried on from its count: the next count follows the last one, it did not start again from 1
         Assert.Equal(last + 1, after[before.Length]);
@@ -99,7 +99,7 @@ public class DisableScriptsPauseTests
     /// </summary>
     private static void HeldStaysSuspended(SchedulerHarness h, OpenSim.Region.Framework.Interfaces.IScriptModule engine, UUID held, UUID other)
     {
-        Assert.True(h.PumpUntil(() => Counts(h).Length >= 3 && OtherCounts(h).Length >= 3, TimeSpan.FromSeconds(30)),
+        Assert.True(h.PumpUntil(() => Counts(h).Length >= 3 && OtherCounts(h).Length >= 3, TestWait.Default),
             "the scripts never counted to 3");
         Assert.True(engine.SuspendScript(held));
         h.PumpFor(TimeSpan.FromMilliseconds(200));
@@ -110,7 +110,7 @@ public class DisableScriptsPauseTests
         int otherLast = OtherCounts(h).Last();
         Enable(h);
 
-        Assert.True(h.PumpUntil(() => OtherCounts(h).Last() > otherLast, TimeSpan.FromSeconds(30)), "the other script never counted again");
+        Assert.True(h.PumpUntil(() => OtherCounts(h).Last() > otherLast, TestWait.Default), "the other script never counted again");
         // a window in which the held script must not count
         h.PumpFor(TimeSpan.FromSeconds(1));
         Assert.Equal(heldLast, Counts(h).Last());
@@ -118,7 +118,7 @@ public class DisableScriptsPauseTests
 
         // its own resume still lets it go on from its count
         Assert.True(engine.ResumeScript(held));
-        Assert.True(h.PumpUntil(() => Counts(h).Last() > heldLast, TimeSpan.FromSeconds(30)), "the held script never counted again");
+        Assert.True(h.PumpUntil(() => Counts(h).Last() > heldLast, TestWait.Default), "the held script never counted again");
         Assert.Equal(heldLast + 1, Counts(h).First(c => c > heldLast));
     }
 
@@ -146,7 +146,7 @@ public class DisableScriptsPauseTests
         // The console command changes only the switch, not the saved setting; the scripts are paused just the same.
         using var h = new SchedulerHarness();
         UUID item = h.RezScript(Counter);
-        Assert.True(h.PumpUntil(() => Counts(h).Length >= 3, TimeSpan.FromSeconds(30)));
+        Assert.True(h.PumpUntil(() => Counts(h).Length >= 3, TestWait.Default));
 
         h.Scene.ScriptsEnabled = false;
         h.PumpFor(TimeSpan.FromMilliseconds(200));
@@ -156,7 +156,7 @@ public class DisableScriptsPauseTests
         Assert.True(HasScript(h, item));
 
         h.Scene.ScriptsEnabled = true;
-        Assert.True(h.PumpUntil(() => Counts(h).Last() > last, TimeSpan.FromSeconds(30)));
+        Assert.True(h.PumpUntil(() => Counts(h).Last() > last, TestWait.Default));
         Assert.Equal(last + 1, Counts(h).First(c => c > last));
     }
 
@@ -165,10 +165,10 @@ public class DisableScriptsPauseTests
     {
         using var h = new SchedulerHarness();
         UUID item = h.RezScript(Counter);
-        Assert.True(h.PumpUntil(() => Counts(h).Length >= 3, TimeSpan.FromSeconds(30)));
+        Assert.True(h.PumpUntil(() => Counts(h).Length >= 3, TestWait.Default));
 
         h.Scene.ScriptsEnabled = true;
-        Assert.True(h.PumpUntil(() => Counts(h).Length >= 5, TimeSpan.FromSeconds(30)));
+        Assert.True(h.PumpUntil(() => Counts(h).Length >= 5, TestWait.Default));
         Assert.True(HasScript(h, item));
         // never started again from 1
         Assert.Equal(Counts(h).OrderBy(c => c).ToArray(), Counts(h));

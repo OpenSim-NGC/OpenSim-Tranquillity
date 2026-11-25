@@ -141,7 +141,7 @@ public class ScriptLogRateTests
         TaskInventoryHelpers.AddNotecard(r.H.Scene.AssetService, r.H.Prim, "gift", UUID.Random(), UUID.Random(), "a gift");
 
         r.H.RezScript("default { state_entry() { integer i; for (i = 0; i < 6; ++i) llGiveInventory(\"" + recipient + "\", \"gift\"); llSay(0, \"done\"); } }");
-        Assert.True(PumpUntil(r.H, () => r.H.Said.Contains("done"), TimeSpan.FromSeconds(60)), string.Join(",", r.H.Said));
+        Assert.True(PumpUntil(r.H, () => r.H.Said.Contains("done"), TestWait.Default), string.Join(",", r.H.Said));
 
         var lines = r.Log.With("Not offering");
         Assert.Equal(6, lines.Count);
@@ -208,9 +208,9 @@ public class ScriptLogRateTests
             string body = string.Concat(calls.Select(c => "llSay(0, \"rc=\" + (string)(" + c + ")); "));
             var item = R.H.RezScript("default { state_entry() { llRequestPermissions(" + Str(ScriptOwner.ToString())
                 + ", PERMISSION_RETURN_OBJECTS); } run_time_permissions(integer p) { " + body + "} }");
-            Assert.True(PumpUntil(R.H, () => client.ScriptQuestions.Count > 0, TimeSpan.FromSeconds(30)), "no permission question");
+            Assert.True(PumpUntil(R.H, () => client.ScriptQuestions.Count > 0, TestWait.Default), "no permission question");
             client.FireScriptAnswer(R.H.Prim.UUID, item, PERMISSION_RETURN_OBJECTS);
-            Assert.True(PumpUntil(R.H, () => R.H.Said.Count(s => s.StartsWith("rc=")) >= calls.Length, TimeSpan.FromSeconds(60)),
+            Assert.True(PumpUntil(R.H, () => R.H.Said.Count(s => s.StartsWith("rc=")) >= calls.Length, TestWait.Default),
                 "the calls never finished: " + string.Join(" | ", R.H.Said));
         }
 
@@ -276,16 +276,16 @@ public class ScriptLogRateTests
 
             // First batch: three calls, all held past the deadline.
             for (int i = 0; i < 3; i++) r.H.RezScript(Script(users[i]));
-            Assert.True(PumpUntil(r.H, () => gates.Take(3).All(g => g.Inside == 1), TimeSpan.FromSeconds(30)), "calls never reached the service");
+            Assert.True(PumpUntil(r.H, () => gates.Take(3).All(g => g.Inside == 1), TestWait.Default), "calls never reached the service");
             r.Now += 5_001;
-            Assert.True(PumpUntil(r.H, () => users.Take(3).All(u => r.H.Said.Contains("got " + u)), TimeSpan.FromSeconds(30)),
+            Assert.True(PumpUntil(r.H, () => users.Take(3).All(u => r.H.Said.Contains("got " + u)), TestWait.Default),
                 "scripts were not answered at the deadline: " + string.Join(",", r.H.Said));
             Assert.Single(r.Log.With("did not answer in"));
             Assert.DoesNotContain("more like this", r.Log.With("did not answer in")[0].Text);
 
             foreach (var g in gates.Take(3)) g.Open();
-            Assert.True(PumpUntil(r.H, () => gates.Take(3).All(g => g.Inside == 0), TimeSpan.FromSeconds(30)));
-            Assert.True(PumpUntil(r.H, () => r.Log.With("answered after its").Count >= 1, TimeSpan.FromSeconds(30)), "no late line");
+            Assert.True(PumpUntil(r.H, () => gates.Take(3).All(g => g.Inside == 0), TestWait.Default));
+            Assert.True(PumpUntil(r.H, () => r.Log.With("answered after its").Count >= 1, TestWait.Default), "no late line");
             r.H.PumpFor(TimeSpan.FromMilliseconds(300));              // let the other two late answers be handled
             Assert.Single(r.Log.With("answered after its"));
             Assert.Equal(LogLevel.Information, r.Log.With("answered after its")[0].Level);
@@ -293,11 +293,11 @@ public class ScriptLogRateTests
             // A minute later, one more call past its deadline writes both lines with the counts held back.
             r.Now += 60_000;
             r.H.RezScript(Script(users[3]));
-            Assert.True(PumpUntil(r.H, () => gates[3].Inside == 1, TimeSpan.FromSeconds(30)));
+            Assert.True(PumpUntil(r.H, () => gates[3].Inside == 1, TestWait.Default));
             r.Now += 5_001;
-            Assert.True(PumpUntil(r.H, () => r.H.Said.Contains("got " + users[3]), TimeSpan.FromSeconds(30)));
+            Assert.True(PumpUntil(r.H, () => r.H.Said.Contains("got " + users[3]), TestWait.Default));
             gates[3].Open();
-            Assert.True(PumpUntil(r.H, () => r.Log.With("answered after its").Count >= 2, TimeSpan.FromSeconds(30)), "no second late line");
+            Assert.True(PumpUntil(r.H, () => r.Log.With("answered after its").Count >= 2, TestWait.Default), "no second late line");
 
             var warnings = r.Log.With("did not answer in");
             Assert.Equal(2, warnings.Count);
@@ -399,7 +399,7 @@ public class ScriptLogRateTests
             + "; ++i) { llRequestExperiencePermissions(llList2Key(a, i), \"\"); llSay(0, \"rc=\" + (string)i); } } }");
         Assert.True(h.Prim.Inventory.CreateScriptInstance(item, 0, false, "InWorldz.Phlox", 0));
         h.Prim.ParentGroup.ResumeScripts();
-        Assert.True(PumpUntil(h, () => h.Said.Count(s => s.StartsWith("rc=")) >= agents, TimeSpan.FromSeconds(60)),
+        Assert.True(PumpUntil(h, () => h.Said.Count(s => s.StartsWith("rc=")) >= agents, TestWait.Default),
             string.Join(" | ", h.Said));
 
         var lines = xr.R.Log.With("Experience permission granted");

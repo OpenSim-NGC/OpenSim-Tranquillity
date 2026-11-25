@@ -106,6 +106,45 @@ public class GroupsService : GroupsServiceBase
     public GroupsService(IConfigSource config, string configName)
         : base(config, configName)
     {
+        RegisterImportCommand(config);
+    }
+
+    private static int s_importCommand;
+
+    /// <summary>
+    /// "groups import flotsam [dry-run]": copy a Flotsam XmlRpcGroups server's groups into this store (see
+    /// <see cref="FlotsamGroupsImport"/>), from the MySQL database [Groups] FlotsamImportConnectionString names (kept in
+    /// the config, so no password goes through the console). Once per process.
+    /// </summary>
+    private void RegisterImportCommand(IConfigSource config)
+    {
+        if (MainConsole.Instance == null || Interlocked.Exchange(ref s_importCommand, 1) == 1)
+            return;
+        MainConsole.Instance.Commands.AddCommand("Groups", false, "groups import flotsam",
+            "groups import flotsam [dry-run]",
+            "Copy the groups of a Flotsam XmlRpcGroups server's tables into Groups V2, from the database [Groups] " +
+            "FlotsamImportConnectionString names; groups V2 already has are left as they are. dry-run only counts.",
+            (module, args) =>
+            {
+                string conn = config.Configs["Groups"]?.GetString("FlotsamImportConnectionString", string.Empty) ?? string.Empty;
+                if (conn.Length == 0)
+                {
+                    MainConsole.Instance.Output("Set [Groups] FlotsamImportConnectionString to the database with the Flotsam tables (osgroup, ...).");
+                    return;
+                }
+                bool dry = args.Length > 3 && args[3].Equals("dry-run", StringComparison.OrdinalIgnoreCase);
+                try
+                {
+                    var report = new FlotsamGroupsImport(() => new MySqlConnector.MySqlConnection(conn), m_Database).Run(dry);
+                    MainConsole.Instance.Output((dry ? "Would copy: " : "Copied: ") + report);
+                    foreach (string skipped in report.Skipped.Take(20))
+                        MainConsole.Instance.Output("  " + skipped);
+                }
+                catch (Exception e)
+                {
+                    MainConsole.Instance.Output("The import stopped: " + e.Message);
+                }
+            });
     }
 
     public GroupsService(IConfigSource config)
@@ -181,21 +220,28 @@ public class GroupsService : GroupsServiceBase
         if (data == null)
             return;
 
-        // Check perms
-        if (!HasPower(RequestingAgentID, groupID, GroupPowers.ChangeActions))
+        // Each part of the settings by its own ability; the viewer sends them all, whichever its user may change.
+        var (identity, enrollment) = GroupRules.For(m_Database, groupID, RequestingAgentID).MayChangeGroup();
+        if (!identity && !enrollment)
         {
             m_log.LogDebug("[Groups]: ({0}) Attempt at updating group {1} denied because of lack of permission", RequestingAgentID, groupID);
             return;
         }
 
         data.GroupID = groupID;
-        data.Data["Charter"] = charter;
-        data.Data["ShowInList"] = showInList ? "1" : "0";
-        data.Data["InsigniaID"] = insigniaID.ToString();
-        data.Data["MembershipFee"] = membershipFee.ToString();
-        data.Data["OpenEnrollment"] = openEnrollment ? "1" : "0";
-        data.Data["AllowPublish"] = allowPublish ? "1" : "0";
-        data.Data["MaturePublish"] = maturePublish ? "1" : "0";
+        if (identity)
+        {
+            data.Data["Charter"] = charter;
+            data.Data["ShowInList"] = showInList ? "1" : "0";
+            data.Data["InsigniaID"] = insigniaID.ToString();
+            data.Data["AllowPublish"] = allowPublish ? "1" : "0";
+            data.Data["MaturePublish"] = maturePublish ? "1" : "0";
+        }
+        if (enrollment)
+        {
+            data.Data["MembershipFee"] = membershipFee.ToString();
+            data.Data["OpenEnrollment"] = openEnrollment ? "1" : "0";
+        }
 
         m_Database.StoreGroup(data);
 
@@ -255,52 +301,44 @@ public class GroupsService : GroupsServiceBase
 
     public List<ExtendedGroupMembersData> GetGroupMembers(string RequestingAgentID, UUID GroupID)
     {
+        // A fixed number of statements whatever the group's size: the group, its roles, its members, their roles,
+        // and their grid user rows in batches. It used to be two statements per member.
         List<ExtendedGroupMembersData> members = new List<ExtendedGroupMembersData>();
 
         GroupData group = m_Database.RetrieveGroup(GroupID);
         if (group == null)
             return members;
 
-        // Unfortunately this doesn't quite work on legacy group data because of a bug
-        // that's also being fixed here on CreateGroup. The OwnerRoleID sent to the DB was wrong.
-        // See how to find the ownerRoleID a few lines below.
-        UUID ownerRoleID = new UUID(group.Data["OwnerRoleID"]);
-
         RoleData[] roles = m_Database.RetrieveRoles(GroupID);
         if (roles == null)
             // something wrong with this group
             return members;
-        List<RoleData> rolesList = new List<RoleData>(roles);
-
-        // The owners role is the one the group names, whatever its stored powers.
-        ownerRoleID = OwnerRoleOf(m_Database.RetrieveGroup(GroupID));
-        List<RoleData> allRoles = new List<RoleData>(roles);
-
-        // Check visibility?
-        // When we don't want to check visibility, we pass it "all" as the requestingAgentID
-        bool checkVisibility = !RequestingAgentID.Equals(UUID.Zero.ToString());
-
-        if (checkVisibility)
-        {
-            // Is the requester a member of the group?
-            bool isInGroup = false;
-            if (m_Database.RetrieveMember(GroupID, RequestingAgentID) != null)
-                isInGroup = true;
-
-            if (!isInGroup) // reduce the roles to the visible ones
-                rolesList = rolesList.FindAll(r => (UInt64.Parse(r.Data["Powers"]) & (ulong)GroupPowers.MemberVisible) != 0);
-        }
 
         MembershipData[] datas = m_Database.RetrieveMembers(GroupID);
-        if (datas == null || (datas != null && datas.Length == 0))
+        if (datas == null || datas.Length == 0)
             return members;
 
-        // OK, we have everything we need
+        // The owners role is the one the group names, whatever its stored powers.
+        UUID ownerRoleID = OwnerRoleOf(group);
+        List<RoleData> allRoles = new List<RoleData>(roles);
+        List<RoleData> rolesList = new List<RoleData>(roles);
+
+        // Check visibility? When we don't want to check visibility, we pass it "all" as the requestingAgentID.
+        // A requester outside the group sees only the titles of roles whose members are visible.
+        bool checkVisibility = !RequestingAgentID.Equals(UUID.Zero.ToString());
+        if (checkVisibility && !datas.Any(d => SamePrincipal(d.PrincipalID, RequestingAgentID)))
+            rolesList = rolesList.FindAll(r => (UInt64.Parse(r.Data["Powers"]) & (ulong)GroupPowers.MemberVisible) != 0);
+
+        ILookup<string, RoleMembershipData> heldBy = (m_Database.RetrieveRolesMembers(GroupID) ?? [])
+            .ToLookup(r => r.PrincipalID, StringComparer.OrdinalIgnoreCase);
+
+        Dictionary<string, GridUserData> gridUsers = new Dictionary<string, GridUserData>(StringComparer.OrdinalIgnoreCase);
+        foreach (GridUserData gud in m_GridUserService.GetMany(datas.Select(d => d.PrincipalID).ToArray()) ?? [])
+            gridUsers.TryAdd(gud.UserID, gud);
 
         foreach (MembershipData d in datas)
         {
-            RoleMembershipData[] rolememberships = m_Database.RetrieveMemberRoles(GroupID, d.PrincipalID);
-            List<RoleMembershipData> rolemembershipsList = new List<RoleMembershipData>(rolememberships);
+            List<RoleMembershipData> rolemembershipsList = heldBy[d.PrincipalID].ToList();
 
             ExtendedGroupMembersData m = new ExtendedGroupMembersData();
 
@@ -318,8 +356,7 @@ public class GroupsService : GroupsServiceBase
             m.Contribution = Int32.Parse(d.Data["Contribution"]);
             m.ListInProfile = d.Data["ListInProfile"] == "1" ? true : false;
 
-            GridUserData gud = m_GridUserService.Get(d.PrincipalID);
-            if (gud != null)
+            if (gridUsers.TryGetValue(d.PrincipalID, out GridUserData gud))
             {
                 if (bool.Parse(gud.Data["Online"]))
                 {
@@ -334,13 +371,16 @@ public class GroupsService : GroupsServiceBase
             }
 
             // Is this person an owner of the group?
-            m.IsOwner = (rolemembershipsList.Find(r => r.RoleID == ownerRoleID) != null) ? true : false;
+            m.IsOwner = !ownerRoleID.IsZero() && rolemembershipsList.Exists(r => r.RoleID == ownerRoleID);
 
             members.Add(m);
         }
 
         return members;
     }
+
+    /// <summary>The same principal: ids compare as the stores' text columns do, without regard to case.</summary>
+    private static bool SamePrincipal(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
     public bool AddGroupRole(string RequestingAgentID, UUID groupID, UUID roleID, string name, string description, string title, ulong powers, out string reason)
     {
@@ -359,26 +399,34 @@ public class GroupsService : GroupsServiceBase
 
     public bool UpdateGroupRole(string RequestingAgentID, UUID groupID, UUID roleID, string name, string description, string title, ulong powers)
     {
-        // check perms
-        if (!HasPower(RequestingAgentID, groupID, GroupPowers.ChangeActions))
+        // A role's name, description and title need RoleProperties; its abilities need ChangeActions. The viewer
+        // sends the whole role, so what the requester may not change is kept as it is.
+        GroupRules rules = GroupRules.For(m_Database, groupID, RequestingAgentID);
+        var (properties, abilities) = rules.MayChangeRole();
+        RoleData current = m_Database.RetrieveRole(groupID, roleID);
+        if (current == null || (!properties && !abilities))
         {
             m_log.LogDebug("[Groups]: ({0}) Attempt at changing role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
             return false;
         }
+        if (!properties)
+        {
+            name = current.Data["Name"];
+            description = current.Data["Description"];
+            title = current.Data["Title"];
+        }
+        if (!abilities)
+            powers = UInt64.Parse(current.Data["Powers"]);
 
         // SL (wiki Group): "Owners always have all available abilities in the group", and "Owner and Everyone role are
         // the only two roles which can't be renamed".
-        RoleData current = m_Database.RetrieveRole(groupID, roleID);
-        if (current != null)
+        if (roleID == rules.OwnerRoleID)
         {
-            if (roleID == OwnerRoleOf(m_Database.RetrieveGroup(groupID)))
-            {
-                powers = UInt64.Parse(current.Data["Powers"]);
-                name = current.Data["Name"];
-            }
-            else if (roleID.IsZero())
-                name = current.Data["Name"];
+            powers = UInt64.Parse(current.Data["Powers"]);
+            name = current.Data["Name"];
         }
+        else if (roleID.IsZero())
+            name = current.Data["Name"];
 
         return _AddOrUpdateGroupRole(RequestingAgentID, groupID, roleID, name, description, title, powers, false);
     }
@@ -450,6 +498,14 @@ public class GroupsService : GroupsServiceBase
             return false;
         }
 
+        // a banned avatar joins neither by itself nor through anyone, invited or not
+        if (IsBanned(GroupID, AgentID))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at adding {1}, who is banned, to group {2} denied", RequestingAgentID, AgentID, GroupID);
+            reason = "You are banned from this group";
+            return false;
+        }
+
         // An agent joins through an invitation (to the role it names), or into the Everyone role of a group open to
         // enrollment. Adding someone else needs the power to invite and to assign the role.
         InvitationData invite = FindInvitation(GroupID, AgentID);
@@ -480,19 +536,15 @@ public class GroupsService : GroupsServiceBase
 
     public bool RemoveAgentFromGroup(string RequestingAgentID, string AgentID, UUID GroupID)
     {
+        AgentID = MemberPrincipal(GroupID, AgentID);
         // check perms. Anyone may leave. SL (wiki Group): "An Owner can eject anyone except another Owner", and "a
         // Member can be ejected from a group if, and only if, they're only in the Everyone Role" by anyone else.
-        if (!SameAgent(RequestingAgentID, AgentID))
+        bool self = SameAgent(RequestingAgentID, AgentID);
+        if (!self)
         {
-            if (!HasPower(RequestingAgentID, GroupID, GroupPowers.Eject) || IsOwner(AgentID, GroupID))
+            GroupRules ejector = GroupRules.For(m_Database, GroupID, RequestingAgentID);
+            if (!ejector.CanEject(ejector.ForOther(m_Database, AgentID), self))
                 return false;
-
-            if (!IsOwner(RequestingAgentID, GroupID))
-            {
-                RoleMembershipData[] held = m_Database.RetrieveMemberRoles(GroupID, AgentID);
-                if (held != null && Array.Exists(held, r => r != null && !r.RoleID.IsZero()))
-                    return false;
-            }
         }
 
         _RemoveAgentFromGroup(RequestingAgentID, AgentID, GroupID);
@@ -502,6 +554,13 @@ public class GroupsService : GroupsServiceBase
 
     public bool AddAgentToGroupInvite(string RequestingAgentID, UUID inviteID, UUID groupID, UUID roleID, string agentID)
     {
+        // a banned avatar is not invited
+        if (IsBanned(groupID, agentID))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at inviting {1}, who is banned, to group {2} denied", RequestingAgentID, agentID, groupID);
+            return false;
+        }
+
         // Check whether the invitee is already a member of the group
         MembershipData m = m_Database.RetrieveMember(groupID, agentID);
         if (m != null)
@@ -547,11 +606,31 @@ public class GroupsService : GroupsServiceBase
 
     public void RemoveAgentToGroupInvite(string RequestingAgentID, UUID inviteID)
     {
+        // The invitee answers their invitation; someone who may invite to the group may withdraw it.
+        InvitationData invite = m_Database.RetrieveInvitation(inviteID);
+        if (invite == null)
+            return;
+        if (!SameInvitee(invite.PrincipalID, RequestingAgentID)
+            && !GroupRules.For(m_Database, invite.GroupID, RequestingAgentID).Has(GroupPowers.Invite))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at removing invitation {1}, sent to {2}, denied", RequestingAgentID, inviteID, invite.PrincipalID);
+            return;
+        }
         m_Database.DeleteInvite(inviteID);
+    }
+
+    /// <summary>The invitee: as stored, or by its UUID when one side names a hypergrid visitor by uuid;url;name.</summary>
+    private static bool SameInvitee(string invitee, string agentID)
+    {
+        if (SameAgent(invitee, agentID))
+            return true;
+        return Util.ParseUniversalUserIdentifier(invitee ?? "", out UUID a) && Util.ParseUniversalUserIdentifier(agentID ?? "", out UUID b)
+            && a.IsNotZero() && a == b;
     }
 
     public bool AddAgentToGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID)
     {
+        AgentID = MemberPrincipal(GroupID, AgentID);
         //if (!m_Database.CheckOwnerRole(RequestingAgentID, GroupID, RoleID))
         //    return;
 
@@ -574,21 +653,14 @@ public class GroupsService : GroupsServiceBase
 
     public bool RemoveAgentFromGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID)
     {
+        AgentID = MemberPrincipal(GroupID, AgentID);
         // Don't remove from Everyone role!
         if (RoleID.IsZero())
             return false;
 
         // check permissions. SL (wiki Group): "Owners can't be removed"; the founder, like any owner, may leave the
         // owners role. Removing members from other roles is the "Remove Members from Roles" ability (RemoveMember).
-        if (RoleID == OwnerRoleOf(m_Database.RetrieveGroup(GroupID)))
-        {
-            if (!SameAgent(RequestingAgentID, AgentID))
-            {
-                m_log.LogDebug("[Groups]: ({0}) Attempt at removing owner {1} from the owners role denied", RequestingAgentID, AgentID);
-                return false;
-            }
-        }
-        else if (!HasPower(RequestingAgentID, GroupID, GroupPowers.RemoveMember))
+        if (!GroupRules.For(m_Database, GroupID, RequestingAgentID).CanRemoveFromRole(RoleID, SameAgent(RequestingAgentID, AgentID)))
         {
             m_log.LogDebug("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
             return false;
@@ -653,7 +725,18 @@ public class GroupsService : GroupsServiceBase
 
     public ExtendedGroupMembershipData SetAgentActiveGroup(string RequestingAgentID, string AgentID, UUID GroupID)
     {
-        // TODO: check perms
+        // An avatar chooses its own active group, among the groups it is in (or none).
+        if (!SameAgent(RequestingAgentID, AgentID))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at choosing the active group of {1} denied", RequestingAgentID, AgentID);
+            return null;
+        }
+        if (!GroupID.IsZero() && m_Database.RetrieveMember(GroupID, AgentID) == null)
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at making group {1}, which they are not in, active denied", AgentID, GroupID);
+            return null;
+        }
+
         PrincipalData principal = new PrincipalData();
         principal.PrincipalID = AgentID;
         principal.ActiveGroupID = GroupID;
@@ -692,9 +775,19 @@ public class GroupsService : GroupsServiceBase
                 return null;
         }
 
+        return MembershipOf(group, membership, m_Database.RetrieveRoles(group.GroupID) ?? [],
+            m_Database.RetrieveMemberRoles(group.GroupID, AgentID) ?? []);
+    }
+
+    /// <summary>A member's view of one group, from rows already read: the group's roles and those the member holds.</summary>
+    private static ExtendedGroupMembershipData MembershipOf(GroupData group, MembershipData membership,
+        IEnumerable<RoleData> groupRoles, IEnumerable<RoleMembershipData> held)
+    {
+        List<RoleData> roles = groupRoles.ToList();
+
         // 4. get the active role
         UUID activeRoleID = new UUID(membership.Data["SelectedRoleID"]);
-        RoleData role = m_Database.RetrieveRole(group.GroupID, activeRoleID);
+        RoleData role = roles.Find(r => r.RoleID == activeRoleID);
 
         ExtendedGroupMembershipData data = new ExtendedGroupMembershipData();
         data.AcceptNotices = membership.Data["AcceptNotices"] == "1" ? true : false;
@@ -711,7 +804,7 @@ public class GroupsService : GroupsServiceBase
         if (role != null)
             data.GroupTitle = role.Data["Title"];
         // A member's powers are those of every role they hold, not only the one whose title they show; owners have all.
-        data.GroupPowers = MemberPowers(group.GroupID, AgentID, OwnerRoleOf(group));
+        data.GroupPowers = held.Any() ? PowersOf(held, roles, OwnerRoleOf(group)) : 0;
         data.ListInProfile = membership.Data["ListInProfile"] == "1" ? true : false;
         data.MaturePublish = group.Data["MaturePublish"] == "1" ? true : false;
         data.MembershipFee = Int32.Parse(group.Data["MembershipFee"]);
@@ -723,23 +816,27 @@ public class GroupsService : GroupsServiceBase
 
     public List<GroupMembershipData> GetAgentGroupMemberships(string RequestingAgentID, string AgentID)
     {
+        // Four statements whatever the number of groups (it used to be four per group): the avatar's memberships,
+        // those groups, their roles, and the roles the avatar holds in them.
         List<GroupMembershipData> memberships = new List<GroupMembershipData>();
 
         // 1. Get all the groups that this person is a member of
         MembershipData[] mdata = m_Database.RetrieveMemberships(AgentID);
-
-        if (mdata == null || (mdata != null && mdata.Length == 0))
+        if (mdata == null || mdata.Length == 0)
             return memberships;
+
+        UUID[] groupIDs = mdata.Select(d => d.GroupID).Distinct().ToArray();
+        Dictionary<UUID, GroupData> groups = new Dictionary<UUID, GroupData>();
+        foreach (GroupData g in m_Database.RetrieveGroupsByID(groupIDs) ?? [])
+            groups.TryAdd(g.GroupID, g);
+        ILookup<UUID, RoleData> roles = (m_Database.RetrieveRolesOfGroups(groupIDs) ?? []).ToLookup(r => r.GroupID);
+        ILookup<UUID, RoleMembershipData> held = (m_Database.RetrievePrincipalRoles(AgentID) ?? [])
+            .Where(r => SamePrincipal(r.PrincipalID, AgentID)).ToLookup(r => r.GroupID);
 
         foreach (MembershipData d in mdata)
         {
-            GroupMembershipData gmember = GetAgentGroupMembership(RequestingAgentID, AgentID, d.GroupID, d);
-            if (gmember != null)
-            {
-                memberships.Add(gmember);
-                //m_log.LogDebug("[XXX]: Member of {0} as {1}", gmember.GroupName, gmember.GroupTitle);
-                //Util.PrintCallStack();
-            }
+            if (groups.TryGetValue(d.GroupID, out GroupData group))
+                memberships.Add(MembershipOf(group, d, roles[d.GroupID], held[d.GroupID]));
         }
 
         return memberships;
@@ -767,7 +864,12 @@ public class GroupsService : GroupsServiceBase
 
     public void UpdateMembership(string RequestingAgentID, string AgentID, UUID GroupID, bool AcceptNotices, bool ListInProfile)
     {
-        // TODO: check perms
+        // Whether to take notices and to list the group in one's profile are the member's own to choose.
+        if (!SameAgent(RequestingAgentID, AgentID))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at changing the membership settings of {1} denied", RequestingAgentID, AgentID);
+            return;
+        }
 
         MembershipData membership = m_Database.RetrieveMember(GroupID, AgentID);
         if (membership == null)
@@ -1118,14 +1220,9 @@ public class GroupsService : GroupsServiceBase
     #region permissions
 
     /// <summary>The viewer's GP_ALL_POWERS: every ability, which owners always have.</summary>
-    public const ulong AllPowers = ulong.MaxValue;
+    public const ulong AllPowers = GroupRules.AllPowers;
 
-    private static UUID OwnerRoleOf(GroupData group)
-    {
-        if (group != null && group.Data != null && group.Data.TryGetValue("OwnerRoleID", out string id) && UUID.TryParse(id, out UUID ownerRoleID))
-            return ownerRoleID;
-        return UUID.Zero;
-    }
+    private static UUID OwnerRoleOf(GroupData group) => GroupRules.OwnerRoleOf(group);
 
     /// <summary>
     /// The pending invitation of <paramref name="agentID"/> to the group. A hypergrid visitor may be named by a
@@ -1140,70 +1237,131 @@ public class GroupsService : GroupsServiceBase
         return invite;
     }
 
+    /// <summary>
+    /// The member as the group stores them. A hypergrid visitor is stored by their universal identifier
+    /// (uuid;home-url;name) but named by the viewer by UUID alone (an ejection, a role given or taken), and the region
+    /// knows the identifier only of visitors it has met: a bare UUID that is no member is looked for among the
+    /// group's members by that UUID.
+    /// </summary>
+    private string MemberPrincipal(UUID groupID, string agentID)
+    {
+        if (string.IsNullOrEmpty(agentID) || m_Database.RetrieveMember(groupID, agentID) != null)
+            return agentID;
+        if (!UUID.TryParse(agentID, out UUID id) || id.IsZero())
+            return agentID;
+        string prefix = id.ToString() + ";";
+        MembershipData visitor = (m_Database.RetrieveMembers(groupID) ?? [])
+            .FirstOrDefault(m => m.PrincipalID != null && m.PrincipalID.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+        return visitor?.PrincipalID ?? agentID;
+    }
+
     private static bool SameAgent(string a, string b)
         => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// A member's abilities: those of every role they hold, the Everyone role included; every ability for an owner.
-    /// </summary>
-    private ulong MemberPowers(UUID groupID, string agentID, UUID ownerRoleID)
-    {
-        RoleMembershipData[] held = m_Database.RetrieveMemberRoles(groupID, agentID);
-        if (held == null || held.Length == 0)
-            return 0;
-
-        RoleData[] roles = m_Database.RetrieveRoles(groupID);
-        return PowersOf(held, roles == null ? new List<RoleData>() : new List<RoleData>(roles), ownerRoleID);
-    }
-
     private static ulong PowersOf(IEnumerable<RoleMembershipData> held, List<RoleData> roles, UUID ownerRoleID)
+        => GroupRules.PowersOf(held, roles, ownerRoleID);
+
+    #region bans (GroupAPIv1)
+    /// <summary>The most bans a group keeps, as SL's ban list does.</summary>
+    public const int MaxBans = 500;
+
+    /// <summary>The group's bans, for someone who may manage them; null otherwise.</summary>
+    public List<BanData> GetGroupBans(string RequestingAgentID, UUID GroupID)
     {
-        ulong powers = 0;
-        foreach (RoleMembershipData r in held)
+        if (!GroupRules.For(m_Database, GroupID, RequestingAgentID).CanManageBans)
         {
-            if (r == null)
-                continue;
-            if (!ownerRoleID.IsZero() && r.RoleID == ownerRoleID)
-                return AllPowers;
-            RoleData role = roles.Find(x => x.RoleID == r.RoleID);
-            if (role != null && UInt64.TryParse(role.Data["Powers"], out ulong p))
-                powers |= p;
+            m_log.LogDebug("[Groups]: ({0}) Attempt at reading the bans of group {1} denied because of lack of permission", RequestingAgentID, GroupID);
+            return null;
         }
-        return powers;
+        return new List<BanData>(m_Database.RetrieveBans(GroupID) ?? []);
     }
+
+    /// <summary>
+    /// Ban avatars from the group: someone who may manage bans; never an owner or oneself; at most
+    /// <see cref="MaxBans"/>. A pending invitation of a banned avatar is withdrawn. The viewer ejects banned members
+    /// itself (LLPanelGroupMembersSubTab), so a member stays one until ejected. False when nothing was banned.
+    /// </summary>
+    public bool BanAgents(string RequestingAgentID, UUID GroupID, string[] AgentIDs, out string reason)
+    {
+        reason = string.Empty;
+        GroupRules rules = GroupRules.For(m_Database, GroupID, RequestingAgentID);
+        if (!rules.GroupExists || !rules.CanManageBans)
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at banning from group {1} denied because of lack of permission", RequestingAgentID, GroupID);
+            reason = "Insufficient permission";
+            return false;
+        }
+
+        int count = (m_Database.RetrieveBans(GroupID) ?? []).Length;
+        bool any = false;
+        foreach (string agent in (AgentIDs ?? []).Where(a => !string.IsNullOrEmpty(a)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (SameAgent(agent, RequestingAgentID) || rules.ForOther(m_Database, agent).IsOwner)
+                continue;   // not oneself, not an owner
+            if (m_Database.RetrieveBan(GroupID, agent) != null)
+                continue;   // banned already
+            if (count >= MaxBans)
+            {
+                reason = "The group's ban list is full";
+                break;
+            }
+
+            BanData ban = new BanData
+            {
+                GroupID = GroupID,
+                PrincipalID = agent,
+                Data = new Dictionary<string, string> { ["BanTime"] = Util.UnixTimeSinceEpoch().ToString() },
+            };
+            if (!m_Database.StoreBan(ban))
+                continue;
+            count++;
+            any = true;
+
+            InvitationData invite = FindInvitation(GroupID, agent);
+            if (invite != null)
+                m_Database.DeleteInvite(invite.InviteID);
+        }
+        return any;
+    }
+
+    /// <summary>Lift bans: someone who may manage bans. False when nothing was lifted.</summary>
+    public bool UnbanAgents(string RequestingAgentID, UUID GroupID, string[] AgentIDs)
+    {
+        if (!GroupRules.For(m_Database, GroupID, RequestingAgentID).CanManageBans)
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at unbanning from group {1} denied because of lack of permission", RequestingAgentID, GroupID);
+            return false;
+        }
+        bool any = false;
+        foreach (string agent in (AgentIDs ?? []).Where(a => !string.IsNullOrEmpty(a)))
+            any |= m_Database.DeleteBan(GroupID, agent);
+        return any;
+    }
+
+    /// <summary>
+    /// Banned from the group. A hypergrid visitor may be named by a universal identifier (uuid;url;name) on one side
+    /// and by the bare UUID on the other (the viewer bans by UUID), so the UUID is tried too.
+    /// </summary>
+    private bool IsBanned(UUID groupID, string agentID)
+    {
+        if (string.IsNullOrEmpty(agentID))
+            return false;
+        if (m_Database.RetrieveBan(groupID, agentID) != null)
+            return true;
+        return agentID.Contains(';') && Util.ParseUniversalUserIdentifier(agentID, out UUID id)
+            && m_Database.RetrieveBan(groupID, id.ToString()) != null;
+    }
+    #endregion
 
     private bool HasPower(string agentID, UUID groupID, GroupPowers power)
-    {
-        ulong p = MemberPowers(groupID, agentID, OwnerRoleOf(m_Database.RetrieveGroup(groupID)));
-        return (p & (ulong)power) == (ulong)power;
-    }
+        => GroupRules.For(m_Database, groupID, agentID).Has(power);
 
     private bool IsOwner(string agentID, UUID groupID)
-    {
-        UUID ownerRoleID = OwnerRoleOf(m_Database.RetrieveGroup(groupID));
-        return !ownerRoleID.IsZero() && m_Database.RetrieveRoleMember(groupID, ownerRoleID, agentID) != null;
-    }
+        => GroupRules.For(m_Database, groupID, agentID).IsOwner;
 
-    /// <summary>
-    /// Whether <paramref name="agentID"/> may put a member in <paramref name="roleID"/>: anyone may for Everyone; only
-    /// an owner for the owners role (SL: "Assign Members to Any Role" reaches non-Owner roles); otherwise "Assign
-    /// Members to Any Role" (AssignMember), or "Assign Members to Assigner's Roles" (AssignMemberLimited) for a role
-    /// the assigner holds.
-    /// </summary>
+    /// <summary>Whether <paramref name="agentID"/> may put a member in <paramref name="roleID"/>; see <see cref="GroupRules.CanAssign"/>.</summary>
     private bool CanAssignRole(string agentID, UUID groupID, UUID roleID)
-    {
-        if (roleID.IsZero())
-            return true;
-
-        UUID ownerRoleID = OwnerRoleOf(m_Database.RetrieveGroup(groupID));
-        if (roleID == ownerRoleID)
-            return IsOwner(agentID, groupID);
-
-        ulong p = MemberPowers(groupID, agentID, ownerRoleID);
-        if ((p & (ulong)GroupPowers.AssignMember) != 0)
-            return true;
-        return (p & (ulong)GroupPowers.AssignMemberLimited) != 0 && m_Database.RetrieveRoleMember(groupID, roleID, agentID) != null;
-    }
+        => GroupRules.For(m_Database, groupID, agentID).CanAssign(roleID);
     #endregion
 
 }

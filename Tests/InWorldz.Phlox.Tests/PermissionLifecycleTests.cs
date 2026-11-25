@@ -72,9 +72,9 @@ public class PermissionLifecycleTests
     private static void Say(SchedulerHarness h, string msg)
         => h.Scene.SimChat(msg, ChatTypeEnum.Region, 7, h.Prim.AbsolutePosition, "tester", UUID.Random(), false);
 
-    private static bool PumpUntil(SchedulerHarness h, Func<bool> done, int seconds = 30)
+    private static bool PumpUntil(SchedulerHarness h, Func<bool> done, int seconds = TestWait.DefaultSeconds)
     {
-        var until = DateTime.UtcNow + TimeSpan.FromSeconds(seconds);
+        var until = DateTime.UtcNow + TimeSpan.FromSeconds(TestWait.Cap(seconds));
         while (!done())
         {
             if (DateTime.UtcNow >= until) return false;

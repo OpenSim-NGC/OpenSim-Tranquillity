@@ -517,7 +517,8 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                 dbcon.Open();
                 using(NpgsqlCommand cmd = new NpgsqlCommand(@"SELECT name, description, access_time, ""AssetType"", temporary, id, asset_flags, creatorid
                                             FROM XAssetsMeta
-                                            LIMIT :start, :count", dbcon))
+                                            ORDER BY id
+                                            LIMIT :count OFFSET :start", dbcon))
                 {
                     cmd.Parameters.Add(m_database.CreateParameter("start", start));
                     cmd.Parameters.Add(m_database.CreateParameter("count", count));
@@ -561,6 +562,10 @@ public class PGSQLXAssetData : IXAssetDataPlugin
     {
 //            m_log.LogDebug("[XASSETS DB]: Deleting asset {0}", id);
 
+        // id is a uuid column: bound as text, PostgreSQL refuses the comparison.
+        if (!UUID.TryParse(id, out UUID asset_id))
+            return false;
+
         lock (m_dbLock)
         {
             using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
@@ -569,10 +574,12 @@ public class PGSQLXAssetData : IXAssetDataPlugin
 
                 using (NpgsqlCommand cmd = new NpgsqlCommand(@"delete from XAssetsMeta where id=:ID", dbcon))
                 {
-                    cmd.Parameters.Add(m_database.CreateParameter("ID", id));
+                    cmd.Parameters.Add(m_database.CreateParameter("ID", asset_id));
                     cmd.ExecuteNonQuery();
                 }
 
+                // The data row stays, as on MySQL: other assets with the same content share it, and removing it
+                // when no row refers to it any more would race a store of the same content that found it.
                 // TODO: How do we deal with data from deleted assets?  Probably not easily reapable unless we
                 // keep a reference count (?)
             }

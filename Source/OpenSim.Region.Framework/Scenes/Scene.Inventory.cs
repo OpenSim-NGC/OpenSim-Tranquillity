@@ -360,6 +360,15 @@ public partial class Scene
     /// the script reset as it starts. A request that leaves the choice as it was restarts nothing. When the engine the region
     /// now places the script in is the one running it, or, while no engine reports the script (it is still loading), the
     /// one its earlier flags placed it in, nothing restarts and nothing is discarded.</para>
+    /// <para>A request that sets an engine or a Lua target ("luau", "lsl-luau") succeeds only when the script then runs on
+    /// that engine, or on the engine that takes that target: state another engine saved does not hold it back, as for a
+    /// saved engine. When no engine loaded here is that engine or takes that target, or another engine still reports the
+    /// script's saved state after the discard for a Lua target (the target would yield to it), the request is refused with
+    /// <see cref="ScriptEngineChoiceResult.NotSwitched"/> and the region log says why. The script keeps the flags it had. In
+    /// the first case it is not touched. In the second it was already stopped: it starts again where its flags and the state
+    /// that engine kept place it, and is reset as it starts when that is not the engine it ran in, so no stale state comes
+    /// back. A request whose choice the script already has answers <see cref="ScriptEngineChoiceResult.Unchanged"/> only when
+    /// the script already runs on the engine asked for; otherwise it is moved there as above.</para>
     /// <para>Calls for one script are made one at a time, so a capability call and an OSSL call on the same script cannot
     /// interleave.</para>
     /// </remarks>
@@ -392,7 +401,29 @@ public partial class Scene
             if (item is null)
                 return ScriptEngineChoiceResult.NotFound;
             uint flags = ScriptCompileTargets.ApplySaveTarget(item.Flags, saveTarget, ScriptEngineCodeFor);
-            if (flags == item.Flags)
+
+            // A request that sets an engine or a Lua target names the engine the script must run on afterwards.
+            IScriptModule asked = null;
+            string askedFor = null;
+            ScriptCompileTarget luaTarget = ScriptCompileTargets.Parse(saveTarget);
+            if (!string.IsNullOrEmpty(engineName))
+            {
+                askedFor = ScriptEngineChoices.NameFor(ScriptEngineCodeFor(engineName));
+                asked = LoadedScriptEngine(e => e.ScriptEngineName == askedFor);
+            }
+            else if (luaTarget != ScriptCompileTarget.Unspecified)
+            {
+                askedFor = ScriptCompileTargets.ToViewerValue(luaTarget);
+                asked = LoadedScriptEngine(e => e is IScriptEngineSelection selection && selection.AcceptsCompileTarget(luaTarget));
+            }
+            if (askedFor is not null && asked is null)
+            {
+                m_log.LogWarning(
+                    $"[SCENE]: The engine of script {item.Name} ({itemId}) in {part.Name} was not changed to {askedFor}: no script engine in this region is that engine or takes that target");
+                return ScriptEngineChoiceResult.NotSwitched;
+            }
+
+            if (flags == item.Flags && asked is null)
                 return ScriptEngineChoiceResult.Unchanged;
 
             AssetBase text = AssetService.Get(item.AssetID.ToString());
@@ -413,8 +444,15 @@ public partial class Scene
             // An engine may not report a script it is still loading. The engine the script's flags as they were place it in
             // then stands in for the one running it, so choosing that engine restarts nothing and discards nothing.
             running ??= ResolveScriptEngine(DefaultScriptEngine, source, item);
+            // The choice is already the script's: nothing to do when it runs on the engine asked for. A Lua target may have
+            // yielded to another engine's saved state when the script was placed; then the script still has to move.
+            if (flags == item.Flags && running == asked)
+                return ScriptEngineChoiceResult.Unchanged;
+            uint flagsBefore = item.Flags;
             item.Flags = flags;
-            IScriptModule placed = ResolveScriptEngine(DefaultScriptEngine, source, item);
+            // A request that sets an engine or a Lua target places the script there; one that clears the choice leaves it to
+            // the ordinary steps, saved state among them.
+            IScriptModule placed = asked ?? ResolveScriptEngine(DefaultScriptEngine, source, item);
             if (running is not null && running == placed)
             {
                 // the engine running the script stays the same: only the choice changes
@@ -423,7 +461,6 @@ public partial class Scene
             }
 
             part.Inventory.RemoveScriptInstance(item.ItemID, false);
-            part.ParentGroup.UpdateInventoryItem(item);
             // The script starts fresh in its new engine, as after a recompile: every engine forgets the state it saved for it,
             // the old one after it has been asked to let the script go, and before the new one starts it.
             foreach (IScriptModule engine in RequestModuleInterfaces<IScriptModule>())
@@ -431,6 +468,25 @@ public partial class Scene
                 if (engine is IScriptStateProvider state)
                     state.DiscardSavedScriptState(item.ItemID);
             }
+            // A Lua target yields to another engine's saved state (see ResolveScriptEngine). If an engine still reports state
+            // for the script after the discard, the script would start there instead: the request is refused, the script gets
+            // back the flags it had (never saved with the new ones) and starts where they and the remaining state place it.
+            // Started anywhere but the engine it ran in, it is reset, so state from before it ran there does not come back.
+            if (asked is not null && ResolveScriptEngine(DefaultScriptEngine, source, item) != asked)
+            {
+                item.Flags = flagsBefore;
+                bool elsewhere = ResolveScriptEngine(DefaultScriptEngine, source, item) != running;
+                part.Inventory.CreateScriptInstance(item.ItemID, 0, false, DefaultScriptEngine, 1);
+                if (elsewhere)
+                    EventManager.TriggerScriptReset(part.LocalId, item.ItemID);
+                EventManager.TriggerUpdateScript(agentId, itemId, primId, item.ScriptRunning, item.AssetID);
+                part.ParentGroup.ResumeScripts();
+                m_log.LogWarning(
+                    $"[SCENE]: The engine of script {item.Name} ({itemId}) in {part.Name} was not changed to {askedFor}: another script engine still holds its saved state");
+                return ScriptEngineChoiceResult.NotSwitched;
+            }
+
+            part.ParentGroup.UpdateInventoryItem(item);
             // An engine that does not implement the discard still reports its state: the script is reset as it starts there.
             bool keptState = placed is IScriptStateProvider kept && kept.HasSavedScriptState(item.ItemID, item.AssetID);
             // Not the variant that waits for compile errors: no one reads them here, and the caller may be a script thread.
@@ -445,6 +501,16 @@ public partial class Scene
         {
             ExitScriptEngineChange(itemId, gate);
         }
+    }
+
+    private IScriptModule LoadedScriptEngine(Func<IScriptModule, bool> match)
+    {
+        foreach (IScriptModule engine in RequestModuleInterfaces<IScriptModule>())
+        {
+            if (match(engine))
+                return engine;
+        }
+        return null;
     }
 
     // One gate per script while an engine change of it is in progress; removed when no call holds or waits for it.
@@ -720,6 +786,16 @@ public partial class Scene
                 }
 
                 avatar.ControllingClient.SendAlertMessage("Notecard updated");
+                break;
+            }
+            case InventoryType.LSL:
+            {
+                // as the script task cap (CapsUpdateTaskInventoryScriptAsset) and the agent inventory path require
+                if (!Permissions.CanEditScript(itemID, objectID, avatarId))
+                {
+                    avatar.ControllingClient.SendAgentAlertMessage("Insufficient permissions to edit script", false);
+                    return UUID.Zero;
+                }
                 break;
             }
             case (InventoryType)CustomInventoryType.AnimationSet:

@@ -82,7 +82,7 @@ state two
     timer() { llSay(0, ""two tick""); llSetTimerEvent(0.0); }
 }");
         Assert.True(h.PumpUntil(() => Count(h, "in two") == 1), Said(h));
-        Assert.True(h.PumpUntil(() => Count(h, "two tick") == 1, TimeSpan.FromSeconds(10)),
+        Assert.True(h.PumpUntil(() => Count(h, "two tick") == 1, TestWait.Default),
             "the timer did not survive the state change: " + Said(h));
     }
 
@@ -96,7 +96,7 @@ default
     state_entry() { llSetTimerEvent(0.2); }
     timer() { llSay(0, ""tick""); }
 }");
-        Assert.True(h.PumpUntil(() => Count(h, "tick") >= 1, TimeSpan.FromSeconds(10)), Said(h));
+        Assert.True(h.PumpUntil(() => Count(h, "tick") >= 1, TestWait.Default), Said(h));
 
         h.Engine.SetScriptState(id, false, false);
         Assert.True(h.PumpUntil(() => Stopped(h, id)), h.StatusOf(id));
@@ -105,7 +105,7 @@ default
         Assert.True(Count(h, "tick") == 0, "a stopped script's timer ticked: " + Said(h));
 
         h.Engine.SetScriptState(id, true, false);
-        Assert.True(h.PumpUntil(() => Count(h, "tick") >= 1, TimeSpan.FromSeconds(10)),
+        Assert.True(h.PumpUntil(() => Count(h, "tick") >= 1, TestWait.Default),
             "the timer did not come back when the script was started again: " + Said(h) + " " + h.StatusOf(id));
     }
 
@@ -132,7 +132,7 @@ default
 
         h.PumpFor(TimeSpan.FromSeconds(0.5));   // the sleep has well over a second left
         Assert.True(Count(h, "woke") == 0, "a restarted script cut its llSleep short: " + Said(h));
-        Assert.True(h.PumpUntil(() => Count(h, "woke") == 1, TimeSpan.FromSeconds(10)),
+        Assert.True(h.PumpUntil(() => Count(h, "woke") == 1, TestWait.Default),
             "the restarted script never woke: " + Said(h) + " " + h.StatusOf(id));
     }
 
@@ -212,7 +212,7 @@ default
         for (int i = 0; i < 64; i++)
             exe.PostEvent(id, new PostedEvent { EventType = InWorldz.Phlox.Types.SupportedEventList.Events.CHANGED, Args = new object[] { 1 } });
 
-        Assert.True(h.PumpUntil(() => Count(h, "tick") == 1, TimeSpan.FromSeconds(10)),
+        Assert.True(h.PumpUntil(() => Count(h, "tick") == 1, TestWait.Default),
             "the timer event was dropped by the full queue: " + Said(h));
     }
 

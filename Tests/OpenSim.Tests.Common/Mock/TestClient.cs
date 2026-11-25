@@ -68,6 +68,7 @@ public class TestClient : IClientAPI, IClientCore
     public event Action<UUID> OnReceivedSendRebakeAvatarTextures;
 
     public event Action<string> OnReceivedAlertMessage;
+    public event Action<string, bool> OnReceivedAgentAlertMessage;
     public event Action<UUID, int, UUID[], uint> OnReceivedEstateList;
     public event Action<UUID, EstateBan[], uint> OnReceivedBannedUserList;
 
@@ -910,6 +911,7 @@ public class TestClient : IClientAPI, IClientCore
 
     public void SendAgentAlertMessage(string message, bool modal)
     {
+        OnReceivedAgentAlertMessage?.Invoke(message, modal);
     }
 
     public void SendAlertMessage(string message, string info)
@@ -1353,8 +1355,12 @@ public class TestClient : IClientAPI, IClientCore
     {
     }
 
+    /// <summary>The groups the client was told to drop (AgentDropGroup).</summary>
+    public event Action<UUID> OnReceivedAgentDropGroup;
+
     public void SendAgentDropGroup(UUID groupID)
     {
+        OnReceivedAgentDropGroup?.Invoke(groupID);
     }
 
     public void SendAvatarNotesReply(UUID targetID, string text)

@@ -75,7 +75,7 @@ public class BotNavigationWaitTests
             Navigate(h, bot);
 
             Assert.True(Near(sp.AbsolutePosition, A), "after the call the bot should wait at the first point, is at " + sp.AbsolutePosition);
-            Assert.True(h.PumpUntil(() => Near(sp.AbsolutePosition, B), TimeSpan.FromSeconds(20)), "never went on, at " + sp.AbsolutePosition);
+            Assert.True(h.PumpUntil(() => Near(sp.AbsolutePosition, B), TestWait.Default), "never went on, at " + sp.AbsolutePosition);
             Assert.True(clock.Elapsed >= TimeSpan.FromSeconds(1), "went on after " + clock.Elapsed);
         }
         finally { bots.Close(); }

@@ -97,7 +97,10 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
     {
         hash = String.Empty;
         AssetMetadata meta = null;
-        UUID uuid = new UUID(id);
+
+        // The id column is a uuid: an id that is not a UUID names no row.
+        if (!UUID.TryParse(id, out UUID uuid))
+            return null;
 
         string query = String.Format("select \"id\", \"type\", \"hash\", \"create_time\", \"access_time\", \"asset_flags\" from {0} where \"id\" = :id", m_Table);
         using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
@@ -151,15 +154,15 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
     {
         try
         {
-            bool found = false;
             string oldhash;
             AssetMetadata existingAsset = Get(meta.ID, out oldhash);
 
+            // An id that already has a row is stored: as on MySQL, the row is kept and the store succeeds, or
+            // the caller would be told it failed and store it again.
             string query = String.Format("UPDATE {0} SET \"access_time\" = :access_time WHERE \"id\" = :id", m_Table);
             if (existingAsset == null)
             {
                query = String.Format("insert into {0} (\"id\", \"type\", \"hash\", \"asset_flags\", \"create_time\", \"access_time\") values ( :id, :type, :hash, :asset_flags, :create_time, :access_time)", m_Table);
-               found = true;
             }
 
             using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
@@ -175,7 +178,7 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
                 cmd.Parameters.Add(m_database.CreateParameter("access_time", now));
                 cmd.ExecuteNonQuery();
             }
-            return found;
+            return true;
         }
         catch(Exception e)
         {
@@ -219,6 +222,44 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
         return results;
     }
 
+    /// <summary>For each id, the hash and type of its row, or a null hash when it has none.</summary>
+    public (string Hash, sbyte Type)[] GetHashes(UUID[] uuids)
+    {
+        (string Hash, sbyte Type)[] results = new (string Hash, sbyte Type)[uuids.Length];
+        if (uuids.Length == 0)
+            return results;
+
+        Dictionary<UUID, (string Hash, sbyte Type)> rows = new Dictionary<UUID, (string Hash, sbyte Type)>();
+
+        // each id is a parameter, never part of the statement
+        string[] names = new string[uuids.Length];
+        for (int i = 0; i < uuids.Length; i++)
+            names[i] = ":id" + i.ToString();
+        string query = string.Format("select \"id\", \"hash\", \"type\" from {1} where id in ({0})", string.Join(",", names), m_Table);
+        using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand(query, dbcon))
+        {
+            for (int i = 0; i < uuids.Length; i++)
+                cmd.Parameters.Add(m_database.CreateParameter("id" + i.ToString(), uuids[i]));
+            dbcon.Open();
+            using (NpgsqlDataReader reader = cmd.ExecuteReader(CommandBehavior.Default))
+            {
+                while (reader.Read())
+                {
+                    UUID id = DBGuid.FromDB(reader["id"]);
+                    rows[id] = (reader["hash"].ToString(), (sbyte)Convert.ToInt32(reader["type"]));
+                }
+            }
+        }
+
+        for (int i = 0; i < uuids.Length; i++)
+        {
+            if (rows.TryGetValue(uuids[i], out (string Hash, sbyte Type) row))
+                results[i] = row;
+        }
+        return results;
+    }
+
     public int Count()
     {
         int count = 0;
@@ -238,12 +279,16 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
 
     public bool Delete(string id)
     {
+        // id is a uuid column; an id that is not a UUID names no row.
+        if (!UUID.TryParse(id, out UUID assetID))
+            return false;
+
         string query = String.Format("delete from {0} where \"id\" = :id", m_Table);
         using (NpgsqlConnection dbcon = new NpgsqlConnection(m_connectionString))
         using (NpgsqlCommand cmd = new NpgsqlCommand(query, dbcon))
         {
             dbcon.Open();
-            cmd.Parameters.Add(m_database.CreateParameter("id", new UUID(id)));
+            cmd.Parameters.Add(m_database.CreateParameter("id", assetID));
             cmd.ExecuteNonQuery();
         }
 
@@ -256,7 +301,9 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
         string limit = String.Empty;
         if(count != -1)
         {
-            limit = String.Format(" limit {0} offset {1}", start, count);
+            // A page is count rows from row start. The rows are in id order so that the pages of one import,
+            // run one after another, neither skip nor repeat a row.
+            limit = " order by \"id\" limit :count offset :start";
         }
         string query = String.Format("select * from {0}{1}", table, limit);
         try
@@ -264,6 +311,11 @@ public class PGSQLFSAssetData : IFSAssetDataPlugin
             using (NpgsqlConnection remote = new NpgsqlConnection(conn))
             using (NpgsqlCommand cmd = new NpgsqlCommand(query, remote))
             {
+                if (count != -1)
+                {
+                    cmd.Parameters.Add(m_database.CreateParameter("count", count));
+                    cmd.Parameters.Add(m_database.CreateParameter("start", start));
+                }
                 remote.Open();
                 MainConsole.Instance.Output("Querying database");
                 MainConsole.Instance.Output("Reading data");

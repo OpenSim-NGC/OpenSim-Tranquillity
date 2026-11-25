@@ -106,6 +106,8 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
             }
 
             m_log.LogInformation("[xmlGROUPS]: Initializing {0}", this.Name);
+            m_log.LogWarning("[xmlGROUPS]: XmlRpcGroups (GroupsModule) is deprecated and gets none of Groups V2's fixes; " +
+                "Robust's \"groups import flotsam\" moves a grid's groups to V2 (Docs/feature/groups-rebuild/ROLLOUT-groups-v2.md)");
 
             m_groupNoticesEnabled   = groupsConfig.GetBoolean("NoticesEnabled", true);
             m_debugEnabled          = groupsConfig.GetBoolean("DebugEnabled", false);
@@ -523,6 +525,12 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
 
                 if(!itemID.IsZero() && !ownerID.IsZero())
                 {
+                    // the attachment comes from the sender's own inventory
+                    if (ownerID != remoteClient.AgentId)
+                    {
+                        remoteClient.SendAgentAlertMessage("A group notice can only carry an item from your own inventory", false);
+                        return;
+                    }
                     item = scene.InventoryService.GetItem(ownerID, itemID);
                     if (item != null)
                     {
@@ -743,36 +751,44 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
             remoteClient.SendInventoryItemCreateUpdate(itemCopy, 0);
         }
 
-        // Interop, received special 210 code for ejecting a group member
-        // this only works within the comms servers domain, and won't work hypergrid
-        // TODO:FIXME: Use a presence server of some kind to find out where the
-        // client actually is, and try contacting that region directly to notify them,
-        // or provide the notification via xmlrpc update queue
-        else if ((im.dialog == 210))
-        {
-            // This is sent from the region that the ejectee was ejected from
-            // if it's being delivered here, then the ejectee is here
-            // so we need to send local updates to the agent.
+    }
 
-            UUID ejecteeID = new UUID(im.toAgentID);
-            im.imSessionID = UUID.Zero.Guid;
-            im.dialog = (byte)InstantMessageDialog.MessageFromAgent;
-            OutgoingInstantMessage(im, ejecteeID);
+    /// <summary>
+    /// A member ejected through another region (dialog 210 from that region's EjectGroupMember): if the member is
+    /// here, they are told, and their viewer drops the group. Only the drop is sent, not the member's whole group
+    /// list: this region may still have the old memberships cached and would put the group back.
+    /// </summary>
+    private void HandleEjectNotice(GridInstantMessage im)
+    {
+        UUID ejecteeID = new UUID(im.toAgentID);
+        UUID groupID = new UUID(im.imSessionID);
 
-            IClientAPI ejectee = GetActiveRootClient(ejecteeID);
-            if (ejectee != null)
-            {
-                UUID groupID = new UUID(im.imSessionID);
-                ejectee.SendAgentDropGroup(groupID);
-                SendAgentGroupDataUpdate(ejectee,true);
-            }
-        }
+        IClientAPI ejectee = GetActiveRootClient(ejecteeID);
+        if (ejectee == null)
+            return;
+
+        GridInstantMessage told = new GridInstantMessage(im, true);
+        told.imSessionID = UUID.Zero.Guid;
+        told.dialog = (byte)InstantMessageDialog.MessageFromAgent;
+        ejectee.SendInstantMessage(told);
+
+        if (groupID.IsNotZero())
+            ejectee.SendAgentDropGroup(groupID);
     }
 
     private void OnGridInstantMessage(GridInstantMessage msg)
     {
         if (m_debugEnabled)
             m_log.LogInformation("[xmlGROUPS]: OnGridInstantMessage called");
+
+        // An eject notice from the region the member was ejected through (dialog 210, the group as its session).
+        // It used to go to the viewer's IM handler above, which takes nothing without a viewer, so a member ejected
+        // through another region kept the group in their viewer.
+        if (msg.dialog == 210)
+        {
+            HandleEjectNotice(msg);
+            return;
+        }
 
         // Trigger the above event handler
         OnInstantMessage(null, msg);
@@ -1279,6 +1295,15 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         // The connector does not say whether the service refused, so read the membership back.
         bool removed = m_groupData.GetAgentGroupMembership(agentID, ejecteeID, groupID) == null;
 
+        // A refused ejection is answered as refused, and nobody is told of an ejection that did not happen. Until
+        // now the requester was told it worked, the member was sent "You have been ejected" and their viewer was
+        // told to drop the group, whatever the service decided.
+        if (!removed)
+        {
+            (remoteClient ?? GetActiveClient(agentID))?.SendEjectGroupMemberReply(agentID, groupID, false);
+            return false;
+        }
+
         string agentName;
         RegionInfo regionInfo;
 
@@ -1688,7 +1713,10 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         else if (m_msgTransferModule != null)
         {
             if (m_debugEnabled) m_log.LogInformation("[GROUPS]: MsgTo ({0}) is not local, delivering via TransferModule", msgTo);
-            m_msgTransferModule.SendInstantMessage(msg, delegate(bool success) { if (m_debugEnabled) m_log.LogDebug("[GROUPS]: Message Sent: {0}", success?"Succeeded":"Failed"); });
+            // An eject notice (dialog 210) is for the groups module of the region the member is in: the transfer module
+            // would hand it to a child agent of the member here (a neighbour region's), whose viewer ignores it.
+            m_msgTransferModule.SendInstantMessage(msg, delegate(bool success) { if (m_debugEnabled) m_log.LogDebug("[GROUPS]: Message Sent: {0}", success?"Succeeded":"Failed"); },
+                ToRootOnly: msg.dialog == 210);
         }
     }
 

@@ -213,6 +213,32 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
         }
     }
 
+    /// <summary>
+    /// The table is <c>utf8</c>, three bytes a character at most. In strict mode MariaDB and MySQL refuse a row
+    /// whose name or description holds a character outside the Basic Multilingual Plane, such as an emoji, so
+    /// those characters (UTF-16 surrogates, paired or not) are left out.
+    /// </summary>
+    private static string WithoutFourByteCharacters(string s)
+    {
+        if (string.IsNullOrEmpty(s))
+            return string.Empty;
+
+        int first = 0;
+        while (first < s.Length && !char.IsSurrogate(s[first]))
+            first++;
+        if (first == s.Length)
+            return s;
+
+        System.Text.StringBuilder kept = new System.Text.StringBuilder(s.Length);
+        kept.Append(s, 0, first);
+        for (int i = first; i < s.Length; i++)
+        {
+            if (!char.IsSurrogate(s[i]))
+                kept.Append(s[i]);
+        }
+        return kept.ToString();
+    }
+
     public bool Store(AssetMetadata meta, string hash)
     {
         try
@@ -223,8 +249,8 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
             using (MySqlCommand cmd = new MySqlCommand())
             {
                 cmd.Parameters.AddWithValue("?id", meta.ID);
-                cmd.Parameters.AddWithValue("?name", meta.Name);
-                cmd.Parameters.AddWithValue("?description", meta.Description);
+                cmd.Parameters.AddWithValue("?name", WithoutFourByteCharacters(meta.Name));
+                cmd.Parameters.AddWithValue("?description", WithoutFourByteCharacters(meta.Description));
 //                    cmd.Parameters.AddWithValue("?type", meta.Type.ToString());
                 cmd.Parameters.AddWithValue("?type", meta.Type);
                 cmd.Parameters.AddWithValue("?hash", hash);
@@ -234,9 +260,9 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
                 {
                     cmd.CommandText = String.Format("insert into {0} (id, name, description, type, hash, asset_flags, create_time, access_time) values ( ?id, ?name, ?description, ?type, ?hash, ?asset_flags, UNIX_TIMESTAMP(), UNIX_TIMESTAMP())", m_Table);
 
-                    ExecuteNonQuery(cmd);
-
-                    return true;
+                    // Without its row the asset cannot be read, although its file is written: a failed insert
+                    // is a failed store.
+                    return ExecuteNonQuery(cmd);
                 }
 
                 //cmd.CommandText = String.Format("update {0} set hash = ?hash, access_time = UNIX_TIMESTAMP() where id = ?id", m_Table);
@@ -311,6 +337,62 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
         return results;
     }
 
+    /// <summary>
+    /// For each id, the hash and type of its row, or a null hash when it has none (or the database cannot be
+    /// reached).
+    /// </summary>
+    public (string Hash, sbyte Type)[] GetHashes(UUID[] uuids)
+    {
+        (string Hash, sbyte Type)[] results = new (string Hash, sbyte Type)[uuids.Length];
+        if (uuids.Length == 0)
+            return results;
+
+        Dictionary<UUID, (string Hash, sbyte Type)> rows = new Dictionary<UUID, (string Hash, sbyte Type)>();
+
+        // each id is a parameter, never part of the statement
+        string[] names = new string[uuids.Length];
+        for (int i = 0; i < uuids.Length; i++)
+            names[i] = "?id" + i.ToString();
+        string sql = string.Format("select id, hash, type from {1} where id in ({0})", string.Join(",", names), m_Table);
+
+        using (MySqlConnection conn = new MySqlConnection(m_ConnectionString))
+        {
+            try
+            {
+                conn.Open();
+            }
+            catch (MySqlException e)
+            {
+                m_log.LogError("[FSASSETS]: Failed to open database: {0}", e.ToString());
+                return results;
+            }
+
+            using (MySqlCommand cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = sql;
+                for (int i = 0; i < uuids.Length; i++)
+                    cmd.Parameters.AddWithValue(names[i], uuids[i].ToString());
+
+                using (MySqlDataReader dbReader = cmd.ExecuteReader())
+                {
+                    while (dbReader.Read())
+                    {
+                        UUID id = DBGuid.FromDB(dbReader["id"]);
+                        rows[id] = (dbReader["hash"].ToString(), (sbyte)Convert.ToInt32(dbReader["type"]));
+                    }
+                }
+            }
+            conn.Close();
+        }
+
+        for (int i = 0; i < uuids.Length; i++)
+        {
+            if (rows.TryGetValue(uuids[i], out (string Hash, sbyte Type) row))
+                results[i] = row;
+        }
+        return results;
+    }
+
     public int Count()
     {
         int count = 0;
@@ -353,10 +435,8 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
 
             cmd.Parameters.AddWithValue("?id", id);
 
-            ExecuteNonQuery(cmd);
+            return ExecuteNonQuery(cmd);
         }
-
-        return true;
     }
 
     public void Import(string conn, string table, int start, int count, bool force, FSStoreDelegate store)

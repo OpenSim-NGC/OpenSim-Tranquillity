@@ -172,6 +172,7 @@ public class FSAssetConnector : ServiceBase, IAssetService
 
         // Setup directory structure including temp directory
         m_SpoolDirectory = assetConfig.GetString("SpoolDirectory", "/tmp");
+        WarnIfSpoolIsTemporary(m_SpoolDirectory);
 
         string spoolTmp = Path.Combine(m_SpoolDirectory, "spool");
 
@@ -243,117 +244,196 @@ public class FSAssetConnector : ServiceBase, IAssetService
         }
     }
 
+    /// <summary>The writer's pause between passes over the spool.</summary>
+    private const int WriterInterval = 1000;
+
+    /// <summary>The longest pause after passes that could not write everything, as with a full disk.</summary>
+    private const int WriterMaxRetryInterval = 60000;
+
+    /// <summary>
+    /// The spool holds the only copy of an asset until the writer has written it, while its row already says it
+    /// is stored. A temporary directory is cleared at a restart, or is memory (tmpfs) and lost with it.
+    /// </summary>
+    private static void WarnIfSpoolIsTemporary(string spoolDirectory)
+    {
+        string spool = Path.TrimEndingDirectorySeparator(Path.GetFullPath(spoolDirectory)) + Path.DirectorySeparatorChar;
+        foreach (string temp in new[] { "/tmp", Path.GetTempPath() })
+        {
+            string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(temp)) + Path.DirectorySeparatorChar;
+            if (spool.StartsWith(root, StringComparison.Ordinal))
+            {
+                m_log.LogWarning("[FSASSETS]: SpoolDirectory {0} is in the temporary directory {1}. Assets wait there until they are written to BaseDirectory, and are lost if it is cleared, as at a restart. Set SpoolDirectory to a directory on the same disk as BaseDirectory.",
+                        spoolDirectory, root);
+                return;
+            }
+        }
+    }
+
     private void Writer()
     {
         m_log.LogInformation("[FSASSETS]: Writer started with spooldir {0} and basedir {1}", m_SpoolDirectory, m_FSBase);
 
+        int interval = WriterInterval;
         while (true)
         {
-            string[] files = Directory.GetFiles(m_SpoolDirectory);
-
-            if (files.Length > 0)
+            bool written;
+            try
             {
-                int tickCount = Environment.TickCount;
-                for (int i = 0 ; i < files.Length ; i++)
-                {
-                    string hash = Path.GetFileNameWithoutExtension(files[i]);
-                    string s = HashToFile(hash);
-                    string diskFile = Path.Combine(m_FSBase, s);
-                    bool pathOk = false;
-
-                    // The cure for chicken bones!
-                    while(true)
-                    {
-                        try
-                        {
-                            // Try to make the directory we need for this file
-                            Directory.CreateDirectory(Path.GetDirectoryName(diskFile));
-                            pathOk = true;
-                            break;
-                        }
-                        catch (System.IO.IOException)
-                        {
-                            // Creating the directory failed. This can't happen unless
-                            // a part of the path already exists as a file. Sadly the
-                            // SRAS data contains such files.
-                            string d = Path.GetDirectoryName(diskFile);
-
-                            // Test each path component in turn. If we can successfully
-                            // make a directory, the level below must be the chicken bone.
-                            while (d.Length > 0)
-                            {
-                                Console.WriteLine(d);
-                                try
-                                {
-                                    Directory.CreateDirectory(Path.GetDirectoryName(d));
-                                }
-                                catch (System.IO.IOException)
-                                {
-                                    d = Path.GetDirectoryName(d);
-
-                                    // We failed making the directory and need to
-                                    // go up a bit more
-                                    continue;
-                                }
-
-                                // We succeeded in making the directory and (d) is
-                                // the chicken bone
-                                break;
-                            }
-
-                            // Is the chicken alive?
-                            if (d.Length > 0)
-                            {
-                                Console.WriteLine(d);
-
-                                FileAttributes attr = File.GetAttributes(d);
-
-                                if ((attr & FileAttributes.Directory) == 0)
-                                {
-                                    // The chicken bone should be resolved.
-                                    // Return to writing the file.
-                                    File.Delete(d);
-                                    continue;
-                                }
-                            }
-                        }
-                        // Could not resolve, skipping
-                        m_log.LogError("[FSASSETS]: Could not resolve path creation error for {0}", diskFile);
-                        break;
-                    }
-
-                    if (pathOk)
-                    {
-                        try
-                        {
-                            byte[] data = File.ReadAllBytes(files[i]);
-
-                            using (GZipStream gz = new GZipStream(new FileStream(diskFile + ".gz", FileMode.Create), CompressionMode.Compress))
-                            {
-                                gz.Write(data, 0, data.Length);
-                            }
-                            File.Delete(files[i]);
-
-                            //File.Move(files[i], diskFile);
-                        }
-                        catch(System.IO.IOException e)
-                        {
-                            if (e.Message.StartsWith("Win32 IO returned ERROR_ALREADY_EXISTS"))
-                                File.Delete(files[i]);
-                            else
-                                throw;
-                        }
-                    }
-                }
-
-                int totalTicks = System.Environment.TickCount - tickCount;
-                if (totalTicks > 0) // Wrap?
-                {
-                    m_log.LogInformation("[FSASSETS]: Write cycle complete, {0} files, {1} ticks, avg {2:F2}", files.Length, totalTicks, (double)totalTicks / (double)files.Length);
-                }
+                written = WriteSpooledFiles();
+            }
+            catch (Exception e)
+            {
+                // Nothing may end this thread, and with it the process: what the pass did not write stays in
+                // the spool for the next one.
+                m_log.LogError(e, "[FSASSETS]: Writer pass over {0} failed", m_SpoolDirectory);
+                written = false;
             }
 
-            Thread.Sleep(1000);
+            // A full disk does not empty by itself: wait longer after each pass that left files behind.
+            interval = written ? WriterInterval : Math.Min(interval * 2, WriterMaxRetryInterval);
+            Thread.Sleep(interval);
+        }
+    }
+
+    /// <summary>
+    /// Writes each asset waiting in the spool to the store and then deletes its spool copy. One that cannot be
+    /// written stays in the spool. Answers whether every one was written.
+    /// </summary>
+    private bool WriteSpooledFiles()
+    {
+        // Only the spool's own files: anything else in the directory is not ours to move or delete.
+        string[] files = Directory.GetFiles(m_SpoolDirectory, "*.asset");
+        if (files.Length == 0)
+            return true;
+
+        int tickCount = Environment.TickCount;
+        int failed = 0;
+        for (int i = 0 ; i < files.Length ; i++)
+        {
+            string hash = Path.GetFileNameWithoutExtension(files[i]);
+            string diskFile = Path.Combine(m_FSBase, HashToFile(hash));
+            try
+            {
+                if (MakeDirectoryFor(diskFile))
+                    WriteStoreFile(files[i], diskFile + ".gz");
+                else
+                    failed++;
+            }
+            catch (Exception e)
+            {
+                if (failed == 0)
+                    m_log.LogError("[FSASSETS]: Could not write {0} to {1}, it stays in the spool to be written again: {2}",
+                            files[i], diskFile + ".gz", e.Message);
+                failed++;
+            }
+        }
+
+        int totalTicks = System.Environment.TickCount - tickCount;
+        if (failed > 0)
+        {
+            m_log.LogError("[FSASSETS]: Write cycle wrote {0} of {1} files; the others stay in the spool to be written again",
+                    files.Length - failed, files.Length);
+        }
+        else if (totalTicks > 0) // Wrap?
+        {
+            m_log.LogInformation("[FSASSETS]: Write cycle complete, {0} files, {1} ticks, avg {2:F2}", files.Length, totalTicks, (double)totalTicks / (double)files.Length);
+        }
+
+        return failed == 0;
+    }
+
+    /// <summary>
+    /// Writes the compressed copy of <paramref name="spoolFile"/> to a temporary file beside
+    /// <paramref name="storeFile"/>, forces it to disk and renames it into place, so the store file is never
+    /// seen part written, even after a crash or a full disk. Then deletes the spool copy.
+    /// </summary>
+    private static void WriteStoreFile(string spoolFile, string storeFile)
+    {
+        byte[] data = File.ReadAllBytes(spoolFile);
+        string tempFile = storeFile + "." + Environment.ProcessId + ".tmp";
+        try
+        {
+            using (FileStream fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                using (GZipStream gz = new GZipStream(fs, CompressionMode.Compress, true))
+                    gz.Write(data, 0, data.Length);
+                fs.Flush(true);
+            }
+            File.Move(tempFile, storeFile, true);
+        }
+        catch
+        {
+            try { File.Delete(tempFile); } catch { /* the write's error is the one to report */ }
+            throw;
+        }
+
+        File.Delete(spoolFile);
+    }
+
+    /// <summary>
+    /// Makes the directory that holds <paramref name="diskFile"/>. A file where a directory of the path should be
+    /// is deleted ("chicken bones": the SRAS data contains such files). False when the path cannot be made.
+    /// </summary>
+    private static bool MakeDirectoryFor(string diskFile)
+    {
+        // The cure for chicken bones!
+        while(true)
+        {
+            try
+            {
+                // Try to make the directory we need for this file
+                Directory.CreateDirectory(Path.GetDirectoryName(diskFile));
+                return true;
+            }
+            catch (System.IO.IOException)
+            {
+                // Creating the directory failed. This can't happen unless
+                // a part of the path already exists as a file. Sadly the
+                // SRAS data contains such files.
+                string d = Path.GetDirectoryName(diskFile);
+
+                // Test each path component in turn. If we can successfully
+                // make a directory, the level below must be the chicken bone.
+                while (d.Length > 0)
+                {
+                    Console.WriteLine(d);
+                    try
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(d));
+                    }
+                    catch (System.IO.IOException)
+                    {
+                        d = Path.GetDirectoryName(d);
+
+                        // We failed making the directory and need to
+                        // go up a bit more
+                        continue;
+                    }
+
+                    // We succeeded in making the directory and (d) is
+                    // the chicken bone
+                    break;
+                }
+
+                // Is the chicken alive?
+                if (d.Length > 0)
+                {
+                    Console.WriteLine(d);
+
+                    FileAttributes attr = File.GetAttributes(d);
+
+                    if ((attr & FileAttributes.Directory) == 0)
+                    {
+                        // The chicken bone should be resolved.
+                        // Return to writing the file.
+                        File.Delete(d);
+                        continue;
+                    }
+                }
+            }
+            // Could not resolve, skipping
+            m_log.LogError("[FSASSETS]: Could not resolve path creation error for {0}", diskFile);
+            return false;
         }
     }
 
@@ -390,21 +470,26 @@ public class FSAssetConnector : ServiceBase, IAssetService
         }
     }
 
-    private bool AssetExists(string hash)
+    /// <summary>Whether the store holds the content for <paramref name="hash"/>, undamaged.</summary>
+    private bool AssetExists(string hash, sbyte type)
     {
-        string s = HashToFile(hash);
-        string diskFile = Path.Combine(m_FSBase, s);
-
-        if (File.Exists(diskFile + ".gz") || File.Exists(diskFile))
-            return true;
-
-        return false;
+        return GetCheckedFsData(hash, type) != null;
     }
 
+    /// <summary>
+    /// Whether each asset is there to be served: it has a row, and its file holds its content. Hypergrid and
+    /// region archive loads do not send or store again an asset that is there, so one whose file is missing or
+    /// damaged must not count.
+    /// </summary>
     public virtual bool[] AssetsExist(string[] ids)
     {
         UUID[] uuid = Array.ConvertAll(ids, id => UUID.Parse(id));
-        return m_DataConnector.AssetsExist(uuid);
+        (string Hash, sbyte Type)[] rows = m_DataConnector.GetHashes(uuid);
+
+        bool[] exist = new bool[ids.Length];
+        for (int i = 0; i < ids.Length; i++)
+            exist[i] = rows[i].Hash != null && GetCheckedFsData(rows[i].Hash, rows[i].Type) != null;
+        return exist;
     }
 
     public string HashToFile(string hash)
@@ -464,8 +549,8 @@ public class FSAssetConnector : ServiceBase, IAssetService
         newAsset.Metadata = metadata;
         try
         {
-            newAsset.Data = GetFsData(hash);
-            if (newAsset.Data.Length == 0)
+            newAsset.Data = GetCheckedFsData(hash, metadata.Type);
+            if (newAsset.Data == null)
             {
                 AssetBase asset = null;
                 if (m_FallbackService != null)
@@ -485,6 +570,10 @@ public class FSAssetConnector : ServiceBase, IAssetService
                     if (m_showStats)
                         m_missingAssetsFS++;
                     // m_log.LogInformation("[FSASSETS]: Asset {0}, hash {1} not found in FS", id, hash);
+
+                    // Without its content the asset is missing, not empty: an empty asset would be cached and
+                    // used by whoever asked.
+                    return null;
                 }
                 else
                 {
@@ -537,10 +626,11 @@ public class FSAssetConnector : ServiceBase, IAssetService
     public virtual byte[] GetData(string id)
     {
         string hash;
-        if (m_DataConnector.Get(id, out hash) == null)
+        AssetMetadata metadata = m_DataConnector.Get(id, out hash);
+        if (metadata == null)
             return null;
 
-        return GetFsData(hash);
+        return GetCheckedFsData(hash, metadata.Type);
     }
 
     public bool Get(string id, Object sender, AssetRetrieved handler)
@@ -552,67 +642,138 @@ public class FSAssetConnector : ServiceBase, IAssetService
         return true;
     }
 
+    /// <summary>
+    /// The bytes of the file for <paramref name="hash"/> as they are on disk, unchecked: empty when there is no
+    /// file that can be read. <see cref="GetCheckedFsData"/> answers only content that matches the hash.
+    /// </summary>
     public byte[] GetFsData(string hash)
     {
-        string spoolFile = Path.Combine(m_SpoolDirectory, hash + ".asset");
+        return ReadFsFile(hash, out _, out _) ?? Array.Empty<byte>();
+    }
 
-        if (File.Exists(spoolFile))
+    /// <summary>The SHA-256 of no bytes: the hash of an asset that really is empty.</summary>
+    private static readonly string m_emptyHash = Util.SHA256Hash(Array.Empty<byte>());
+
+    /// <summary>
+    /// The content of the asset whose row names <paramref name="hash"/>, or null when its file does not hold it:
+    /// there is no file, it cannot be read, or what it holds does not match the hash (an empty file, a file cut
+    /// short, any other damage). An asset whose hash is that of no bytes needs no file.
+    /// </summary>
+    private byte[] GetCheckedFsData(string hash, sbyte type)
+    {
+        if (string.IsNullOrEmpty(hash))
+            return null;
+
+        if (string.Equals(hash, m_emptyHash, StringComparison.OrdinalIgnoreCase))
+            return Array.Empty<byte>();
+
+        byte[] data = ReadFsFile(hash, out string file, out bool whole);
+        if (data == null)
+            return null;
+
+        if (FileContentMatches(data, hash, type, whole))
+            return data;
+
+        m_log.LogWarning("[FSASSETS]: {0} holds {1} bytes that do not match hash {2}; assets with that hash are answered as missing until their content is stored again",
+                file, data.Length, hash);
+        return null;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="data"/>, read from a file, is the content whose SHA-256 is <paramref name="hash"/>.
+    /// Store writes an object as its XML cleaned by SanitizeXml and ending in a NUL, while its hash is that of the
+    /// bytes it was given, so an object also matches without its last NUL, or else when the file was read
+    /// <paramref name="whole"/>.
+    /// </summary>
+    private static bool FileContentMatches(byte[] data, string hash, sbyte type, bool whole)
+    {
+        if (string.Equals(Util.SHA256Hash(data), hash, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (type != (sbyte)AssetType.Object || data.Length == 0)
+            return false;
+
+        if (data[data.Length - 1] == 0 &&
+                string.Equals(Util.SHA256Hash(data.AsSpan(0, data.Length - 1)), hash, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return whole;
+    }
+
+    /// <summary>
+    /// Reads the file for <paramref name="hash"/>: the copy waiting in the spool, else the compressed file, else an
+    /// uncompressed one. Null when there is none or it cannot be read. <paramref name="whole"/> is false when the
+    /// read may hold only part of the file: a compressed file whose gzip trailer does not give the length read,
+    /// as when the file was cut short. An uncompressed file has no length to check.
+    /// </summary>
+    private byte[] ReadFsFile(string hash, out string file, out bool whole)
+    {
+        whole = false;
+        file = Path.Combine(m_SpoolDirectory, hash + ".asset");
+
+        if (File.Exists(file))
         {
             try
             {
-                byte[] content = File.ReadAllBytes(spoolFile);
-
+                byte[] content = File.ReadAllBytes(file);
+                whole = true;
                 return content;
             }
             catch
             {
+                // The writer may have just moved it into the store.
             }
         }
 
-        string file = HashToFile(hash);
-        string diskFile = Path.Combine(m_FSBase, file);
+        string diskFile = Path.Combine(m_FSBase, HashToFile(hash));
 
-        if (File.Exists(diskFile + ".gz"))
+        file = diskFile + ".gz";
+        if (File.Exists(file))
         {
             try
             {
-                using (GZipStream gz = new GZipStream(new FileStream(diskFile + ".gz", FileMode.Open, FileAccess.Read), CompressionMode.Decompress))
+                using (FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read))
+                using (MemoryStream ms = new MemoryStream())
                 {
-                    using (MemoryStream ms = new MemoryStream())
+                    using (GZipStream gz = new GZipStream(fs, CompressionMode.Decompress, true))
+                        gz.CopyTo(ms);
+
+                    // A gzip file ends with the length of what it holds, modulo 2^32. A file cut short ends
+                    // somewhere else, and unpacks without an error to the part that is left.
+                    if (fs.Length >= 18)
                     {
-                        byte[] data = new byte[32768];
-                        int bytesRead;
-
-                        do
-                        {
-                            bytesRead = gz.Read(data, 0, 32768);
-                            if (bytesRead > 0)
-                                ms.Write(data, 0, bytesRead);
-                        } while (bytesRead > 0);
-
-                        return ms.ToArray();
+                        byte[] trailer = new byte[4];
+                        fs.Seek(-4, SeekOrigin.End);
+                        fs.ReadExactly(trailer, 0, 4);
+                        whole = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(trailer) == (uint)ms.Length;
                     }
+                    return ms.ToArray();
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return Array.Empty<byte>();
+                m_log.LogWarning("[FSASSETS]: Could not read {0}: {1}", file, e.Message);
+                return null;
             }
         }
-        else if (File.Exists(diskFile))
+
+        file = diskFile;
+        if (File.Exists(file))
         {
             try
             {
-                byte[] content = File.ReadAllBytes(diskFile);
-
+                byte[] content = File.ReadAllBytes(file);
+                whole = true;
                 return content;
             }
-            catch
+            catch (Exception e)
             {
+                m_log.LogWarning("[FSASSETS]: Could not read {0}: {1}", file, e.Message);
+                return null;
             }
         }
-        return Array.Empty<byte>();
 
+        return null;
     }
 
     public virtual string Store(AssetBase asset)
@@ -643,7 +804,8 @@ public class FSAssetConnector : ServiceBase, IAssetService
             asset.Description = assetDescription;
         }
 
-        if (!AssetExists(hash))
+        // A file that is missing or damaged is written again from this content.
+        if (!AssetExists(hash, asset.Type))
         {
             string tempFile = Path.Combine(Path.Combine(m_SpoolDirectory, "spool"), hash + ".asset");
             string finalFile = Path.Combine(m_SpoolDirectory, hash + ".asset");
@@ -658,13 +820,9 @@ public class FSAssetConnector : ServiceBase, IAssetService
                     asset.Data = Utils.StringToBytes(xml);
                 }
 
-                FileStream fs = File.Create(tempFile);
-
-                fs.Write(asset.Data, 0, asset.Data.Length);
-
-                fs.Close();
-
-                File.Move(tempFile, finalFile);
+                // Without its file the asset cannot be served: no row is written for it.
+                if (!WriteSpoolFile(asset.Data, tempFile, finalFile))
+                    return UUID.Zero.ToString();
             }
         }
 
@@ -702,6 +860,35 @@ public class FSAssetConnector : ServiceBase, IAssetService
         }
     }
 
+    /// <summary>
+    /// Writes <paramref name="data"/> to the spool as <paramref name="spoolFile"/>, where the writer takes it to the
+    /// store. It is written to a temporary file in the spool's own folder, named after <paramref name="tempFile"/>
+    /// and not ending in .asset, forced to disk and renamed into place, so the writer never takes a file part
+    /// written. A write that fails, as on a full disk, leaves no file behind and answers false.
+    /// </summary>
+    private static bool WriteSpoolFile(byte[] data, string tempFile, string spoolFile)
+    {
+        // Unique, as two stores of the same content can run at once.
+        string partFile = tempFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using (FileStream fs = new FileStream(partFile, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                fs.Write(data, 0, data.Length);
+                fs.Flush(true);
+            }
+            // The same hash is the same content, so a spool file another store wrote meanwhile can be replaced.
+            File.Move(partFile, spoolFile, true);
+            return true;
+        }
+        catch (Exception e)
+        {
+            try { File.Delete(partFile); } catch { /* the write's error is the one to report */ }
+            m_log.LogError("[FSASSETS]: Could not write {0} to the spool, the asset is not stored: {1}", spoolFile, e.Message);
+            return false;
+        }
+    }
+
     public bool UpdateContent(string id, byte[] data)
     {
         return false;
@@ -721,11 +908,10 @@ public class FSAssetConnector : ServiceBase, IAssetService
 //            return true;
     }
 
+    /// <summary>Deletes the asset's row and answers what the store answers. The file stays: other rows may share it.</summary>
     public virtual bool Delete(string id)
     {
-        m_DataConnector.Delete(id);
-
-        return true;
+        return m_DataConnector.Delete(id);
     }
 
     private void HandleShowAssets(string module, string[] args)
@@ -785,9 +971,8 @@ public class FSAssetConnector : ServiceBase, IAssetService
             return;
         }
 
-        AssetBase asset = Get(args[2]);
-
-        if (asset == null || asset.Data.Length == 0)
+        // The row is what is deleted, so an asset whose file is missing or damaged can be deleted too.
+        if (GetMetadata(args[2]) == null)
         {
             MainConsole.Instance.Output("Asset not found");
             return;

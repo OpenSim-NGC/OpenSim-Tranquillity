@@ -152,7 +152,7 @@ public class NotecardFetchLossTests : IDisposable
     private static void Ask(SchedulerHarness h, UUID item)
     {
         h.PostTouch(item);
-        Assert.True(h.PumpUntil(() => h.Said.Contains("asked"), TimeSpan.FromSeconds(30)), SavedStateRig.SaidText(h));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("asked"), TestWait.Default), SavedStateRig.SaidText(h));
     }
 
     private (LogLevel Level, string Text)[] LinesAbout(UUID asset)
@@ -169,10 +169,10 @@ public class NotecardFetchLossTests : IDisposable
         FetchOf fetch = FetchOf.Install(h.Scene, asset);
         fetch.Answer = () => null;
         UUID item = h.RezScript(Reader);
-        Assert.True(h.PumpUntil(() => h.Said.Contains("entry"), TimeSpan.FromSeconds(30)), SavedStateRig.SaidText(h));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("entry"), TestWait.Default), SavedStateRig.SaidText(h));
 
         Ask(h, item);
-        Assert.True(h.PumpUntil(() => DebugChannelErrors(h).Count > 0, TimeSpan.FromSeconds(30)), SavedStateRig.SaidText(h));
+        Assert.True(h.PumpUntil(() => DebugChannelErrors(h).Count > 0, TestWait.Default), SavedStateRig.SaidText(h));
 
         // The debug channel has its error, as before; the script gets no answer and its request stays owed.
         Assert.Equal(new[] { "Script error: Notecard 'card' could not be found." }, DebugChannelErrors(h));
@@ -200,10 +200,10 @@ public class NotecardFetchLossTests : IDisposable
         AddCardItem(h, asset, UUID.Random());
         h.Scene.AssetService.Store(AssetHelpers.CreateAsset(asset, AssetType.Texture, new byte[] { 1, 2, 3 }, h.Prim.OwnerID));
         UUID item = h.RezScript(Reader);
-        Assert.True(h.PumpUntil(() => h.Said.Contains("entry"), TimeSpan.FromSeconds(30)), SavedStateRig.SaidText(h));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("entry"), TestWait.Default), SavedStateRig.SaidText(h));
 
         Ask(h, item);
-        Assert.True(h.PumpUntil(() => DebugChannelErrors(h).Count > 0, TimeSpan.FromSeconds(30)), SavedStateRig.SaidText(h));
+        Assert.True(h.PumpUntil(() => DebugChannelErrors(h).Count > 0, TestWait.Default), SavedStateRig.SaidText(h));
 
         Assert.Equal(new[] { "Script error: Notecard 'card' could not be found." }, DebugChannelErrors(h));
         var warnings = LinesAbout(asset).Where(l => l.Level == LogLevel.Warning).ToArray();
@@ -221,10 +221,10 @@ public class NotecardFetchLossTests : IDisposable
         FetchOf fetch = FetchOf.Install(h.Scene, asset);
         fetch.Answer = () => throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout of 30 seconds elapsing.", new TimeoutException());
         UUID item = h.RezScript(Reader);
-        Assert.True(h.PumpUntil(() => h.Said.Contains("entry"), TimeSpan.FromSeconds(30)), SavedStateRig.SaidText(h));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("entry"), TestWait.Default), SavedStateRig.SaidText(h));
 
         Ask(h, item);
-        Assert.True(h.PumpUntil(() => DebugChannelErrors(h).Count > 0, TimeSpan.FromSeconds(30)), SavedStateRig.SaidText(h));
+        Assert.True(h.PumpUntil(() => DebugChannelErrors(h).Count > 0, TestWait.Default), SavedStateRig.SaidText(h));
 
         Assert.Equal(new[] { "Script error: Notecard 'card' could not be found." }, DebugChannelErrors(h));
         Assert.Equal(1, ApiOf(h, item).PendingDataserverCount);

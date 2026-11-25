@@ -165,7 +165,7 @@ public class PermissionsTests
         h.RezScript(Asker(h.Prim.OwnerID, OVERRIDE_ANIMATIONS | TRIGGER_ANIMATION));
         // The silent grant arrives as run_time_permissions some rounds later; a fixed pump count can end first.
         var granted = "rtp=" + (OVERRIDE_ANIMATIONS | TRIGGER_ANIMATION);
-        Assert.True(PumpUntil(h, () => h.Said.Contains(granted), TimeSpan.FromSeconds(30)),
+        Assert.True(PumpUntil(h, () => h.Said.Contains(granted), TestWait.Default),
             "no grant within 30 s: [" + string.Join(" | ", h.Said) + "]");
         Assert.Empty(wearer.ScriptQuestions);
     }

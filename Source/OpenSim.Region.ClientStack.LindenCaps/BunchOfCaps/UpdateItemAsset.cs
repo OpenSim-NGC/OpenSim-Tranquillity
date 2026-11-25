@@ -101,6 +101,18 @@ public partial class BunchOfCaps
             }
         }
 
+        // Each of these caps saves one type of item: the notecard cap a notecard, the script cap a script, and so
+        // on. The checks that follow the upload are chosen by the item's type, so an item of another type is refused.
+        sbyte itemType = ItemAssetType(itemID, objectID);
+        if (itemType != (sbyte)atype)
+        {
+            LLSDAssetUploadError error = new LLSDAssetUploadError();
+            error.message = itemType == sbyte.MinValue ? "item not found" : "item is not of this type";
+            error.identifier = UUID.Zero;
+            httpResponse.RawBuffer = Util.UTF8NBGetbytes(LLSDHelpers.SerialiseLLSDReply(error));
+            return;
+        }
+
         string uploaderPath = GetNewCapPath();
 
         string protocol = m_HostCapsObj.SSLCaps ? "https://" : "http://";
@@ -124,6 +136,22 @@ public partial class BunchOfCaps
         //                             LLSDHelpers.SerialiseLLSDReply(uploadResponse)));
 
         httpResponse.RawBuffer = Util.UTF8NBGetbytes(LLSDHelpers.SerialiseLLSDReply(uploadResponse));
+    }
+
+    /// <summary>
+    /// The asset type of the item the caller names: in their inventory, or in the object's when
+    /// <paramref name="objectID"/> is set. <see cref="sbyte.MinValue"/> when there is no such item.
+    /// </summary>
+    private sbyte ItemAssetType(UUID itemID, UUID objectID)
+    {
+        if (objectID.IsZero())
+        {
+            InventoryItemBase item = m_Scene.InventoryService.GetItem(m_AgentID, itemID);
+            return item is null || item.Owner.NotEqual(m_AgentID) ? sbyte.MinValue : (sbyte)item.AssetType;
+        }
+
+        TaskInventoryItem taskItem = m_Scene.GetSceneObjectPart(objectID)?.Inventory.GetInventoryItem(itemID);
+        return taskItem is null ? sbyte.MinValue : (sbyte)taskItem.Type;
     }
 
     /// <summary>
@@ -185,6 +213,7 @@ public partial class BunchOfCaps
                     ScriptEngineChoiceResult.NotAllowed => "no permission to choose this script's engine",
                     ScriptEngineChoiceResult.Disabled => "this region keeps no script engine choices",
                     ScriptEngineChoiceResult.UnknownEngine => "no such script engine",
+                    ScriptEngineChoiceResult.NotSwitched => "the script cannot run on that engine in this region",
                     _ => result.ToString(),
                 };
             }

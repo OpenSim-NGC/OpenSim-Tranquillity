@@ -203,7 +203,7 @@ default
         h.Scene.ProcessObjectGrab(h.Prim.LocalId, Vector3.Zero, client, Surface());
 
         // The viewer sends nothing more while the mouse is held still; the region repeats touch() itself.
-        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 3, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 3, TestWait.Default), string.Join(" | ", h.Said));
         Assert.Equal(1, Count(h, "S"));
         Assert.StartsWith("T <0.00000, 0.00000, 0.00000> 2", h.Said.First(s => s.StartsWith("T ", StringComparison.Ordinal)));
     }
@@ -217,7 +217,7 @@ default
         var client = h.AddClient();
 
         h.Scene.ProcessObjectGrab(h.Prim.LocalId, Vector3.Zero, client, Surface());
-        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 2, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 2, TestWait.Default), string.Join(" | ", h.Said));
         h.Scene.ProcessObjectDeGrab(h.Prim.LocalId, client, Surface());
         Assert.True(h.PumpUntil(() => Count(h, "E") == 1), string.Join(" | ", h.Said));
         Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
@@ -269,7 +269,7 @@ default
             var client = h.AddClient();
 
             h.Scene.ProcessObjectGrab(h.Prim.LocalId, Vector3.Zero, client, Surface());
-            Assert.True(h.PumpUntil(() => Count(h, "T ") >= 1, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+            Assert.True(h.PumpUntil(() => Count(h, "T ") >= 1, TestWait.Default), string.Join(" | ", h.Said));
 
             // From here no repeat falls due unless the test moves the clock.
             Freeze();
@@ -321,7 +321,7 @@ default
         var client = h.AddClient();
 
         h.Scene.ProcessObjectGrab(h.Prim.LocalId, Vector3.Zero, client, Surface());
-        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 3, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 3, TestWait.Default), string.Join(" | ", h.Said));
 
         h.Scene.ProcessObjectDeGrab(h.Prim.LocalId, client, Surface());
         Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
@@ -346,7 +346,7 @@ default
         var client = h.AddClient();
 
         h.Scene.ProcessObjectGrab(parts[1].LocalId, Vector3.Zero, client, Surface());
-        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 1, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 1, TestWait.Default), string.Join(" | ", h.Said));
         h.Scene.ProcessObjectDeGrab(parts[1].LocalId, client, Surface());
         h.PumpFor(TimeSpan.FromMilliseconds(500));   // a "did not arrive" window
         Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));

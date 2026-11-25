@@ -35,7 +35,7 @@ public class YEngineOsslSettingsTests
         var part = SceneHelpers.AddSceneObject(h.Scene, "yengine prim", h.Prim.OwnerID).RootPart;
         SchedulerHarnessYEngine.Rez(h, part, "default { state_entry() { osMakeNotecard(\"made\", \"text\"); llSay(0, \"done\"); } }");
         string Errors() => string.Join(" | ", h.SaidOn.Where(s => s.Channel == DebugChannel).Select(s => s.Message));
-        Assert.True(h.PumpUntil(() => h.Said.Contains("done") || Errors().Length > 0, TimeSpan.FromSeconds(30)), "said: " + string.Join(" | ", h.Said));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("done") || Errors().Length > 0, TestWait.Default), "said: " + string.Join(" | ", h.Said));
         int cards = part.Inventory.GetInventoryItems().Count(i => i.Type == (int)OpenMetaverse.AssetType.Notecard);
         return (cards, Errors());
     }
@@ -75,7 +75,7 @@ public class YEngineOsslSettingsTests
     }
 
     [Fact]
-    public void TwoHarnessesWithYEngineAreNeverUpAtOnce()
+    public async Task TwoHarnessesWithYEngineAreNeverUpAtOnce()
     {
         var order = new ConcurrentQueue<string>();
         using var first = new SchedulerHarness(withYEngine: true);
@@ -86,10 +86,11 @@ public class YEngineOsslSettingsTests
         });
 
         // Not happening is what is shown here, so this is a real wait; standing a harness up with YEngine takes about a second.
-        Assert.False(second.Wait(TimeSpan.FromSeconds(4)), "the second harness with YEngine came up while the first was up");
+        Assert.True(second != await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(4))), "the second harness with YEngine came up while the first was up");
         order.Enqueue("first down");
         first.Dispose();   // a second Dispose at the end of the test does nothing
-        Assert.True(second.Wait(TimeSpan.FromSeconds(60)), "the second harness did not come up after the first was disposed");
+        Assert.True(second == await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(60))), "the second harness did not come up after the first was disposed");
+        await second;
         Assert.Equal(new[] { "first down", "second up" }, order.ToArray());
     }
 }

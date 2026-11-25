@@ -45,6 +45,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
     private List<Scene> m_sceneList = new List<Scene>();
 
     private IMessageTransferModule m_msgTransferModule = null;
+    private GroupNoticeSender m_noticeSender;
 
     private IGroupsServicesConnector m_groupData = null;
     private IUserManagement m_UserManagement;
@@ -86,6 +87,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
             m_groupNoticesEnabled   = groupsConfig.GetBoolean("NoticesEnabled", true);
             m_debugEnabled          = groupsConfig.GetBoolean("DebugEnabled", false);
             m_levelGroupCreate      = groupsConfig.GetInt("LevelGroupCreate", 0);
+            m_noticeSender          = new GroupNoticeSender(() => m_msgTransferModule);
         }
     }
 
@@ -202,6 +204,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
             return;
 
         if (m_debugEnabled) m_log.LogDebug("[Groups]: Shutting down Groups module.");
+        m_noticeSender?.Dispose();
     }
 
     public Type ReplaceableInterface
@@ -473,6 +476,12 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
 
                 if (!itemID.IsZero() && !ownerID.IsZero())
                 {
+                    // the attachment comes from the sender's own inventory
+                    if (ownerID != remoteClient.AgentId)
+                    {
+                        remoteClient.SendAgentAlertMessage("A group notice can only carry an item from your own inventory", false);
+                        return;
+                    }
                     item = scene.InventoryService.GetItem(ownerID, itemID);
                     if(item != null)
                     {
@@ -487,27 +496,39 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
                 }
             }
 
+            // the group keeps its own copy of the attachment, as SL's notices do, so a member who opens the notice
+            // later still gets it when the sender has since deleted or changed theirs
+            InventoryItemBase attached = item == null ? null : HoldNoticeAttachment(scene, GroupID, item) ?? item;
+
             if (m_groupData.AddGroupNotice(remoteAgentIDstr, GroupID, NoticeID, im.fromAgentName, Subject, Message,
                 hasAttachment,
-                (byte)(item == null ? 0 : item.AssetType),
-                item == null ? null : item.Name,
-                item == null ? UUID.Zero : item.ID,
-                item == null ? UUID.Zero.ToString() : item.Owner.ToString()))
+                (byte)(attached == null ? 0 : attached.AssetType),
+                attached == null ? null : attached.Name,
+                attached == null ? UUID.Zero : attached.ID,
+                attached == null ? UUID.Zero.ToString() : attached.Owner.ToString()))
             {
                 OnNewGroupNotice?.Invoke(GroupID, NoticeID);
 
-                // Send notice out to everyone that wants notices
+                // Send notice out to everyone that wants notices: at once to those in this process, and through the
+                // notice sender, a few at a time, to the others (see GroupNoticeSender).
+                List<GridInstantMessage> away = new List<GridInstantMessage>();
                 foreach (GroupMembersData member in m_groupData.GetGroupMembers(remoteAgentIDstr, GroupID))
                 {
-                    GridInstantMessage msg = CreateGroupNoticeIM(UUID.Zero, NoticeID, (byte)InstantMessageDialog.GroupNotice);
                     // to the members who take notices and whose roles give "Receive notices"
-                    if (member.AcceptNotices && (member.AgentPowers & (ulong)GroupPowers.ReceiveNotices) != 0)
-                    {
-                        // Build notice IIM, one of reach, because the sending may be async
-                        msg.toAgentID = member.AgentID.Guid;
-                        OutgoingInstantMessage(msg, member.AgentID);
-                    }
+                    if (!member.AcceptNotices || (member.AgentPowers & (ulong)GroupPowers.ReceiveNotices) == 0)
+                        continue;
+
+                    // Build notice IIM, one of reach, because the sending may be async
+                    GridInstantMessage msg = CreateGroupNoticeIM(UUID.Zero, NoticeID, (byte)InstantMessageDialog.GroupNotice);
+                    msg.toAgentID = member.AgentID.Guid;
+                    IClientAPI local = GetActiveRootClient(member.AgentID);
+                    if (local != null)
+                        local.SendInstantMessage(msg);
+                    else
+                        away.Add(msg);
                 }
+                if (away.Count > 0)
+                    m_noticeSender.Send(away);
             }
         }
 
@@ -627,36 +648,88 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         }
 
 
-        // Interop, received special 210 code for ejecting a group member
-        // this only works within the comms servers domain, and won't work hypergrid
-        // TODO:FIXME: Use a presense server of some kind to find out where the
-        // client actually is, and try contacting that region directly to notify them,
-        // or provide the notification via xmlrpc update queue
-        else if ((im.dialog == 210))
+    }
+
+    /// <summary>
+    /// A member ejected through another region (dialog 210 from that region's EjectGroupMember): if the member is
+    /// here, they are told, and their viewer drops the group. Only the drop is sent, not the member's whole group
+    /// list: this region may still have the old memberships cached and would put the group back.
+    /// </summary>
+    private void HandleEjectNotice(GridInstantMessage im)
+    {
+        UUID ejecteeID = new UUID(im.toAgentID);
+        UUID groupID = new UUID(im.imSessionID);
+
+        IClientAPI ejectee = GetActiveRootClient(ejecteeID);
+        if (ejectee == null)
+            return;
+
+        GridInstantMessage told = new GridInstantMessage(im, true);
+        told.imSessionID = UUID.Zero.Guid;
+        told.dialog = (byte)InstantMessageDialog.MessageFromAgent;
+        ejectee.SendInstantMessage(told);
+
+        if (groupID.IsNotZero())
+            ejectee.SendAgentDropGroup(groupID);
+    }
+
+    /// <summary>The name of the inventory folder, owned by the group, that holds its notices' attachments.</summary>
+    public const string NoticeAttachmentsFolder = "Group notice attachments";
+
+    /// <summary>
+    /// A copy of a notice's attachment owned by the group, in a folder of its own whose id is the group's (no viewer
+    /// sees it), with the item's permissions as the sender had them: giving it to a member later applies the sender's
+    /// next-owner permissions, as giving the sender's item did. Null when the inventory service would not take it;
+    /// the notice then carries the sender's item, as before.
+    /// </summary>
+    private InventoryItemBase HoldNoticeAttachment(Scene scene, UUID groupID, InventoryItemBase item)
+    {
+        try
         {
-            // This is sent from the region that the ejectee was ejected from
-            // if it's being delivered here, then the ejectee is here
-            // so we need to send local updates to the agent.
+            IInventoryService inventory = scene.InventoryService;
+            if (inventory.GetFolder(groupID, groupID) == null
+                && !inventory.AddFolder(new InventoryFolderBase(groupID, NoticeAttachmentsFolder, groupID, (short)FolderType.None, UUID.Zero, 1)))
+                return null;
 
-            UUID ejecteeID = new UUID(im.toAgentID);
-
-            im.imSessionID = UUID.Zero.Guid;
-            im.dialog = (byte)InstantMessageDialog.MessageFromAgent;
-            OutgoingInstantMessage(im, ejecteeID);
-
-            IClientAPI ejectee = GetActiveRootClient(ejecteeID);
-            if (ejectee != null)
+            InventoryItemBase held = new InventoryItemBase(UUID.Random(), groupID)
             {
-                UUID groupID = new UUID(im.imSessionID);
-                ejectee.SendAgentDropGroup(groupID);
-                SendAgentGroupDataUpdate(ejectee,true);
-            }
+                Folder = groupID,
+                AssetID = item.AssetID,
+                AssetType = item.AssetType,
+                InvType = item.InvType,
+                Name = item.Name,
+                Description = item.Description,
+                CreatorId = item.CreatorId,
+                CreatorData = item.CreatorData,
+                Flags = item.Flags,
+                BasePermissions = item.BasePermissions,
+                CurrentPermissions = item.CurrentPermissions,
+                NextPermissions = item.NextPermissions,
+                EveryOnePermissions = item.EveryOnePermissions,
+                GroupPermissions = item.GroupPermissions,
+                CreationDate = Util.UnixTimeSinceEpoch(),
+            };
+            return inventory.AddItem(held) ? held : null;
+        }
+        catch (Exception e)
+        {
+            m_log.LogDebug("[Groups]: could not keep a copy of notice attachment {0} for group {1}: {2}", item.ID, groupID, e.Message);
+            return null;
         }
     }
 
     private void OnGridInstantMessage(GridInstantMessage msg)
     {
         if (m_debugEnabled) m_log.LogInformation("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
+
+        // An eject notice from the region the member was ejected through (dialog 210, the group as its session).
+        // It used to go to the viewer's IM handler above, which takes nothing without a viewer, so a member ejected
+        // through another region kept the group in their viewer.
+        if (msg.dialog == 210)
+        {
+            HandleEjectNotice(msg);
+            return;
+        }
 
         // Trigger the above event handler
         OnInstantMessage(null, msg);
@@ -684,6 +757,23 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
     #region IGroupsModule Members
 
     public event NewGroupNotice OnNewGroupNotice;
+
+    public List<GroupBanData> GroupBanList(IClientAPI client, UUID groupID)
+    {
+        List<ExtendedGroupBanData> bans = m_groupData.GetGroupBans(GetRequestingAgentIDStr(client), groupID);
+        if (bans == null)
+            return null;
+        // the viewer knows avatars by UUID: a hypergrid visitor's universal identifier gives its UUID
+        List<GroupBanData> list = new List<GroupBanData>();
+        foreach (ExtendedGroupBanData b in bans)
+            if (Util.ParseUniversalUserIdentifier(b.AgentID, out UUID id) && id.IsNotZero())
+                list.Add(new GroupBanData { AgentID = id, BanTime = b.BanTime });
+        return list;
+    }
+
+    public bool GroupBanChange(IClientAPI client, UUID groupID, bool ban, UUID[] agentIDs)
+        => m_groupData.ChangeGroupBans(GetRequestingAgentIDStr(client), groupID, ban,
+            (agentIDs ?? []).Select(a => a.ToString()).ToArray());
 
     public GroupRecord GetGroupRecord(UUID GroupID)
     {
@@ -1192,6 +1282,15 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         // so read the membership back.
         bool removed = m_groupData.GetAgentGroupMembership(agentID.ToString(), ejecteeID.ToString(), groupID) == null;
 
+        // A refused ejection is answered as refused, and nobody is told of an ejection that did not happen. Until
+        // now the requester was told it worked, the member was sent "You have been ejected" and their viewer was
+        // told to drop the group, whatever the service decided.
+        if (!removed)
+        {
+            (remoteClient ?? GetActiveClient(agentID))?.SendEjectGroupMemberReply(agentID, groupID, false);
+            return false;
+        }
+
         string agentName;
         RegionInfo regionInfo;
 
@@ -1567,7 +1666,10 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         else if (m_msgTransferModule != null)
         {
             if (m_debugEnabled) m_log.LogInformation("[Groups]: MsgTo ({0}) is not local, delivering via TransferModule", msgTo);
-            m_msgTransferModule.SendInstantMessage(msg, delegate(bool success) { if (m_debugEnabled) m_log.LogDebug("[Groups]: Message Sent: {0}", success?"Succeeded":"Failed"); });
+            // An eject notice (dialog 210) is for the groups module of the region the member is in: the transfer module
+            // would hand it to a child agent of the member here (a neighbour region's), whose viewer ignores it.
+            m_msgTransferModule.SendInstantMessage(msg, delegate(bool success) { if (m_debugEnabled) m_log.LogDebug("[Groups]: Message Sent: {0}", success?"Succeeded":"Failed"); },
+                ToRootOnly: msg.dialog == 210);
         }
     }
 

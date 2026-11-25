@@ -54,6 +54,7 @@
     <Compile Include="PhloxEngine.cs" />
     <Compile Include="PhloxEngineHeader.cs" />
     <Compile Include="OsslGate.cs" />
+    <Compile Include="WallclockZone.cs" />
     <Compile Include="SluaBackHalfProof.cs" />
     <Compile Include="PhloxExecutionScheduler.cs" />
     <Compile Include="PhloxLoadRequest.cs" />

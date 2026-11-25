@@ -170,9 +170,9 @@ public class ScriptCleanupTests
         public LSLSystemAPI Api(UUID item) => ((Dictionary<UUID, LSLSystemAPI>)Field(Exe, "m_Apis"))[item];
         public Interpreter Interp(UUID item) => (Interpreter)H.InterpreterFor(item);
 
-        public bool PumpUntil(Func<bool> done, int seconds = 30)
+        public bool PumpUntil(Func<bool> done, int seconds = TestWait.DefaultSeconds)
         {
-            var until = DateTime.UtcNow + TimeSpan.FromSeconds(seconds);
+            var until = DateTime.UtcNow + TimeSpan.FromSeconds(TestWait.Cap(seconds));
             while (!done())
             {
                 if (DateTime.UtcNow >= until) return false;

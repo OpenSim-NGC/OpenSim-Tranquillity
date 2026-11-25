@@ -43,7 +43,7 @@ public class EngineHeaderLanguageTests
     {
         var item = Add(h, source);
         var save = Task.Run(() => h.Prim.Inventory.CreateScriptInstanceEr(item.ItemID, 0, false, defaultEngine, 1));
-        Assert.True(h.PumpUntil(() => save.IsCompleted, TimeSpan.FromSeconds(30)), "the Save did not return");
+        Assert.True(h.PumpUntil(() => save.IsCompleted, TestWait.Default), "the Save did not return");
         h.Prim.ParentGroup.ResumeScripts();
         return (item.ItemID, save.Result);
     }

@@ -191,6 +191,15 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         agent.OnAgentUpdateWhileChild += ResendCrossingToALostViewer;
     }
 
+    /// <summary>
+    /// An avatar that is a root agent here again has come back (a crossing back, or a teleport into this region): the
+    /// crossing it once made out of here is over, and a viewer sending here is no longer one that missed it.
+    /// </summary>
+    private void ForgetCrossedAway(ScenePresence agent)
+    {
+        m_crossedAway.TryRemove(agent.UUID, out _);
+    }
+
     private void ResendCrossingToALostViewer(ScenePresence agent)
     {
         if (!m_crossedAway.TryGetValue(agent.UUID, out CrossedAway c))
@@ -463,6 +472,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         m_sceneRegionInfo = scene.RegionInfo;
         m_sceneRegionHandler = m_sceneRegionInfo.RegionHandle;
         m_thisGridInfo = scene.SceneGridInfo;
+        scene.EventManager.OnMakeRootAgent += ForgetCrossedAway;
         m_viewerAddresses = CreateViewerAddresses(m_viewerAddressSection, m_sceneRegionInfo);
 
         m_interRegionTeleportAttempts =
@@ -548,6 +558,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             StatsManager.DeregisterStat(m_interRegionTeleportCancels);
             StatsManager.DeregisterStat(m_interRegionTeleportFailures);
             scene.EventManager.OnNewClient -= OnNewClient;
+            scene.EventManager.OnMakeRootAgent -= ForgetCrossedAway;
             m_thisGridInfo = null;
             m_viewerAddresses.Dispose();
             m_viewerAddresses = ViewerAddressSelector.Disabled;

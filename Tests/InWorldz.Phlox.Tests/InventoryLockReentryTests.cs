@@ -86,7 +86,7 @@ public class InventoryLockReentryTests
     }
 
     [Fact]
-    public async Task AReadScopeInsideAReadScopeTakesNothingAndLetsGoOnlyAtTheOuterEnd()
+    public void AReadScopeInsideAReadScopeTakesNothingAndLetsGoOnlyAtTheOuterEnd()
     {
         var log = new Capture();
         ILoggerFactory previous = LoggerProvider.LoggerFactory;
@@ -94,21 +94,23 @@ public class InventoryLockReentryTests
         try
         {
             var inventory = new TaskInventoryDictionary();
-            Task<bool> writer;
+            using var writerDone = new ManualResetEventSlim(false);
             using (InventoryLock.Read(inventory))
             {
                 using (InventoryLock.Read(inventory)) { }
                 // The inner scope ended; the outer hold is still there, so a writer on another thread must wait.
-                writer = Task.Run(() =>
+                new Thread(() =>
                 {
                     inventory.LockItemsForWrite(true);
                     inventory.LockItemsForWrite(false);
-                    return true;
-                });
-                Assert.NotSame(writer, await Task.WhenAny(writer, Task.Delay(300)));
+                    writerDone.Set();
+                }) { IsBackground = true, Name = "writer" }.Start();
+                // Waited for on this thread, never with await: after an await the scope would end on another thread, the lock
+                // would not be given back by the thread that took it, and the writer would get in only when the dictionary's
+                // own 60 s lock-timeout replaces the lock - a 60 s test that passed for the wrong reason.
+                Assert.False(writerDone.Wait(300), "a writer got in while the outer read scope was still held");
             }
-            Assert.NotSame(Task.Delay(0), await Task.WhenAny(writer, Task.Delay(TimeSpan.FromSeconds(10))));
-            await writer;
+            Assert.True(writerDone.Wait(TestWait.Default), "the writer did not get in after the outer read scope ended");
             Assert.DoesNotContain(log.Lines, l => l.Contains("Recursive"));
         }
         finally { LoggerProvider.LoggerFactory = previous; }
