@@ -63,7 +63,7 @@ public class AppearanceService : ServiceBase, IAppearanceService
         if (!string.IsNullOrWhiteSpace(gridAssets) && !string.Equals(assetService, gridAssets, StringComparison.Ordinal))
             m_log.LogWarning(
                 "[APPEARANCE SERVICE]: [{Section}] AssetService is {Ours}, but the grid stores assets through {Grid}. "
-                + "Bakes stored there cannot be served from here; remove AssetService from [{Section}] to use the grid's.",
+                + "Bakes stored there cannot be served from here; remove the AssetService override to use the grid's.",
                 serviceConfig.Name, assetService, gridAssets);
 
         if (string.IsNullOrWhiteSpace(avatarService))
