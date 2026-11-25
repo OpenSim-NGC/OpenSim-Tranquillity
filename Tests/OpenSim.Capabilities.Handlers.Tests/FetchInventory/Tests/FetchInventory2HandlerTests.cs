@@ -41,12 +41,11 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
     public class FetchInventory2HandlerTests : OpenSimTestCase
     {
         private UUID m_userID = UUID.Random();
-        private Scene m_scene;
         private UUID m_rootFolderID;
         private UUID m_notecardsFolder;
         private UUID m_objectsFolder;
 
-        private void Init()
+        private Scene Init()
         {
             // Create an inventory that looks like this:
             //
@@ -63,13 +62,13 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             //      Notecard 4
             //      Notecard 5
 
-            m_scene = new SceneHelpers().SetupScene();
+            Scene scene = new SceneHelpers().SetupScene();
 
-            m_scene.InventoryService.CreateUserInventory(m_userID);
+            scene.InventoryService.CreateUserInventory(m_userID);
 
-            m_rootFolderID = m_scene.InventoryService.GetRootFolder(m_userID).ID;
+            m_rootFolderID = scene.InventoryService.GetRootFolder(m_userID).ID;
 
-            InventoryFolderBase of = m_scene.InventoryService.GetFolderForType(m_userID, FolderType.Object);
+            InventoryFolderBase of = scene.InventoryService.GetFolderForType(m_userID, FolderType.Object);
             m_objectsFolder = of.ID;
 
             // Add 3 objects
@@ -81,10 +80,10 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
                 item.AssetType = (int)AssetType.Object;
                 item.Folder = m_objectsFolder;
                 item.Name = "Object " + i;
-                m_scene.InventoryService.AddItem(item);
+                scene.InventoryService.AddItem(item);
             }
 
-            InventoryFolderBase ncf = m_scene.InventoryService.GetFolderForType(m_userID, FolderType.Notecard);
+            InventoryFolderBase ncf = scene.InventoryService.GetFolderForType(m_userID, FolderType.Notecard);
             m_notecardsFolder = ncf.ID;
 
             // Add 5 notecards
@@ -95,9 +94,10 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
                 item.AssetType = (int)AssetType.Notecard;
                 item.Folder = m_notecardsFolder;
                 item.Name = "Notecard " + i;
-                m_scene.InventoryService.AddItem(item);
+                scene.InventoryService.AddItem(item);
             }
 
+            return scene;
         }
 
         [Fact]
@@ -105,9 +105,9 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
         {
             TestHelpers.InMethod();
 
-            Init();
+            Scene scene = Init();
 
-            FetchInventory2Handler handler = new FetchInventory2Handler(m_scene.InventoryService, m_userID);
+            FetchInventory2Handler handler = new FetchInventory2Handler(scene.InventoryService, m_userID);
             TestOSHttpRequest req = new TestOSHttpRequest();
             TestOSHttpResponse resp = new TestOSHttpResponse();
 
@@ -131,9 +131,9 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
         {
             TestHelpers.InMethod();
 
-            Init();
+            Scene scene = Init();
 
-            FetchInventory2Handler handler = new FetchInventory2Handler(m_scene.InventoryService, m_userID);
+            FetchInventory2Handler handler = new FetchInventory2Handler(scene.InventoryService, m_userID);
             TestOSHttpRequest req = new TestOSHttpRequest();
             TestOSHttpResponse resp = new TestOSHttpResponse();
 

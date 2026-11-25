@@ -71,7 +71,9 @@ public class PhysicsSitTests
         Assert.Equal(status, a.Status);
         Assert.Equal(part.LocalID, a.Part);
         Assert.True(Vector3.Distance(offset, a.Offset) < Tol, $"offset {a.Offset}, expected {offset}");
-        float dot = MathF.Abs(Quaternion.Dot(Quaternion.Normalize(a.Orientation), ori));
+        Quaternion sourceOrientation = a.Orientation;
+        Quaternion orientation = Quaternion.Normalize(in sourceOrientation);
+        float dot = MathF.Abs(Quaternion.Dot(orientation, ori));
         Assert.True(dot > 0.9999f, $"orientation {a.Orientation}, expected {ori} (|dot| {dot})");
     }
 

@@ -1,5 +1,38 @@
 # Build warning cleanup
 
+## Current dependency-update baseline
+
+On the dependency-update branch at `a225f5581b`, a non-incremental Release
+solution build with .NET SDK 10.0.115 reported 120 warnings and 242 errors.
+After the first test cleanup it reported 120 warnings and 216 errors.
+Adapting the Jolt backend and Jolt tests to the pinned JoltPhysicsSharp 2.26
+API removed the eight backend compilation errors and three readonly-reference
+test call-contract errors. A refreshed solution build reports 120 warnings and
+208 errors, concentrated in test-project xUnit migration, nullable fixture
+initialization and inherited test-double methods. The solution does not yet
+build.
+
+The Jolt native package is also pinned consistently to 1.3.0:
+`JoltPhysics.Native`, managed API and native hash allowlist now agree. The native
+allowlist tests pass 35/35. The full Jolt test project reports 1316 passed,
+2 skipped and 5 failed. The failures are native-behavior changes in hold/resume,
+terrain jitter, rough-ground vehicle/box response and mesh-asset settling, not
+compiler or hash-record failures. Their thresholds were not weakened.
+
+The first cleanup moves inventory-handler scene initialization into the
+fixture methods' return values and initializes framework test fixtures in their
+constructors. It also corrects nullable theory parameters and uses asynchronous
+task completion in the rate-limited log tests. The full Release test projects
+passed: `OpenSim.Capabilities.Handlers.Tests` 11 passed, 0 failed, 0 skipped;
+`OpenSim.Framework.Tests` 267 passed, 0 failed, 0 skipped.
+
+The xUnit v3 migration is still pending. The current solution contains both
+NUnit and xUnit v2 projects, and `OpenSim.Tests.Common` uses the xUnit v2
+fixture lifecycle. Projects excluded from the solution also need separate
+assessment.
+
+## Earlier cleanup baseline
+
 Original baseline: Release build of `Tranquillity.sln` on .NET SDK 10.0.112,
 648 warning occurrences, 0 errors. Counts identify diagnostic occurrences by
 project, file, position, code and message; the build summary repeats diagnostics
