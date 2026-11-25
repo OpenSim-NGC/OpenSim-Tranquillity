@@ -74,7 +74,7 @@ public class LandmarkTeleportTests : OpenSimTestCase
         {
             Data = Encoding.UTF8.GetBytes(data),
         });
-        AssetLandmark requested = null;
+        AssetLandmark? requested = null;
         client.OnTeleportLandmarkRequest += (c, lm) => requested = lm;
 
         TeleportLandmarkRequestPacket request = new();
@@ -85,6 +85,6 @@ public class LandmarkTeleportTests : OpenSimTestCase
 
         failed = udp.PacketsSent.Exists(p => p is TeleportFailedPacket);
         scene.CloseAgent(sp.UUID, true);
-        return requested;
+        return requested ?? throw new InvalidOperationException("The teleport landmark request was not handled.");
     }
 }

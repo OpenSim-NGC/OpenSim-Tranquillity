@@ -266,10 +266,8 @@ namespace OpenSim.Tests.Permissions
             InventoryFolderBase objsFolder = UserInventoryHelpers.GetInventoryFolder(m_Scene.InventoryService, userID, folderName);
             Assert.NotNull(objsFolder);
             List<InventoryItemBase> items = m_Scene.InventoryService.GetFolderItems(userID, objsFolder.ID);
-            InventoryItemBase item = items.Find(i => i.Name == itemName);
-            Assert.NotNull(item);
-
-            return item;
+            return items.Find(i => i.Name == itemName)
+                ?? throw new InvalidOperationException($"Could not find inventory item {itemName}.");
         }
 
         public InventoryItemBase CloneInventoryItem(InventoryItemBase item)

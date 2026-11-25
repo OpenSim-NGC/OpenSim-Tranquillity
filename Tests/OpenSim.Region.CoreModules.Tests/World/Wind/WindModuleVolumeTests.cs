@@ -352,7 +352,11 @@ public class WindModuleVolumeTests : OpenSimTestCase
         SetPlugin(module, new ConstantPlugin(new Vector3(1f, 0f, 0f)));
         Assert.True(module.WindVolumes.Create(UUID.Random(), Owner, Sphere(new Vector3(100, 100, 50), 10f, new Vector3(5f, 0f, 0f))) > 0);
 
-        object writeLock = typeof(WindVolumeStore).GetField("m_writeLock", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(module.WindVolumes);
+        FieldInfo writeLockField = typeof(WindVolumeStore).GetField(
+            "m_writeLock", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(typeof(WindVolumeStore).FullName, "m_writeLock");
+        object writeLock = writeLockField.GetValue(module.WindVolumes)
+            ?? throw new InvalidOperationException("Wind volume store has no write lock.");
         Vector3 seen = default, seenInt = default;
         lock (writeLock)
         {
@@ -392,7 +396,7 @@ public class WindModuleVolumeTests : OpenSimTestCase
 
         long samples = 0;
         var clock = Stopwatch.StartNew();
-        string failure = null;
+        string? failure = null;
         while (clock.ElapsedMilliseconds < 400 && failure == null)
         {
             for (int i = 0; i < 500; i++)
@@ -418,7 +422,7 @@ public class WindModuleVolumeTests : OpenSimTestCase
     private sealed class IntegerOnlyModule : IWindModule
     {
         public string Name => "IntegerOnly";
-        public Type ReplaceableInterface => null;
+        public Type ReplaceableInterface => null!;
         public void Initialise(IConfigSource source) { }
         public void Close() { }
         public void AddRegion(Scene scene) { }

@@ -447,9 +447,11 @@ public class LandManagementModuleTests : OpenSimTestCase
     {
         TestHelpers.InMethod();
         ParcelFixture f = new ParcelFixture();
-        object landList = typeof(LandManagementModule)
+        System.Reflection.FieldInfo landListField = typeof(LandManagementModule)
             .GetField("m_landList", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-            .GetValue(f.Module);
+            ?? throw new MissingFieldException(typeof(LandManagementModule).FullName, "m_landList");
+        object landList = landListField.GetValue(f.Module)
+            ?? throw new InvalidOperationException("Land management module has no land list.");
         List<string> locked = new();
         int events = 0;
         void Check(string what)

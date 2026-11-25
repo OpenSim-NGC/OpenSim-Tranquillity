@@ -12,6 +12,16 @@ test call-contract errors. A refreshed solution build reports 120 warnings and
 initialization and inherited test-double methods. The solution does not yet
 build.
 
+The follow-up nullable cleanup resolves the remaining solution warnings,
+including the script-engine test warnings. The latest non-incremental Release build reports **0 warnings and 179 errors**:
+
+```sh
+dotnet build Tranquillity.sln -c Release --no-restore --no-incremental -m:1
+```
+
+The remaining errors are in test projects and still prevent the full solution
+and affected test projects from building; no tests were run for this follow-up.
+
 The Jolt native package is also pinned consistently to 1.3.0:
 `JoltPhysics.Native`, managed API and native hash allowlist now agree. The native
 allowlist tests pass 35/35. The full Jolt test project reports 1316 passed,

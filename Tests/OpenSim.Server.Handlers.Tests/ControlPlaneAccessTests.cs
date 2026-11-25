@@ -339,8 +339,8 @@ public class ControlPlaneAccessTests
             Interlocked.Increment(ref Lookups);
             lock (Answers)
             {
-                if (Answers.TryGetValue(name, out IPAddress[] a))
-                    return a;
+                if (Answers.TryGetValue(name, out IPAddress[]? a))
+                    return a ?? throw new InvalidOperationException($"Name server has no answer for {name}.");
             }
             throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound);
         }

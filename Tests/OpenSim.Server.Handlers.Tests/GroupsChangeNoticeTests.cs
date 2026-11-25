@@ -88,7 +88,7 @@ public class GroupsChangeNoticeTests
     public void ARegionTakesNoNoticeWithoutTheKey()
     {
         var region = new CachedRegion();
-        Assert.Equal(403, Notify(null, GroupsChangeNotice.Body(new[] { region.Group })));
+        Assert.Equal(403, Notify(null!, GroupsChangeNotice.Body(new[] { region.Group })));
         Assert.Equal(403, Notify("not the key", GroupsChangeNotice.Body(new[] { region.Group })));
         region.Read();
         Assert.Equal(1, region.Fetches);
@@ -192,7 +192,7 @@ public class GroupsChangeNoticeTests
     {
         var told = new System.Collections.Concurrent.ConcurrentBag<UUID>();
         var recorder = new Recorder(told);
-        var handler = new GroupsServicePostHandler(SqliteGroupsStoreTests.Service, null, string.Empty, recorder);
+        var handler = new GroupsServicePostHandler(SqliteGroupsStoreTests.Service, null!, string.Empty, recorder);
         string owner = UUID.Random().ToString();
         UUID group = SqliteGroupsStoreTests.Service.CreateGroup(owner, "Notice " + Guid.NewGuid().ToString("N")[..8], "", true,
             UUID.Zero, 0, false, true, false, new UUID(owner), out string reason);
@@ -219,9 +219,12 @@ public class GroupsChangeNoticeTests
         {
             HttpListenerContext ctx = listener.GetContext();
             var headers = new NameValueCollection();
-            headers[GroupsSecretKey.Header] = ctx.Request.Headers[GroupsSecretKey.Header];
+            headers[GroupsSecretKey.Header] = ctx.Request.Headers[GroupsSecretKey.Header]
+                ?? throw new InvalidOperationException($"Request is missing {GroupsSecretKey.Header}.");
             var response = new TestOSHttpResponse { StatusCode = 200 };
-            byte[] reply = new GroupsChangedHandler(Key).Handle(ctx.Request.Url.AbsolutePath, ctx.Request.InputStream,
+            byte[] reply = new GroupsChangedHandler(Key).Handle(
+                ctx.Request.Url?.AbsolutePath ?? throw new InvalidOperationException("Request has no URL."),
+                ctx.Request.InputStream,
                 new TestOSHttpRequest { Headers = headers }, response);
             ctx.Response.StatusCode = response.StatusCode;
             ctx.Response.ContentLength64 = reply.Length;
@@ -245,7 +248,7 @@ public class GroupsChangeNoticeTests
         using var listener = new HttpListener();
         listener.Prefixes.Add($"http://127.0.0.1:{port}/");
         listener.Start();
-        var handler = new GroupsServicePostHandler(SqliteGroupsStoreTests.Service, null, string.Empty);
+        var handler = new GroupsServicePostHandler(SqliteGroupsStoreTests.Service, null!, string.Empty);
         using var stop = new CancellationTokenSource();
         _ = Task.Run(async () =>
         {
@@ -292,7 +295,7 @@ public class GroupsChangeNoticeTests
         private readonly System.Collections.Concurrent.ConcurrentBag<UUID> m_told;
         public Recorder(System.Collections.Concurrent.ConcurrentBag<UUID> told) => m_told = told;
         public readonly System.Collections.Concurrent.ConcurrentBag<string> Agents = new();
-        public void Changed(UUID groupID, string agentID = null)
+        public void Changed(UUID groupID, string agentID = null!)
         {
             m_told.Add(groupID);
             if (agentID != null)
