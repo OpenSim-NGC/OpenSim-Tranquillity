@@ -156,13 +156,46 @@ single deployment (a container's `environment:`/`-e`, a systemd unit's `Environm
 the shell that starts the binary) and override the compiled-in configuration. See
 [.NET runtime configuration settings](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/).
 
+Number values are read differently in each place: a `runtimeconfig.json`/`runtimeconfig.template.json`
+property takes a decimal number, while the same setting as a `DOTNET_`-prefixed environment variable
+is read as **hexadecimal**, with or without a leading `0x` ([.NET runtime configuration
+settings](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/), "Ways to specify the
+configuration"; this is Microsoft's general rule for numeric settings, not something the heap-limit
+variables alone state). The two heap-hard-limit variables below name "hexadecimal value" in their own
+documentation, so a decimal value sets the wrong limit. `DOTNET_GCConserveMemory` falls under the
+same general rule but its own page does not call hex out by name for it; since its only valid values
+are the single digits 0-9 (the same digit in hex and in decimal), the distinction makes no practical
+difference for it.
+
 | setting | variable | what it costs or saves |
 |---|---|---|
-| Server GC | `DOTNET_gcServer=1` | A separate GC heap and thread per CPU core instead of one shared heap. Raises throughput on a busy, many-core host; on a small host it raises GC-committed memory (observed on a running region server process: 148 MiB committed for its one workstation heap; a per-core server-GC heap budget would add to that on every core). Leave at the default (`0`, workstation GC) on a small host. |
-| Conserve memory | `DOTNET_GCConserveMemory=<0-9>` | Trades GC pause time and throughput for a smaller heap budget on workstation GC. `0` (default) favours throughput; higher values shrink the committed-but-not-resident portion of the heap (measured 21 to 54 MiB of GC memory committed but not resident across a region server, Robust and a scratch region process, which this knob can reclaim) at the cost of more frequent, longer collections. See [GCConserveMemory](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/garbage-collector#conserve-memory). |
-| Heap hard limit | `DOTNET_GCHeapHardLimit=<bytes, hex>` or `DOTNET_GCHeapHardLimitPercent=<1-100>` | Caps committed GC memory instead of leaving it unbounded (today: no hard limit; an observed region server process reserved far more virtual memory than it committed). Protects a small host from a runaway heap at the cost of an `OutOfMemoryException` instead of growth if the limit is too low. See [GCHeapHardLimit](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/garbage-collector#heap-limit). |
-| Invariant globalization | `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` | Skips loading ICU (`icudtl.dat`, about 30 MiB mapped in every process today) and switches all culture-sensitive string comparison and formatting to ordinal/invariant rules. Saves that memory (shared file pages on Windows; a real process cost on Linux, where ICU is not already resident) but changes string sorting, casing and formatting for any culture-sensitive text. See [Invariant mode](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/globalization#invariant-mode). |
+| Server GC | `DOTNET_gcServer=1` (`0` workstation GC / `1` server GC; not a hexadecimal value) | A separate GC heap and thread per CPU core instead of one shared heap. Raises throughput on a busy, many-core host; on a small host it raises GC-committed memory per core instead of one shared heap. Leave at the default (`0`, workstation GC) on a small host; see the measured effect below. |
+| Conserve memory | `DOTNET_GCConserveMemory=9` (valid range `0`-`9`; see the hex note above) | Trades GC pause time and throughput for a smaller heap budget on workstation GC. `0` (default) favours throughput; higher values shrink the committed-but-not-resident portion of the heap at the cost of more frequent, longer collections. See [GCConserveMemory](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/garbage-collector#conserve-memory) and the measured effect below. |
+| Heap hard limit (bytes) | `DOTNET_GCHeapHardLimit=<hexadecimal bytes>` | Caps committed GC memory instead of leaving it unbounded (today: no hard limit). Protects a small host from a runaway heap at the cost of an `OutOfMemoryException` instead of growth if the limit is too low. Worked example: a 200 MiB limit is `209715200` as the `runtimeconfig.json` decimal value, `DOTNET_GCHeapHardLimit=0xC800000` (or `C800000`) as the environment variable. See [GCHeapHardLimit](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/garbage-collector#heap-limit). |
+| Heap hard limit (percent) | `DOTNET_GCHeapHardLimitPercent=<hexadecimal percent, 1-100>` | Caps committed GC memory as a share of physical memory instead of a byte count. Writing the percentage in decimal sets the wrong limit: `=90` is read as hex `0x90` (144), outside the valid 1-100 range. Worked example: a 90% limit is `90` as the `runtimeconfig.json` decimal value, `DOTNET_GCHeapHardLimitPercent=0x5A` (or `5A`) as the environment variable. See [GCHeapHardLimitPercent](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/garbage-collector#heap-limit). |
+| Invariant globalization | `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` (`0` access cultural data / `1` invariant mode; not a hexadecimal value) | Skips loading ICU and switches all culture-sensitive string comparison and formatting to ordinal/invariant rules. Saves that memory (shared file pages on Windows; a real process cost on Linux, where ICU is not already resident) but changes string sorting, casing and formatting for any culture-sensitive text. See [Invariant mode](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/globalization#invariant-mode). |
 
 These are runtime knobs, not `OpenSim.ini`/`GridServer.ini`/`MoneyServer.ini` settings: they
 take effect before OpenSimulator's own configuration is read, and `config show` on the
 console does not list them.
+
+### Measured effect (RegionServer)
+
+Measured with Windows process private bytes and .NET's own committed-GC-memory counter
+(`dotnet-counters`, `dotnet.gc.last_collection.memory.committed_size`), 60 seconds after the
+region(s) reported ready, on one 256 MiB region and on four 256 MiB regions sharing one
+RegionServer process (RegionServer can host several regions in one process, sharing one GC heap
+between them).
+
+| configuration | 1 region, private bytes | 1 region, GC committed | 4 regions, private bytes | 4 regions, GC committed |
+|---|---:|---:|---:|---:|
+| today's behaviour (the bug in effect: workstation GC regardless of the template) | 86.4 MiB (1 start) | not measured | 191.6 MiB (1 start) | not measured |
+| server GC as the templates intended (`DOTNET_gcServer=1`) | 105.6 MiB (1 start) | not measured | 235.8 MiB (median of 2 starts: 234.6, 237.0) | 74.0 MiB (median of 2 starts: 71.4, 76.5) |
+| workstation GC, `DOTNET_GCConserveMemory=9` | 73.8 MiB (1 start) | not measured | 194.8 MiB (median of 2 starts: 196.2, 193.3) | 62.5 MiB (median of 2 starts: 62.5, 62.6) |
+
+These are single-process-start samples, not an averaged benchmark. Three starts per cell were
+asked for; time allowed two for the two four-region server-GC/conserve-memory cells (new in this
+measurement) and one, with no GC-committed sample, for the other four (carried over from an
+earlier measurement). Direction matches expectations: server GC costs more than workstation GC on
+a small host, and `GCConserveMemory` saves against it, in both the one-region and four-region
+cases.
