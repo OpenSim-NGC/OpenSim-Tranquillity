@@ -3143,7 +3143,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         private void WireCharacter(JoltCharacterRecord rec, CharacterVirtual character)
         {
             // Jolt 5.6 hands the listener mContactNormal pointing toward the character. v5.4 passed
-            // -inContact.mContactNormal (APIChanges.md, 20260506). Floors are still a positive Z.
+            // -inContact.mContactNormal (APIChanges.md, 20260506). Jolt's mContactNormal for a floor is +Z;
+            // the module's normal, negated, is -Z.
             character.OnContactAdded += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
                 => NoteCharacterBodyContact(rec, contact.BodyB.ID, contact.SubShapeIDB.Value, contact.Position, -contact.ContactNormal, ContactPhase.Begin, ref s);
             character.OnContactPersisted += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
