@@ -17,8 +17,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 /// Several regions on one job pool are safe on a joltc whose regions share one TempAllocator (the stock
 /// JoltPhysics.Native) only because of two rules in the backend:
 /// <list type="bullet">
-/// <item>the pool gate rule: every call that draws on the allocator (PhysicsSystem::Update and
-/// CharacterVirtual::ExtendedUpdate) happens inside the job pool's gate, which admits one Step at a time;</item>
+/// <item>the pool gate rule: the physics step (JPH_PhysicsSystem_Update2, this backend's allocator) and
+/// CharacterVirtual::ExtendedUpdate happen inside the job pool's gate, which admits one Step at a time;</item>
 /// <item>the maximum depth rule: CharacterVirtual::SetShape, the one allocator entry point called outside the gate,
 /// always passes the maximum penetration depth, at which Jolt swaps the shape without testing it and touches no
 /// allocator (Jolt CharacterVirtual.cpp:1504, v5.4.0).</item>
@@ -149,7 +149,7 @@ public class ShapeAndAllocatorRuleTests
         Dictionary<string, SortedSet<string>> callers = CallersOfAllocatorEntryPoints();
         var expected = new Dictionary<string, string[]>
         {
-            ["JoltPhysicsSharp.PhysicsSystem.Update"] = new[] { "JoltPhysicsBackend.StepLocked" },                     // gate
+            ["JoltPhysicsSharp.PhysicsSystem.Update"] = Array.Empty<string>(),   // the step calls Update2, not this
             ["JoltPhysicsSharp.CharacterVirtual.ExtendedUpdate"] = new[] { "JoltPhysicsBackend.StepCharacter" },       // gate
             ["JoltPhysicsSharp.CharacterVirtual.SetShape"] = new[] { "JoltPhysicsBackend.SetShapeWithoutScratch" },    // depth
             ["JoltPhysicsSharp.CharacterVirtual.Update"] = Array.Empty<string>(),
@@ -167,7 +167,12 @@ public class ShapeAndAllocatorRuleTests
     [Fact]
     public void The_gated_calls_are_reached_only_from_the_step()
     {
-        var callersOf = new Dictionary<string, SortedSet<string>> { ["StepLocked"] = new(), ["StepCharacter"] = new() };
+        var callersOf = new Dictionary<string, SortedSet<string>>
+        {
+            ["StepLocked"] = new(),
+            ["StepCharacter"] = new(),
+            ["JPH_PhysicsSystem_Update2"] = new(),
+        };
         Assembly[] assemblies = { typeof(JoltPhysicsBackend).Assembly, typeof(JoltScene).Assembly };
         foreach (Assembly assembly in assemblies)
             foreach (MethodBase caller in AllMethods(assembly))
@@ -181,6 +186,7 @@ public class ShapeAndAllocatorRuleTests
                 }
         Assert.Equal(new[] { "JoltPhysicsBackend.Step" }, callersOf["StepLocked"]);
         Assert.Equal(new[] { "JoltPhysicsBackend.StepLocked" }, callersOf["StepCharacter"]);
+        Assert.Equal(new[] { "JoltPhysicsBackend.StepLocked" }, callersOf["JPH_PhysicsSystem_Update2"]);
     }
 
     // The maximum depth rule: the one SetShape call passes float.MaxValue, a constant no caller can change.

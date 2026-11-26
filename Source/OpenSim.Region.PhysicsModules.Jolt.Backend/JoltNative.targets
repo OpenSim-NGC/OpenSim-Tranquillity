@@ -14,6 +14,9 @@
   double-precision build for win-x64 and win-arm64 (the module runs single precision, Foundation.Init(false)), and
   builds for Android, which has no region server. This keeps those out of the output, so each platform folder holds
   the one joltc the module checks and loads (JoltNative.cs).
+
+  linux-x64 is then replaced by native/linux-x64/libjoltc.so, the deterministic rebuild of joltc 886e0886
+  (Jolt e77f1755, CROSS_PLATFORM_DETERMINISTIC). The other platforms keep the package files.
 -->
 <Project>
   <Target Name="JoltDropUnusedNatives" AfterTargets="ResolvePackageAssets">
@@ -25,5 +28,34 @@
       <RuntimeTargetsCopyLocalItems Remove="@(_JoltUnusedNative)" />
       <NativeCopyLocalItems Remove="@(_JoltUnusedNative)" />
     </ItemGroup>
+  </Target>
+
+  <!-- After the package copy: the file the module loads on linux-x64 is the deterministic rebuild, not the package bytes. -->
+  <Target Name="JoltOverlayDeterministicLinux" AfterTargets="CopyFilesToOutputDirectory">
+    <PropertyGroup>
+      <_JoltDeterministicLinux>$(MSBuildThisFileDirectory)native/linux-x64/libjoltc.so</_JoltDeterministicLinux>
+    </PropertyGroup>
+    <Copy SourceFiles="$(_JoltDeterministicLinux)"
+          DestinationFiles="$(TargetDir)runtimes/linux-x64/native/libjoltc.so"
+          Condition="Exists('$(_JoltDeterministicLinux)') and Exists('$(TargetDir)runtimes/linux-x64/native/libjoltc.so')"
+          SkipUnchangedFiles="false" />
+    <Copy SourceFiles="$(_JoltDeterministicLinux)"
+          DestinationFiles="$(TargetDir)libjoltc.so"
+          Condition="Exists('$(_JoltDeterministicLinux)') and '$(RuntimeIdentifier)' == 'linux-x64' and Exists('$(TargetDir)libjoltc.so')"
+          SkipUnchangedFiles="false" />
+  </Target>
+
+  <Target Name="JoltOverlayDeterministicLinuxPublish" AfterTargets="CopyFilesToPublishDirectory">
+    <PropertyGroup>
+      <_JoltDeterministicLinux>$(MSBuildThisFileDirectory)native/linux-x64/libjoltc.so</_JoltDeterministicLinux>
+    </PropertyGroup>
+    <Copy SourceFiles="$(_JoltDeterministicLinux)"
+          DestinationFiles="$(PublishDir)runtimes/linux-x64/native/libjoltc.so"
+          Condition="Exists('$(_JoltDeterministicLinux)') and Exists('$(PublishDir)runtimes/linux-x64/native/libjoltc.so')"
+          SkipUnchangedFiles="false" />
+    <Copy SourceFiles="$(_JoltDeterministicLinux)"
+          DestinationFiles="$(PublishDir)libjoltc.so"
+          Condition="Exists('$(_JoltDeterministicLinux)') and '$(RuntimeIdentifier)' == 'linux-x64' and Exists('$(PublishDir)libjoltc.so')"
+          SkipUnchangedFiles="false" />
   </Target>
 </Project>

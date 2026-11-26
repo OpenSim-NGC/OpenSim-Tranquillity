@@ -40,15 +40,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# The stock files of JoltPhysics.Native 1.0.4, by SHA-256. Must equal the entries of JoltNative.Known in
+# The files the module loads, by SHA-256. Must equal the entries of JoltNative.Known in
 # OpenSim.Region.PhysicsModules.Jolt.Backend/JoltNative.cs (a unit test checks both against the files).
-$stockVersion = "1.0.4"
+# JoltPhysics.Native 1.1.0. linux-x64 is the deterministic rebuild of joltc 886e0886 (Jolt e77f1755,
+# CROSS_PLATFORM_DETERMINISTIC), not the bytes of that package's linux-x64 file. The other four rows are
+# the unmodified files of the package.
+$stockVersion = "1.1.0"
 $stock = [ordered]@{
-    "67BECFC70CFBDA643AB9B75ABA895042900C3E339B001080BA4107E4929B0910" = @{ Folder = "win-x64"; File = "joltc.dll" }
-    "5FC051708BDD05031A816796612A2F87E17ED32CC198F195A43B2305B3D990FD" = @{ Folder = "linux-x64"; File = "libjoltc.so" }
-    "B0A7D05151A8E504765A39E23B2EC196B88B3BF2CE3E8B884161E6925E7578E4" = @{ Folder = "win-arm64"; File = "joltc.dll" }
-    "FDE70508C826370B5CF6BB54C6EA9CEEAB0C37C826BCD71579EBB9B4AC3E0D61" = @{ Folder = "linux-arm64"; File = "libjoltc.so" }
-    "39E4A8728307E48026D965D8AB661348A8808A9A2AFDDDE6CE58272B37D83E91" = @{ Folder = "osx"; File = "libjoltc.dylib" }
+    "79125AB6882A1AEEECD5509BFE9EDF383E8E48A34D9A8B642A6B9A197D44DF74" = @{ Folder = "win-x64"; File = "joltc.dll" }
+    "ED9B88B77C8F27EF035BD9FD809AF7A425757E5B8C37D11EC4527374A06DBA59" = @{ Folder = "linux-x64"; File = "libjoltc.so" }
+    "D32B29B9AADFD7887E4681302A766C5476A196C6AD77FF1F86473BBFB47325E0" = @{ Folder = "win-arm64"; File = "joltc.dll" }
+    "DAF06442FDF25BD2FC4234C252E3862CA3A94E32792A4466A9D93723C8BB03CB" = @{ Folder = "linux-arm64"; File = "libjoltc.so" }
+    "386DBEEC5E6892C218F9692572528EE3AF748184C9298861C90AAC1E3443C2EC" = @{ Folder = "osx"; File = "libjoltc.dylib" }
 }
 # The runtimes/ folders the module loads from, and the file it loads in each.
 $folders = @{}
@@ -63,6 +66,7 @@ function Get-Kind([string]$folder, [string]$hash) {
 }
 
 function Get-Name([string]$hash) {
+    if ($stock.Contains($hash) -and $stock[$hash].Folder -eq "linux-x64") { return "joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC" }
     if ($stock.Contains($hash)) { return ("stock JoltPhysics.Native {0} {1}" -f $stockVersion, $stock[$hash].Folder) }
     return "an unknown build"
 }

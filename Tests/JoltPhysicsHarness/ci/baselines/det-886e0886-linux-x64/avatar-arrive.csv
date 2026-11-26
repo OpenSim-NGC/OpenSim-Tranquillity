@@ -1,0 +1,9 @@
+scenario,slope_deg,rate_hz,steps,top_speed,release_t,release_speed,steady_speed,steady_hspeed,dist_before_release,dist_after_release,time_to_rest,peak_height,peak_rise,z_range,max_tilt_deg,end_x,end_y,end_z,left_region_t,nonfinite,sleep_after,active_at_end,impact_t,arrival_speed,leaving_speed,penetration,tunneled,push_range_early,push_range_late,push_penetration,crash_rise,ray_casts,ray_us_per_cast,ray_refused,ray_cut_short
+avatar-platform,0,11,110,0.000,-,-,0.000,0.000,0.000,-,-,4.050,0.000,0.000,0.0,170.000,60.000,29.050,-,0,0.091,0,-,-,-,-,0,-,-,-,-,0,-,0,0
+avatar-platform/p45,0,11,110,0.000,-,-,0.000,0.000,0.000,-,-,4.050,0.000,0.000,0.0,170.000,60.000,29.050,-,0,0.091,0,-,-,-,-,0,-,-,-,-,0,-,0,0
+avatar-platform,0,45,450,0.000,-,-,0.000,0.000,0.000,-,-,4.050,0.000,0.000,0.0,170.000,60.000,29.050,-,0,0.022,0,-,-,-,-,0,-,-,-,-,0,-,0,0
+avatar-platform/p45,0,45,450,0.000,-,-,0.000,0.000,0.000,-,-,4.050,0.000,0.000,0.0,170.000,60.000,29.050,-,0,0.022,0,-,-,-,-,0,-,-,-,-,0,-,0,0
+avatar-platform-drop,0,11,110,7.132,-,-,0.000,0.000,0.000,-,-,7.009,0.000,0.000,0.0,170.000,60.000,29.050,-,0,0.091,0,-,-,-,-,0,-,-,-,-,0,-,0,0
+avatar-platform-drop/p45,0,11,110,6.974,-,-,0.000,0.000,0.000,-,-,7.011,0.000,0.000,0.0,170.000,60.000,29.050,-,0,0.091,0,-,-,-,-,0,-,-,-,-,0,-,0,0
+avatar-platform-drop,0,45,450,7.627,-,-,0.000,0.000,0.000,-,-,7.048,0.000,0.000,0.0,170.000,60.000,29.050,-,0,0.022,0,-,-,-,-,0,-,-,-,-,0,-,0,0
+avatar-platform-drop/p45,0,45,450,7.627,-,-,0.000,0.000,0.000,-,-,7.048,0.000,0.000,0.0,170.000,60.000,29.050,-,0,0.022,0,-,-,-,-,0,-,-,-,-,0,-,0,0

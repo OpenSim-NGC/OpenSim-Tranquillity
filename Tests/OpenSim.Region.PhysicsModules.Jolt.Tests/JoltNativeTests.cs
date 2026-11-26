@@ -102,7 +102,7 @@ public class JoltNativeTests
         Assert.Equal(!info.Build.TestedByProject, info.UntestedNotice != null);
         Assert.Contains(info.Path, info.Describe());
         Assert.Contains(info.Sha256, info.Describe());
-        Assert.Contains($"stock JoltPhysics.Native {JoltNative.PackageVersion}; one job pool", info.Describe());
+        Assert.Contains($"{info.Build.Source}; one job pool", info.Describe());
 
         // Nothing at the output root: the file under runtimes/ is the only one.
         Assert.False(File.Exists(Path.Combine(JoltNative.DefaultBaseDirectory(), "joltc.dll")));
@@ -157,8 +157,8 @@ public class JoltNativeTests
     [Fact]
     public void The_record_has_the_stock_files()
     {
-        // Stock files of the package version the projects use: tested here on win-x64 and linux-x64, none safe for more
-        // than one pool.
+        // Package version the projects use. linux-x64 is the deterministic rebuild and the one this project tests.
+        // The other four are the unmodified package files, not tested here. None is safe for more than one pool.
         var rows = JoltNative.Known.Select(b => (b.Folder, b.File, b.Origin, b.PackageVersion, b.SafeForMultiplePools, b.TestedByProject))
             .OrderBy(r => r.Origin).ThenBy(r => r.Folder, StringComparer.Ordinal).ToArray();
         var v = JoltNative.PackageVersion;
@@ -168,8 +168,12 @@ public class JoltNativeTests
             ("linux-x64", "libjoltc.so", JoltNativeOrigin.Package, (string)v, false, true),
             ("osx", "libjoltc.dylib", JoltNativeOrigin.Package, (string)v, false, false),
             ("win-arm64", "joltc.dll", JoltNativeOrigin.Package, (string)v, false, false),
-            ("win-x64", "joltc.dll", JoltNativeOrigin.Package, (string)v, false, true),
+            ("win-x64", "joltc.dll", JoltNativeOrigin.Package, (string)v, false, false),
         }, rows);
+        JoltNativeBuild linux = JoltNative.Known.Single(b => b.Folder == "linux-x64");
+        Assert.Equal("joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC", linux.Source);
+        Assert.Equal("det-886e0886-linux-x64", linux.BaselineName);
+        Assert.All(JoltNative.Known.Where(b => b.Folder != "linux-x64"), b => Assert.Equal($"stock JoltPhysics.Native {v}", b.Source));
         Assert.Equal(JoltNative.Known.Count, JoltNative.Known.Select(b => b.Sha256).Distinct().Count());
         Assert.All(JoltNative.Known, b => Assert.Matches("^[0-9A-F]{64}$", b.Sha256));
     }
@@ -177,24 +181,29 @@ public class JoltNativeTests
     [Fact]
     public void The_start_line_names_the_build_and_an_untested_platform_gets_a_notice()
     {
+        JoltNativeBuild stockLinux = JoltNative.Known.Single(b => b.Folder == "linux-x64" && b.Origin == JoltNativeOrigin.Package);
         JoltNativeBuild stockWin = JoltNative.Known.Single(b => b.Folder == "win-x64" && b.Origin == JoltNativeOrigin.Package);
         JoltNativeBuild stockOsx = JoltNative.Known.Single(b => b.Folder == "osx");
 
-        var stock = new JoltNativeInfo("win-x64", "p", stockWin.Sha256, stockWin);
-        Assert.Equal($"joltc for win-x64: p sha256 {stockWin.Sha256} (stock JoltPhysics.Native 1.0.4; one job pool)", stock.Describe());
-        Assert.Null(stock.UntestedNotice);
+        var linux = new JoltNativeInfo("linux-x64", "p", stockLinux.Sha256, stockLinux);
+        Assert.Equal($"joltc for linux-x64: p sha256 {stockLinux.Sha256} ({stockLinux.Source}; one job pool)", linux.Describe());
+        Assert.Null(linux.UntestedNotice);
+
+        var win = new JoltNativeInfo("win-x64", "p", stockWin.Sha256, stockWin);
+        Assert.Equal($"joltc for win-x64: p sha256 {stockWin.Sha256} ({stockWin.Source}; one job pool)", win.Describe());
+        Assert.NotNull(win.UntestedNotice);
 
         // The record has no build safe for more than one pool; the line for one that was, built here.
         var safeBuild = new JoltNativeBuild("linux-x64", "libjoltc.so", new string('A', 64), JoltNativeOrigin.Package, JoltNative.PackageVersion,
                                             safeForMultiplePools: true, testedByProject: true);
         var safe = new JoltNativeInfo("linux-x64", "p", safeBuild.Sha256, safeBuild);
-        Assert.Equal($"joltc for linux-x64: p sha256 {safeBuild.Sha256} (stock JoltPhysics.Native 1.0.4; safe for more than one job pool)", safe.Describe());
+        Assert.Equal($"joltc for linux-x64: p sha256 {safeBuild.Sha256} (stock JoltPhysics.Native {JoltNative.PackageVersion}; safe for more than one job pool)", safe.Describe());
         Assert.True(safe.SafeForMultiplePools);
         Assert.Null(safe.UntestedNotice);
 
         var mac = new JoltNativeInfo("osx-arm64", "p", stockOsx.Sha256, stockOsx);
-        Assert.Equal("the joltc for osx-arm64 (stock JoltPhysics.Native 1.0.4) is recorded from its package, but this project does not test it: " +
-                     "the module's tests run on win-x64 and linux-x64.", mac.UntestedNotice);
+        Assert.Equal($"the joltc for osx-arm64 (stock JoltPhysics.Native {JoltNative.PackageVersion}) is recorded from its package, but this project does not test it: " +
+                     "the module's tests run on linux-x64.", mac.UntestedNotice);
 
         var unrecorded = new JoltNativeInfo("win-x64", "p", new string('0', 64), null);
         Assert.False(unrecorded.SafeForMultiplePools);
@@ -332,7 +341,7 @@ public class JoltNativeTests
         Assert.Null(JoltPhysicsBackend.JobPoolLimitReason(3, safe));
         Assert.Null(CapacityReport.JobPoolLimitWarning(3, safe));
 
-        string reason = "the loaded joltc (stock JoltPhysics.Native 1.0.4) is not safe for more than one job pool: its physics systems " +
+        string reason = $"the loaded joltc ({stockWin.Source}) is not safe for more than one job pool: its physics systems " +
                         "share one scratch allocator, and two physics updates at once would stop the process";
         Assert.Equal(reason, JoltPhysicsBackend.JobPoolLimitReason(3, stock));
         Assert.Equal(

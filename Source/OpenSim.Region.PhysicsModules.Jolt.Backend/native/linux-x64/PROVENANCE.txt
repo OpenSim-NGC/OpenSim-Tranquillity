@@ -1,0 +1,14 @@
+linux-x64 libjoltc.so
+
+joltc 886e088675bae3a086f8318c7803f8ee962c2f2c
+Jolt Physics e77f175595e64cb44218cc9d9d56fc365ad0e36a (v5.6.0)
+
+Built as a shared library with CROSS_PLATFORM_DETERMINISTIC, single precision, asserts off,
+debug renderer off, floating-point exceptions off, profiler off, and no GPU compute.
+OBJECT_LAYER_BITS is 32. fmodf is bound to GLIBC_2.2.5 so the file loads on the same glibc
+floor as the JoltPhysics.Native 1.1.0 package file.
+
+SHA-256 ed9b88b77c8f27ef035bd9fd809af7a425757e5b8c37d11ec4527374a06dba59
+
+The build copies this file over the package's linux-x64 libjoltc.so. The package's other
+platform files are unchanged and are not built with CROSS_PLATFORM_DETERMINISTIC.

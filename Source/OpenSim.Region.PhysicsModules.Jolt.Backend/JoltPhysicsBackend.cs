@@ -8,9 +8,8 @@
 // Jolt implementation of IPhysicsBackend.
 //
 // ============================ READ THIS FIRST ============================
-// Jolt binding: JoltPhysicsSharp 2.19.1,
-// single precision (Foundation.Init(false); the native is loaded by JoltNative). The Jolt calls below
-// are the 2.19.1 surface.
+// Jolt binding: JoltPhysicsSharp 2.22.0 (Jolt 5.6),
+// single precision (Foundation.Init(false); the native is loaded by JoltNative).
 //
 // The parts worth reading carefully are the ones that are easy to get wrong and
 // expensive to discover later:
@@ -422,8 +421,12 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         private ObjectLayerPairFilterTable? _objectLayerPairFilter;
         private BroadPhaseLayerInterfaceTable? _broadPhaseInterface;
         private ObjectVsBroadPhaseLayerFilterTable? _objectVsBroadPhaseFilter;
-        // NOTE: 2.19.1 has NO TempAllocator - temp allocation is internal
-        // to PhysicsSystem.Update. There is deliberately no _tempAllocator field.
+        // The physics step's scratch allocator: 8 MB, the size of joltc's process-wide allocator
+        // (TempAllocatorImplWithMallocFallback). Created with the PhysicsSystem and destroyed after it.
+        // JPH_PhysicsSystem_Update2 takes it. CharacterVirtual's scratch calls still use the process-wide
+        // allocator, so more than one job pool stays unsafe.
+        private IntPtr _tempAllocator;
+        private const uint PhysicsScratchBytes = 8u * 1024u * 1024u;
 
         // Cached BodyInterface, valid for the PhysicsSystem's lifetime.
         //
@@ -516,31 +519,23 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // parallel across cores.
         //
         // !!! CRITICAL DEPENDENCY: the scratch allocator !!!
-        // Stock JoltPhysics.Native 1.0.4 joltc supplies ONE process-global
-        // TempAllocatorImpl (a LIFO stack, NOT thread-safe) to every
-        // JPH_PhysicsSystem_Update and all six JPH_CharacterVirtual_* scratch
-        // consumers. With it shared, three regions' heartbeats stepping
-        // concurrently produce "TempAllocator: Freeing in the wrong order" ->
-        // std::abort(). With the STOCK DLL a per-instance
-        // lock CANNOT protect it - two regions each holding their own _simLock
-        // still hammer the one allocator. What protects it there is the job
+        // The physics step draws on this backend's own 8 MB allocator
+        // (JPH_PhysicsSystem_Update2). CharacterVirtual's six scratch calls still
+        // draw on ONE process-wide TempAllocatorImpl (a LIFO stack, NOT
+        // thread-safe): Update, ExtendedUpdate, RefreshContacts, WalkStairs,
+        // StickToFloor and SetShape. Two regions stepping at once can still
+        // abort with "TempAllocator: Freeing in the wrong order". A per-instance
+        // lock CANNOT protect that shared allocator: two regions each holding
+        // their own _simLock still hammer it. What protects it is the job
         // pool's gate (one Step at a time per pool; see "The pool gate rule")
         // and ONE pool: ResolveJobPools(requested, native) gives one pool on a
         // native that JoltNative's record does not mark safe for more. Anyone
-        // touching this lock's scope or the gate must keep every allocator use
-        // inside the gate (ShapeAndAllocatorRuleTests).
+        // touching this lock's scope or the gate must keep every shared-allocator
+        // use inside the gate (ShapeAndAllocatorRuleTests).
         //
-        // The stock joltc (amerkoleci/joltc @ 1715c5aab8, the source of
-        // JoltPhysics.Native 1.0.4) has ONE process-wide
-        // TempAllocatorImplWithMallocFallback(8MB), used at ALL SEVEN consuming
-        // sites: PhysicsSystem_Update and CharacterVirtual Update /
-        // ExtendedUpdate / RefreshContacts / WalkStairs / StickToFloor /
-        // SetShape. All regions in the process therefore share one job pool,
-        // and its gate keeps two regions' native calls from overlapping.
         // _simLock guards the INTRA-region races (this region's scene thread vs
-        // its own heartbeat Step). A joltc with an allocator per physics system
-        // (BulletSim's per-world scratch, PhysX's per-PxScene scratch) would
-        // allow one pool per region; that needs a change in joltc itself.
+        // its own heartbeat Step). One pool per region would need the character
+        // calls to take an allocator too; joltc 886e0886 does not offer that.
         //
         // The races (all real, all still needed):
         //   1. NarrowPhaseQuery races Update   -> queries take _simLock
@@ -608,14 +603,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // ---------------------------------------------------------------------
         // The pool gate rule.
         //
-        // Several regions can share one job pool, and with the stock joltc of the
-        // JoltPhysics.Native package every PhysicsSystem draws on ONE process-wide TempAllocatorImpl. Two regions on one pool
-        // are then safe only because every use of that allocator happens inside the pool's gate, which admits one
-        // Step at a time: PhysicsSystem::Update and CharacterVirtual::ExtendedUpdate are called only from Step, under
-        // the gate. CharacterVirtual::SetShape is the one call outside it, and it never reaches the allocator (see
-        // SetShapeWithoutScratch). Nothing in the native checks this, so the allocator check does: Step records the
-        // pool whose gate this thread holds, and a site that needs the gate fails when this thread does not hold
-        // its region's. ShapeAndAllocatorRuleTests also lists every call into the seven allocator entry points.
+        // Several regions can share one job pool. CharacterVirtual's scratch calls draw on ONE process-wide
+        // TempAllocatorImpl. Two regions on one pool are then safe only because every use of that allocator happens
+        // inside the pool's gate, which admits one Step at a time: CharacterVirtual::ExtendedUpdate is called only
+        // from Step, under the gate. The physics step calls JPH_PhysicsSystem_Update2 with this backend's own
+        // allocator, also only from Step, under the gate. CharacterVirtual::SetShape is the one character call
+        // outside the gate, and it never reaches the allocator (see SetShapeWithoutScratch). Nothing in the native
+        // checks this, so the allocator check does: Step records the pool whose gate this thread holds, and a site
+        // that needs the gate fails when this thread does not hold its region's. ShapeAndAllocatorRuleTests also
+        // lists every call into the binding's allocator entry points, and the one Update2 call.
         // ---------------------------------------------------------------------
         [ThreadStatic] private static JobPool? t_gateHeld;
 
@@ -989,6 +985,13 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             lock (s_systemMapGate)
             {
                 _system = new PhysicsSystem(systemSettings);
+                _tempAllocator = JPH_TempAllocator_Create(PhysicsScratchBytes);
+                if (_tempAllocator == IntPtr.Zero)
+                {
+                    DestroyPhysicsSystem(_system);
+                    _system = null;
+                    throw new InvalidOperationException("Jolt physics: the scratch allocator could not be created.");
+                }
                 ClearContactValidateProc();
             }
             _system.Gravity = settings.Gravity;
@@ -1178,8 +1181,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // the parameterless NativeObject constructor, so PhysicsSystem.Dispose() never runs its DisposeNative, which is
         // what calls JPH_PhysicsSystem_Destroy, destroys the contact and body-activation listeners it created, and frees
         // the GCHandle behind their userData. Without this every region teardown leaks the native system, its temp
-        // allocator, the three layer-filter objects (JPH_PhysicsSystem_Destroy deletes those; joltc has no other
-        // destroy for them), both listeners, and the GCHandle, which also keeps the managed wrapper alive.
+        // allocator, the three layer-filter objects (JPH_PhysicsSystem_Destroy deletes those), both listeners, and
+        // the GCHandle, which also keeps the managed wrapper alive. JoltPhysicsSharp 2.22's ObjectLayerPairFilterTable
+        // and ObjectVsBroadPhaseLayerFilterTable own those handles, so their Dispose would destroy them again;
+        // ReleaseFilterConsumedBySystem drops that ownership. BroadPhaseLayerInterfaceTable leaves OwnsHandle false.
         //
         // joltc keeps every system in a global map, s_PhysicsSystems: JPH_PhysicsSystem_Create inserts and
         // JPH_PhysicsSystem_Destroy erases. Regions are created and torn down on different threads. The native this
@@ -1191,6 +1196,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
 
         [System.Runtime.InteropServices.DllImport("joltc", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
         private static extern void JPH_PhysicsSystem_Destroy(IntPtr system);
+
+        [System.Runtime.InteropServices.DllImport("joltc", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+        private static extern IntPtr JPH_TempAllocator_Create(uint size);
+
+        [System.Runtime.InteropServices.DllImport("joltc", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+        private static extern void JPH_TempAllocator_Destroy(IntPtr allocator);
+
+        [System.Runtime.InteropServices.DllImport("joltc", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+        private static extern PhysicsUpdateError JPH_PhysicsSystem_Update2(IntPtr system, float deltaTime, int collisionSteps, IntPtr tempAllocator, IntPtr jobSystem);
 
         [System.Runtime.InteropServices.DllImport("joltc", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
         private static extern void JPH_ContactListener_Destroy(IntPtr listener);
@@ -1242,23 +1256,29 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             system.Dispose();
         }
 
+        // JPH_PhysicsSystem_Destroy has already deleted the native filter. A wrapper that owns its handle would
+        // delete it again from DisposeNative (JoltPhysicsSharp 2.22 does, for the pair filter and the object-vs-
+        // broadphase filter). Clear the flag, then dispose so the wrapper drops its handle and skips its finalizer.
+        private static void ReleaseFilterConsumedBySystem(NativeObject? filter)
+        {
+            if (filter == null || filter.IsDisposed)
+                return;
+            if (s_ownsHandle?.GetValue(filter) is true)
+                s_ownsHandle.SetValue(filter, false);
+            filter.Dispose();
+        }
+
         // =====================================================================
         // No contact-validate callback.
         //
         // joltc's contact listener converts Jolt's CollideShapeResult for the OnContactValidate callback, and that
-        // conversion mallocs both supporting-face arrays (joltc.cpp FromJolt, used by ManagedContactListener::
-        // OnContactValidate at 1715c5a). joltc frees them only from joltc bc8a8002a on (upstream PR #76); the native
-        // this module ships, and the stock JoltPhysics.Native 1.0.4, both predate it. The physics step collects faces
-        // for every body pair it collides, and calls OnContactValidate once per colliding pair per step, so every
-        // awake body touching something leaked 12 bytes per face vertex, plus the allocation overhead, every step:
-        // about 17 KB per step for a kicked pile of 100 boxes.
-        //
-        // joltc calls a callback only when its slot in the process-wide procs table is set, and with the slot empty it
-        // accepts every contact (AcceptAllContactsForThisBodyPair). JoltPhysicsSharp sets all four slots in
-        // PhysicsSystem's static constructor, and its validate callback returns that same answer when no handler is
-        // subscribed. The module never subscribes OnContactValidate, so joltc gets a copy of the binding's table with
-        // the validate slot empty: the same answer for every contact, with no conversion and no allocation, on any
-        // joltc. The copy lives in native memory for the life of the process, since joltc keeps the pointer.
+        // conversion mallocs both supporting-face arrays (joltc.cpp FromJolt, ManagedContactListener::OnContactValidate).
+        // joltc 886e0886 frees them when the callback runs. The module never subscribes OnContactValidate, so the
+        // conversion is not done: joltc calls a callback only when its slot in the process-wide procs table is set,
+        // and with the slot empty it accepts every contact (AcceptAllContactsForThisBodyPair). JoltPhysicsSharp sets
+        // all four slots in PhysicsSystem's static constructor, and its validate callback returns that same answer
+        // when no handler is subscribed. The module gives joltc a copy of that table with the validate slot empty.
+        // The copy lives in native memory for the life of the process, since joltc keeps the pointer.
         // =====================================================================
         [System.Runtime.InteropServices.DllImport("joltc", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
         private static extern void JPH_ContactListener_SetProcs(IntPtr procs);
@@ -1356,22 +1376,26 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 _system.OnContactRemoved -= HandleContactRemoved;
             }
 
-            // Native teardown order: system -> jobs -> filters -> Foundation.
-            // The PhysicsSystem holds the filter interfaces and steps on the job system,
-            // so it must go down first. Destroying it also frees the three layer-filter objects natively; the filter
-            // wrappers below free nothing native.
+            // Native teardown order: system -> scratch allocator -> filters -> Foundation.
+            // The PhysicsSystem holds the filter interfaces, so it goes down first. Destroying it deletes the three
+            // layer-filter objects. The wrappers are released afterwards and must not delete them again.
             if (_system != null)
                 DestroyPhysicsSystem(_system);
             _system = null;
+            if (_tempAllocator != IntPtr.Zero)
+            {
+                JPH_TempAllocator_Destroy(_tempAllocator);
+                _tempAllocator = IntPtr.Zero;
+            }
 
             // Shared job pool is process-wide: disposed by the LAST region out in
             // Dispose()'s s_foundationGate block, NOT per-region here.
 
-            _objectVsBroadPhaseFilter?.Dispose();
+            ReleaseFilterConsumedBySystem(_objectVsBroadPhaseFilter);
             _objectVsBroadPhaseFilter = null;
-            _broadPhaseInterface?.Dispose();
+            ReleaseFilterConsumedBySystem(_broadPhaseInterface);
             _broadPhaseInterface = null;
-            _objectLayerPairFilter?.Dispose();
+            ReleaseFilterConsumedBySystem(_objectLayerPairFilter);
             _objectLayerPairFilter = null;
 
             // Foundation.Shutdown() is NOT here anymore - it is process-global + ref-counted in Dispose().
@@ -1619,10 +1643,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             // Impulse is a POST-solve quantity but Added/Persisted fire PRE-solve, so we use Jolt's own
             // in-callback estimator - the same helper its collision-sound sample uses. It reads only the
             // two bodies Jolt already handed us (NOT a lock we take) plus the manifold. It allocates no managed
-            // memory, but joltc mallocs the per-point impulse array on every call (JPH_EstimateCollisionResponse)
-            // and the binding never frees it, so it is freed here with joltc's own JPH_CollisionEstimationResult_FreeMembers
-            // (joltc links its C runtime statically: only its own free may release its malloc). Sum the per-point
-            // NORMAL impulses -> newton-seconds.
+            // memory, but joltc mallocs the per-point normal-impulse array on every call
+            // (JPH_EstimateCollisionResponse). The binding's Free releases it with joltc's own free. Sum the
+            // per-point NORMAL impulses -> newton-seconds.
             float impulse = 0f;
             if (listening)
             {
@@ -1632,10 +1655,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                     body1, body2, manifold, out CollisionEstimationResult response,
                     settings.CombinedFriction, settings.CombinedRestitution,
                     MinVelocityForRestitution, Math.Max(1, _settings.VelocityIterations));
-                ReadOnlySpan<CollisionEstimationResult.Impulse> impulses = response.Impulses;
+                ReadOnlySpan<float> impulses = response.ContactImpulses;
                 for (int i = 0; i < impulses.Length; i++)
-                    impulse += impulses[i].ContactImpulse;
-                FreeEstimate(ref response);
+                    impulse += impulses[i];
+                response.Free();
+                Interlocked.Increment(ref s_estimatesFreed);
             }
 
             // Name the struck part on each side from the contact sub-shape (child of a linkset, or the body
@@ -1645,17 +1669,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             _contactListener.Push(BuildContact(ra, rb, point, normal, MathF.Max(0f, impulse), phase, childA, childB, relativeSpeed));
         }
 
-        [System.Runtime.InteropServices.DllImport("joltc", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
-        private static extern unsafe void JPH_CollisionEstimationResult_FreeMembers(CollisionEstimationResult* result);
-
-        // Free the impulse array joltc allocated for an estimate (nothing when it has none). Counted for the tests.
-        private static unsafe void FreeEstimate(ref CollisionEstimationResult result)
-        {
-            fixed (CollisionEstimationResult* r = &result)
-                JPH_CollisionEstimationResult_FreeMembers(r);
-            Interlocked.Increment(ref s_estimatesFreed);
-        }
-
+        // Collision estimates whose native impulse array has been freed, process-wide (tests).
         private static long s_estimatesFreed;
 
         /// <summary>Collision estimates whose native impulse array has been freed, process-wide (tests).</summary>
@@ -3118,10 +3132,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // _characterGate, for a new controller and for the one that replaces it on a resize.
         private void WireCharacter(JoltCharacterRecord rec, CharacterVirtual character)
         {
-            character.OnContactAdded += (CharacterVirtual cv, in BodyID b2, SubShapeID ss, in RVector3 pos, in Vector3 normal, ref CharacterContactSettings s)
-                => NoteCharacterBodyContact(rec, b2.ID, ss.Value, ToVec(pos), normal, ContactPhase.Begin, ref s);
-            character.OnContactPersisted += (CharacterVirtual cv, in BodyID b2, SubShapeID ss, in RVector3 pos, in Vector3 normal, ref CharacterContactSettings s)
-                => NoteCharacterBodyContact(rec, b2.ID, ss.Value, ToVec(pos), normal, ContactPhase.Persist, ref s);
+            character.OnContactAdded += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
+                => NoteCharacterBodyContact(rec, contact.BodyB.ID, contact.SubShapeIDB.Value, contact.Position, contact.ContactNormal, ContactPhase.Begin, ref s);
+            character.OnContactPersisted += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
+                => NoteCharacterBodyContact(rec, contact.BodyB.ID, contact.SubShapeIDB.Value, contact.Position, contact.ContactNormal, ContactPhase.Persist, ref s);
             character.OnContactRemoved += (CharacterVirtual cv, in BodyID b2, SubShapeID ss)
                 => PushCharacterBodyContact(rec, b2.ID, ss.Value, default, default, ContactPhase.End);
 
@@ -3132,10 +3146,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 _charVsChar.Add(character);
                 character.SetCharacterVsCharacterCollision(_charVsChar);
             }
-            character.OnCharacterContactAdded += (CharacterVirtual cv, CharacterVirtual other, SubShapeID ss, in RVector3 pos, in Vector3 normal, ref CharacterContactSettings s)
-                => PushCharacterCharacterContact(rec, other, ToVec(pos), normal, ContactPhase.Begin);
-            character.OnCharacterContactPersisted += (CharacterVirtual cv, CharacterVirtual other, SubShapeID ss, in RVector3 pos, in Vector3 normal, ref CharacterContactSettings s)
-                => PushCharacterCharacterContact(rec, other, ToVec(pos), normal, ContactPhase.Persist);
+            character.OnCharacterContactAdded += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
+                => PushCharacterCharacterContact(rec, contact.CharacterB, contact.Position, contact.ContactNormal, ContactPhase.Begin);
+            character.OnCharacterContactPersisted += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
+                => PushCharacterCharacterContact(rec, contact.CharacterB, contact.Position, contact.ContactNormal, ContactPhase.Persist);
         }
 
         // The supporting plane is one radius below the capsule's centre, and CharacterVirtual takes it only at creation
@@ -3688,7 +3702,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         }
 
         // Push an avatar-vs-AVATAR contact. Both sides are avatars (no BodyId); UserData on each.
-        private void PushCharacterCharacterContact(JoltCharacterRecord ch, CharacterVirtual other, Vector3 point, Vector3 normal, ContactPhase phase)
+        private void PushCharacterCharacterContact(JoltCharacterRecord ch, CharacterVirtual? other, Vector3 point, Vector3 normal, ContactPhase phase)
         {
             uint otherUserData = other != null ? (uint)other.UserData : 0u;
             if (phase == ContactPhase.Persist && !ch.WantsContactEvents)
@@ -5118,7 +5132,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 _removedBodyIds.Clear();   // every avatar has been stepped since
             }
 
-            // 2. Advance the simulation (3-arg Update, temp allocation internal).
+            // 2. Advance the simulation (Update2, this backend's scratch allocator).
             //    Uses this region's shared, process-capped job pool, not a per-region one.
             if (_system != null && pool != null)
             {
@@ -5135,9 +5149,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 try
                 {
                     RecordInside(pool, Interlocked.Increment(ref pool.Inside));
-                    // Draws on the TempAllocator: only here, inside the pool gate (the pool gate rule).
-                    using (Enter("PhysicsSystem::Update (joltc.cpp:1050)"))
-                        updateError = _system.Update(deltaTime, collisionSteps, pool.System);
+                    // This backend's scratch allocator: only here, inside the pool gate (the pool gate rule).
+                    using (Enter("PhysicsSystem::Update2"))
+                        updateError = JPH_PhysicsSystem_Update2(_system.Handle, deltaTime, collisionSteps, _tempAllocator, pool.System.Handle);
                 }
                 finally
                 {

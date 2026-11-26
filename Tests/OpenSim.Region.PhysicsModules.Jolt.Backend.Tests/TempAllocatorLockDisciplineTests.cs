@@ -163,17 +163,18 @@ public class TempAllocatorLockDisciplineTests
     }
 
     /// <summary>
-    /// <c>PhysicsSystem::Update</c> — <c>joltc.cpp:1050</c>. One call site, inside <c>_simLock</c>.
+    /// <c>JPH_PhysicsSystem_Update2</c>, this backend's scratch allocator. One call site, inside <c>_simLock</c>.
+    /// The binding's <c>PhysicsSystem.Update</c> uses joltc's process-wide allocator and is not called.
     /// </summary>
     [Fact]
     public void PhysicsSystem_Update_is_called_once_and_under_simLock()
     {
         var source = BackendSource();
-        Assert.Single(Regex.Matches(source, @"_system\.Update\("));
+        Assert.DoesNotContain("_system.Update(", source);
 
         var step = MethodBody(source, "StepResult StepLocked(");   // Step's locked body
-        Assert.Contains("_system.Update(", step);
-        AssertSimLockSpans(step, "_system.Update(");
+        Assert.Single(Regex.Matches(step, @"JPH_PhysicsSystem_Update2\("));
+        AssertSimLockSpans(step, "JPH_PhysicsSystem_Update2(");
     }
 
     // ------------------------------------------------------------------ the rule that was already written down

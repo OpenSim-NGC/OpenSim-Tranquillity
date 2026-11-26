@@ -372,7 +372,9 @@ public class ParkedPastTheEdgeSceneTests
 
     private static float Angle(Quaternion a, Quaternion b)
     {
-        float d = MathF.Min(1f, MathF.Abs(Quaternion.Dot(Quaternion.Normalize(a), Quaternion.Normalize(b))));
+        Quaternion na = a;
+        Quaternion nb = b;
+        float d = MathF.Min(1f, MathF.Abs(Quaternion.Dot(Quaternion.Normalize(in na), Quaternion.Normalize(in nb))));
         return 2f * MathF.Acos(d) * 180f / MathF.PI;
     }
 

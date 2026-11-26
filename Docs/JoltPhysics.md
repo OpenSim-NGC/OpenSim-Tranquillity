@@ -21,13 +21,15 @@ the platforms it runs on today.
 
 ## Platforms
 
-The module runs on joltc, the native library of the `JoltPhysics.Native` package (version 1.0.4,
-the one JoltPhysicsSharp 2.19.1 depends on). The build puts the package's file for each platform
-in the output:
+The module runs on joltc through JoltPhysicsSharp 2.22.0 and `JoltPhysics.Native` 1.1.0 (Jolt 5.6).
+Linux x64 loads a joltc built from commit 886e0886 and Jolt e77f1755 with
+`CROSS_PLATFORM_DETERMINISTIC`, in place of the package's linux-x64 file. Windows, Arm and macOS
+load the package's own files, which are not built with that option. The build puts the file for
+each platform in the output:
 
 | Platform | File in the build output | Tested by this project |
 |---|---|---|
-| Windows x64 | `runtimes/win-x64/native/joltc.dll` | yes |
+| Windows x64 | `runtimes/win-x64/native/joltc.dll` | no |
 | Linux x64 (glibc) | `runtimes/linux-x64/native/libjoltc.so` | yes |
 | Windows Arm64 | `runtimes/win-arm64/native/joltc.dll` | no |
 | Linux Arm64 (glibc) | `runtimes/linux-arm64/native/libjoltc.so` | no |
@@ -36,10 +38,10 @@ in the output:
 On a platform this project does not test, the module starts and logs a notice saying so.
 musl-based Linux (Alpine) has no native: there, keep another physics engine.
 
-All regions in a process share one job pool on this native (`JobPools`, below): its physics systems
-share one scratch allocator, so two physics updates at once would stop the process. More pools need a
-change in joltc itself. The recorded files and their hashes are in
-[JoltcNative.md](JoltcNative.md).
+All regions in a process share one job pool on this native (`JobPools`, below). The physics step
+uses an allocator of its own. Character scratch is still shared, so two physics updates at once
+would stop the process. More pools need the character calls to take an allocator too. The recorded
+files and their hashes are in [JoltcNative.md](JoltcNative.md).
 
 A build with no runtime identifier carries every platform's file, so the same output runs on each.
 A `dotnet publish -r <rid>` puts that platform's file beside the assemblies instead, where the
@@ -81,13 +83,13 @@ and compares it with the builds it has a record of. With a good file it logs one
 process, naming the build:
 
 ```
-[JOLT SCENE] joltc for linux-x64: /opt/opensim/bin/runtimes/linux-x64/native/libjoltc.so sha256 5FC05170... (stock JoltPhysics.Native 1.0.4; one job pool)
+[JOLT SCENE] joltc for linux-x64: /opt/opensim/bin/runtimes/linux-x64/native/libjoltc.so sha256 ED9B88B7... (joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC; one job pool)
 ```
 
 With `JobPools` above 1 it also logs one warning, and runs one pool:
 
 ```
-[JOLT SCENE] [Jolt] JobPools = 3, but the module runs ONE job pool: the loaded joltc (stock JoltPhysics.Native 1.0.4) is not safe for more than one job pool: its physics systems share one scratch allocator, and two physics updates at once would stop the process. Regions take turns on that pool. More than one pool needs a change in joltc itself; set [Jolt] JobPools = 1.
+[JOLT SCENE] [Jolt] JobPools = 3, but the module runs ONE job pool: the loaded joltc (joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC) is not safe for more than one job pool: its physics systems share one scratch allocator, and two physics updates at once would stop the process. Regions take turns on that pool. More than one pool needs a change in joltc itself; set [Jolt] JobPools = 1.
 ```
 
 In the cases below the module logs one error line and throws from its `Initialise`, before any
@@ -2108,15 +2110,17 @@ workflows do not run this check; it is run by hand:
 dotnet Tests/JoltPhysicsHarness/bin/Release/net10.0/JoltPhysicsHarness.dll --check-baseline <folder of the runs> --baselines Tests/JoltPhysicsHarness/ci/baselines
 ```
 
-The baseline depends on the joltc build that was loaded, not on the operating system: the stock
-files are built without Jolt's `CROSS_PLATFORM_DETERMINISTIC` option, so the stock Windows x64 file
-gives different results from the stock Linux x64 file. Each `--out` folder holds `native.txt`,
-naming the build the run loaded, and the check reads `ci/baselines/stock-<version>-<rid>/` for that
-file. It leaves out `ray_us_per_cast`, which is timed on the wall clock. A build with
-no baseline (the stock Arm64 and macOS files, a file the module has no record of, or a new package
-version not yet recorded) is reported as `SKIPPED: no baseline for this native` with exit code 3,
-neither passed nor failed. Exit 0 is passed and 1 is failed. To record a build's baseline from a set
-of runs:
+The baseline depends on the joltc build that was loaded, not on the operating system. The linux-x64
+file is built with `CROSS_PLATFORM_DETERMINISTIC`; its folder is
+`ci/baselines/det-886e0886-linux-x64/`. The folders `stock-1.0.4-win-x64` and
+`stock-1.0.4-linux-x64` remain the record of Jolt 5.4 (`JoltPhysics.Native` 1.0.4) and are not the
+files this module loads. The Windows, Arm and macOS files of 1.1.0 have no baseline here. Each
+`--out` folder holds `native.txt`, naming the build the run loaded, and the check reads that
+build's folder. It leaves out `ray_us_per_cast`, which is timed on the wall clock. A build with
+no baseline (the 1.1.0 Windows, Arm and macOS files, a file the module has no record of, or a new
+package version not yet recorded) is reported as `SKIPPED: no baseline for this native` with exit
+code 3, neither passed nor failed. Exit 0 is passed and 1 is failed. To record a build's baseline
+from a set of runs:
 
 ```
 dotnet Tests/JoltPhysicsHarness/bin/Release/net10.0/JoltPhysicsHarness.dll --record-baseline <folder of the runs> --baselines Tests/JoltPhysicsHarness/ci/baselines

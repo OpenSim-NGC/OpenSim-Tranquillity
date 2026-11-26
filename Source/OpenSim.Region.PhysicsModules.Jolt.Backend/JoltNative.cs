@@ -13,16 +13,17 @@
 // platform, checks its SHA-256 against the record below, loads it by full path, and hands that one handle to every
 // P/Invoke into "joltc":
 //   - JoltPhysicsSharp's own calls, through the binding's JoltApi.JoltDllImporterResolver hook, which its
-//     resolver asks before it probes for a joltc of its own (JoltApi.cs in JoltPhysicsSharp at the commit
-//     behind 2.19.1). The hook is on an internal class, so it is reached by reflection; without it the
-//     binding would load whichever joltc its own probing finds, so a missing hook is an error.
+//     resolver asks before it probes for a joltc of its own (JoltApi.cs in JoltPhysicsSharp 2.22.0). The hook
+//     is on an internal class, so it is reached by reflection; without it the binding would load whichever
+//     joltc its own probing finds, so a missing hook is an error.
 //   - this assembly's own DllImport("joltc") calls (JoltPhysicsBackend), through SetDllImportResolver.
 // The load happens once per process; every region and every backend shares it.
 //
-// The record also says whether a build is safe for more than one job pool. The stock joltc gives every physics system
-// one process-wide TempAllocator, so two physics updates at once on two pools stop the process; on it the backend runs
-// one pool whatever [Jolt] JobPools asks (JoltPhysicsBackend.ResolveJobPools). More than one pool needs a joltc that
-// gives each system its own allocator; no recorded build does.
+// The record also says whether a build is safe for more than one job pool. The physics step uses an allocator per
+// backend. CharacterVirtual's scratch calls still share one process-wide TempAllocator, so two physics steps at once
+// on two pools stop the process; the backend runs one pool whatever [Jolt] JobPools asks
+// (JoltPhysicsBackend.ResolveJobPools). More than one pool needs character calls that take an allocator; no recorded
+// build has that.
 
 using System;
 using System.Collections.Generic;
@@ -57,9 +58,16 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         public bool SafeForMultiplePools { get; }
         /// <summary>This project's test suite and harness run on this file (on the GitHub runners for its platform).</summary>
         public bool TestedByProject { get; }
+        /// <summary>Where the file comes from, in words. A package file is "stock JoltPhysics.Native &lt;version&gt;".</summary>
+        public string Source { get; }
+        /// <summary>
+        /// The harness baseline folder for this file, when it is not "stock-&lt;version&gt;-&lt;folder&gt;".
+        /// The linux-x64 file is a deterministic rebuild, so its folder names the joltc commit.
+        /// </summary>
+        public string? BaselineName { get; }
 
         public JoltNativeBuild(string folder, string file, string sha256, JoltNativeOrigin origin, string? packageVersion,
-                               bool safeForMultiplePools, bool testedByProject)
+                               bool safeForMultiplePools, bool testedByProject, string? source = null, string? baselineName = null)
         {
             Folder = folder;
             File = file;
@@ -68,10 +76,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             PackageVersion = packageVersion;
             SafeForMultiplePools = safeForMultiplePools;
             TestedByProject = testedByProject;
+            Source = source ?? $"stock {JoltNative.PackageId} {packageVersion}";
+            BaselineName = baselineName;
         }
-
-        /// <summary>Where the file comes from, in words: "stock JoltPhysics.Native 1.0.4".</summary>
-        public string Source => $"stock {JoltNative.PackageId} {PackageVersion}";
     }
 
     /// <summary>What was loaded: the platform, the file, its SHA-256 and the record it matched, if any.</summary>
@@ -109,7 +116,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         public string? UntestedNotice =>
             Build is { TestedByProject: false }
                 ? $"the joltc for {Rid} ({Build.Source}) is recorded from its package, but this project does not test it: " +
-                  "the module's tests run on win-x64 and linux-x64."
+                  "the module's tests run on linux-x64."
                 : null;
     }
 
@@ -123,9 +130,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
     public static class JoltNative
     {
         /// <summary>The package the stock native comes from, and the version the projects use (the one JoltPhysicsSharp
-        /// 2.19.1 depends on). A package bump fails JoltNativePackageTests until the record below is checked again.</summary>
+        /// 2.22.0 depends on). linux-x64 is replaced by the deterministic rebuild recorded below. A package bump fails
+        /// JoltNativePackageTests until the record is checked again.</summary>
         public const string PackageId = "JoltPhysics.Native";
-        public const string PackageVersion = "1.0.4";
+        public const string PackageVersion = "1.1.0";
 
         /// <summary>
         /// The platforms the module has a native for, by runtime identifier: the runtimes/ folder the package puts the
@@ -143,20 +151,22 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             };
 
         /// <summary>
-        /// Every joltc build the module knows, with its SHA-256 (upper-case hex). The package entries are read from the
-        /// JoltPhysics.Native package of <see cref="PackageVersion"/>.
+        /// Every joltc build the module knows, with its SHA-256 (upper-case hex). Four are the files of the
+        /// JoltPhysics.Native package of <see cref="PackageVersion"/>. linux-x64 is the deterministic rebuild of
+        /// joltc 886e0886 (Jolt e77f1755, CROSS_PLATFORM_DETERMINISTIC) that the build copies over that package file.
         /// </summary>
         public static readonly IReadOnlyList<JoltNativeBuild> Known = new[]
         {
-            Stock("win-x64", "joltc.dll", "67BECFC70CFBDA643AB9B75ABA895042900C3E339B001080BA4107E4929B0910", tested: true),
-            Stock("linux-x64", "libjoltc.so", "5FC051708BDD05031A816796612A2F87E17ED32CC198F195A43B2305B3D990FD", tested: true),
-            Stock("win-arm64", "joltc.dll", "B0A7D05151A8E504765A39E23B2EC196B88B3BF2CE3E8B884161E6925E7578E4", tested: false),
-            Stock("linux-arm64", "libjoltc.so", "FDE70508C826370B5CF6BB54C6EA9CEEAB0C37C826BCD71579EBB9B4AC3E0D61", tested: false),
-            Stock("osx", "libjoltc.dylib", "39E4A8728307E48026D965D8AB661348A8808A9A2AFDDDE6CE58272B37D83E91", tested: false),
+            Stock("win-x64", "joltc.dll", "79125AB6882A1AEEECD5509BFE9EDF383E8E48A34D9A8B642A6B9A197D44DF74", tested: false),
+            Stock("linux-x64", "libjoltc.so", "ED9B88B77C8F27EF035BD9FD809AF7A425757E5B8C37D11EC4527374A06DBA59", tested: true,
+                source: "joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC", baselineName: "det-886e0886-linux-x64"),
+            Stock("win-arm64", "joltc.dll", "D32B29B9AADFD7887E4681302A766C5476A196C6AD77FF1F86473BBFB47325E0", tested: false),
+            Stock("linux-arm64", "libjoltc.so", "DAF06442FDF25BD2FC4234C252E3862CA3A94E32792A4466A9D93723C8BB03CB", tested: false),
+            Stock("osx", "libjoltc.dylib", "386DBEEC5E6892C218F9692572528EE3AF748184C9298861C90AAC1E3443C2EC", tested: false),
         };
 
-        private static JoltNativeBuild Stock(string folder, string file, string sha256, bool tested)
-            => new JoltNativeBuild(folder, file, sha256, JoltNativeOrigin.Package, PackageVersion, safeForMultiplePools: false, tested);
+        private static JoltNativeBuild Stock(string folder, string file, string sha256, bool tested, string? source = null, string? baselineName = null)
+            => new JoltNativeBuild(folder, file, sha256, JoltNativeOrigin.Package, PackageVersion, safeForMultiplePools: false, tested, source, baselineName);
 
         public static string SupportedList => string.Join(", ", Platforms.Keys);
 
@@ -331,7 +341,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             if (hook == null || hook.EventHandlerType != typeof(DllImportResolver))
                 throw new JoltNativeException(
                     "Jolt physics: JoltPhysicsSharp has no JoltApi.JoltDllImporterResolver hook, so the module cannot make it " +
-                    "load the checked joltc. The binding is pinned to 2.19.1; a newer one needs this loader updated.");
+                    "load the checked joltc. The binding is pinned to 2.22.0; a newer one needs this loader updated.");
             hook.AddEventHandler(null, new DllImportResolver(Resolve));
         }
     }

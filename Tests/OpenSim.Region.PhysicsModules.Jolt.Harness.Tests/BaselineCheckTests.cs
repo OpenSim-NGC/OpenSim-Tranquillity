@@ -82,7 +82,7 @@ public class BaselineCheckTests
     public void Each_recorded_build_names_its_baseline_folder()
     {
         Assert.Equal($"stock-{JoltNative.PackageVersion}-win-x64", BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "win-x64")));
-        Assert.Equal($"stock-{JoltNative.PackageVersion}-linux-x64", BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "linux-x64")));
+        Assert.Equal("det-886e0886-linux-x64", BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "linux-x64")));
         Assert.Equal($"stock-{JoltNative.PackageVersion}-osx", BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "osx")));
         Assert.Null(BaselineCheck.KeyFor(null));
     }
@@ -90,10 +90,11 @@ public class BaselineCheckTests
     [Fact]
     public void The_native_file_names_the_build_and_its_baseline()
     {
-        string stock = BaselineCheck.Describe(Info("linux-x64", Build(JoltNativeOrigin.Package, "linux-x64")));
+        JoltNativeBuild linux = Build(JoltNativeOrigin.Package, "linux-x64");
+        string stock = BaselineCheck.Describe(Info("linux-x64", linux));
         Assert.Contains("rid=linux-x64\n", stock);
-        Assert.Contains($"build=stock JoltPhysics.Native {JoltNative.PackageVersion}\n", stock);
-        Assert.Contains($"baseline=stock-{JoltNative.PackageVersion}-linux-x64\n", stock);
+        Assert.Contains($"build={linux.Source}\n", stock);
+        Assert.Contains($"baseline={BaselineCheck.KeyFor(linux)}\n", stock);
 
         string unrecorded = BaselineCheck.Describe(Info("win-x64", null, "ABCD"));
         Assert.Contains("build=unrecorded\n", unrecorded);
@@ -107,8 +108,8 @@ public class BaselineCheckTests
         var s = new Scratch();
         string stockWinRows = Summary(Row("drop", ("end_z", "25.501")));
         string stockLinuxRows = Summary(Row("drop", ("end_z", "25.502")));
-        s.AddBaseline($"stock-{JoltNative.PackageVersion}-win-x64", "drop-run", stockWinRows);
-        s.AddBaseline($"stock-{JoltNative.PackageVersion}-linux-x64", "drop-run", stockLinuxRows);
+        s.AddBaseline(BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "win-x64")), "drop-run", stockWinRows);
+        s.AddBaseline(BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "linux-x64")), "drop-run", stockLinuxRows);
 
         foreach (var (rid, origin, rows) in new[]
                  {
@@ -206,7 +207,7 @@ public class BaselineCheckTests
     public void A_recorded_run_that_did_not_run_fails()
     {
         var s = new Scratch();
-        string key = $"stock-{JoltNative.PackageVersion}-linux-x64";
+        string key = BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "linux-x64"));
         s.AddBaseline(key, "a", Summary(Row("a")));
         s.AddBaseline(key, "b", Summary(Row("b")));
         s.AddRun("a", Summary(Row("a")), Info("linux-x64", Build(JoltNativeOrigin.Package, "linux-x64")));
@@ -245,9 +246,9 @@ public class BaselineCheckTests
 
     // ------------------------------------------------------------------ the committed baselines
 
-    // Every committed baseline is a run of ci/runs.txt with today's summary columns, and its folder is the baseline of a
-    // build the module has a record of. Every build this project tests has one holding every listed run; the stock files
-    // it does not test (Arm64, macOS) have none.
+    // Every committed baseline is a run of ci/runs.txt with today's summary columns. stock-1.0.4-* is the Jolt 5.4
+    // record and is not a build this module loads. Every other folder is the baseline of a recorded build. Every
+    // build this project tests has one holding every listed run; the files it does not test have none.
     [Fact]
     public void The_committed_baselines_match_the_run_list_and_the_record()
     {
@@ -256,12 +257,15 @@ public class BaselineCheckTests
             .Select(l => l[..l.IndexOf(':')])
             .ToArray();
         string[] keys = JoltNative.Known.Select(BaselineCheck.KeyFor).Distinct().ToArray();
+        string[] retained54 = { "stock-1.0.4-win-x64", "stock-1.0.4-linux-x64" };
         string[] folders = Directory.GetDirectories(CommittedBaselines).Select(Path.GetFileName).ToArray();
-        Assert.Contains($"stock-{JoltNative.PackageVersion}-win-x64", folders);
-        Assert.Contains($"stock-{JoltNative.PackageVersion}-linux-x64", folders);
+        Assert.Contains("stock-1.0.4-win-x64", folders);
+        Assert.Contains("stock-1.0.4-linux-x64", folders);
+        Assert.Contains("det-886e0886-linux-x64", folders);
         foreach (string folder in folders)
         {
-            Assert.Contains(folder, keys);
+            if (!retained54.Contains(folder))
+                Assert.Contains(folder, keys);
             foreach (string file in Directory.GetFiles(Path.Combine(CommittedBaselines, folder)))
             {
                 Assert.Equal(".csv", Path.GetExtension(file));

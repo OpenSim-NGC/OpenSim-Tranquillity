@@ -64,12 +64,22 @@ public class JoltNativePackageTests
         if (version != JoltNative.PackageVersion)
             problems.AppendLine($"  the projects restore {JoltNative.PackageId} {version}; the record is for {JoltNative.PackageVersion}");
 
-        // Every recorded stock file: present in the package with its recorded hash.
+        // Every recorded file. A repository copy under native/<folder>/<file> replaces the package file in the
+        // output (JoltNative.targets): the record is that copy's hash, and the package file only has to be present.
+        // Every other recorded file is the package file, hash and all.
+        string nativeRoot = Path.Combine(RepoRoot(), "Source", "OpenSim.Region.PhysicsModules.Jolt.Backend", "native");
         foreach (JoltNativeBuild b in JoltNative.Known.Where(b => b.Origin == JoltNativeOrigin.Package))
         {
             string path = Path.Combine(folder, "runtimes", b.Folder, "native", b.File);
+            string replacement = Path.Combine(nativeRoot, b.Folder, b.File);
             if (!File.Exists(path))
                 problems.AppendLine($"  runtimes/{b.Folder}/native/{b.File}: recorded, but not in the package");
+            else if (File.Exists(replacement))
+            {
+                string hash = JoltNative.Sha256Of(replacement);
+                if (hash != b.Sha256)
+                    problems.AppendLine($"  native/{b.Folder}/{b.File}: sha256 {hash}, recorded {b.Sha256}");
+            }
             else if (JoltNative.Sha256Of(path) is string hash && hash != b.Sha256)
                 problems.AppendLine($"  runtimes/{b.Folder}/native/{b.File}: sha256 {hash}, recorded {b.Sha256}");
         }

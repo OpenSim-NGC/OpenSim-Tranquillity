@@ -8,14 +8,15 @@
 // The harness regression check: the summary rows of the listed CI runs (ci/runs.txt) compared with the rows recorded
 // for the joltc build the runs loaded.
 //
-// Different joltc builds give different results: the stock JoltPhysics.Native files are not built with Jolt's
-// CROSS_PLATFORM_DETERMINISTIC option, so the stock Windows file and the stock Linux file disagree with each other.
-// So a baseline belongs to a build, not to an operating system: each run's --out folder holds native.txt, naming the
-// build the run loaded (from JoltNative's record), and the check reads the baseline folder for that build:
-//   ci/baselines/stock-<version>-<rid>/    the stock file of JoltPhysics.Native <version> for one platform
-// A build with no folder (the stock ARM and macOS files, an unrecorded file, a new package version before its rows
-// are recorded) is reported as having no baseline: skipped, neither passed nor failed. A run with no file in the
-// folder is skipped the same way, so a run whose rows are not repeatable on one machine can stay unrecorded.
+// Different joltc builds give different results. A baseline belongs to a build, not to an operating system: each
+// run's --out folder holds native.txt, naming the build the run loaded (from JoltNative's record), and the check
+// reads the baseline folder for that build:
+//   ci/baselines/stock-<version>-<rid>/    a package file of JoltPhysics.Native <version>
+//   ci/baselines/det-886e0886-linux-x64/   the linux-x64 file built with CROSS_PLATFORM_DETERMINISTIC
+// The folders stock-1.0.4-win-x64 and stock-1.0.4-linux-x64 stay as the Jolt 5.4 record. They are not a build this
+// module loads. A build with no folder (the 1.1.0 Windows, Arm and macOS package files, an unrecorded file) is
+// reported as having no baseline: skipped, neither passed nor failed. A run with no file in the folder is skipped
+// the same way, so a run whose rows are not repeatable on one machine can stay unrecorded.
 //
 // Columns measured on the wall clock (WallClockColumns) are left out of the comparison.
 
@@ -47,12 +48,12 @@ public static class BaselineCheck
     private const int ListedDifferences = 20;
 
     /// <summary>
-    /// The baseline folder name for a joltc build: "stock-&lt;package version&gt;-&lt;runtimes folder&gt;" for a
-    /// package file. Null for an unrecorded file.
+    /// The baseline folder name for a joltc build: the build's own name when it has one, otherwise
+    /// "stock-&lt;package version&gt;-&lt;runtimes folder&gt;" for a package file. Null for an unrecorded file.
     /// </summary>
     public static string KeyFor(JoltNativeBuild build) => build == null
         ? null
-        : $"stock-{build.PackageVersion}-{build.Folder}";
+        : build.BaselineName ?? $"stock-{build.PackageVersion}-{build.Folder}";
 
     /// <summary>The lines of native.txt for the build a run loaded.</summary>
     public static string Describe(JoltNativeInfo info) =>
