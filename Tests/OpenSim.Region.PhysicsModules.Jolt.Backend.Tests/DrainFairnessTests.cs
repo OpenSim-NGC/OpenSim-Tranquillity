@@ -8,7 +8,6 @@
 using System.Numerics;
 using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 

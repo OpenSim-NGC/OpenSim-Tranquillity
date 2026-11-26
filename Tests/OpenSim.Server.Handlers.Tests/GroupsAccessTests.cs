@@ -132,7 +132,7 @@ public class GroupsAccessTests
             ctx.Response.ContentType = "text/xml";
             ctx.Response.OutputStream.Write(reply);
             ctx.Response.Close();
-        });
+        }, Xunit.TestContext.Current.CancellationToken);
 
         var config = new IniConfigSource();
         IConfig groups = config.AddConfig("Groups");
@@ -141,7 +141,7 @@ public class GroupsAccessTests
         var connector = new GroupsServiceRemoteConnector(config);
         connector.GetGroupRecord(UUID.Random().ToString(), UUID.Random(), string.Empty);
 
-        Assert.True(served.Wait(TimeSpan.FromSeconds(10)), "the region sent no request");
+        Assert.True(served.Wait(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken), "the region sent no request");
         Assert.Equal(new[] { Key }, seen);
     }
 

@@ -12,15 +12,32 @@ test call-contract errors. A refreshed solution build reports 120 warnings and
 initialization and inherited test-double methods. The solution does not yet
 build.
 
-The follow-up nullable cleanup resolves the remaining solution warnings,
-including the script-engine test warnings. The latest non-incremental Release build reports **0 warnings and 179 errors**:
+The follow-up cleanup resolves the remaining warning-level nullable diagnostics
+in Release, but does not make the solution warning-free. Release promotes
+warnings to errors through `TreatWarningsAsErrors` in `Directory.Build.props`;
+its zero-warning summary must not be interpreted as a completed cleanup.
+The committed follow-up reported **0 warnings and 179 errors** in Release:
 
 ```sh
 dotnet build Tranquillity.sln -c Release --no-restore --no-incremental -m:1
 ```
 
-The remaining errors are in test projects and still prevent the full solution
-and affected test projects from building; no tests were run for this follow-up.
+After adding the missing `System.Reflection` import in
+`OSSL_ApiSetScriptEngineTests.cs`, non-incremental builds on .NET SDK 10.0.115
+report **178 warnings and 0 errors in Debug**, and **0 warnings and 178 errors
+in Release**. All 178 diagnostics are in test projects. The Debug log prints
+each warning again in its summary (356 warning lines, 178 unique diagnostics).
+
+```sh
+dotnet build Tranquillity.sln -c Debug --no-restore --no-incremental -m:1
+dotnet build Tranquillity.sln -c Release --no-incremental -m:1
+```
+
+The remaining diagnostics include hidden test-double members (CS0108, 56),
+nullable fixture initialization (CS8618, 52), xUnit analyzers (52), nullable
+annotations outside an enabled context (CS8632, 11), null arguments (CS8625, 4),
+obsolete HTTP APIs (SYSLIB0014, 2), and nullable value access (CS8629, 1).
+Release still cannot build; no tests were run for this follow-up.
 
 The Jolt native package is also pinned consistently to 1.3.0:
 `JoltPhysics.Native`, managed API and native hash allowlist now agree. The native
@@ -36,10 +53,31 @@ task completion in the rate-limited log tests. The full Release test projects
 passed: `OpenSim.Capabilities.Handlers.Tests` 11 passed, 0 failed, 0 skipped;
 `OpenSim.Framework.Tests` 267 passed, 0 failed, 0 skipped.
 
-The xUnit v3 migration is still pending. The current solution contains both
-NUnit and xUnit v2 projects, and `OpenSim.Tests.Common` uses the xUnit v2
-fixture lifecycle. Projects excluded from the solution also need separate
-assessment.
+The framework package migration now replaces xUnit v2 with `xunit.v3` 4.0.3
+in 35 projects, including mixed NUnit/xUnit assemblies and the NUnit AIS
+harness, whose shared helpers require an xUnit app host. NUnit tests remain
+NUnit, and VSTest discovery and TRX reporting are retained. The shared fixture
+uses `ValueTask` lifecycle methods and forwards async disposal to existing
+synchronous teardown overrides; its regression test fails without that
+forwarding and the seven shared tests pass with it.
+
+New v3 cancellation-token, custom-Fact source-location and nullable-return
+diagnostics were resolved without suppressions. The non-incremental Debug
+build still reports **178 warnings and 0 errors**, and Release still reports
+**0 warnings and 178 promoted errors**. This migration does not close the
+remaining warning backlog. Six migrated projects outside the solution remain
+blocked at restore by pre-existing direct-package downgrades against
+`OpenSim.Tests.Common`; their test bodies could not be validated.
+
+The full Debug test run recorded **15416 passed, 1963 failed and 102 skipped
+or not executed**, with no timeout abort. Phlox completed with 5951 passed,
+0 failed and 2 skipped. The suite is not green: NUnit voice tests reject
+their timeout attributes, physics and UDP tests fail, and CoreModules reports
+foreground threads left running after its 1004 tests pass. The AIS app-host
+compatibility fix was then verified separately: 232 passed, 0 failed, 0 skipped.
+Child-process physics diagnostics now use `ITestOutputHelper`, preserving the
+output their parent tests parse under v3. No failing assertions or known-failure
+entries were weakened.
 
 ## Earlier cleanup baseline
 

@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -41,6 +43,13 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.15" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <PackageReference Include="xunit.v3" Version="4.0.3">
+      <PrivateAssets>contentfiles;analyzers;build;buildtransitive</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime;build;native;contentfiles;analyzers;buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="NUnit" Version="4.6.1" />
     <PackageReference Include="NUnit.Analyzers" Version="4.15.0">
       <PrivateAssets>all</PrivateAssets>
@@ -53,4 +62,8 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <!-- NUnit runs through VSTest, not the xUnit executable's MTP registration. -->
+  <ItemGroup>
+    <TestingPlatformBuilderHook Remove="2E8E7F63-61DB-4EDB-A21E-5BF48279A7B8" />
+  </ItemGroup>
 </Project>

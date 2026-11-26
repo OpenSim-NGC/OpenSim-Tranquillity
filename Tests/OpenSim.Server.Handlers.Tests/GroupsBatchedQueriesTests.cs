@@ -34,8 +34,8 @@ using OpenMetaverse;
 using OpenSim.Data;
 using OpenSim.Framework;
 using OpenSim.Groups;
+using System.Runtime.CompilerServices;
 using Xunit;
-using Xunit.Abstractions;
 using V2Import = OpenSim.Groups.FlotsamGroupsImport;
 using Assert = Xunit.Assert;
 
@@ -586,7 +586,10 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     /// <summary>Runs only with both OPENSIM_TEST_MYSQL (the Flotsam tables) and OPENSIM_TEST_PGSQL set.</summary>
     public sealed class MySQLAndPGSQLServerFactAttribute : FactAttribute
     {
-        public MySQLAndPGSQLServerFactAttribute()
+        public MySQLAndPGSQLServerFactAttribute(
+            [CallerFilePath] string sourceFilePath = "",
+            [CallerLineNumber] int sourceLineNumber = -1)
+            : base(sourceFilePath, sourceLineNumber)
         {
             if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar))
                 || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(PGSQLServerFactAttribute.EnvVar)))

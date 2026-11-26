@@ -370,8 +370,8 @@ public class LandManagementModuleTests : OpenSimTestCase
         IClientAPI client = SceneHelpers.AddScenePresence(f.Scene, TestHelpers.ParseTail(0x3)).ControllingClient;
         f.Module.Clear(false);
 
-        Task send = Task.Run(() => f.Module.SendParcelOverlay(client));
-        Assert.True(send.Wait(TimeSpan.FromSeconds(10)), "the overlay was never sent");
+        Task send = Task.Run(() => f.Module.SendParcelOverlay(client), TestContext.Current.CancellationToken);
+        Assert.True(send.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), "the overlay was never sent");
     }
 
     // About Land compared the selection's south edge with the region's width: in a region taller than wide nothing

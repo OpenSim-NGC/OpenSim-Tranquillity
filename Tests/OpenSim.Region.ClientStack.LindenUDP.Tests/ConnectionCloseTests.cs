@@ -75,7 +75,7 @@ public class ConnectionCloseTests : OpenSimTestCase
         client.OnConnectionClosed += _ => throw new InvalidOperationException("a handler that fails");
         client.OnConnectionClosed += _ => laterRan = true;
 
-        Exception thrown = Record.Exception(() => scene.CloseAgent(agent, false));
+        Exception? thrown = Record.Exception(() => scene.CloseAgent(agent, false));
 
         Assert.Null(thrown);
         Assert.True(laterRan, "the handler after the one that threw did not run");

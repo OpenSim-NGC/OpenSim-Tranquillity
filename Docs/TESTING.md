@@ -3,48 +3,60 @@
 How to run Tranquillity's tests, where new tests go, and what each kind of test can and cannot prove. For build
 instructions see [BUILDING.md](BUILDING.md); for how CI judges a run see [Tests/README-CI.md](../Tests/README-CI.md).
 
-The [Tests/] directory contains automated tests built on **xUnit.net v3** and **Microsoft.Testing.Platform (MTP)**. Because 
-xUnit v3 builds test projects as standalone executables rather than VSTest class libraries, traditional VSTest CLI flags do not work here.
+The [Tests/](../Tests/) directory contains **xUnit.net v3** and **NUnit** tests. `dotnet test` uses
+**VSTest** for both frameworks, including assemblies containing both. The xUnit projects are executables, but
+set `IsTestingPlatformApplication` to `false` so the .NET 10 SDK retains the existing VSTest workflow.
+Do not switch `global.json` to MTP while NUnit-only and mixed assemblies still use VSTest.
 
 ## Running Tests
 
-Always pass runner arguments after `--` (or run the test project directly with `dotnet run`). Do **not** use legacy VSTest `--filter` expressions.
+From the repository root, use VSTest arguments directly with `dotnet test`:
 
 * **Run all tests in this directory:**
   ```bash
-  dotnet test
+  dotnet test Tranquillity.sln -c Debug
   ```
 * **Run a single test class:**
   ```bash
-  dotnet run -- --filter-class "YourNamespace.YourTestClass"
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug \
+      --filter "FullyQualifiedName~YourNamespace.YourTestClass"
   ```
 * **Run a single test method (supports `*` wildcards at start/end):**
   ```bash
-  dotnet run -- --filter-method "*MethodName*"
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug \
+      --filter "FullyQualifiedName~MethodName"
   ```
 * **Filter by namespace:**
   ```bash
-  dotnet run -- --filter-namespace "YourNamespace.SubNamespace*"
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug \
+      --filter "FullyQualifiedName~YourNamespace.SubNamespace"
   ```
 * **Filter by trait (replaces `TestCategory`):**
   ```bash
-  dotnet run -- --filter-trait "Category=Unit"
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug --filter "Category=Unit"
   ```
 * **Exclude traits (e.g., skipping slow or integration tests):**
   ```bash
-  dotnet run -- --filter-not-trait "Category=Integration"
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug --filter "Category!=Integration"
   ```
 * **List all discovered tests without executing them:**
   ```bash
-  dotnet run -- --list-tests
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug --list-tests
   ```
 
-> **Filter Logic:** Multiple filters of the same flag type combine with `OR` logic; different filter flag types combine with `AND` logic.
+Combine VSTest filters with `|` (OR) or `&` (AND). NUnit categories use `TestCategory`, while xUnit
+`[Trait("Category", "...")]` uses `Category`. Use `--logger trx` to record results.
+
+The xUnit executable can also be run directly with its native runner, for example
+`dotnet run --project Tests/OpenSim.Tests.Common -- -class OpenSim.Tests.Common.OpenSimTestCaseLifecycleTests`.
+Native runner arguments differ from VSTest arguments; use `-?` for help. The xUnit executable does not run
+NUnit tests, so use `dotnet test` to validate mixed assemblies.
 
 ## xUnit v3 Architecture & Conventions
 
-* **Standalone Executable Model:** Test projects use `<OutputType>Exe</OutputType>` and reference `xunit.v3` (not `xunit` v2) alongside `Microsoft.NET.Test.Sdk` or `xunit.v3.mtp-v2`.
-* **Async Lifecycle (`IAsyncLifetime`):** In xUnit v3, `IAsyncLifetime.InitializeAsync()` and `DisposeAsync()` return `ValueTask` instead of `Task`. Always use `ValueTask` when implementing `IAsyncLifetime`.
+* **Standalone Executable Model:** xUnit projects use `<OutputType>Exe</OutputType>` and reference `xunit.v3` (not `xunit` v2), `Microsoft.NET.Test.Sdk` and `xunit.runner.visualstudio`.
+* **Async Lifecycle (`IAsyncLifetime`):** In xUnit v3, `IAsyncLifetime.InitializeAsync()` and `DisposeAsync()` return `ValueTask` instead of `Task`. When a fixture implements both async and synchronous disposal, v3 only calls `DisposeAsync()`. `OpenSimTestCase` forwards this to its virtual `Dispose()` so existing teardown overrides still run.
+* **Output and extension APIs:** `ITestOutputHelper` is in `Xunit`, not `Xunit.Abstractions`. `BeforeAfterTestAttribute` is in `Xunit.v3` and receives both the method and `IXunitTest`.
 * **Async Assertions:** Prefer native async assertions (`Assert.ThrowsAsync<T>`, `Assert.RaisesAsync`) and avoid `.Result` or `.Wait()` on tasks to prevent thread-pool starvation.
 * **Test Context & Cancellation:** Use `TestContext.Current.CancellationToken` when calling async APIs inside tests instead of `CancellationToken.None`.
 * **Console & Output Capture:** Use `ITestOutputHelper` injected via constructor, or `TestContext.Current.TestOutputHelper`, rather than `Console.WriteLine`.
@@ -64,13 +76,15 @@ Always pass runner arguments after `--` (or run the test project directly with `
   * Keep unit tests isolated from network, filesystem, and system clock dependencies unless explicitly tagged with `[Trait("Category", "Integration")]`.
 * **Never:**
   * Install `xunit` (v2), `xunit.runner.visualstudio` (v2), or mix v2 and v3 packages in the same project.
-  * Use legacy VSTest CLI syntax (`dotnet test --filter "FullyQualifiedName~..."`).
   * Disable or `[Fact(Skip = "...")]` failing tests to make the suite pass without explicit instruction.
 
 
 ## Running tests
 
 Use the .NET SDK selected by `global.json`. From the repository root:
+
+Release treats warnings as errors. Until the remaining warning backlog is resolved, use `-c Debug`
+for validation; see [WarningCleanup.md](WarningCleanup.md) for the current build baseline.
 
 ```sh
 dotnet build Tranquillity.sln -c Release
@@ -96,10 +110,9 @@ them.
 - Tests live in `Tests/`, never in production assemblies. A project is tested by `Tests/<Project>.Tests`, for
   example `Source/OpenSim.Region.CoreModules` by `Tests/OpenSim.Region.CoreModules.Tests`. Inside it, follow the
   folder of the code under test.
-- Use the framework the project already uses. Most test projects use **xUnit**. These use **NUnit**:
-  `OpenSim.Region.ClientStack.LindenCaps.AIS.Tests`, `OpenSim.Framework.Servers.Tests`,
-  `OpenSim.Server.Handlers.Tests` (which also has xUnit tests), `OpenSim.Tests.Clients.AssetClient`,
-  `WebRtcJanusService.Tests` and `WebRtcVoiceRegionModule.Tests`.
+- Use the framework the project already uses. The xUnit v2 consumers now reference **xUnit v3**;
+  this does not convert remaining NUnit tests. Thirteen projects retain NUnit references, including
+  mixed assemblies such as `OpenSim.Framework.Servers.Tests` and `OpenSim.Server.Handlers.Tests`.
 - A new test project must be added to `Tranquillity.sln`, or CI will not run it.
 
 ## Writing a test

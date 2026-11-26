@@ -230,12 +230,12 @@ public class GroupsChangeNoticeTests
             ctx.Response.ContentLength64 = reply.Length;
             ctx.Response.OutputStream.Write(reply);
             ctx.Response.Close();
-        });
+        }, Xunit.TestContext.Current.CancellationToken);
 
         using var notifier = new GroupsChangeNotifier(() => new[] { $"http://127.0.0.1:{port}/" }, Key, gather: TimeSpan.FromMilliseconds(50));
         notifier.Changed(region.Group);
 
-        Assert.True(handled.Wait(TimeSpan.FromSeconds(10)), "the region was not told");
+        Assert.True(handled.Wait(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken), "the region was not told");
         region.Read();
         Assert.Equal(2, region.Fetches);
     }
@@ -264,7 +264,7 @@ public class GroupsChangeNoticeTests
                 ctx.Response.OutputStream.Write(reply);
                 ctx.Response.Close();
             }
-        });
+        }, Xunit.TestContext.Current.CancellationToken);
 
         var config = new Nini.Config.IniConfigSource();
         config.AddConfig("Groups").Set("GroupsServerURI", $"http://127.0.0.1:{port}/");

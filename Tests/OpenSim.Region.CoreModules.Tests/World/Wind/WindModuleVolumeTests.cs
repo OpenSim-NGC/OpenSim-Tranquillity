@@ -364,8 +364,8 @@ public class WindModuleVolumeTests : OpenSimTestCase
             {
                 seen = module.WindSpeedAt(new Vector3(100f, 100f, 50f));
                 seenInt = module.WindSpeed(100, 100, 50);
-            });
-            Assert.True(reader.Wait(TimeSpan.FromSeconds(10)), "a sample waited for the store's write lock");
+            }, TestContext.Current.CancellationToken);
+            Assert.True(reader.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), "a sample waited for the store's write lock");
         }
         Assert.Equal(new Vector3(6f, 0f, 0f), seen);
         Assert.Equal(new Vector3(6f, 0f, 0f), seenInt);
@@ -392,7 +392,7 @@ public class WindModuleVolumeTests : OpenSimTestCase
                 if (handles.Count % 5 == 0)
                     module.WindVolumes.Clear();
             }
-        });
+        }, TestContext.Current.CancellationToken);
 
         long samples = 0;
         var clock = Stopwatch.StartNew();
@@ -412,7 +412,7 @@ public class WindModuleVolumeTests : OpenSimTestCase
             }
         }
         stop.Cancel();
-        Assert.True(writer.Wait(TimeSpan.FromSeconds(10)));
+        Assert.True(writer.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         Assert.Null(failure);
         Assert.True(samples > 1000, $"only {samples} samples");
     }

@@ -37,7 +37,7 @@ using OpenSim.Tests.Common;
 // These tests exercise scenes that share process-wide static state (MainServer,
 // Util.FireAndForgetMethod, static caps registries), so they cannot run in parallel. The same
 // declaration, for the same reason, is in OpenSim.Region.CoreModules.Tests/AssemblyInfo.cs.
-[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
 
 namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 {

@@ -525,7 +525,7 @@ public class WindVolumeStoreTests
         var deadline = DateTime.UtcNow.AddSeconds(20);
         while (Interlocked.Read(ref samples) < 300_000 && DateTime.UtcNow < deadline) Thread.Sleep(20);
         stop.Cancel();
-        Task.WaitAll(writers.Concat(readers).ToArray());
+        Task.WaitAll(writers.Concat(readers).ToArray(), TestContext.Current.CancellationToken);
 
         Assert.True(Interlocked.Read(ref samples) >= 300_000, "the readers did not make enough samples");
         Assert.Equal(0, bad);
@@ -556,15 +556,15 @@ public class WindVolumeStoreTests
         s2.Create(ObjA, Owner, Sphere());   // the clock does not block yet
         blocker.Armed = true;
         var writer = Task.Run(() => s2.Create(ObjB, Owner, Sphere()));   // blocks inside the lock, in the clock call
-        Assert.True(inside.Wait(TimeSpan.FromSeconds(20)));
+        Assert.True(inside.Wait(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
 
         // The sampler uses the explicit-time overload, so it does not touch the blocked clock; it must not need the lock.
         var read = Task.Run(() => s2.Sample(new Vector3(100, 100, 50), 1500));
-        Assert.True(read.Wait(TimeSpan.FromSeconds(20)), "the sampler waited for the writer");
+        Assert.True(read.Wait(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken), "the sampler waited for the writer");
         Near(new Vector3(10, 0, 0), read.Result);
 
         release.Set();
-        Assert.True(writer.Wait(TimeSpan.FromSeconds(20)));
+        Assert.True(writer.Wait(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
     }
 
     private class BlockingClock
