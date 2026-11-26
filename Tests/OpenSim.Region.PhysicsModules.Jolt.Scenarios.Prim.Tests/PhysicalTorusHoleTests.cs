@@ -142,8 +142,8 @@ public class PhysicalTorusHoleTests
         var mesher = new OpenSim.Region.PhysicsModules.Meshing.Meshmerizer();
         mesher.Initialise(config);
         IMesh mesh = mesher.CreateMesh("torus", Torus(hollow), TorusSize, 32f, false, false, false);
-        float[] v = mesh.getVertexListAsFloat();
-        int[] ix = mesh.getIndexListAsInt();
+        float[] v = mesh.getVertexListAsFloatLocked();
+        int[] ix = mesh.getIndexListAsIntLocked();
         float rMin = float.MaxValue, rMax = 0f;
         for (int i = 0; i + 2 < v.Length; i += 3)
         {
