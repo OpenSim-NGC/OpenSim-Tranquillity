@@ -114,7 +114,7 @@ public class BaselineCheckTests
         foreach (var (rid, origin, rows) in new[]
                  {
                      ("win-x64", JoltNativeOrigin.Package, stockWinRows),
-                     ("linux-x64", JoltNativeOrigin.Package, stockLinuxRows),
+                     ("linux-x64", JoltNativeOrigin.Rebuilt, stockLinuxRows),
                  })
         {
             JoltNativeBuild build = Build(origin, rid);
