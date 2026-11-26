@@ -337,12 +337,13 @@ public partial class PhysxSpikeTests
                     if (overOn > overOff)
                         failures.Add($"15 m/s, edge removal {edge}: more starts over a trip point with the cut ({overOn} of {starts.Length}) than without ({overOff})");
                     // The upward percentile must still be brought down by 10 percent when it starts well over the trip point.
-                    // The angular percentile must be brought down the same way, or, on the 5.6 deterministic build, stay
-                    // inside the recorded inversion: at most 250, and at most 15 percent above the run without the cut
-                    // (measured 224.8 against 203.1).
+                    // The angular percentile must be brought down the same way. One cell inverts, 64 Hz with one collision
+                    // step and edge removal on: measured 224.8 against 203.1. That cell may stay at most 250 and at most
+                    // 15 percent above the run without the cut. Every other cell keeps the 10 percent requirement.
                     bool upNotBroughtDown = upP90Off >= 1.25 * TripDvz && upP90On >= upP90Off * 0.9;
-                    bool wyInsideRecorded = wyP90On <= 250.0 && wyP90On <= wyP90Off * 1.15;
-                    bool wyNotBroughtDown = wyP90Off >= 1.25 * TripDwy && wyP90On >= wyP90Off * 0.9 && !wyInsideRecorded;
+                    bool recordedInversion = rate == 64.0 && n == 1 && edge
+                        && wyP90On <= 250.0 && wyP90On <= wyP90Off * 1.15;
+                    bool wyNotBroughtDown = wyP90Off >= 1.25 * TripDwy && wyP90On >= wyP90Off * 0.9 && !recordedInversion;
                     if (upNotBroughtDown || wyNotBroughtDown)
                         failures.Add($"15 m/s, edge removal {edge}: well over a trip point without the cut and not brought down by it at the 90th percentile (up15 {upP90On:0.0} against {upP90Off:0.0}, dwy15 {wyP90On:0.0} against {wyP90Off:0.0})");
                 }
@@ -550,9 +551,9 @@ public partial class PhysxSpikeTests
                 // steps the box on the terrain at multiplier 28 bounces about 3 m/s up and down for a quarter of a second.
                 // SpeculativeContactDistance 0 stops that cell and starts a bounce at 32 Hz with 3 steps, so its figures
                 // are recorded and not asserted.
-                // Jolt 5.4 (Pin8), 64 Hz x 4, on the terrain, multiplier 28: 4 vz sign flips, and |vz| after 0.3 s stays
-                // under 0.5. Jolt 5.6 (this deterministic build and stock JoltPhysics.Native 1.1.0): |vz| after 1.5 s is
-                // still 0, but |vz| after 0.3 s is 1.122 and the sign flips 18 times. Gravity applied through AddForce is
+                // Jolt 5.4 (Pin8), 64 Hz x 4, on the terrain, multiplier 28: 4 vz sign flips (raw flips 4), and |vz| after
+                // 0.3 s is 0.000. Jolt 5.6 (this deterministic build and stock JoltPhysics.Native 1.1.0): |vz| after 1.5 s
+                // is still 0, but |vz| after 0.3 s is 1.122 and the sign flips 18 times. Gravity applied through AddForce is
                 // cancelled along the contact normal when a body starts in collision (Jolt ReleaseNotes 5.6), on top of
                 // the new friction model, so that landing lasts past 0.3 s. The settle bound for that cell is 1.25 m/s.
                 double settleBound = place == "on the terrain" && label == "multiplier 28" && rate == 64.0 && n == 4 ? 1.25 : 0.5;
