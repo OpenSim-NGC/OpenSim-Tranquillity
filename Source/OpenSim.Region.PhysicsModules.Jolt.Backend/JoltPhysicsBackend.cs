@@ -989,6 +989,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 _tempAllocator = JPH_TempAllocator_Create(PhysicsScratchBytes);
                 if (_tempAllocator == IntPtr.Zero)
                 {
+                    // Create uses new and does not return null. If it did, destroying the system would delete the
+                    // three filters while these wrappers still owned their handles, and their finalizers would free
+                    // them again. Release that ownership first, as Dispose does.
+                    ReleaseFilterConsumedBySystem(_objectVsBroadPhaseFilter);
+                    _objectVsBroadPhaseFilter = null;
+                    ReleaseFilterConsumedBySystem(_broadPhaseInterface);
+                    _broadPhaseInterface = null;
+                    ReleaseFilterConsumedBySystem(_objectLayerPairFilter);
+                    _objectLayerPairFilter = null;
                     DestroyPhysicsSystem(_system);
                     _system = null;
                     throw new InvalidOperationException("Jolt physics: the scratch allocator could not be created.");
@@ -1026,7 +1035,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 _system.Settings = physicsSettings;
             }
 
-            // Contacts + body activation arrive as C# EVENTS in 2.19.1, not a
+            // Contacts + body activation arrive as C# EVENTS in 2.22.0, not a
             // listener object. The handlers ONLY enqueue / push into the ring - they never touch
             // scene state, never allocate, and never mutate the active set (see the field notes).
             _system.OnBodyActivated += HandleBodyActivated;
@@ -1044,7 +1053,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             // Avatar-vs-avatar collision registry (characters add themselves on create).
             _charVsChar = new CharacterVsCharacterCollisionSimple();
 
-            // Contact ring; it is engine-agnostic. 2.19.1 exposes contacts as EVENTS on PhysicsSystem
+            // Contact ring; it is engine-agnostic. 2.22.0 exposes contacts as EVENTS on PhysicsSystem
             // (OnContactAdded/Persisted/Removed), NOT a SetContactListener object; the handlers
             // subscribed above push into this ring, and OnBodyActivated / OnBodyDeactivated keep
             // the O(active) set.
@@ -1100,7 +1109,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // =====================================================================
         // The job pools' native job systems are destroyed by us.
         //
-        // JoltPhysicsSharp 2.19.1's JobSystem sets its handle through the parameterless NativeObject constructor,
+        // JoltPhysicsSharp 2.22.0's JobSystem sets its handle through the parameterless NativeObject constructor,
         // so NativeObject.OwnsHandle stays false and JobSystemThreadPool.Dispose() skips DisposeNative - i.e.
         // JPH_JobSystem_Destroy is never called and the pool's workers are never stopped or joined (the finalizer
         // path checks the same flag). Measured: +19 threads per create/dispose cycle (20 -> 116 over
@@ -1119,7 +1128,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // =====================================================================
         // Shape settings are freed by us too.
         //
-        // The same OwnsHandle defect: JoltPhysicsSharp 2.19.1 builds ConvexHullShapeSettings, MeshShapeSettings,
+        // The same OwnsHandle defect: JoltPhysicsSharp 2.22.0 builds ConvexHullShapeSettings, MeshShapeSettings,
         // ScaledShapeSettings and RotatedTranslatedShapeSettings through the parameterless NativeObject constructor, so
         // their Dispose() frees nothing native. The native settings then outlive the cook for good, holding their copy
         // of the input (a mesh's triangles, a hull's points) and the shape Create() caches in them, which keeps that
@@ -1142,7 +1151,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // =====================================================================
         // Body creation settings are freed by us too.
         //
-        // The same OwnsHandle defect: JoltPhysicsSharp 2.19.1 builds BodyCreationSettings through the parameterless
+        // The same OwnsHandle defect: JoltPhysicsSharp 2.22.0 builds BodyCreationSettings through the parameterless
         // NativeObject constructor, so Dispose() frees nothing native. The native settings object keeps its reference on
         // the shape it was made with, so the shape outlives its last release and the destroy of the system that held the
         // body: measured, about 243 KB for every region start and stop (the terrain heightfield), and the shape of every
@@ -1168,7 +1177,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
 
         private static void DestroyJobSystem(JobSystemThreadPool pool)
         {
-            // Unknown binding shape (no such property): assume it does NOT own the handle, as 2.19.1 does not.
+            // Unknown binding shape (no such property): assume it does NOT own the handle, as 2.22.0 does not.
             bool bindingDestroys = s_ownsHandle?.GetValue(pool) is true;
             if (!bindingDestroys && !pool.IsDisposed && pool.Handle != IntPtr.Zero)
                 JPH_JobSystem_Destroy(pool.Handle);   // ~JobSystemThreadPool joins the workers
@@ -1213,7 +1222,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         [System.Runtime.InteropServices.DllImport("joltc", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
         private static extern void JPH_BodyActivationListener_Destroy(IntPtr listener);
 
-        // The binding's private fields that hold the listeners and their userData (JoltPhysicsSharp 2.19.1, PhysicsSystem.cs).
+        // The binding's private fields that hold the listeners and their userData (JoltPhysicsSharp 2.22.0, PhysicsSystem.cs).
         private static readonly System.Reflection.FieldInfo? s_contactListenerField = PhysicsSystemField("_contactListenerHandle");
         private static readonly System.Reflection.FieldInfo? s_activationListenerField = PhysicsSystemField("_bodyActivationListenerHandle");
         private static readonly System.Reflection.FieldInfo? s_listenerUserDataField = PhysicsSystemField("_listenerUserData");
@@ -1865,7 +1874,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             // which is already Z-up-correct and self-consistent for any caller/query. See below.
             //
             // Sample-count constraint (checked empirically against JoltPhysicsSharp 2.18.6):
-            // the managed HeightFieldShapeSettings has BlockSize and BitsPerSample properties in 2.19.1;
+            // the managed HeightFieldShapeSettings has BlockSize and BitsPerSample properties in 2.22.0;
             // this leaves both at the native defaults. joltc is a RELEASE build with Jolt's asserts compiled
             // out, so a bad count does NOT throw - it silently mis-cooks (n>=3 incl. odd/non-PoT all
             // return a non-null shape; only n<3 fails). A 257-sample test showed an odd/prime count
@@ -2129,7 +2138,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 }
 
                 // The motion quality goes through the body interface, not BodyCreationSettings: under JoltPhysicsSharp
-                // 2.19.1, BodyCreationSettings.MotionQuality's setter stores a value that is neither Discrete nor
+                // 2.22.0, BodyCreationSettings.MotionQuality's setter stores a value that is neither Discrete nor
                 // LinearCast whatever it is given (read back with its getter and BodyInterface.GetMotionQuality), so a
                 // body created with it is never cast. Jolt reads the quality only as "is it LinearCast", so such a body
                 // moved as a Discrete one. BodyInterface.SetMotionQuality stores the value it is given. A WhenFast body
@@ -2323,7 +2332,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
 
         // Move a body IN PLACE - Jolt's BodyInterface repositions the existing body (velocity, contacts,
         // BodyID all preserved); it does NOT destroy/recreate. This is the real reposition (JoltPhysicsSharp
-        // 2.19.1 exposes SetPositionAndRotation - the earlier stub was deferred, not a native gap). A no-op
+        // 2.22.0 exposes SetPositionAndRotation - the earlier stub was deferred, not a native gap). A no-op
         // on an inert body just sets its transform; activate:true wakes it (used when a live/vehicle body is
         // repositioned so it keeps stepping). Resolve failure (destroyed body) is a safe no-op.
         public void SetBodyTransform(BodyId body, Vector3 position, Quaternion orientation, bool activate)
@@ -2405,7 +2414,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             if (rec.MotionType != BodyMotionType.Dynamic)
                 return; // mass is inert for static/kinematic motion; recorded for a later flip to Dynamic.
 
-            // No BodyInterface.SetMass in 2.19.1. Take the shape's geometry-correct mass properties,
+            // No BodyInterface.SetMass in 2.22.0. Take the shape's geometry-correct mass properties,
             // scale them to the target mass (keeps the inertia tensor's SHAPE, changes only its
             // magnitude), and push them through a body write-lock.
             BodyLockInterface bli = _system!.BodyLockInterface;
@@ -3845,7 +3854,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // in that order, is the whole fix - no allocator change, no native change.
         // The maximum penetration depth rule. CharacterVirtual::SetShape draws on the TempAllocator only to test the new
         // shape for penetration, which it does only when inMaxPenetrationDepth is below FLT_MAX (Jolt
-        // CharacterVirtual.cpp:1504, v5.4.0); at FLT_MAX it swaps the shape and touches no allocator. That is what
+        // CharacterVirtual.cpp:1550, v5.6.0); at FLT_MAX it swaps the shape and touches no allocator. That is what
         // lets this call run outside the pool gate (see the pool gate rule) on a joltc whose regions share one
         // allocator. Every SetShape goes through here, with the depth fixed: ShapeAndAllocatorRuleTests fails if
         // another caller appears or the depth changes.

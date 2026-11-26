@@ -16,7 +16,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
 /// <summary>
 /// What a Jolt PhysicsStepListener does on the native this module ships (the stock joltc of JoltPhysics.Native 1.0.4 with
-/// JoltPhysicsSharp 2.19.1), as the forces plan relies on it. Jolt calls OnStep before each collision step of every
+/// JoltPhysicsSharp 2.22.0), as the forces plan relies on it. Jolt calls OnStep before each collision step of every
 /// Update (PhysicsSystem.cpp, JobStepListeners), with every body locked, so a listener reads and writes bodies through the
 /// no-lock interfaces and takes no region lock. Jolt's accumulated force is applied in every collision step and cleared only
 /// after the last (PhysicsSystem.cpp, ApplyGravity and the sleep check), so a force added from OnStep is applied again in

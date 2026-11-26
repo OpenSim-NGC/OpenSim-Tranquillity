@@ -71,7 +71,7 @@ public class PoolTeardownTests
         return $"{sys.GetType().Name}.OwnsHandle={owns}";
     }
 
-    // JoltPhysicsSharp 2.19.1: JobSystem never sets NativeObject.OwnsHandle, so JobSystemThreadPool.Dispose skips
+    // JoltPhysicsSharp 2.22.0: JobSystem never sets NativeObject.OwnsHandle, so JobSystemThreadPool.Dispose skips
     // JPH_JobSystem_Destroy and the workers are never joined. Measured: OwnsHandle=False on every
     // pool; threads 20 -> 39 -> 58 -> 77 -> 97 -> 116 across five cycles (19 workers each), still 116 after GC.
     // So the backend destroys the native job system itself at teardown.

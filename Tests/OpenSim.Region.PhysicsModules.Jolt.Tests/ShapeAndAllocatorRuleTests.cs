@@ -21,7 +21,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 /// CharacterVirtual::ExtendedUpdate happen inside the job pool's gate, which admits one Step at a time;</item>
 /// <item>the maximum depth rule: CharacterVirtual::SetShape, the one allocator entry point called outside the gate,
 /// always passes the maximum penetration depth, at which Jolt swaps the shape without testing it and touches no
-/// allocator (Jolt CharacterVirtual.cpp:1504, v5.4.0).</item>
+/// allocator (Jolt CharacterVirtual.cpp:1550, v5.6.0).</item>
 /// </list>
 /// A break of either aborts the process from native code only when two regions happen to collide, so these tests
 /// check the rules themselves: the compiled calls into the seven allocator entry points, the depth the shape call

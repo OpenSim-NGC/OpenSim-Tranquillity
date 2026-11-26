@@ -15,7 +15,7 @@ using Xunit.Abstractions;
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
 /// <summary>
-/// Backend teardown destroys the region's native physics system (JoltPhysicsSharp 2.19.1's PhysicsSystem.Dispose
+/// Backend teardown destroys the region's native physics system (JoltPhysicsSharp 2.22.0's PhysicsSystem.Dispose
 /// does not), and creating and destroying systems from several threads is safe around joltc's global map
 /// of systems. Serial collection: these tests read the process-wide Foundation reference count, and other tests'
 /// backends would disturb it. The memory test measures in a child test host of its own (<see cref="ChildTestHost"/>).
@@ -75,6 +75,31 @@ public class SystemTeardownTests
     {
         // A binding upgrade that renames them would leave the listeners and the GCHandle behind; fail here instead.
         Assert.True(JoltPhysicsBackend.PhysicsSystemFieldsFound);
+    }
+
+    [Fact]
+    public void The_table_filters_own_their_handles_before_release()
+    {
+        // ReleaseFilterConsumedBySystem clears NativeObject.OwnsHandle by reflection. A binding that renames the
+        // property would make that clear a no-op, and the filter finalizers would free the native filters again.
+        PropertyInfo? owns = typeof(NativeObject).GetProperty(
+            "OwnsHandle", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        Assert.NotNull(owns);
+
+        var t = new JoltTestBackend();
+        try
+        {
+            object pair = typeof(JoltPhysicsBackend).GetField("_objectLayerPairFilter", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(t.B)!;
+            object broad = typeof(JoltPhysicsBackend).GetField("_objectVsBroadPhaseFilter", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(t.B)!;
+            Assert.True((bool)owns.GetValue(pair)!);
+            Assert.True((bool)owns.GetValue(broad)!);
+        }
+        finally
+        {
+            t.Dispose();
+        }
     }
 
     [Fact]

@@ -1083,7 +1083,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         }
 
         // Move the body IN PLACE to the current cached transform via the backend's real reposition
-        // (BodyInterface.SetPositionAndRotation, JoltPhysicsSharp 2.19.1). This preserves velocity,
+        // (BodyInterface.SetPositionAndRotation, JoltPhysicsSharp 2.22.0). This preserves velocity,
         // contacts, and the BodyID - it does NOT destroy+recreate. That recreate was the root of the
         // every-frame rebuild loop: OpenSim's SOP->physics sync pushes the transform each frame for a
         // moving object, and the old remove+recreate zeroed a never-settling vehicle's velocity + re-inerted

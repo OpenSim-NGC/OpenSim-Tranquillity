@@ -66,7 +66,7 @@ public class ContinuousCollisionTests
     public void A_body_created_with_each_mode_holds_the_motion_quality_jolt_reads()
     {
         // The quality is set through the body interface: BodyCreationSettings.MotionQuality's setter in JoltPhysicsSharp
-        // 2.19.1 stores neither value, so these read back neither 0 nor 1 when the body is created with it.
+        // 2.22.0 stores neither value, so these read back neither 0 nor 1 when the body is created with it.
         JoltPhysicsBackend b = NewBackend();
         try
         {

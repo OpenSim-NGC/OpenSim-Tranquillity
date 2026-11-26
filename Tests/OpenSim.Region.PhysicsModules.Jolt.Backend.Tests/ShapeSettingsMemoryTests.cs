@@ -16,7 +16,7 @@ using Xunit.Abstractions;
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
 /// <summary>
-/// A shape cooked and released gives back all its native memory. JoltPhysicsSharp 2.19.1 builds the settings of a
+/// A shape cooked and released gives back all its native memory. JoltPhysicsSharp 2.22.0 builds the settings of a
 /// convex hull, a mesh, a scaled shape and the terrain's Z-up wrapper so that their Dispose frees nothing native; the
 /// settings kept their copy of the input and the shape they cached, so every cook of those kinds stayed in memory
 /// (a 257-sample terrain about 240 KB, every time a region loaded or its terrain changed). Memory is a process-wide
