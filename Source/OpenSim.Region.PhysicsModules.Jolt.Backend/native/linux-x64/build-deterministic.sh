@@ -145,9 +145,20 @@ fi
 out="$SCRATCH/libjoltc.so"
 strip -o "$out" "$unstripped"
 
-# SSE2 only: the stock package files have none of these.
-if objdump -d "$out" | grep -E -q '[[:space:]](ymm|lzcnt|vcvtph2ps)'; then
-    echo "the stripped library still has AVX2, lzcnt, or F16C instructions" >&2
+# SSE2 only, the same floor as the stock package files. The CMake checks above are the first
+# line. This is the second: the stripped file must not contain a VEX mnemonic (anything starting
+# with v: AVX, FMA, F16C), an ymm or zmm operand, lzcnt, or an SSE3 through SSE4.2 mnemonic.
+# objdump prints GCC's rep bsf (f3 0f bc) as tzcnt. That encoding is generic x86-64 and is allowed.
+if objdump -d "$out" | grep -E -q \
+    -e '[[:space:]](ymm|zmm|lzcnt)' \
+    -e '[[:space:]]v[a-z]' \
+    -e '[[:space:]](addsubp[ds]|haddp[ds]|hsubp[ds]|lddqu|movddup|movshdup|movsldup|fisttp)' \
+    -e '[[:space:]](pabs[bwd]|palignr|phadd(sw|[dw])|phsub(sw|[dw])|pmaddubsw|pmulhrsw|pshufb|psign[bwd])' \
+    -e '[[:space:]](blendv?p[ds]|dpp[ds]|extractps|insertps|movntdqa|mpsadbw|packusdw|pblend(vb|w)|pcmpeqq)' \
+    -e '[[:space:]](pextr[bdq]|phminposuw|pinsr[bdq]|pmax(s[bd]|u[dw])|pmin(s[bd]|u[dw]))' \
+    -e '[[:space:]](pmov(sx|zx)|pmuldq|pmulld|ptest|round(p[ds]|s[ds]))' \
+    -e '[[:space:]](crc32|pcmp(estri|estrm|istri|istrm)|pcmpgtq|popcnt)'; then
+    echo "the stripped library has an instruction above SSE2 (VEX, SSE3-SSE4.2, lzcnt, ymm, or zmm)" >&2
     exit 1
 fi
 
