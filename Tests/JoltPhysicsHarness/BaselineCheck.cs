@@ -42,8 +42,12 @@ public static class BaselineCheck
     /// <summary>The file each run's --out folder holds, naming the joltc build the run loaded.</summary>
     public const string NativeFile = "native.txt";
 
-    /// <summary>The summary columns timed on the wall clock, so they differ from run to run and machine to machine.</summary>
-    public static readonly IReadOnlySet<string> WallClockColumns = new HashSet<string>(StringComparer.Ordinal) { "ray_us_per_cast" };
+    /// <summary>
+    /// The summary columns timed on the wall clock, so they differ from run to run and machine to machine.
+    /// <c>ray_us_per_cast</c> is the measured cost. <c>ray_refused</c> counts casts the wall-clock ray budget
+    /// turned away, so a busy host can refuse casts the baseline did not.
+    /// </summary>
+    public static readonly IReadOnlySet<string> WallClockColumns = new HashSet<string>(StringComparer.Ordinal) { "ray_us_per_cast", "ray_refused" };
 
     // How many differing cells are listed per run; the count is always given.
     private const int ListedDifferences = 20;

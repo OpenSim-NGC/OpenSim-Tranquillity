@@ -161,9 +161,9 @@ public class BaselineCheckTests
     [Fact]
     public void Wall_clock_columns_are_left_out_and_every_other_column_counts()
     {
-        Assert.Equal(new[] { "ray_us_per_cast" }, BaselineCheck.WallClockColumns.ToArray());
-        string recorded = Summary(Row("raycast-cost", ("ray_casts", "2750"), ("ray_us_per_cast", "22.0")));
-        Assert.Empty(BaselineCheck.Compare(recorded, Summary(Row("raycast-cost", ("ray_casts", "2750"), ("ray_us_per_cast", "14.8")))));
+        Assert.Equal(new[] { "ray_refused", "ray_us_per_cast" }, BaselineCheck.WallClockColumns.OrderBy(c => c, StringComparer.Ordinal).ToArray());
+        string recorded = Summary(Row("raycast-cost", ("ray_casts", "2750"), ("ray_us_per_cast", "22.0"), ("ray_refused", "0")));
+        Assert.Empty(BaselineCheck.Compare(recorded, Summary(Row("raycast-cost", ("ray_casts", "2750"), ("ray_us_per_cast", "14.8"), ("ray_refused", "36")))));
 
         foreach (string column in Header.Split(',').Skip(1).Where(c => !BaselineCheck.WallClockColumns.Contains(c)))
         {

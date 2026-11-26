@@ -2117,7 +2117,8 @@ file is built with `CROSS_PLATFORM_DETERMINISTIC`; its folder is
 `stock-1.0.4-linux-x64` remain the record of Jolt 5.4 (`JoltPhysics.Native` 1.0.4) and are not the
 files this module loads. The Windows, Arm and macOS files of 1.1.0 have no baseline here. Each
 `--out` folder holds `native.txt`, naming the build the run loaded, and the check reads that
-build's folder. It leaves out `ray_us_per_cast`, which is timed on the wall clock. A build with
+build's folder. It leaves out `ray_us_per_cast`, which is timed on the wall clock, and `ray_refused`,
+which counts casts the wall-clock ray budget turned away. A build with
 no baseline (the 1.1.0 Windows, Arm and macOS files, a file the module has no record of, or a new
 package version not yet recorded) is reported as `SKIPPED: no baseline for this native` with exit
 code 3, neither passed nor failed. Exit 0 is passed and 1 is failed. To record a build's baseline
