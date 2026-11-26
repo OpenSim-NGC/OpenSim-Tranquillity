@@ -182,9 +182,14 @@ public class PrimHullBehaviourTests
     // the pole's axis.
     //   PRIM:   the ring slides down the pole and rests flat on the ground around it: its centre 0.13 to 0.18 m up (half its
     //           thickness is 0.15 m) and within 0.1 m of the pole's axis.
-    //   CONVEX: the ring is a solid disc: it lands on top of the pole, and in the 5 s the lowest its centre gets while it is over
-    //           the pole (within 0.3 m of its axis) is 2.1 to 2.2 m (the pole's top is 2.0 m up, half the ring's thickness 0.15 m).
-    //           It may then slip off the thin pole top: that is not asked about.
+    //   CONVEX: the ring is a solid disc. The pole's top is 2.0 m up and half the ring's thickness is 0.15 m.
+    //           Jolt 5.4 (Pin8): the lowest its centre gets while it is over the pole (within 0.3 m of the axis) is 2.122 m,
+    //           and at 5 s it is 0.499 m up and 0.658 m off the axis.
+    //           Jolt 5.6 (this deterministic build, and stock JoltPhysics.Native 1.1.0): that lowest point is 2.043 m,
+    //           and at 5 s the ring has slid off to 0.149 m up and 1.472 m off the axis. Friction is applied at the
+    //           average contact point (Jolt ReleaseNotes 5.6, APIChanges 20260531), so "lands and stays in the 2.1 to
+    //           2.2 m band" no longer holds. The window is the 5.6 figure: still on the pole top, 2.00 to 2.10 m.
+    //           How far it then slides is recorded above and not asserted.
     // The default torus is not used: the mesher's torus has no hole a 0.1 m ball passes through, even as a static triangle mesh.
     [Theory]
     [InlineData(Prim, true)]
@@ -218,7 +223,7 @@ public class PrimHullBehaviourTests
             }
             else
             {
-                Assert.InRange(lowestOver, 2.1f, 2.2f);
+                Assert.InRange(lowestOver, 2.00f, 2.10f);
             }
         }
         finally { scene.Dispose(); }

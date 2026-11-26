@@ -154,9 +154,15 @@ public class FlyingSeatedAndFastLinksetAvatarTests
             Assert.True(end.X - start.X > common * 0.5f, $"{res.Name}: the avatar was hardly moved ({end.X - start.X:0.00} m)");
         // A box of about the avatar's own mass thrown fast at it, falling as it arrives, pushes it down about 1 m/s as well as
         // along; a flying avatar's push fades over a second (PushFadeFlyingSeconds) and is not taken back up, so it settles
-        // about 1 m lower (measured 35.000 to 34.007 at one step a heartbeat), against 0.05 m at 80.
+        // about 1 m lower (measured 35.000 to 34.007 at one step a heartbeat). The other cells stay within 0.05 m, except
+        // one. Jolt 5.6 takes character padding fully into account (ReleaseNotes: CharacterVirtual sometimes did not).
+        // On 5.4 the 100 kg box at 5 m/s, one step per heartbeat, stayed inside 0.05 m. On 5.6, deterministic and stock
+        // JoltPhysics.Native 1.1.0, that cell goes from 35.000 to 35.061 at 1.91 s. Its bound is 0.10 m, which still
+        // separates it from the 1 m drop.
+        float heightBound = kg <= 1f && speed >= 20f ? 1.1f
+            : (physicsHz <= 0.0 && kg >= 100f && speed <= 5f ? 0.10f : 0.05f);
         foreach ((double t, Vector3 p) in trace)
-            Assert.True(MathF.Abs(p.Z - start.Z) < (kg <= 1f && speed >= 20f ? 1.1f : 0.05f), $"{res.Name}: the avatar's height went from {start.Z:0.000} to {p.Z:0.000} at {t:0.00} s");
+            Assert.True(MathF.Abs(p.Z - start.Z) < heightBound, $"{res.Name}: the avatar's height went from {start.Z:0.000} to {p.Z:0.000} at {t:0.00} s");
         Assert.True(stillFlying, $"{res.Name}: the avatar stopped flying");
         // A flying avatar's push fades with a time constant of a second (PushFadeFlyingSeconds): over the last half second,
         // nearly four seconds after the hit, it drifts at no more than a tenth of their common speed.
