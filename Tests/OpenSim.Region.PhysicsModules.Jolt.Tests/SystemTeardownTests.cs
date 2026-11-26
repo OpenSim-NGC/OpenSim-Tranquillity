@@ -82,7 +82,7 @@ public class SystemTeardownTests
     {
         // ReleaseFilterConsumedBySystem clears NativeObject.OwnsHandle by reflection. A binding that renames the
         // property would make that clear a no-op, and the filter finalizers would free the native filters again.
-        PropertyInfo? owns = typeof(NativeObject).GetProperty(
+        PropertyInfo owns = typeof(NativeObject).GetProperty(
             "OwnsHandle", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         Assert.NotNull(owns);
 

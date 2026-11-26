@@ -156,11 +156,14 @@ public class FlyingSeatedAndFastLinksetAvatarTests
         // along; a flying avatar's push fades over a second (PushFadeFlyingSeconds) and is not taken back up, so it settles
         // about 1 m lower (measured 35.000 to 34.007 at one step a heartbeat). The other cells stay within 0.05 m, except
         // one. Jolt 5.6 takes character padding fully into account (ReleaseNotes: CharacterVirtual sometimes did not).
-        // On 5.4 the 100 kg box at 5 m/s, one step per heartbeat, stayed inside 0.05 m. On 5.6, deterministic and stock
-        // JoltPhysics.Native 1.1.0, that cell goes from 35.000 to 35.061 at 1.91 s. Its bound is 0.10 m, which still
-        // separates it from the 1 m drop.
+        // On 5.4 the 100 kg box at 5 m/s, one step per heartbeat, stayed inside 0.05 m. On 5.6 the same cell climbs for
+        // the whole run: the old 0.05 m assert stops at the first sample past it (35.061 at 1.91 s on the other
+        // deterministic builds and on stock JoltPhysics.Native 1.1.0). On this SSE2 rebuild the height is +0.074 m at
+        // 2 s, +0.155 m at 3 s, +0.184 m at 4 s and +0.195 m at 4.91 s (35.000 to 35.195), and the last second adds
+        // only 0.011 m. One physics step per heartbeat integrates that contact more coarsely than 45 Hz, which stays
+        // at +0.023 m. The bound is 0.25 m, still far from the 1 m drop.
         float heightBound = kg <= 1f && speed >= 20f ? 1.1f
-            : (physicsHz <= 0.0 && kg >= 100f && speed <= 5f ? 0.10f : 0.05f);
+            : (physicsHz <= 0.0 && kg >= 100f && speed <= 5f ? 0.25f : 0.05f);
         foreach ((double t, Vector3 p) in trace)
             Assert.True(MathF.Abs(p.Z - start.Z) < heightBound, $"{res.Name}: the avatar's height went from {start.Z:0.000} to {p.Z:0.000} at {t:0.00} s");
         Assert.True(stillFlying, $"{res.Name}: the avatar stopped flying");
