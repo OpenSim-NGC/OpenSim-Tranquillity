@@ -155,13 +155,12 @@ public class FlyingSeatedAndFastLinksetAvatarTests
         // A box of about the avatar's own mass thrown fast at it, falling as it arrives, pushes it down about 1 m/s as well as
         // along; a flying avatar's push fades over a second (PushFadeFlyingSeconds) and is not taken back up, so it settles
         // about 1 m lower (measured 35.000 to 34.007 at one step a heartbeat). The other cells stay within 0.05 m, except
-        // one. Jolt 5.6 takes character padding fully into account (ReleaseNotes: CharacterVirtual sometimes did not).
-        // On 5.4 the 100 kg box at 5 m/s, one step per heartbeat, stayed inside 0.05 m. On 5.6 the same cell climbs for
-        // the whole run: the old 0.05 m assert stops at the first sample past it (35.061 at 1.91 s on the other
-        // deterministic builds and on stock JoltPhysics.Native 1.1.0). On this SSE2 rebuild the height is +0.074 m at
-        // 2 s, +0.155 m at 3 s, +0.184 m at 4 s and +0.195 m at 4.91 s (35.000 to 35.195), and the last second adds
-        // only 0.011 m. One physics step per heartbeat integrates that contact more coarsely than 45 Hz, which stays
-        // at +0.023 m. The bound is 0.25 m, still far from the 1 m drop.
+        // one. The 100 kg box at 5 m/s, one step per heartbeat: Pin8, this SSE2 rebuild and stock JoltPhysics.Native 1.1.0
+        // match to four decimals up to t = 1.4545 s. At that heartbeat the box is deep under the capsule. 5.4 reports
+        // normal (-1, 0, 0) and 5.6 reports (-0.953, 0, -0.302). Strike pushes along the full 3D normal, vz +0.19 m/s,
+        // which fades with the 1 s flying push fade and integrates to about 0.21 m: +0.074 m at 2 s, +0.155 m at 3 s,
+        // +0.184 m at 4 s and +0.195 m at 4.91 s (35.000 to 35.195). On 5.4 this cell stays at exactly +0.000 m. The
+        // 45 Hz cell is +0.023 m on 5.4 and on 5.6. The bound is 0.25 m, still far from the 1 m drop.
         float heightBound = kg <= 1f && speed >= 20f ? 1.1f
             : (physicsHz <= 0.0 && kg >= 100f && speed <= 5f ? 0.25f : 0.05f);
         foreach ((double t, Vector3 p) in trace)
