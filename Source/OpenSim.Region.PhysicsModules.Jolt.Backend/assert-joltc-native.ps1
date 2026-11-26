@@ -9,8 +9,10 @@
 # is a build the Jolt physics module has a record of.
 #
 # The module loads its native from runtimes/<rid>/native/ (JoltNative.cs in the backend),
-# after checking its SHA-256 against the same record as the tables below. By default that
-# file is the stock one of the JoltPhysics.Native package, which runs one job pool.
+# after checking its SHA-256 against the same record as the table below. linux-x64 in a
+# build output is the deterministic rebuild, not the package file. The package's own
+# linux-x64 hash is 3800CC6FFF9E5470C524B15E8895599F90E9B96129B3F5CF9F76504BEDA178A3 and is
+# checked by JoltNativePackageTests against the restored package, not by this script.
 # This script checks an output before it is deployed:
 #   - every runtimes/<folder>/native/ joltc file of a platform the module supports must be
 #     a recorded build for that folder;
@@ -40,15 +42,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# The files the module loads, by SHA-256. Must equal the entries of JoltNative.Known in
-# OpenSim.Region.PhysicsModules.Jolt.Backend/JoltNative.cs (a unit test checks both against the files).
-# JoltPhysics.Native 1.1.0. linux-x64 is the deterministic rebuild of joltc 886e0886 (Jolt e77f1755,
-# CROSS_PLATFORM_DETERMINISTIC), not the bytes of that package's linux-x64 file. The other four rows are
-# the unmodified files of the package.
+# The files a build output holds, by SHA-256: one per folder. Where JoltNative.Known has a Rebuilt row,
+# that hash is the one copied over the package file. The other rows are the package files. A unit test
+# checks this table against JoltNative.Known.
 $stockVersion = "1.1.0"
 $stock = [ordered]@{
     "79125AB6882A1AEEECD5509BFE9EDF383E8E48A34D9A8B642A6B9A197D44DF74" = @{ Folder = "win-x64"; File = "joltc.dll" }
-    "ED9B88B77C8F27EF035BD9FD809AF7A425757E5B8C37D11EC4527374A06DBA59" = @{ Folder = "linux-x64"; File = "libjoltc.so" }
+    "27EFC48C813E75294DA11EAF22618BC1E0A5426A50EDDE7870EF4A60C8E4288B" = @{ Folder = "linux-x64"; File = "libjoltc.so" }
     "D32B29B9AADFD7887E4681302A766C5476A196C6AD77FF1F86473BBFB47325E0" = @{ Folder = "win-arm64"; File = "joltc.dll" }
     "DAF06442FDF25BD2FC4234C252E3862CA3A94E32792A4466A9D93723C8BB03CB" = @{ Folder = "linux-arm64"; File = "libjoltc.so" }
     "386DBEEC5E6892C218F9692572528EE3AF748184C9298861C90AAC1E3443C2EC" = @{ Folder = "osx"; File = "libjoltc.dylib" }
@@ -59,14 +59,14 @@ foreach ($h in $stock.Keys) { $folders[$stock[$h].Folder] = $stock[$h].File }
 
 function Get-Sha256([string]$path) { (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToUpperInvariant() }
 
-# What a hash is, for a file in runtimes/<folder>/native/: "stock" or $null (unknown or another folder's).
+# What a hash is, for a file in runtimes/<folder>/native/: "recorded" or $null (unknown or another folder's).
 function Get-Kind([string]$folder, [string]$hash) {
-    if ($stock.Contains($hash) -and $stock[$hash].Folder -eq $folder) { return "stock" }
+    if ($stock.Contains($hash) -and $stock[$hash].Folder -eq $folder) { return "recorded" }
     return $null
 }
 
 function Get-Name([string]$hash) {
-    if ($stock.Contains($hash) -and $stock[$hash].Folder -eq "linux-x64") { return "joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC" }
+    if ($stock.Contains($hash) -and $stock[$hash].Folder -eq "linux-x64") { return "joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC SSE2" }
     if ($stock.Contains($hash)) { return ("stock JoltPhysics.Native {0} {1}" -f $stockVersion, $stock[$hash].Folder) }
     return "an unknown build"
 }

@@ -82,7 +82,7 @@ public class BaselineCheckTests
     public void Each_recorded_build_names_its_baseline_folder()
     {
         Assert.Equal($"stock-{JoltNative.PackageVersion}-win-x64", BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "win-x64")));
-        Assert.Equal("det-886e0886-linux-x64", BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "linux-x64")));
+        Assert.Equal("det-886e0886-linux-x64", BaselineCheck.KeyFor(Build(JoltNativeOrigin.Rebuilt, "linux-x64")));
         Assert.Equal($"stock-{JoltNative.PackageVersion}-osx", BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "osx")));
         Assert.Null(BaselineCheck.KeyFor(null));
     }
@@ -90,7 +90,7 @@ public class BaselineCheckTests
     [Fact]
     public void The_native_file_names_the_build_and_its_baseline()
     {
-        JoltNativeBuild linux = Build(JoltNativeOrigin.Package, "linux-x64");
+        JoltNativeBuild linux = Build(JoltNativeOrigin.Rebuilt, "linux-x64");
         string stock = BaselineCheck.Describe(Info("linux-x64", linux));
         Assert.Contains("rid=linux-x64\n", stock);
         Assert.Contains($"build={linux.Source}\n", stock);
@@ -101,7 +101,7 @@ public class BaselineCheckTests
         Assert.Contains("baseline=none\n", unrecorded);
     }
 
-    // The two stock platforms' files get their own baselines.
+    // Windows' package file and the linux rebuild each get their own baseline.
     [Fact]
     public void The_baseline_is_chosen_by_the_loaded_build_not_by_the_platform()
     {
@@ -109,7 +109,7 @@ public class BaselineCheckTests
         string stockWinRows = Summary(Row("drop", ("end_z", "25.501")));
         string stockLinuxRows = Summary(Row("drop", ("end_z", "25.502")));
         s.AddBaseline(BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "win-x64")), "drop-run", stockWinRows);
-        s.AddBaseline(BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "linux-x64")), "drop-run", stockLinuxRows);
+        s.AddBaseline(BaselineCheck.KeyFor(Build(JoltNativeOrigin.Rebuilt, "linux-x64")), "drop-run", stockLinuxRows);
 
         foreach (var (rid, origin, rows) in new[]
                  {
@@ -207,10 +207,10 @@ public class BaselineCheckTests
     public void A_recorded_run_that_did_not_run_fails()
     {
         var s = new Scratch();
-        string key = BaselineCheck.KeyFor(Build(JoltNativeOrigin.Package, "linux-x64"));
+        string key = BaselineCheck.KeyFor(Build(JoltNativeOrigin.Rebuilt, "linux-x64"));
         s.AddBaseline(key, "a", Summary(Row("a")));
         s.AddBaseline(key, "b", Summary(Row("b")));
-        s.AddRun("a", Summary(Row("a")), Info("linux-x64", Build(JoltNativeOrigin.Package, "linux-x64")));
+        s.AddRun("a", Summary(Row("a")), Info("linux-x64", Build(JoltNativeOrigin.Rebuilt, "linux-x64")));
         var (outcome, report) = s.Check();
         Assert.Equal(BaselineOutcome.Failed, outcome);
         Assert.Contains("FAILED  b: recorded in the baseline but not run", report);
@@ -222,7 +222,7 @@ public class BaselineCheckTests
         var s = new Scratch();
         s.AddBaseline($"stock-{JoltNative.PackageVersion}-win-x64", "a", Summary(Row("a")));
         s.AddRun("a", Summary(Row("a")), Info("win-x64", Build(JoltNativeOrigin.Package, "win-x64")));
-        s.AddRun("b", Summary(Row("b")), Info("linux-x64", Build(JoltNativeOrigin.Package, "linux-x64")));
+        s.AddRun("b", Summary(Row("b")), Info("linux-x64", Build(JoltNativeOrigin.Rebuilt, "linux-x64")));
         var (outcome, report) = s.Check();
         Assert.Equal(BaselineOutcome.Failed, outcome);
         Assert.StartsWith("FAILED: the runs loaded different joltc files", report);
@@ -232,7 +232,7 @@ public class BaselineCheckTests
     public void Recording_writes_the_loaded_builds_folder_and_leaves_out_the_runs_named()
     {
         var s = new Scratch();
-        JoltNativeInfo native = Info("linux-x64", Build(JoltNativeOrigin.Package, "linux-x64"));
+        JoltNativeInfo native = Info("linux-x64", Build(JoltNativeOrigin.Rebuilt, "linux-x64"));
         s.AddRun("a", Summary(Row("a")).Replace("\n", "\r\n"), native);
         s.AddRun("b", Summary(Row("b")), native);
         Assert.Equal(0, BaselineCheck.Run(new[] { "--record-baseline", s.Output, "--baselines", s.Baselines, "--leave-out", "b" }, new StringWriter()));

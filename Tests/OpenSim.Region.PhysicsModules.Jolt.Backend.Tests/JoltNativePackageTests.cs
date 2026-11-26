@@ -64,24 +64,27 @@ public class JoltNativePackageTests
         if (version != JoltNative.PackageVersion)
             problems.AppendLine($"  the projects restore {JoltNative.PackageId} {version}; the record is for {JoltNative.PackageVersion}");
 
-        // Every recorded file. A repository copy under native/<folder>/<file> replaces the package file in the
-        // output (JoltNative.targets): the record is that copy's hash, and the package file only has to be present.
-        // Every other recorded file is the package file, hash and all.
+        // Package rows are the bytes in the restored package, including linux-x64. A repository copy under
+        // native/<folder>/<file> is a rebuild (JoltNative.targets copies it over the package file in the output);
+        // its hash is the Rebuilt row, not the package row.
         string nativeRoot = Path.Combine(RepoRoot(), "Source", "OpenSim.Region.PhysicsModules.Jolt.Backend", "native");
-        foreach (JoltNativeBuild b in JoltNative.Known.Where(b => b.Origin == JoltNativeOrigin.Package))
+        foreach (JoltNativeBuild b in JoltNative.Known)
         {
+            if (b.Origin == JoltNativeOrigin.Rebuilt)
+            {
+                string replacement = Path.Combine(nativeRoot, b.Folder, b.File);
+                if (!File.Exists(replacement))
+                    problems.AppendLine($"  native/{b.Folder}/{b.File}: the deterministic rebuild is not in the repository");
+                else if (JoltNative.Sha256Of(replacement) != b.Sha256)
+                    problems.AppendLine($"  native/{b.Folder}/{b.File}: sha256 {JoltNative.Sha256Of(replacement)}, recorded {b.Sha256}");
+                continue;
+            }
+
             string path = Path.Combine(folder, "runtimes", b.Folder, "native", b.File);
-            string replacement = Path.Combine(nativeRoot, b.Folder, b.File);
             if (!File.Exists(path))
                 problems.AppendLine($"  runtimes/{b.Folder}/native/{b.File}: recorded, but not in the package");
-            else if (File.Exists(replacement))
-            {
-                string hash = JoltNative.Sha256Of(replacement);
-                if (hash != b.Sha256)
-                    problems.AppendLine($"  native/{b.Folder}/{b.File}: sha256 {hash}, recorded {b.Sha256}");
-            }
-            else if (JoltNative.Sha256Of(path) is string hash && hash != b.Sha256)
-                problems.AppendLine($"  runtimes/{b.Folder}/native/{b.File}: sha256 {hash}, recorded {b.Sha256}");
+            else if (JoltNative.Sha256Of(path) != b.Sha256)
+                problems.AppendLine($"  runtimes/{b.Folder}/native/{b.File}: sha256 {JoltNative.Sha256Of(path)}, recorded {b.Sha256}");
         }
 
         // Every joltc of a platform the module supports: recorded.

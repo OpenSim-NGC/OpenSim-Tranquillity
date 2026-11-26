@@ -99,7 +99,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             string reason = JoltPhysicsBackend.JobPoolLimitReason(requested, native);
             if (reason == null)
                 return null;
-            const string remedy = "More than one pool needs a change in joltc itself; set [Jolt] JobPools = 1.";
+            const string remedy = "More than one pool needs character calls that take an allocator; set [Jolt] JobPools = 1.";
             return $"[Jolt] JobPools = {JoltPhysicsBackend.ResolveJobPools(requested)}, but the module runs ONE job pool: {reason}. " +
                    $"Regions take turns on that pool. {remedy}";
         }

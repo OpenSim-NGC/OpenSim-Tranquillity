@@ -72,12 +72,16 @@ public class JoltNativeTests
         Assert.Equal(Path.Combine(baseDir, "runtimes", folder, "native", file), JoltNative.PathFor(baseDir, rid));
     }
 
-    // The stock record entry for the platform the suite runs on.
-    private static JoltNativeBuild StockFor(string rid)
-        => JoltNative.Known.Single(b => b.Origin == JoltNativeOrigin.Package && b.Folder == JoltNative.Platforms[rid].Folder);
+    // The file the process loads for this platform: the rebuild when the folder has one, otherwise the package file.
+    private static JoltNativeBuild LoadedFor(string rid)
+    {
+        string folder = JoltNative.Platforms[rid].Folder;
+        return JoltNative.Known.SingleOrDefault(b => b.Origin == JoltNativeOrigin.Rebuilt && b.Folder == folder)
+            ?? JoltNative.Known.Single(b => b.Origin == JoltNativeOrigin.Package && b.Folder == folder);
+    }
 
     [Fact]
-    public void The_running_process_loads_the_stock_file_of_the_package_from_runtimes()
+    public void The_running_process_loads_the_recorded_file_for_its_platform_from_runtimes()
     {
         JoltNativeInfo info = JoltNative.EnsureLoaded(allowUnrecorded: false);
 
@@ -95,8 +99,8 @@ public class JoltNativeTests
         Assert.Equal(JoltNative.PathFor(JoltNative.DefaultBaseDirectory(), expectedRid), info.Path);
         Assert.Equal(os == "win" ? "joltc.dll" : os == "linux" ? "libjoltc.so" : "libjoltc.dylib", Path.GetFileName(info.Path));
         Assert.True(info.Recorded);
-        Assert.Same(StockFor(expectedRid), info.Build);
-        Assert.Equal(StockFor(expectedRid).Sha256, info.Sha256);
+        Assert.Same(LoadedFor(expectedRid), info.Build);
+        Assert.Equal(LoadedFor(expectedRid).Sha256, info.Sha256);
         Assert.False(info.SafeForMultiplePools);
         // A platform the record marks as tested logs no notice; an untested one logs it.
         Assert.Equal(!info.Build.TestedByProject, info.UntestedNotice != null);
@@ -111,7 +115,7 @@ public class JoltNativeTests
     }
 
     [Fact]
-    public void The_output_holds_one_joltc_per_platform_folder_and_it_is_the_stock_one()
+    public void The_output_holds_one_joltc_per_platform_folder_and_the_recorded_file()
     {
         string runtimes = Path.Combine(JoltNative.DefaultBaseDirectory(), "runtimes");
         var joltcFiles = Directory.GetFiles(runtimes, "*joltc*", SearchOption.AllDirectories)
@@ -122,7 +126,8 @@ public class JoltNativeTests
         foreach (string rid in JoltNative.Platforms.Keys)
         {
             JoltNativeInfo info = JoltNative.Check(JoltNative.DefaultBaseDirectory(), rid, allowUnrecorded: false);
-            Assert.Equal(JoltNativeOrigin.Package, info.Build!.Origin);
+            // linux-x64 is the deterministic rebuild copied over the package file. The other folders keep the package bytes.
+            Assert.Same(LoadedFor(rid), info.Build);
         }
     }
 
@@ -157,23 +162,28 @@ public class JoltNativeTests
     [Fact]
     public void The_record_has_the_stock_files()
     {
-        // Package version the projects use. linux-x64 is the deterministic rebuild and the one this project tests.
-        // The other four are the unmodified package files, not tested here. None is safe for more than one pool.
+        // Package version the projects use. linux-x64 is loaded as the deterministic rebuild, the one this project tests.
+        // The package's own linux-x64 file is recorded separately and is not that rebuild. The other four package files
+        // are unmodified. Windows is untested; a deterministic Windows build is a follow-up, not this record.
+        // None is safe for more than one pool.
         var rows = JoltNative.Known.Select(b => (b.Folder, b.File, b.Origin, b.PackageVersion, b.SafeForMultiplePools, b.TestedByProject))
             .OrderBy(r => r.Origin).ThenBy(r => r.Folder, StringComparer.Ordinal).ToArray();
         var v = JoltNative.PackageVersion;
         Assert.Equal(new[]
         {
             ("linux-arm64", "libjoltc.so", JoltNativeOrigin.Package, (string)v, false, false),
-            ("linux-x64", "libjoltc.so", JoltNativeOrigin.Package, (string)v, false, true),
+            ("linux-x64", "libjoltc.so", JoltNativeOrigin.Package, (string)v, false, false),
             ("osx", "libjoltc.dylib", JoltNativeOrigin.Package, (string)v, false, false),
             ("win-arm64", "joltc.dll", JoltNativeOrigin.Package, (string)v, false, false),
             ("win-x64", "joltc.dll", JoltNativeOrigin.Package, (string)v, false, false),
+            ("linux-x64", "libjoltc.so", JoltNativeOrigin.Rebuilt, (string)null, false, true),
         }, rows);
-        JoltNativeBuild linux = JoltNative.Known.Single(b => b.Folder == "linux-x64");
-        Assert.Equal("joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC", linux.Source);
+        JoltNativeBuild linux = JoltNative.Known.Single(b => b.Folder == "linux-x64" && b.Origin == JoltNativeOrigin.Rebuilt);
+        Assert.Equal("joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC SSE2", linux.Source);
         Assert.Equal("det-886e0886-linux-x64", linux.BaselineName);
-        Assert.All(JoltNative.Known.Where(b => b.Folder != "linux-x64"), b => Assert.Equal($"stock JoltPhysics.Native {v}", b.Source));
+        Assert.Null(linux.PackageVersion);
+        Assert.All(JoltNative.Known.Where(b => b.Origin == JoltNativeOrigin.Package), b => Assert.Equal($"stock JoltPhysics.Native {v}", b.Source));
+        Assert.False(JoltNative.Known.Single(b => b.Folder == "win-x64").TestedByProject);
         Assert.Equal(JoltNative.Known.Count, JoltNative.Known.Select(b => b.Sha256).Distinct().Count());
         Assert.All(JoltNative.Known, b => Assert.Matches("^[0-9A-F]{64}$", b.Sha256));
     }
@@ -181,7 +191,7 @@ public class JoltNativeTests
     [Fact]
     public void The_start_line_names_the_build_and_an_untested_platform_gets_a_notice()
     {
-        JoltNativeBuild stockLinux = JoltNative.Known.Single(b => b.Folder == "linux-x64" && b.Origin == JoltNativeOrigin.Package);
+        JoltNativeBuild stockLinux = JoltNative.Known.Single(b => b.Folder == "linux-x64" && b.Origin == JoltNativeOrigin.Rebuilt);
         JoltNativeBuild stockWin = JoltNative.Known.Single(b => b.Folder == "win-x64" && b.Origin == JoltNativeOrigin.Package);
         JoltNativeBuild stockOsx = JoltNative.Known.Single(b => b.Folder == "osx");
 
@@ -202,8 +212,11 @@ public class JoltNativeTests
         Assert.Null(safe.UntestedNotice);
 
         var mac = new JoltNativeInfo("osx-arm64", "p", stockOsx.Sha256, stockOsx);
-        Assert.Equal($"the joltc for osx-arm64 (stock JoltPhysics.Native {JoltNative.PackageVersion}) is recorded from its package, but this project does not test it: " +
+        Assert.Equal($"the joltc for osx-arm64 (stock JoltPhysics.Native {JoltNative.PackageVersion}) is not tested by this project: " +
                      "the module's tests run on linux-x64.", mac.UntestedNotice);
+        JoltNativeBuild packageLinux = JoltNative.Known.Single(b => b.Folder == "linux-x64" && b.Origin == JoltNativeOrigin.Package);
+        Assert.NotNull(new JoltNativeInfo("linux-x64", "p", packageLinux.Sha256, packageLinux).UntestedNotice);
+        Assert.Contains("not tested by this project", win.UntestedNotice);
 
         var unrecorded = new JoltNativeInfo("win-x64", "p", new string('0', 64), null);
         Assert.False(unrecorded.SafeForMultiplePools);
@@ -217,6 +230,11 @@ public class JoltNativeTests
         JoltNativeBuild stockWin = JoltNative.Known.Single(b => b.Folder == "win-x64" && b.Origin == JoltNativeOrigin.Package);
         Assert.Same(stockWin, JoltNative.Find("win-x64", stockWin.Sha256.ToLowerInvariant()));
         Assert.Null(JoltNative.Find("linux-x64", stockWin.Sha256));
+        JoltNativeBuild rebuiltLinux = JoltNative.Known.Single(b => b.Folder == "linux-x64" && b.Origin == JoltNativeOrigin.Rebuilt);
+        JoltNativeBuild packageLinux = JoltNative.Known.Single(b => b.Folder == "linux-x64" && b.Origin == JoltNativeOrigin.Package);
+        Assert.Same(rebuiltLinux, JoltNative.Find("linux-x64", rebuiltLinux.Sha256));
+        Assert.Same(packageLinux, JoltNative.Find("linux-x64", packageLinux.Sha256));
+        Assert.Null(JoltNative.Find("win-x64", rebuiltLinux.Sha256));
         Assert.Null(JoltNative.Find("freebsd-x64", stockWin.Sha256));
         JoltNativeBuild osx = JoltNative.Known.Single(b => b.Folder == "osx");
         Assert.Same(osx, JoltNative.Find("osx-x64", osx.Sha256));
@@ -239,8 +257,14 @@ public class JoltNativeTests
         string guard = File.ReadAllText(Path.Combine(RepoRoot(), "Source", "OpenSim.Region.PhysicsModules.Jolt.Backend", "assert-joltc-native.ps1"));
         var guardStock = Regex.Matches(guard, "\"([0-9A-F]{64})\"\\s*=\\s*@\\{\\s*Folder\\s*=\\s*\"([^\"]+)\";\\s*File\\s*=\\s*\"([^\"]+)\"")
             .Select(m => (Folder: m.Groups[2].Value, File: m.Groups[3].Value, Sha256: m.Groups[1].Value)).OrderBy(x => x.Folder).ToArray();
-        Assert.Equal(JoltNative.Known.Where(b => b.Origin == JoltNativeOrigin.Package)
-            .Select(b => (b.Folder, b.File, b.Sha256)).OrderBy(x => x.Folder).ToArray(), guardStock);
+        // The guard lists the file a build output should hold: the rebuild where there is one, else the package file.
+        var shipped = JoltNative.Known
+            .GroupBy(b => b.Folder)
+            .Select(g => g.FirstOrDefault(b => b.Origin == JoltNativeOrigin.Rebuilt) ?? g.First())
+            .Select(b => (b.Folder, b.File, b.Sha256))
+            .OrderBy(x => x.Folder, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(shipped, guardStock);
         Assert.Contains($"$stockVersion = \"{JoltNative.PackageVersion}\"", guard);
 
         // The module's project holds no compiled native: the package's file reaches the output through NuGet.
@@ -267,6 +291,13 @@ public class JoltNativeTests
             .OrderBy(x => x.Folder).ToArray();
         Assert.Equal(JoltNative.Known.Where(b => b.Origin == JoltNativeOrigin.Package)
             .Select(b => (b.PackageVersion, b.Folder, b.File, b.Sha256)).OrderBy(x => x.Folder).ToArray(), stock);
+
+        // The file linux-x64 loads is the rebuild, in its own table, not the package row above.
+        var loaded = Regex.Matches(readme, @"^\| `deterministic rebuild, ([^`]+)` \| `([a-z0-9-]+)/([^`]+)` \| `([0-9a-f]{64})` \|", RegexOptions.Multiline)
+            .Select(m => (Folder: m.Groups[2].Value, File: m.Groups[3].Value, Sha256: m.Groups[4].Value.ToUpperInvariant()))
+            .ToArray();
+        JoltNativeBuild rebuilt = JoltNative.Known.Single(b => b.Origin == JoltNativeOrigin.Rebuilt);
+        Assert.Equal(new[] { (rebuilt.Folder, rebuilt.File, rebuilt.Sha256) }, loaded);
     }
 
     [Fact]
@@ -341,15 +372,15 @@ public class JoltNativeTests
         Assert.Null(JoltPhysicsBackend.JobPoolLimitReason(3, safe));
         Assert.Null(CapacityReport.JobPoolLimitWarning(3, safe));
 
-        string reason = $"the loaded joltc ({stockWin.Source}) is not safe for more than one job pool: its physics systems " +
-                        "share one scratch allocator, and two physics updates at once would stop the process";
+        string reason = $"the loaded joltc ({stockWin.Source}) is not safe for more than one job pool: CharacterVirtual's scratch " +
+                        "calls share one process-wide allocator, and two physics updates at once would stop the process";
         Assert.Equal(reason, JoltPhysicsBackend.JobPoolLimitReason(3, stock));
         Assert.Equal(
             $"[Jolt] JobPools = 3, but the module runs ONE job pool: {reason}. Regions take turns on that pool. More than one pool needs " +
-            "a change in joltc itself; set [Jolt] JobPools = 1.",
+            "character calls that take an allocator; set [Jolt] JobPools = 1.",
             CapacityReport.JobPoolLimitWarning(3, stock));
         Assert.Contains("(a build this module has no record of)", JoltPhysicsBackend.JobPoolLimitReason(2, unrecorded));
-        Assert.EndsWith("More than one pool needs a change in joltc itself; set [Jolt] JobPools = 1.",
+        Assert.EndsWith("More than one pool needs character calls that take an allocator; set [Jolt] JobPools = 1.",
             CapacityReport.JobPoolLimitWarning(2, new JoltNativeInfo("linux-arm64", "p", stockArm.Sha256, stockArm)));
     }
 

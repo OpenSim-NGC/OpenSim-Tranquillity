@@ -29,8 +29,8 @@ each platform in the output:
 
 | Platform | File in the build output | Tested by this project |
 |---|---|---|
-| Windows x64 | `runtimes/win-x64/native/joltc.dll` | no |
-| Linux x64 (glibc) | `runtimes/linux-x64/native/libjoltc.so` | yes |
+| Windows x64 | `runtimes/win-x64/native/joltc.dll` | no. The package file, not deterministic. A deterministic Windows build is a follow-up and is not in this change |
+| Linux x64 (glibc) | `runtimes/linux-x64/native/libjoltc.so` | yes. The deterministic SSE2 rebuild, not the package file |
 | Windows Arm64 | `runtimes/win-arm64/native/joltc.dll` | no |
 | Linux Arm64 (glibc) | `runtimes/linux-arm64/native/libjoltc.so` | no |
 | macOS (x64 and Arm64) | `runtimes/osx/native/libjoltc.dylib` | no |
@@ -67,7 +67,7 @@ The module knows each native file by its SHA-256, so a new `JoltPhysics.Native` 
 through a JoltPhysicsSharp update) is refused at start until its files are recorded, and
 `JoltNativePackageTests` fails on it with what to check. Before recording it:
 
-1. Re-check the rules that make one shared scratch allocator safe on one pool, against the joltc
+1. Re-check the rules that make one shared character-scratch allocator safe on one pool, against the joltc
    and Jolt sources the new package is built from: the list in `JoltNativePackageTests`
    (`ShapeAndAllocatorRuleTests` checks the module's side of each rule).
 2. Record the new files: `JoltNative.PackageVersion` and the stock entries of `JoltNative.Known`,
@@ -83,13 +83,13 @@ and compares it with the builds it has a record of. With a good file it logs one
 process, naming the build:
 
 ```
-[JOLT SCENE] joltc for linux-x64: /opt/opensim/bin/runtimes/linux-x64/native/libjoltc.so sha256 ED9B88B7... (joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC; one job pool)
+[JOLT SCENE] joltc for linux-x64: /opt/opensim/bin/runtimes/linux-x64/native/libjoltc.so sha256 27EFC48C... (joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC SSE2; one job pool)
 ```
 
 With `JobPools` above 1 it also logs one warning, and runs one pool:
 
 ```
-[JOLT SCENE] [Jolt] JobPools = 3, but the module runs ONE job pool: the loaded joltc (joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC) is not safe for more than one job pool: its physics systems share one scratch allocator, and two physics updates at once would stop the process. Regions take turns on that pool. More than one pool needs a change in joltc itself; set [Jolt] JobPools = 1.
+[JOLT SCENE] [Jolt] JobPools = 3, but the module runs ONE job pool: the loaded joltc (joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC SSE2) is not safe for more than one job pool: CharacterVirtual's scratch calls share one process-wide allocator, and two physics updates at once would stop the process. Regions take turns on that pool. More than one pool needs character calls that take an allocator; set [Jolt] JobPools = 1.
 ```
 
 In the cases below the module logs one error line and throws from its `Initialise`, before any
@@ -335,8 +335,9 @@ All regions in a simulator share Jolt's worker threads through `JobPools` job po
 `ThreadCount` is the total number of worker threads, split evenly across the pools, and each
 region is given the pool with the fewest regions when it starts.
 
-All regions in a process share one job pool on the joltc this module runs on, so more than one pool
-needs a change in joltc itself. The module runs one pool, sized as `JobPools = 1` would size it,
+All regions in a process share one job pool on the joltc this module runs on. The physics step
+has an allocator of its own; CharacterVirtual's scratch calls still share one, so more than one
+pool needs character calls that take an allocator. The module runs one pool, sized as `JobPools = 1` would size it,
 logs a warning at start naming the setting, and `jolt capacity` shows the pools in use and why.
 
 `ThreadCount = 0` (the default) is automatic: each pool gets its share of the processor count

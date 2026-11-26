@@ -40,6 +40,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
     {
         /// <summary>The stock file of the JoltPhysics.Native package (<see cref="JoltNative.PackageId"/>).</summary>
         Package,
+
+        /// <summary>
+        /// A deterministic rebuild from named joltc and Jolt commits. Not the bytes of the package file it replaces.
+        /// </summary>
+        Rebuilt,
     }
 
     /// <summary>One joltc build the module has a record of.</summary>
@@ -52,7 +57,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         /// <summary>Upper-case hex.</summary>
         public string Sha256 { get; }
         public JoltNativeOrigin Origin { get; }
-        /// <summary>The package version for <see cref="JoltNativeOrigin.Package"/>.</summary>
+        /// <summary>The package version for <see cref="JoltNativeOrigin.Package"/>. Null for a rebuild.</summary>
         public string? PackageVersion { get; }
         /// <summary>Each physics system has its own scratch allocator, so more than one job pool may step at once.</summary>
         public bool SafeForMultiplePools { get; }
@@ -115,8 +120,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         /// <summary>A notice for a recorded file this project's tests do not run on, or null.</summary>
         public string? UntestedNotice =>
             Build is { TestedByProject: false }
-                ? $"the joltc for {Rid} ({Build.Source}) is recorded from its package, but this project does not test it: " +
-                  "the module's tests run on linux-x64."
+                ? $"the joltc for {Rid} ({Build.Source}) is not tested by this project: the module's tests run on linux-x64."
                 : null;
     }
 
@@ -130,7 +134,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
     public static class JoltNative
     {
         /// <summary>The package the stock native comes from, and the version the projects use (the one JoltPhysicsSharp
-        /// 2.22.0 depends on). linux-x64 is replaced by the deterministic rebuild recorded below. A package bump fails
+        /// 2.22.0 depends on). linux-x64 is replaced at load by the deterministic rebuild recorded below; the package
+        /// file's own hash stays in the record and is checked against the restored package. A package bump fails
         /// JoltNativePackageTests until the record is checked again.</summary>
         public const string PackageId = "JoltPhysics.Native";
         public const string PackageVersion = "1.1.0";
@@ -151,15 +156,18 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             };
 
         /// <summary>
-        /// Every joltc build the module knows, with its SHA-256 (upper-case hex). Four are the files of the
-        /// JoltPhysics.Native package of <see cref="PackageVersion"/>. linux-x64 is the deterministic rebuild of
-        /// joltc 886e0886 (Jolt e77f1755, CROSS_PLATFORM_DETERMINISTIC) that the build copies over that package file.
+        /// Every joltc build the module knows, with its SHA-256 (upper-case hex). Five are the files of the
+        /// JoltPhysics.Native package of <see cref="PackageVersion"/>, including that package's own linux-x64 file.
+        /// The other linux-x64 row is the deterministic SSE2 rebuild of joltc 886e0886 (Jolt e77f1755,
+        /// CROSS_PLATFORM_DETERMINISTIC) that the build copies over the package file. It is its own origin.
+        /// Windows is the package file: not built deterministic here, not tested here, and a follow-up.
         /// </summary>
         public static readonly IReadOnlyList<JoltNativeBuild> Known = new[]
         {
             Stock("win-x64", "joltc.dll", "79125AB6882A1AEEECD5509BFE9EDF383E8E48A34D9A8B642A6B9A197D44DF74", tested: false),
-            Stock("linux-x64", "libjoltc.so", "ED9B88B77C8F27EF035BD9FD809AF7A425757E5B8C37D11EC4527374A06DBA59", tested: true,
-                source: "joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC", baselineName: "det-886e0886-linux-x64"),
+            Stock("linux-x64", "libjoltc.so", "3800CC6FFF9E5470C524B15E8895599F90E9B96129B3F5CF9F76504BEDA178A3", tested: false),
+            Rebuilt("linux-x64", "libjoltc.so", "27EFC48C813E75294DA11EAF22618BC1E0A5426A50EDDE7870EF4A60C8E4288B", tested: true,
+                source: "joltc 886e0886 Jolt e77f1755 CROSS_PLATFORM_DETERMINISTIC SSE2", baselineName: "det-886e0886-linux-x64"),
             Stock("win-arm64", "joltc.dll", "D32B29B9AADFD7887E4681302A766C5476A196C6AD77FF1F86473BBFB47325E0", tested: false),
             Stock("linux-arm64", "libjoltc.so", "DAF06442FDF25BD2FC4234C252E3862CA3A94E32792A4466A9D93723C8BB03CB", tested: false),
             Stock("osx", "libjoltc.dylib", "386DBEEC5E6892C218F9692572528EE3AF748184C9298861C90AAC1E3443C2EC", tested: false),
@@ -167,6 +175,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
 
         private static JoltNativeBuild Stock(string folder, string file, string sha256, bool tested, string? source = null, string? baselineName = null)
             => new JoltNativeBuild(folder, file, sha256, JoltNativeOrigin.Package, PackageVersion, safeForMultiplePools: false, tested, source, baselineName);
+
+        private static JoltNativeBuild Rebuilt(string folder, string file, string sha256, bool tested, string source, string baselineName)
+            => new JoltNativeBuild(folder, file, sha256, JoltNativeOrigin.Rebuilt, packageVersion: null, safeForMultiplePools: false, tested, source, baselineName);
 
         public static string SupportedList => string.Join(", ", Platforms.Keys);
 

@@ -12,10 +12,11 @@
 // run's --out folder holds native.txt, naming the build the run loaded (from JoltNative's record), and the check
 // reads the baseline folder for that build:
 //   ci/baselines/stock-<version>-<rid>/    a package file of JoltPhysics.Native <version>
-//   ci/baselines/det-886e0886-linux-x64/   the linux-x64 file built with CROSS_PLATFORM_DETERMINISTIC
+//   ci/baselines/det-886e0886-linux-x64/   the linux-x64 deterministic rebuild (origin Rebuilt)
 // The folders stock-1.0.4-win-x64 and stock-1.0.4-linux-x64 stay as the Jolt 5.4 record. They are not a build this
-// module loads. A build with no folder (the 1.1.0 Windows, Arm and macOS package files, an unrecorded file) is
-// reported as having no baseline: skipped, neither passed nor failed. A run with no file in the folder is skipped
+// module loads. A build with no folder (the 1.1.0 Windows, Arm and macOS package files, the package's own linux-x64
+// file, an unrecorded file) is reported as having no baseline: skipped, neither passed nor failed. Windows is
+// untested; a deterministic Windows build is a follow-up. A run with no file in the folder is skipped
 // the same way, so a run whose rows are not repeatable on one machine can stay unrecorded.
 //
 // Columns measured on the wall clock (WallClockColumns) are left out of the comparison.

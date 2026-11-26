@@ -391,9 +391,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
 
         /// <summary>
         /// The job pools that run on <paramref name="native"/>: <see cref="ResolveJobPools(int)"/>, or 1 when the native
-        /// is not safe for more than one pool. On such a native (the stock joltc) every physics system draws on one
-        /// process-wide TempAllocator, and two physics updates at once on two pools stop the process ("TempAllocator:
-        /// Freeing in the wrong order"); one pool admits one update at a time, so its regions take turns on it.
+        /// is not safe for more than one pool. The physics step has an allocator of its own. CharacterVirtual's
+        /// scratch calls still share one process-wide TempAllocator, and two physics updates at once on two pools
+        /// stop the process ("TempAllocator: Freeing in the wrong order"); one pool admits one update at a time,
+        /// so its regions take turns on it.
         /// </summary>
         public static int ResolveJobPools(int requested, JoltNativeInfo native)
             => native.SafeForMultiplePools ? ResolveJobPools(requested) : 1;
@@ -407,8 +408,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             if (ResolveJobPools(requested, native) == ResolveJobPools(requested))
                 return null;
             string what = native.Build?.Source ?? "a build this module has no record of";
-            return $"the loaded joltc ({what}) is not safe for more than one job pool: its physics systems share one " +
-                   "scratch allocator, and two physics updates at once would stop the process";
+            return $"the loaded joltc ({what}) is not safe for more than one job pool: CharacterVirtual's scratch " +
+                   "calls share one process-wide allocator, and two physics updates at once would stop the process";
         }
 
         /// <summary>

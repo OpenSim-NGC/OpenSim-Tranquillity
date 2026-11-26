@@ -1,14 +1,57 @@
 linux-x64 libjoltc.so
 
-joltc 886e088675bae3a086f8318c7803f8ee962c2f2c
-Jolt Physics e77f175595e64cb44218cc9d9d56fc365ad0e36a (v5.6.0)
+A deterministic rebuild of
+  joltc 886e088675bae3a086f8318c7803f8ee962c2f2c
+  Jolt Physics e77f175595e64cb44218cc9d9d56fc365ad0e36a (v5.6.0)
 
-Built as a shared library with CROSS_PLATFORM_DETERMINISTIC, single precision, asserts off,
-debug renderer off, floating-point exceptions off, profiler off, and no GPU compute.
-OBJECT_LAYER_BITS is 32. fmodf is bound to GLIBC_2.2.5 so the file loads on the same glibc
-floor as the JoltPhysics.Native 1.1.0 package file.
+This file is not the JoltPhysics.Native 1.1.0 package's linux-x64 library. The package file's own
+hash is recorded separately and checked against the restored package (JoltNative origin Package).
+The loaded file's origin is Rebuilt.
 
-SHA-256 ed9b88b77c8f27ef035bd9fd809af7a425757e5b8c37d11ec4527374a06dba59
+Rebuild it with native/linux-x64/build-deterministic.sh. The script takes a scratch directory and
+optional paths to the two checkouts above. It configures joltc with the Unix Makefiles generator:
 
-The build copies this file over the package's linux-x64 libjoltc.so. The package's other
-platform files are unchanged and are not built with CROSS_PLATFORM_DETERMINISTIC.
+  CMAKE_BUILD_TYPE=Release
+  CMAKE_OSX_ARCHITECTURES empty. joltc caches "x86_64;arm64" by default. That value matches
+    "arm64", and Jolt then skips every x86 instruction-set flag, so the empty value is required.
+  JOLT_PHYSICS_ROOT pointing at the Jolt checkout
+  CROSS_PLATFORM_DETERMINISTIC=ON
+  DOUBLE_PRECISION=OFF
+  USE_ASSERTS=OFF
+  debug renderer off (DEBUG_RENDERER_IN_DEBUG_AND_RELEASE and DEBUG_RENDERER_IN_DISTRIBUTION)
+  profiler off (PROFILER_IN_DEBUG_AND_RELEASE and PROFILER_IN_DISTRIBUTION)
+  FLOATING_POINT_EXCEPTIONS_ENABLED=OFF
+  GENERATE_DEBUG_SYMBOLS=OFF
+  INTERPROCEDURAL_OPTIMIZATION=OFF
+  ENABLE_ALL_WARNINGS=OFF
+  GPU backends off (JPH_USE_DX12, JPH_USE_VK, JPH_USE_MTL)
+  SSE2 only, the same floor as the stock package files: USE_SSE4_1, USE_SSE4_2, USE_AVX, USE_AVX2,
+    USE_AVX512, USE_LZCNT, USE_TZCNT, USE_F16C and USE_FMADD all OFF
+  CMAKE_C_FLAGS and CMAKE_CXX_FLAGS force-include glibc-fmodf-symver.h, which is
+    __asm__(".symver fmodf,fmodf@GLIBC_2.2.5");
+
+joltc sets OBJECT_LAYER_BITS to 32 before Jolt's option default of 16, so the library is 32-bit
+object layers. The script then builds the joltc target and strips the shared library with strip
+and no extra flags. The committed file is that stripped output.
+
+Toolchain that produced the committed bytes:
+  GCC 16.2.1 20260810 (x86_64-pc-linux-gnu)
+  CMake 4.5.1
+  GNU strip (GNU Binutils) 2.47
+
+The stripped file requires GLIBC symbols no newer than 2.34 and GLIBCXX symbols no newer than
+3.4.22, the same glibc floor as the JoltPhysics.Native 1.1.0 package file. fmodf is bound to
+GLIBC_2.2.5. The build host's own glibc may be newer; the symbol versions are what the file needs.
+
+The debug renderer is off, so this file does not export JPH_DebugRenderer_*, JPH_BodyDrawFilter_*,
+JPH_PhysicsSystem_Draw* or JPH_Shape_Draw. The module does not call them.
+
+SHA-256 27efc48c813e75294da11eaf22618bc1e0a5426a50edde7870ef4a60c8e4288b
+
+Licences for the code compiled into this file:
+  ThirdPartyLicenses/joltc.txt (joltc, MIT, Copyright (c) Amer Koleci and Contributors)
+  ThirdPartyLicenses/JoltPhysics.txt (Jolt Physics, MIT, Copyright 2021 Jorrit Rouwe)
+
+The build copies this file over the package's linux-x64 libjoltc.so. The package's other platform
+files are unchanged and are not built with CROSS_PLATFORM_DETERMINISTIC. Windows is one of those
+package files. It is not tested here. A deterministic Windows build is a follow-up, not this file.
