@@ -17,7 +17,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ProvisionRefusalCacheTests
     {
         private static readonly UUID Agent = new UUID("aaaaaaaa-1111-1111-1111-0000000a0072");
@@ -29,71 +28,76 @@ namespace osWebRtcVoice.Tests
 
         private ProvisionRefusalCache New(int pSeconds = 5) => new ProvisionRefusalCache(TimeSpan.FromSeconds(pSeconds), () => _now);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RepeatInsideTheWindow_HitsTheCache_AndIsCounted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var cache = New();
             var answer = new object();
-            Assert.That(cache.RecordRefusal(Agent, RegionA, answer), Is.EqualTo(0), "no previous window");
+            {
+                var assertedValue = cache.RecordRefusal(Agent, RegionA, answer);
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no previous window");
+            }
 
             _now += 1000;
-            Assert.That(cache.TryGetRefusal(Agent, RegionA, out object a1), Is.True);
+            Assert.True(cache.TryGetRefusal(Agent, RegionA, out object a1));
             _now += 1000;
-            Assert.That(cache.TryGetRefusal(Agent, RegionA, out object a2), Is.True);
-            Assert.That(a1, Is.SameAs(answer));
-            Assert.That(a2, Is.SameAs(answer));
+            Assert.True(cache.TryGetRefusal(Agent, RegionA, out object a2));
+            Assert.Same(answer, a1);
+            Assert.Same(answer, a2);
 
             _now += 3500;   // past the 5 s window
-            Assert.That(cache.TryGetRefusal(Agent, RegionA, out _), Is.False, "re-evaluated after the window");
-            Assert.That(cache.RecordRefusal(Agent, RegionA, answer), Is.EqualTo(2), "the previous window suppressed two retries");
+            Assert.False(cache.TryGetRefusal(Agent, RegionA, out _), "re-evaluated after the window");
+            {
+                var assertedValue = cache.RecordRefusal(Agent, RegionA, answer);
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the previous window suppressed two retries");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Clear_ForgetsTheRefusal()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var cache = New();
             cache.RecordRefusal(Agent, RegionA, "refused");
             cache.TryGetRefusal(Agent, RegionA, out _);
 
-            Assert.That(cache.Clear(Agent, RegionA), Is.EqualTo(1));
-            Assert.That(cache.TryGetRefusal(Agent, RegionA, out _), Is.False);
-            Assert.That(cache.Count, Is.EqualTo(0));
+            Assert.Equal(1, cache.Clear(Agent, RegionA));
+            Assert.False(cache.TryGetRefusal(Agent, RegionA, out _));
+            Assert.Equal(0, cache.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheKeyIsAgentAndRegion()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var cache = New();
             cache.RecordRefusal(Agent, RegionA, "refused");
 
-            Assert.That(cache.TryGetRefusal(Agent, RegionB, out _), Is.False, "same agent, other region");
-            Assert.That(cache.TryGetRefusal(Other, RegionA, out _), Is.False, "other agent, same region");
+            Assert.False(cache.TryGetRefusal(Agent, RegionB, out _), "same agent, other region");
+            Assert.False(cache.TryGetRefusal(Other, RegionA, out _), "other agent, same region");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ZeroSeconds_DisablesTheCache()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var cache = New(0);
             cache.RecordRefusal(Agent, RegionA, "refused");
-            Assert.That(cache.TryGetRefusal(Agent, RegionA, out _), Is.False);
+            Assert.False(cache.TryGetRefusal(Agent, RegionA, out _));
         }
     }
 
-    [TestFixture]
-    public class ProvisionRefusalCacheServiceTests
-    {
+    public class ProvisionRefusalCacheServiceTests : IAsyncLifetime
+        {
         private static readonly UUID Region = new UUID("bbbbbbbb-0000-0000-0000-0000000b0072");
         private static readonly UUID Alice = new UUID("aaaaaaaa-1111-1111-1111-0000000b0072");
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             FakeVoiceService.Mode = FakeProvisionMode.Fail;
             lock (FakeVoiceService.Created) FakeVoiceService.Created.Clear();
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             foreach (IVoiceViewerSession s in VoiceViewerSession.CaptureSessionsForClose(Region, Alice, UUID.Zero))
                 VoiceViewerSession.CloseCompleted(s);
@@ -125,60 +129,88 @@ namespace osWebRtcVoice.Tests
             lock (FakeVoiceService.Created) return FakeVoiceService.Created.Count;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RepeatRefusalInsideTheWindow_IsAnsweredFromTheCache_WithoutANewSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcVoiceServiceModule module = NewModule(5);
 
             OSDMap first = module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
             OSDMap second = module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
             OSDMap third = module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
 
-            Assert.That(CreatedCount(), Is.EqualTo(1), "only the first attempt created a session and reached the voice service");
+            {
+                var assertedValue = CreatedCount();
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "only the first attempt created a session and reached the voice service");
+            }
             foreach (OSDMap resp in new[] { first, second, third })
             {
-                Assert.That(resp["response"].AsString(), Is.EqualTo("failed"), "the same failure map every time");
-                Assert.That(resp["error"].AsString(), Is.EqualTo(first["error"].AsString()));
+                {
+                    var assertedValue = resp["response"].AsString();
+                    TestAssert.WithMessage(() => Assert.Equal("failed", assertedValue), "the same failure map every time");
+                }
+                Assert.Equal(first["error"].AsString(), resp["error"].AsString());
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AfterTheWindow_TheProvisionIsReEvaluated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcVoiceServiceModule module = NewModule(1);
 
             module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
             Thread.Sleep(1150);
             module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
 
-            Assert.That(CreatedCount(), Is.EqualTo(2), "the second attempt ran again after the window");
+            {
+                var assertedValue = CreatedCount();
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the second attempt ran again after the window");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Logout_ClearsTheCachedRefusal()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcVoiceServiceModule module = NewModule(5);
             module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
 
             OSDMap closed = module.ProvisionVoiceAccountRequest(new OSDMap { ["logout"] = OSD.FromBoolean(true) }, Alice, Region);
-            Assert.That(closed["response"].AsString(), Is.EqualTo("closed"));
+            Assert.Equal("closed", closed["response"].AsString());
 
             FakeVoiceService.Mode = FakeProvisionMode.Succeed;
             OSDMap resp = module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
 
-            Assert.That(CreatedCount(), Is.EqualTo(2), "after the logout the provision is evaluated again");
-            Assert.That(resp.ContainsKey("viewer_session"), Is.True, "and succeeds");
+            {
+                var assertedValue = CreatedCount();
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "after the logout the provision is evaluated again");
+            }
+            Assert.True(resp.ContainsKey("viewer_session"), "and succeeds");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RefusalCacheZero_EveryAttemptReachesTheVoiceService()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcVoiceServiceModule module = NewModule(0);
 
             module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
             module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
 
-            Assert.That(CreatedCount(), Is.EqualTo(2));
+            Assert.Equal(2, CreatedCount());
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

@@ -2,8 +2,8 @@
 
 The build job (`.github/workflows/dotnetci.yml`) runs every test project in `Tranquillity.sln` with
 `dotnet test` and then `tools/check-test-results.py`, which reads the `.trx` result files.
-The xUnit v3 migration retains VSTest, so the same run also discovers NUnit tests in mixed assemblies;
-the `.trx` logger and known-failure comparison remain unchanged. See [the testing guide](../Docs/TESTING.md)
+All active test projects now use xUnit v3. VSTest, the `.trx` logger and the known-failure comparison
+remain unchanged; excluded legacy NUnit projects are not part of this run. See [the testing guide](../Docs/TESTING.md)
 for project properties and filters.
 
 The job fails when:

@@ -53,10 +53,10 @@ task completion in the rate-limited log tests. The full Release test projects
 passed: `OpenSim.Capabilities.Handlers.Tests` 11 passed, 0 failed, 0 skipped;
 `OpenSim.Framework.Tests` 267 passed, 0 failed, 0 skipped.
 
-The framework package migration now replaces xUnit v2 with `xunit.v3` 4.0.3
+The earlier framework package migration replaced xUnit v2 with `xunit.v3` 4.0.3
 in 35 projects, including mixed NUnit/xUnit assemblies and the NUnit AIS
-harness, whose shared helpers require an xUnit app host. NUnit tests remain
-NUnit, and VSTest discovery and TRX reporting are retained. The shared fixture
+harness, whose shared helpers require an xUnit app host. NUnit tests remained
+NUnit at that stage, and VSTest discovery and TRX reporting were retained. The shared fixture
 uses `ValueTask` lifecycle methods and forwards async disposal to existing
 synchronous teardown overrides; its regression test fails without that
 forwarding and the seven shared tests pass with it.
@@ -78,6 +78,38 @@ compatibility fix was then verified separately: 232 passed, 0 failed, 0 skipped.
 Child-process physics diagnostics now use `ITestOutputHelper`, preserving the
 output their parent tests parse under v3. No failing assertions or known-failure
 entries were weakened.
+
+## Active NUnit suites converted to xUnit v3
+
+The AIS and both voice suites now use native xUnit v3 assertions, data attributes and fixture APIs.
+Unused NUnit dependencies were removed from Framework.Servers, Server.Handlers and the asset-client
+console harness. All **115 solution project manifests** are free of NUnit references; excluded projects
+remain unchanged. VSTest/TRX compatibility, serial execution and external-service opt-in guards are retained.
+Two regression cases verify that an incompatible plugin is refused before fixture setup; both fail
+without the guard and pass with it.
+
+Full Debug project runs after a non-incremental solution build recorded:
+
+| Project | Passed | Failed | Skipped / not executed |
+| --- | ---: | ---: | ---: |
+| OpenSim.Region.ClientStack.LindenCaps.AIS.Tests | 232 | 0 | 0 |
+| WebRtcJanusService.Tests | 625 | 0 | 4 |
+| WebRtcVoiceRegionModule.Tests | 1198 | 0 | 47 |
+| OpenSim.Framework.Servers.Tests | 5 | 0 | 0 |
+| OpenSim.Server.Handlers.Tests | 243 | 0 | 14 |
+
+Each project was run with `dotnet test Tests/<Project>/<Project>.csproj -c Debug --no-build --logger trx`.
+External opt-in environment variables were unset for these runs. Counts are taken from TRX records:
+the Janus console summary omits three explicit skips. Its 629 cases match the runnable NUnit baseline.
+The region suite preserves its 1206 baseline cases and adds 37 separately reported race repetitions
+and two plugin-guard cases. Baselines required temporarily removing NUnit timeout attributes that
+are unsupported on .NET 10; no assertions were removed. The asset-client harness has no tests and
+builds with its existing single CS8618 warning.
+
+`dotnet build Tranquillity.sln -c Debug --no-incremental -m:1` succeeds with **178 warnings, 0 errors**.
+`dotnet build Tranquillity.sln -c Release --no-restore --no-incremental -m:1` still fails with
+**0 warnings, 178 promoted errors**. The converted AIS and voice projects add no warnings.
+Live gateway, media and external-store checks remain pending; the full solution test suite was not rerun.
 
 ## Earlier cleanup baseline
 

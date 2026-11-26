@@ -10,23 +10,23 @@
  */
 using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class CallTextMuteTests
     {
         private static readonly UUID Group = NonSpatialIdentityTests.Group;
 
         // ---- text ------------------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMutedConferenceMembersLineGoesToNobody_AndAnotherMembersStillDoes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             SessionOutcome start = e.StartAdhoc(Alice, UUID.Random(), RegionA, new List<UUID> { Bob, Carol });
             UUID id = start.Session.SessionId;
@@ -35,22 +35,26 @@ namespace osWebRtcVoice.Tests
             e.Moderate(id, Alice, ModerationOp.TextMute, Bob, true);
 
             bool mine = AdhocTextSession.TryPlan(e, true, id, Bob, "hello", out AdhocTextPlan plan, out string decision);
-            Assert.That(mine, Is.True);
-            Assert.That(plan, Is.Null);
-            Assert.That(decision, Is.EqualTo(AdhocTextSession.DecisionMuted));
+            Assert.True(mine);
+            Assert.Null(plan);
+            Assert.Equal(AdhocTextSession.DecisionMuted, decision);
 
             AdhocTextSession.TryPlan(e, true, id, Carol, "hello", out AdhocTextPlan ok, out string okDecision);
-            Assert.That(ok, Is.Not.Null);
-            Assert.That(okDecision, Is.EqualTo(AdhocTextSession.DecisionDelivered));
+            Assert.NotNull(ok);
+            Assert.Equal(AdhocTextSession.DecisionDelivered, okDecision);
 
             e.Moderate(id, Alice, ModerationOp.TextMute, Bob, false);
             AdhocTextSession.TryPlan(e, true, id, Bob, "hello", out AdhocTextPlan again, out _);
-            Assert.That(again, Is.Not.Null, "unmuted");
+            {
+                var assertedValue = again;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "unmuted");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheGroupChatGateReadsTheRecord_AndAGridCopyIsKeptBrieflyAndDroppedOnAChange()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialIdentityTests.FakeClock clock = new();
             VoiceSessionService service = VoiceSessionServiceTests.NewService(clock);
             GridNonSpatialSessions a = VoiceSessionServiceTests.NewRegion(service);
@@ -58,22 +62,23 @@ namespace osWebRtcVoice.Tests
             a.Start(NonSpatialSessionType.Group, Alice, Group, Group, RegionA);
             CallGroupChatGate gate = new CallGroupChatGate(b, cache: true, clock.Get);
 
-            Assert.That(gate.MaySend(Group, Bob), Is.True);
+            Assert.True(gate.MaySend(Group, Bob));
             a.Moderate(Group, Alice, ModerationOp.TextMute, Bob, true);
-            Assert.That(gate.MaySend(Group, Bob), Is.True, "the copy kept for a few seconds still says yes");
+            Assert.True(gate.MaySend(Group, Bob), "the copy kept for a few seconds still says yes");
 
             gate.Forget(Group);
-            Assert.That(gate.MaySend(Group, Bob), Is.False);
+            Assert.False(gate.MaySend(Group, Bob));
 
             a.Moderate(Group, Alice, ModerationOp.TextMute, Bob, false);
             clock.Now += CallGroupChatGate.Kept + TimeSpan.FromSeconds(1);
-            Assert.That(gate.MaySend(Group, Bob), Is.True, "after the time it reads the service again");
-            Assert.That(gate.MaySend(UUID.Random(), Bob), Is.True, "a group with no call");
+            Assert.True(gate.MaySend(Group, Bob), "after the time it reads the service again");
+            Assert.True(gate.MaySend(UUID.Random(), Bob), "a group with no call");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheGroupChatGateKeepsAGridCopyForTenSeconds_SoOneReadServesTheLinesInBetween()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialIdentityTests.FakeClock clock = new();
             VoiceSessionService service = VoiceSessionServiceTests.NewService(clock);
             GridNonSpatialSessions a = VoiceSessionServiceTests.NewRegion(service);
@@ -91,12 +96,18 @@ namespace osWebRtcVoice.Tests
                 clock.Now = t0 + TimeSpan.FromSeconds(second);
                 gate.MaySend(Group, Bob);
             }
-            Assert.That(counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.Get)), Is.EqualTo(1), "five lines in nine seconds: one read");
+            {
+                var assertedValue = counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.Get));
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "five lines in nine seconds: one read");
+            }
 
             clock.Now = t0 + TimeSpan.FromSeconds(11);
             gate.MaySend(Group, Bob);
-            Assert.That(counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.Get)), Is.EqualTo(2), "and the next one after ten seconds reads again");
-            Assert.That(CallGroupChatGate.Kept, Is.EqualTo(TimeSpan.FromSeconds(10)));
+            {
+                var assertedValue = counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.Get));
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "and the next one after ten seconds reads again");
+            }
+            Assert.Equal(TimeSpan.FromSeconds(10), CallGroupChatGate.Kept);
         }
     }
 }

@@ -11,7 +11,6 @@ using OpenSim.Server.Handlers.Inventory;
 using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 using Xunit;
-using Theory = Xunit.TheoryAttribute;
 
 namespace OpenSim.Server.Handlers.Tests;
 

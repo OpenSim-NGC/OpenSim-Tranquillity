@@ -13,7 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Microsoft.Extensions.Logging;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -28,19 +28,13 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
-    public class RefusalWarningLogTests
-    {
+    public class RefusalWarningLogTests : IAsyncLifetime
+        {
         private const int Requests = 30;
 
         private LogCapture _log;
-
-        [SetUp]
-        public void SetUp() => _log = new LogCapture();
-
-        [TearDown]
-        public void TearDown() => _log.Dispose();
+        private void SetUp() => _log = new LogCapture();
+        private void TearDown() => _log.Dispose();
 
         private List<LogCapture.Line> Warnings(string contains) => _log.At(LogLevel.Warning, contains);
 
@@ -64,38 +58,44 @@ namespace osWebRtcVoice.Tests
             return response.StatusCode;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusedChannelType_WarnsOncePerAgent_NotOncePerRequest()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = Region.Create();
 
             for (int i = 0; i < Requests; i++)
-                Assert.That(Provision(r, Member, Body("bogus")), Is.EqualTo((int)HttpStatusCode.Forbidden));
+                Assert.Equal((int)HttpStatusCode.Forbidden, Provision(r, Member, Body("bogus")));
 
-            Assert.That(Warnings("refusing provision with channel_type").Count, Is.EqualTo(1));
+            Assert.Single(Warnings("refusing provision with channel_type"));
 
             UUID another = UUID.Random();
             SceneHelpers.AddScenePresence(r.Scene, another);
             Provision(r, another, Body("bogus"));
-            Assert.That(Warnings("refusing provision with channel_type").Count, Is.EqualTo(2), "another agent has its own line");
+            {
+                var assertedValue = Warnings("refusing provision with channel_type").Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "another agent has its own line");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusedChildAgent_WarnsOncePerAgent_NotOncePerRequest()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = Region.Create();
             UUID child = UUID.Random();
             SceneHelpers.AddChildScenePresence(r.Scene, child);
 
             for (int i = 0; i < Requests; i++)
-                Assert.That(r.Call(child), Is.EqualTo((int)HttpStatusCode.Forbidden));
+                Assert.Equal((int)HttpStatusCode.Forbidden, r.Call(child));
 
-            Assert.That(Warnings("refusing child agent").Count, Is.EqualTo(1));
+            Assert.Single(Warnings("refusing child agent"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusedGroupProvision_WarnsOncePerAgent_NotOncePerRequest()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = Region.Create();
             r.Call(Officer);
             string room = r.Sessions.Get(GroupId).RoomKey;
@@ -103,14 +103,15 @@ namespace osWebRtcVoice.Tests
             SceneHelpers.AddScenePresence(r.Scene, stranger);
 
             for (int i = 0; i < Requests; i++)
-                Assert.That(Provision(r, stranger, Body("multiagent", room, "not-the-token")), Is.EqualTo((int)HttpStatusCode.Forbidden));
+                Assert.Equal((int)HttpStatusCode.Forbidden, Provision(r, stranger, Body("multiagent", room, "not-the-token")));
 
-            Assert.That(Warnings("refusing group provision").Count, Is.EqualTo(1));
+            Assert.Single(Warnings("refusing group provision"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStrangersLinesToAConference_WarnOncePerSender_NotOncePerLine()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = Region.Create(v => v.Set("AdhocVoiceEnabled", "true"));
             UUID home = r.Scene.RegionInfo.RegionID;
             UUID conference = r.Sessions.StartAdhoc(Officer, UUID.Random(), home, new[] { Member }).Session.SessionId;
@@ -126,12 +127,13 @@ namespace osWebRtcVoice.Tests
                     message = "let me in " + i,
                 });
 
-            Assert.That(Warnings(stranger.ToString()).Count, Is.EqualTo(1));
+            Assert.Single(Warnings(stranger.ToString()));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASignedConferenceLineFromANonMember_WarnsOnce_NotOncePerCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
             string roomKey = two.Engine.Store.Get(session).RoomKey;
@@ -140,12 +142,13 @@ namespace osWebRtcVoice.Tests
                 Invoke(two.Module, "OnIncomingConferenceText", AdhocTextTransport.Build(Bob, Stranger, "Test Stranger", session, RegionA,
                     "let me in " + i, null, roomKey, (CarrierAuth)GetPrivate(one.Module, "m_carrierAuth")));
 
-            Assert.That(Warnings(Stranger.ToString()).Count, Is.EqualTo(1));
+            Assert.Single(Warnings(Stranger.ToString()));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingWhoseRoomKeyIsWrong_WarnsOnce_NotOncePerRing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The far process derives its room keys from another grid id, so every genuine ring it receives is refused.
             INonSpatialSessionStore store1 = new InMemoryNonSpatialSessionStore();
             Node one = MakeNode("Region One", 1000, store1);
@@ -163,25 +166,44 @@ namespace osWebRtcVoice.Tests
                 Invoke(two.Module, "OnIncomingGroupRing",
                     GroupVoiceRingTransport.Build(Bob, Alice, "Test User", start.Session.SessionId, RegionA, invitation, auth));
 
-            Assert.That(Warnings("check GatekeeperURI").Count, Is.EqualTo(1));
+            Assert.Single(Warnings("check GatekeeperURI"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusedAvatarToAvatarCarrier_WarnsOncePerDecision_NotOncePerCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = Region.Create();
             A2ACarrier carrier = new A2ACarrier { Step = A2ACarrierTransport.StepRing, Target = Member, About = Officer, SessionId = UUID.Random() };
 
             for (int i = 0; i < Requests; i++)
                 Invoke(r.Module, "LogA2ACarrier", carrier, A2ACarrierTransport.DecisionBadToken, null);
-            Assert.That(Warnings(A2ACarrierTransport.DecisionBadToken).Count, Is.EqualTo(1));
+            Assert.Single(Warnings(A2ACarrierTransport.DecisionBadToken));
 
             Invoke(r.Module, "LogA2ACarrier", carrier, A2ACarrierTransport.DecisionBadRoom, null);
-            Assert.That(Warnings(A2ACarrierTransport.DecisionBadRoom).Count, Is.EqualTo(1), "another reason has its own line");
+            {
+                var assertedValue = Warnings(A2ACarrierTransport.DecisionBadRoom).Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "another reason has its own line");
+            }
 
             for (int i = 0; i < Requests; i++)
                 Invoke(r.Module, "LogA2ACarrier", carrier, A2ACarrierTransport.DecisionSent, null);
-            Assert.That(Warnings(A2ACarrierTransport.DecisionSent), Is.Empty, "a carrier that was sent is a Debug line, as before");
+            {
+                var assertedValue = Warnings(A2ACarrierTransport.DecisionSent);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a carrier that was sent is a Debug line, as before");
+            }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

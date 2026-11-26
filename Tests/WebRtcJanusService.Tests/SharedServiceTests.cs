@@ -17,7 +17,6 @@ using Nini.Config;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class SharedServiceTests
     {
         private const string ServiceName = "WebRtcJanusService.dll:WebRtcJanusService";
@@ -41,22 +40,30 @@ namespace osWebRtcVoice.Tests
                 .GetField(field, BindingFlags.Instance | BindingFlags.NonPublic)
                 .GetValue(module);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SameDllForBothRoles_NonSpatialServiceIsTheSpatialService()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var module = InitialiseModule(ServiceName, ServiceName);
             object spatial = GetService(module, "m_spatialVoiceService");
-            Assert.That(spatial, Is.Not.Null, "precondition: the service loaded");
-            Assert.That(GetService(module, "m_nonSpatialVoiceService"), Is.SameAs(spatial));
+            {
+                var assertedValue = spatial;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "precondition: the service loaded");
+            }
+            Assert.Same(spatial, GetService(module, "m_nonSpatialVoiceService"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void NonSpatialServiceNotConfigured_DefaultsToTheSpatialService()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var module = InitialiseModule(ServiceName, null);
             object spatial = GetService(module, "m_spatialVoiceService");
-            Assert.That(spatial, Is.Not.Null, "precondition: the service loaded");
-            Assert.That(GetService(module, "m_nonSpatialVoiceService"), Is.SameAs(spatial));
+            {
+                var assertedValue = spatial;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "precondition: the service loaded");
+            }
+            Assert.Same(spatial, GetService(module, "m_nonSpatialVoiceService"));
         }
     }
 }

@@ -22,36 +22,38 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VoiceMembershipIndexTests
     {
         // VoiceService is only stored, never dereferenced by the index paths, so null is fine.
         private static VoiceViewerSession NewSession(UUID region, UUID agent)
             => new VoiceViewerSession(null, region, agent);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AddThenQuery_AgentIsPresent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random();
             VoiceViewerSession.AddViewerSession(NewSession(region, agent));
-            Assert.That(VoiceViewerSession.IsAgentInRegion(region, agent), Is.True);
+            Assert.True(VoiceViewerSession.IsAgentInRegion(region, agent));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RemoveThenQuery_AgentIsAbsent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random();
             VoiceViewerSession s = NewSession(region, agent);
             VoiceViewerSession.AddViewerSession(s);
             VoiceViewerSession.RemoveViewerSession(s.ViewerSessionID);
-            Assert.That(VoiceViewerSession.IsAgentInRegion(region, agent), Is.False);
+            Assert.False(VoiceViewerSession.IsAgentInRegion(region, agent));
         }
 
         // Refcount: while a second session for the same agent is still live, removing the first must
         // NOT blink the agent out of the matrix. Only the last session leaving clears membership.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TwoSessionsOneRemoved_AgentStaysPresent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random();
             VoiceViewerSession s1 = NewSession(region, agent);
             VoiceViewerSession s2 = NewSession(region, agent);
@@ -59,52 +61,62 @@ namespace osWebRtcVoice.Tests
             VoiceViewerSession.AddViewerSession(s2);
 
             VoiceViewerSession.RemoveViewerSession(s1.ViewerSessionID);
-            Assert.That(VoiceViewerSession.IsAgentInRegion(region, agent), Is.True,
-                "agent must remain a member while its second session is live");
+            Assert.True(VoiceViewerSession.IsAgentInRegion(region, agent), "agent must remain a member while its second session is live");
 
             VoiceViewerSession.RemoveViewerSession(s2.ViewerSessionID);
-            Assert.That(VoiceViewerSession.IsAgentInRegion(region, agent), Is.False,
-                "membership clears once the last session leaves");
+            Assert.False(VoiceViewerSession.IsAgentInRegion(region, agent), "membership clears once the last session leaves");
         }
 
         // Teardown paths genuinely re-arrive for the same session (the registry leaks and cleanup is
         // best-effort). A second remove of a now-cleared id must be a silent no-op, never throwing
         // and never driving the refcount negative.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void DoubleRemove_IsNoOpAndDoesNotThrow()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random();
             VoiceViewerSession s = NewSession(region, agent);
             VoiceViewerSession.AddViewerSession(s);
             VoiceViewerSession.RemoveViewerSession(s.ViewerSessionID);
 
-            Assert.DoesNotThrow(() => VoiceViewerSession.RemoveViewerSession(s.ViewerSessionID));
-            Assert.That(VoiceViewerSession.IsAgentInRegion(region, agent), Is.False,
-                "a second remove must not resurrect or corrupt membership");
+            {
+                var assertedValue = () => VoiceViewerSession.RemoveViewerSession(s.ViewerSessionID);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
+            Assert.False(VoiceViewerSession.IsAgentInRegion(region, agent), "a second remove must not resurrect or corrupt membership");
         }
 
         // A remove for a session id the index never saw. Removes genuinely re-arrive for entries
         // already cleared (a hangup racing a close-time capture) or never registered. That must be
         // a no-op on the teardown path, not an exception.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RemoveNeverAdded_IsNoOp()
         {
-            Assert.DoesNotThrow(() => VoiceViewerSession.RemoveViewerSession(UUID.Random().ToString()));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            {
+                var assertedValue = () => VoiceViewerSession.RemoveViewerSession(UUID.Random().ToString());
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
         }
 
         // Region scoping: the index answers per-region. An agent voiced in region A must not read as
         // present in region B — the exact case (adjacent-region child agents) that a global check
         // would wrongly admit as a spurious matrix column.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RegionScoping_AgentInRegionA_NotPresentInRegionB()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID regionA = UUID.Random(), regionB = UUID.Random(), agent = UUID.Random();
             VoiceViewerSession.AddViewerSession(NewSession(regionA, agent));
 
-            Assert.That(VoiceViewerSession.IsAgentInRegion(regionA, agent), Is.True,
-                "present in its own region");
-            Assert.That(VoiceViewerSession.IsAgentInRegion(regionB, agent), Is.False,
-                "an adjacent region must not see the agent as a voice participant");
+            Assert.True(VoiceViewerSession.IsAgentInRegion(regionA, agent), "present in its own region");
+            Assert.False(VoiceViewerSession.IsAgentInRegion(regionB, agent), "an adjacent region must not see the agent as a voice participant");
         }
     }
 }
