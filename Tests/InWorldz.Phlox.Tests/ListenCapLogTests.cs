@@ -14,7 +14,6 @@ using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Framework;
 using Xunit;
-using Xunit.Abstractions;
 using Clock = InWorldz.Phlox.Util.Clock;
 
 namespace InWorldz.Phlox.Tests;

@@ -421,7 +421,7 @@ public class SubstepSceneTests
                 catch (Exception e) { failure = e; }
             });
             heartbeat.Start();
-            started.Wait();
+            started.Wait(TestContext.Current.CancellationToken);
             Thread.Sleep(20 + cycle * 7);
             s.Dispose();
             Assert.True(heartbeat.Join(TimeSpan.FromSeconds(30)), "the heartbeat did not finish after teardown");
@@ -464,7 +464,7 @@ public class SubstepSceneTests
                 catch (Exception e) { failure = e; }
             });
             heartbeat.Start();
-            started.Wait();
+            started.Wait(TestContext.Current.CancellationToken);
             Thread.Sleep(cycle % 5);
             s.Dispose();
             Assert.True(heartbeat.Join(TimeSpan.FromSeconds(30)), "the heartbeat did not finish after teardown");

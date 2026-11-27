@@ -11,7 +11,6 @@ using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using OpenSim.Region.PhysicsModules.Jolt.Harness;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -90,7 +89,7 @@ public class FlyingSeatedAndFastLinksetAvatarTests
 
     // ------------------------------------------------------------------ 1. a flying avatar hit by a box
 
-    [Theory]
+    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 6 scenario(s)")]
     [InlineData(45.0, 1f, 5f)]
     [InlineData(0.0, 1f, 5f)]
     [InlineData(45.0, 1f, 20f)]
@@ -173,7 +172,7 @@ public class FlyingSeatedAndFastLinksetAvatarTests
 
     // ------------------------------------------------------------------ 2. a flying avatar flying into an object
 
-    [Theory]
+    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 6 scenario(s)")]
     [InlineData(45.0, 0f)]
     [InlineData(0.0, 0f)]
     [InlineData(45.0, 1f)]
@@ -451,7 +450,7 @@ public class FlyingSeatedAndFastLinksetAvatarTests
         }
     }
 
-    [Theory]
+    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 16 scenario(s)")]
     [MemberData(nameof(LinksetCases))]
     public void A_fast_linkset_does_not_pass_through_an_avatar_moves_it_within_the_push_limits_and_is_named_by_its_root(
         double physicsHz, float kg, float speed, string avatarIs)

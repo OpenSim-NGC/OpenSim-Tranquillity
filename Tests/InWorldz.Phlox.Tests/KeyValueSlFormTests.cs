@@ -10,7 +10,6 @@ using System.Diagnostics;
 using OpenMetaverse;
 using OpenSim.Services.Interfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 
