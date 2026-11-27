@@ -3111,10 +3111,13 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // _characterGate, for a new controller and for the one that replaces it on a resize.
         private void WireCharacter(JoltCharacterRecord rec, CharacterVirtual character)
         {
+            // The module's character contact normal points from the character into what it touches. Jolt's contact
+            // normal points the other way: its callbacks used to pass -mContactNormal and now pass the contact itself
+            // (Jolt Docs/APIChanges.md, 20260506), so it is negated here.
             character.OnContactAdded += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
-                => NoteCharacterBodyContact(rec, contact.BodyB.ID, contact.SubShapeIDB.Value, ToVec(contact.RPosition), contact.ContactNormal, ContactPhase.Begin, ref s);
+                => NoteCharacterBodyContact(rec, contact.BodyB.ID, contact.SubShapeIDB.Value, ToVec(contact.RPosition), -contact.ContactNormal, ContactPhase.Begin, ref s);
             character.OnContactPersisted += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
-                => NoteCharacterBodyContact(rec, contact.BodyB.ID, contact.SubShapeIDB.Value, ToVec(contact.RPosition), contact.ContactNormal, ContactPhase.Persist, ref s);
+                => NoteCharacterBodyContact(rec, contact.BodyB.ID, contact.SubShapeIDB.Value, ToVec(contact.RPosition), -contact.ContactNormal, ContactPhase.Persist, ref s);
             character.OnContactRemoved += (CharacterVirtual cv, in BodyID b2, SubShapeID ss)
                 => PushCharacterBodyContact(rec, b2.ID, ss.Value, default, default, ContactPhase.End);
 
@@ -3126,9 +3129,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 character.SetCharacterVsCharacterCollision(_charVsChar);
             }
             character.OnCharacterContactAdded += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
-                => PushCharacterCharacterContact(rec, contact.CharacterB, ToVec(contact.RPosition), contact.ContactNormal, ContactPhase.Begin);
+                => PushCharacterCharacterContact(rec, contact.CharacterB, ToVec(contact.RPosition), -contact.ContactNormal, ContactPhase.Begin);
             character.OnCharacterContactPersisted += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
-                => PushCharacterCharacterContact(rec, contact.CharacterB, ToVec(contact.RPosition), contact.ContactNormal, ContactPhase.Persist);
+                => PushCharacterCharacterContact(rec, contact.CharacterB, ToVec(contact.RPosition), -contact.ContactNormal, ContactPhase.Persist);
         }
 
         // The supporting plane is one radius below the capsule's centre, and CharacterVirtual takes it only at creation
