@@ -17,7 +17,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ParticipantMuteTests
     {
         private const long BigId = 6969906757968657;
@@ -26,56 +25,73 @@ namespace osWebRtcVoice.Tests
             => new AudioBridgeResp(JanusMessageResp.FromJson(
                 "{\"janus\":\"success\",\"plugindata\":{\"plugin\":\"janus.plugin.audiobridge\",\"data\":" + data + "}}"));
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void P1_AJoinAnswersParticipantId_KeepsAll64Bits()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var join = new AudioBridgeJoinRoomResp(JanusMessageResp.FromJson(
                 "{\"janus\":\"event\",\"plugindata\":{\"plugin\":\"janus.plugin.audiobridge\",\"data\":{\"audiobridge\":\"joined\",\"room\":5,\"id\":" + BigId + "}}}"));
 
-            Assert.That(join.ParticipantId, Is.EqualTo(BigId));
+            Assert.Equal(BigId, join.ParticipantId);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void P2_TheMuteRequest_NamesTheWholeParticipantId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string json = new AudioBridgeMuteReq(5, BigId, true).ToJson();
 
-            Assert.That(json, Does.Contain("\"request\":\"mute\"").And.Contain("\"room\":5").And.Contain("\"id\":" + BigId));
+            {
+                var assertedValue = json;
+                Assert.Contains("\"request\":\"mute\"", assertedValue);
+                Assert.Contains("\"room\":5", assertedValue);
+                Assert.Contains("\"id\":" + BigId, assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void P3_TheLeaveRequest_NamesTheWholeParticipantId()
         {
-            Assert.That(new AudioBridgeLeaveRoomReq(5, BigId).ToJson(), Does.Contain("\"id\":" + BigId));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Contains("\"id\":" + BigId, new AudioBridgeLeaveRoomReq(5, BigId).ToJson());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void P4_AnUnmuteRequest_IsAnUnmute()
         {
-            Assert.That(new AudioBridgeMuteReq(5, 7, false).ToJson(), Does.Contain("\"request\":\"unmute\""));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Contains("\"request\":\"unmute\"", new AudioBridgeMuteReq(5, 7, false).ToJson());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void P5_Success_IsApplied()
-            => Assert.That(JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"success\"}")), Is.EqualTo(ParticipantMuteResult.Applied));
 
-        [Test]
+            {
+    TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+    Assert.Equal(ParticipantMuteResult.Applied, JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"success\"}")));
+}
+        [Fact(Timeout = 60000)]
         public void P6_UnknownRequest_MeansTheAudioBridgeCannotMute()
-            => Assert.That(JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"event\",\"error_code\":482,\"error\":\"Unknown request 'mute'\"}")),
-                Is.EqualTo(ParticipantMuteResult.Unsupported));
 
-        [TestCase(485)]
-        [TestCase(492)]
+            {
+    TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+    Assert.Equal(ParticipantMuteResult.Unsupported, JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"event\",\"error_code\":482,\"error\":\"Unknown request 'mute'\"}")));
+}
+        [InlineData(485)]
+        [InlineData(492)]
+        [Theory(Timeout = 60000)]
         public void P7_NoSuchRoomOrUser_MeansTheParticipantIsNotThere(int code)
-            => Assert.That(JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"event\",\"error_code\":" + code + ",\"error\":\"x\"}")),
-                Is.EqualTo(ParticipantMuteResult.NotInRoom));
 
-        [Test]
+            {
+    TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+    Assert.Equal(ParticipantMuteResult.NotInRoom, JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"event\",\"error_code\":" + code + ",\"error\":\"x\"}")));
+}
+        [Fact(Timeout = 60000)]
         public void P8_AnyOtherError_OrNoAnswer_IsAFailure()
         {
-            Assert.That(JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"event\",\"error_code\":487,\"error\":\"Not joined\"}")),
-                Is.EqualTo(ParticipantMuteResult.Failed));
-            Assert.That(JanusAudioBridge.ClassifyMuteReply(null), Is.EqualTo(ParticipantMuteResult.Failed));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(ParticipantMuteResult.Failed, JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"event\",\"error_code\":487,\"error\":\"Not joined\"}")));
+            Assert.Equal(ParticipantMuteResult.Failed, JanusAudioBridge.ClassifyMuteReply(null));
         }
     }
 }

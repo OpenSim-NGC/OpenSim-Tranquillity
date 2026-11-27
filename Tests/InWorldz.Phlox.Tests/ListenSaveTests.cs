@@ -18,7 +18,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.OptionalModules.World.NPC;
 using OpenSim.Tests.Common;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

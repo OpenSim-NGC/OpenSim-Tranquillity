@@ -27,7 +27,6 @@ using System.Threading;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class RoomSelectionConcurrencyTests
     {
         // JanusRoom's ctor only stores the plugin handle (used later by Join/Leave); a
@@ -37,9 +36,10 @@ namespace osWebRtcVoice.Tests
         // --- Part 1: CreateWithRecheck ---
 
         // Non-486 / inconclusive first attempt, room exists on the retry -> reuse.
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task CreateWithRecheck_InconclusiveThenExists_ReusesOnRetry()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int attempts = 0;
             Func<Task<JanusRoom>> attempt = () =>
             {
@@ -50,33 +50,38 @@ namespace osWebRtcVoice.Tests
 
             JanusRoom result = await JanusAudioBridge.CreateWithRecheck(attempt);
 
-            Assert.That(attempts, Is.EqualTo(2), "must re-check exactly once after an inconclusive first attempt");
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.RoomId, Is.EqualTo(4242));
+            {
+                var assertedValue = attempts;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "must re-check exactly once after an inconclusive first attempt");
+            }
+            Assert.NotNull(result);
+            Assert.Equal(4242, result.RoomId);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task CreateWithRecheck_FirstSucceeds_NoRetry()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int attempts = 0;
             Func<Task<JanusRoom>> attempt = () => { attempts++; return Task.FromResult(FakeRoom(1)); };
 
             JanusRoom result = await JanusAudioBridge.CreateWithRecheck(attempt);
 
-            Assert.That(attempts, Is.EqualTo(1));
-            Assert.That(result, Is.Not.Null);
+            Assert.Equal(1, attempts);
+            Assert.NotNull(result);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task CreateWithRecheck_BothInconclusive_ReturnsNull()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int attempts = 0;
             Func<Task<JanusRoom>> attempt = () => { attempts++; return Task.FromResult<JanusRoom>(null); };
 
             JanusRoom result = await JanusAudioBridge.CreateWithRecheck(attempt);
 
-            Assert.That(attempts, Is.EqualTo(2));
-            Assert.That(result, Is.Null);
+            Assert.Equal(2, attempts);
+            Assert.Null(result);
         }
 
         // --- Part 2: SelectRoomCoalesced ---
@@ -85,9 +90,10 @@ namespace osWebRtcVoice.Tests
         // at a time through the per-room gate, never overlapping - and the mixer answers one "created" and N-1 486s,
         // all of which are success. The process-wide hint used to make the other racers skip the create; that hint
         // is deleted (a stale one cost a viewer more than five seconds).
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SelectRoomCoalesced_ConcurrentSameRoom_CreatesSerialized_AllSucceed()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int room = 900001;   // distinct per test (static process-wide state)
             int creates = 0, inFlight = 0, maxInFlight = 0;
 
@@ -109,15 +115,22 @@ namespace osWebRtcVoice.Tests
                 tasks[i] = JanusAudioBridge.SelectRoomCoalesced(room, create);
             JanusRoom[] results = await Task.WhenAll(tasks);
 
-            Assert.That(creates, Is.EqualTo(N), "every select asks the mixer");
-            Assert.That(maxInFlight, Is.EqualTo(1), "but never two creates of one room at once");
-            Assert.That(results, Has.All.Not.Null);
+            {
+                var assertedValue = creates;
+                TestAssert.WithMessage(() => Assert.Equal(N, assertedValue), "every select asks the mixer");
+            }
+            {
+                var assertedValue = maxInFlight;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "but never two creates of one room at once");
+            }
+            Assert.All(results, item => Assert.NotNull(item));
         }
 
         // A room this process created is asked for again on the next select - nothing is remembered.
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SelectRoomCoalesced_AfterACreate_TheNextSelectAsksTheMixerAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int room = 900002;
             int creates = 0;
             Func<Task<JanusRoom>> create = () => { Interlocked.Increment(ref creates); return Task.FromResult(FakeRoom(room)); };
@@ -125,13 +138,14 @@ namespace osWebRtcVoice.Tests
             await JanusAudioBridge.SelectRoomCoalesced(room, create);
             await JanusAudioBridge.SelectRoomCoalesced(room, create);
 
-            Assert.That(creates, Is.EqualTo(2));
+            Assert.Equal(2, creates);
         }
 
         // An inconclusive create (null) is returned as null, and the next select simply tries again.
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SelectRoomCoalesced_FailedCreate_ReturnsNull_AndTheNextSelectTriesAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int room = 900003;
             int creates = 0;
             Func<Task<JanusRoom>> failingCreate = () => { Interlocked.Increment(ref creates); return Task.FromResult<JanusRoom>(null); };
@@ -139,9 +153,9 @@ namespace osWebRtcVoice.Tests
             JanusRoom first = await JanusAudioBridge.SelectRoomCoalesced(room, failingCreate);
             JanusRoom second = await JanusAudioBridge.SelectRoomCoalesced(room, failingCreate);
 
-            Assert.That(first, Is.Null);
-            Assert.That(second, Is.Null);
-            Assert.That(creates, Is.EqualTo(2));
+            Assert.Null(first);
+            Assert.Null(second);
+            Assert.Equal(2, creates);
         }
     }
 }

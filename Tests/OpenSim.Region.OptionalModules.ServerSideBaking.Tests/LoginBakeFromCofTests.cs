@@ -307,10 +307,10 @@ public class LoginBakeFromCofTests
             using (var log = new LogCapture())
             {
                 bake = Task.Run(() => rig.Module.LoginBakeAsync(rig.Presence, CancellationToken.None));
-                Assert.True(gated.Entered.Wait(TimeSpan.FromSeconds(30)), "the login bake never read the Current Outfit");
+                Assert.True(gated.Entered.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the login bake never read the Current Outfit");
 
                 // generous: the limit is 300 ms, so a bake held by the read is what keeps this from finishing
-                finished = await Task.WhenAny(bake, Task.Delay(TimeSpan.FromSeconds(30))) == bake;
+                finished = await Task.WhenAny(bake, Task.Delay(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken)) == bake;
                 warnings = log.Messages.Where(m => m.Contains("could not read the Current Outfit", StringComparison.Ordinal) && m.Contains(Agent.ToString(), StringComparison.Ordinal)).ToList();
             }
         }
@@ -325,8 +325,8 @@ public class LoginBakeFromCofTests
         Assert.Single(warnings);
 
         // the late read must not rewrite the worn set behind the bake that was sent
-        Assert.True(gated.Left.Wait(TimeSpan.FromSeconds(30)), "the stalled read never finished");
-        await Task.Delay(TimeSpan.FromMilliseconds(500));   // a NOT-happened window: the late read's result has nowhere to go
+        Assert.True(gated.Left.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the stalled read never finished");
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);   // a NOT-happened window: the late read's result has nowhere to go
         Assert.Equal(1, rig.Presence.Appearance.Wearables[Alpha].Count);
     }
 }

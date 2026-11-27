@@ -156,7 +156,7 @@ public class VehicleStateQueueTests
                 }
             }
             catch (Exception e) { fault = e; }
-        });
+        }, TestContext.Current.CancellationToken);
 
         try
         {
@@ -184,7 +184,7 @@ public class VehicleStateQueueTests
             stop.Cancel();
             // the script tasks were cancelled just above; the wait only bounds how long the test lets them wind down
 #pragma warning disable xUnit1031
-            scripts.Wait(TimeSpan.FromSeconds(10));
+            scripts.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 #pragma warning restore xUnit1031
         }
         Assert.Null(fault);

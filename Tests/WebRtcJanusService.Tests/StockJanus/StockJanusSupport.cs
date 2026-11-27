@@ -29,11 +29,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Nini.Config;
+using Xunit;
+using Xunit.v3;
 
 namespace osWebRtcVoice.Tests.StockJanus
 {
@@ -54,16 +57,16 @@ namespace osWebRtcVoice.Tests.StockJanus
     /// gateway the attribute does nothing and the fixture's own opt-in skip applies.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
-    public sealed class NeedsPluginAttribute : NUnit.Framework.NUnitAttribute, NUnit.Framework.Interfaces.IApplyToTest
+    public sealed class NeedsPluginAttribute : BeforeAfterTestAttribute
     {
         public JanusPluginKind Needs { get; }
 
         public NeedsPluginAttribute(JanusPluginKind needs) { Needs = needs; }
 
-        public void ApplyToTest(NUnit.Framework.Internal.Test test)
+        public string GetSkipReason()
         {
             if (!StockJanusEnvironment.Configured)
-                return;
+                return null;
             bool fits = Needs switch
             {
                 JanusPluginKind.Stock => StockJanusEnvironment.IsStockPlugin,
@@ -71,10 +74,14 @@ namespace osWebRtcVoice.Tests.StockJanus
                 _ => true,
             };
             if (fits)
-                return;
-            test.RunState = NUnit.Framework.Interfaces.RunState.Ignored;
-            test.Properties.Set(NUnit.Framework.Internal.PropertyNames.SkipReason,
-                $"needs the {(Needs == JanusPluginKind.Stock ? "stock AudioBridge" : "slvoice mixer")} plugin; this run drives {StockJanusEnvironment.PluginName}");
+                return null;
+            return $"needs the {(Needs == JanusPluginKind.Stock ? "stock AudioBridge" : "slvoice mixer")} plugin; this run drives {StockJanusEnvironment.PluginName}";
+        }
+
+        public override void Before(MethodInfo methodUnderTest, IXunitTest test)
+        {
+            if (GetSkipReason() is { } reason)
+                Assert.Skip(reason);
         }
     }
 
@@ -104,30 +111,34 @@ namespace osWebRtcVoice.Tests.StockJanus
             int.TryParse(Get("WEBRTC_JANUS_TEST_GRACE_SECONDS"), out int g) && g > 0 ? g : 70;
 
         /// <summary>Skips the calling fixture unless a Janus endpoint is named.</summary>
-        public static void IgnoreUnlessConfigured()
+        public static void IgnoreUnlessConfigured(JanusPluginKind needs = JanusPluginKind.Any)
         {
-            if (!Configured)
-                NUnit.Framework.Assert.Ignore($"{UrlVariable} is not set: the Janus integration tests are opt-in");
+            if (GetConfigurationSkipReason(needs) is { } reason)
+                Assert.Skip(reason);
         }
+
+        public static string GetConfigurationSkipReason(JanusPluginKind needs) =>
+            !Configured ? $"{UrlVariable} is not set: the Janus integration tests are opt-in" :
+                new NeedsPluginAttribute(needs).GetSkipReason();
 
         /// <summary>Skips the calling test unless a Python with aiortc is named.</summary>
         public static void IgnoreUnlessPeerAvailable()
         {
             if (string.IsNullOrEmpty(Python))
-                NUnit.Framework.Assert.Ignore("WEBRTC_JANUS_TEST_PYTHON is not set: this test needs a real WebRTC peer (aiortc)");
+                Assert.Skip("WEBRTC_JANUS_TEST_PYTHON is not set: this test needs a real WebRTC peer (aiortc)");
         }
 
         /// <summary>Skips the calling test unless the plugin under test is the stock AudioBridge.</summary>
         public static void IgnoreUnlessAudioBridge()
         {
             if (PluginName != "janus.plugin.audiobridge")
-                NUnit.Framework.Assert.Ignore("this test is about the stock AudioBridge plugin");
+                Assert.Skip("this test is about the stock AudioBridge plugin");
         }
 
         public static void IgnoreUnlessRestartable()
         {
             if (string.IsNullOrEmpty(Container))
-                NUnit.Framework.Assert.Ignore("WEBRTC_JANUS_TEST_CONTAINER is not set: this test restarts the gateway's container");
+                Assert.Skip("WEBRTC_JANUS_TEST_CONTAINER is not set: this test restarts the gateway's container");
         }
 
         /// <summary>Fills the [WebRtcVoice] and [JanusWebRtcVoice] sections the service and region module read.

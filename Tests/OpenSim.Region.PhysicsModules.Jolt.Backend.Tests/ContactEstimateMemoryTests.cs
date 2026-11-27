@@ -11,7 +11,6 @@ using System.Numerics;
 using System.Reflection;
 using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -126,7 +125,7 @@ public class ContactEstimateMemoryTests
         long[] intervals = readings.Zip(readings.Skip(1), (a, b) => (b - a) / ReadEvery).Order().ToArray();
         long median = (intervals[(intervals.Length - 1) / 2] + intervals[intervals.Length / 2]) / 2;
         long overall = (readings[^1] - readings[0]) / WindowSteps;
-        Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+        _out.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"CONTACT-ESTIMATE-MEMORY median_bytes_per_step={median} overall_bytes_per_step={overall} reports={reports} " +
             $"window={WindowSteps} readings_kb={string.Join(",", readings.Select(r => r / 1024))}"));
     }
