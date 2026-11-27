@@ -31,7 +31,7 @@ public class VolumeDetectFastCrossingTests
         return Harness.Harness.Run(Harness.Harness.Find("tunnel-vd-slab"), o);
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Theory]
     [InlineData(5.0, 0.0)]
     [InlineData(5.0, 45.0)]
     [InlineData(25.0, 0.0)]

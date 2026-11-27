@@ -116,7 +116,7 @@ public class LinksetHitOnStandingAvatarTests
 
     // ------------------------------------------------------------------ a hundred kilograms at the middle
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 3 scenario(s)")]
+    [Theory]
     [InlineData(19.9f, true)]
     [InlineData(19.9f, false)]
     [InlineData(20f, false)]
@@ -137,7 +137,7 @@ public class LinksetHitOnStandingAvatarTests
 
     // ------------------------------------------------------------------ one kilogram at the middle
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(19.9f, true)]
     [InlineData(19.9f, false)]
     public void A_1_kg_linkset_at_20_ms_stops_at_a_standing_avatar_and_moves_it_a_few_centimetres(float speed, bool floats)
@@ -156,7 +156,7 @@ public class LinksetHitOnStandingAvatarTests
 
     // ------------------------------------------------------------------ a slow linkset
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 3 scenario(s)")]
+    [Theory]
     [InlineData(15432f, 3f)]
     [InlineData(15432f, 8f)]
     [InlineData(154.32f, 8f)]
@@ -178,7 +178,7 @@ public class LinksetHitOnStandingAvatarTests
 
     // ------------------------------------------------------------------ a glancing blow
 
-    [OpenSim.Tests.Common.KnownFailureFact("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Fact]
     public void A_1_kg_linkset_that_only_grazes_a_standing_avatar_is_turned_and_barely_moves_it()
     {
         // 0.51 m off the avatar's middle: the cube's edge meets the capsule's side (the capsule's radius is a quarter

@@ -87,14 +87,14 @@ public class WakeAroundMovedSupportTests
         Assert.True(stuck == 0, $"{stuck} of {res.Boxes.Count} boxes were still in the air 1.5 s after the platform moved");
     }
 
-    [OpenSim.Tests.Common.KnownFailureFact("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Fact]
     public void Every_one_of_100_sleeping_boxes_wakes_and_falls_when_its_platform_is_moved_away()
     {
         Result res = Run(s => s.Platform.Actor.Position += new Vector3(40f, 0f, 0f));   // llSetPos on the platform
         AssertEveryBoxFell(res);
     }
 
-    [OpenSim.Tests.Common.KnownFailureFact("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Fact]
     public void Every_one_of_100_sleeping_boxes_wakes_when_its_platform_is_turned()
     {
         // Turned in place (llSetRot): most boxes stay on it, so the check is that all of them are awake at the next heartbeat.
@@ -103,7 +103,7 @@ public class WakeAroundMovedSupportTests
         Assert.True(res.AsleepAfterAct == 0, $"{res.AsleepAfterAct} of {res.Boxes.Count} boxes were still asleep after the platform turned");
     }
 
-    [OpenSim.Tests.Common.KnownFailureFact("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Fact]
     public void Every_one_of_100_sleeping_boxes_wakes_when_its_platform_is_moved_up_out_from_under_them()
     {
         // Moved straight up: the new place no longer overlaps the boxes, but the old one does.
