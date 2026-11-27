@@ -54,6 +54,21 @@ public class OverlapQueryTests
         Assert.Equal(new[] { there }, found[..n]);
     }
 
+    [Fact]
+    public void ShapeCast_RotatedAndAwayFromTheOrigin_HitsTheBoxUnderItsTurnedEnd()
+    {
+        using var t = new JoltTestBackend();
+        BodyId turned = Box(t, Away + new Vector3(5f, 5f, 0f));
+        Box(t, Away + new Vector3(5f, -5f, 0f));
+        ShapeId bar = t.B.CreateBoxShape(new Vector3(10f, 0.2f, 0.2f));
+
+        bool struck = t.B.ShapeCast(bar, Away + new Vector3(0f, 0f, 5f),
+            Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI / 4f), -Vector3.UnitZ, 10f, QueryFilter.All, out RayHit hit);
+
+        Assert.True(struck, "the cast hit nothing");
+        Assert.Equal(turned, hit.Body);
+    }
+
     // A long thin query box turned 45 degrees about +Z reaches toward (+x, +y). The inverse turn reaches toward (+x, -y).
     // At the origin the translation is zero, so that row tests the rotation alone.
     [Theory]
