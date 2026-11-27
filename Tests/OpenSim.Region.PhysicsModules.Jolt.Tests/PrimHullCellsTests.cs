@@ -13,7 +13,6 @@ using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using OpenSim.Region.PhysicsModules.Meshing;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Xunit;
-using Xunit.Abstractions;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.MeshShapesTodayTests;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.PrimHullProbeTests;
 using SVector3 = System.Numerics.Vector3;

@@ -26,7 +26,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework.Servers.HttpServer;
@@ -37,7 +37,6 @@ using osWebRtcVoice.NonSpatial;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class GroupProvisionHandlerTests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
@@ -163,49 +162,61 @@ namespace osWebRtcVoice.Tests
         private static (string, string) OpenRoom(NonSpatialVoiceSessionEngine engine, GroupVoicePolicy policy, UUID region)
         {
             OSDMap call = new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(Group) };
-            Assert.That(GroupVoiceChatSession.TryHandleCall(call, Alice, policy, engine, region, out ChatSessionOutcome o), Is.True);
+            Assert.True(GroupVoiceChatSession.TryHandleCall(call, Alice, policy, engine, region, out ChatSessionOutcome o));
             OSDMap creds = (OSDMap)o.Body["voice_credentials"];
             return (creds["channel_uri"].AsString(), creds["channel_credentials"].AsString());
         }
 
         // ---- the regression itself ---------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupProvisionRunsTheWholeHandlerWithoutThrowing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // This is the shape that threw for a group provision.
             (WebRtcVoiceRegionModule mod, Scene scene, StubVoiceService svc, NonSpatialVoiceSessionEngine engine, GroupVoicePolicy policy) = Harness();
             (string room, string token) = OpenRoom(engine, policy, scene.RegionInfo.RegionID);
 
             (int status, OSDMap body) = Provision(mod, scene, Alice, GroupProvisionBody(room, token));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK), "the handler must complete, not throw");
-            Assert.That(svc.Calls, Is.EqualTo(1), "and the body must have reached the voice service unchanged");
-            Assert.That(svc.LastRequest["channel"].AsString(), Is.EqualTo(room));
-            Assert.That(body, Is.Not.Null);
-            Assert.That(body["viewer_session"].AsString(), Is.EqualTo("vs-1"));
+            {
+                var assertedValue = status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "the handler must complete, not throw");
+            }
+            {
+                var assertedValue = svc.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "and the body must have reached the voice service unchanged");
+            }
+            Assert.Equal(room, svc.LastRequest["channel"].AsString());
+            Assert.NotNull(body);
+            Assert.Equal("vs-1", body["viewer_session"].AsString());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheGroupSeatIsTaggedWithTheViewerSession_SoTeardownCanFindIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (WebRtcVoiceRegionModule mod, Scene scene, _, NonSpatialVoiceSessionEngine engine, GroupVoicePolicy policy) = Harness();
             (string room, string token) = OpenRoom(engine, policy, scene.RegionInfo.RegionID);
 
             Provision(mod, scene, Alice, GroupProvisionBody(room, token));
 
             NonSpatialMember m = engine.Store.Get(Group).Find(Alice);
-            Assert.That(m.ViewerSession, Is.EqualTo("vs-1"));
-            Assert.That(m.State, Is.EqualTo(MemberState.Present), "an admitted provision means the agent is in the room");
+            Assert.Equal("vs-1", m.ViewerSession);
+            {
+                var assertedValue = m.State;
+                TestAssert.WithMessage(() => Assert.Equal(MemberState.Present, assertedValue), "an admitted provision means the agent is in the room");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALogoutReleasesTheGroupSeat_ThroughTheRealHandler()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (WebRtcVoiceRegionModule mod, Scene scene, _, NonSpatialVoiceSessionEngine engine, GroupVoicePolicy policy) = Harness();
             (string room, string token) = OpenRoom(engine, policy, scene.RegionInfo.RegionID);
             Provision(mod, scene, Alice, GroupProvisionBody(room, token));
-            Assert.That(engine.Store.Get(Group).SeatsHeld, Is.EqualTo(1));
+            Assert.Equal(1, engine.Store.Get(Group).SeatsHeld);
 
             // The teardown body the viewer actually sends: logout + viewer_session, NO channel_type.
             OSDMap logout = new OSDMap
@@ -216,59 +227,71 @@ namespace osWebRtcVoice.Tests
             };
             Provision(mod, scene, Alice, logout);
 
-            Assert.That(engine.Store.Get(Group).SeatsHeld, Is.EqualTo(0), "the hang-up frees the seat");
-            Assert.That(engine.Store.Get(Group).Find(Alice).Departure, Is.EqualTo(DepartureReason.VoiceTeardown));
+            {
+                var assertedValue = engine.Store.Get(Group).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the hang-up frees the seat");
+            }
+            Assert.Equal(DepartureReason.VoiceTeardown, engine.Store.Get(Group).Find(Alice).Departure);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RepeatedProvisionsThroughTheHandler_HoldOneSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (WebRtcVoiceRegionModule mod, Scene scene, StubVoiceService svc, NonSpatialVoiceSessionEngine engine, GroupVoicePolicy policy) = Harness();
             (string room, string token) = OpenRoom(engine, policy, scene.RegionInfo.RegionID);
 
             for (int i = 0; i < 20; i++)
-                Assert.That(Provision(mod, scene, Alice, GroupProvisionBody(room, token)).Status,
-                            Is.EqualTo((int)HttpStatusCode.OK), "retry " + i);
+                {
+                    var assertedValue = Provision(mod, scene, Alice, GroupProvisionBody(room, token)).Status;
+                    TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "retry " + i);
+                }
 
-            Assert.That(engine.Store.Get(Group).SeatsHeld, Is.EqualTo(1));
-            Assert.That(svc.Calls, Is.EqualTo(20));
+            Assert.Equal(1, engine.Store.Get(Group).SeatsHeld);
+            Assert.Equal(20, svc.Calls);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ANonMemberIsRefused403ByTheHandler_AndNeverReachesTheVoiceService()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (WebRtcVoiceRegionModule mod, Scene scene, StubVoiceService svc, NonSpatialVoiceSessionEngine engine, GroupVoicePolicy policy) = Harness();
             (string room, string token) = OpenRoom(engine, policy, scene.RegionInfo.RegionID);
             UUID stranger = UUID.Random();
 
             (int status, _) = Provision(mod, scene, stranger, GroupProvisionBody(room, token));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(svc.Calls, Is.EqualTo(0), "a refusal must never reach the mixer");
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            {
+                var assertedValue = svc.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "a refusal must never reach the mixer");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ABadTokenIsRefused403ByTheHandler()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (WebRtcVoiceRegionModule mod, Scene scene, StubVoiceService svc, NonSpatialVoiceSessionEngine engine, GroupVoicePolicy policy) = Harness();
             (string room, _) = OpenRoom(engine, policy, scene.RegionInfo.RegionID);
 
             (int status, _) = Provision(mod, scene, Alice, GroupProvisionBody(room, new string('a', 64)));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(svc.Calls, Is.EqualTo(0));
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            Assert.Equal(0, svc.Calls);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnUnknownRoomKeyIsRefused_AndTheA2AArmNeverSeesIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (WebRtcVoiceRegionModule mod, Scene scene, StubVoiceService svc, _, _) = Harness();
             string stranger = NonSpatialRoomKey.Derive(Grid, NonSpatialSessionType.Group, UUID.Random());
 
             (int status, _) = Provision(mod, scene, Alice, GroupProvisionBody(stranger, "x"));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(svc.Calls, Is.EqualTo(0));
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            Assert.Equal(0, svc.Calls);
         }
     }
 }

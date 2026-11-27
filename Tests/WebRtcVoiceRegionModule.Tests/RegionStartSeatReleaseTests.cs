@@ -15,7 +15,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
@@ -24,7 +24,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class RegionStartSeatReleaseTests
     {
         private static void SetPrivate(object target, string field, object value)
@@ -46,9 +45,10 @@ namespace osWebRtcVoice.Tests
                 System.Threading.Thread.Yield();
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGridRegionThatStarts_ReleasesTheSeatsLeftByAnEarlierRun_AndNoOthers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             UUID thisRegion = scene.RegionInfo.RegionID;
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
@@ -62,36 +62,62 @@ namespace osWebRtcVoice.Tests
             RegisterScene(module, scene);
             WaitUntil(() => earlierRun.Get(stale).SeatsHeld == 0);   // the result, not the request: the request is logged before it is carried out
 
-            Assert.That(earlierRun.Get(stale).SeatsHeld, Is.EqualTo(0), "the seat that named this region is released");
-            Assert.That(flaky.Delivered.Count(w => w == "departregion"), Is.EqualTo(1), "asked once for the region");
-            Assert.That(earlierRun.Get(other).SeatsHeld, Is.EqualTo(1), "another region's seat is not");
+            {
+                var assertedValue = earlierRun.Get(stale).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the seat that named this region is released");
+            }
+            {
+                var assertedValue = flaky.Delivered.Count(w => w == "departregion");
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "asked once for the region");
+            }
+            {
+                var assertedValue = earlierRun.Get(other).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "another region's seat is not");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARegionThatKeepsItsOwnSessions_AsksNobody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             GridStoreResilienceTests.FlakyService flaky = new GridStoreResilienceTests.FlakyService(VoiceSessionServiceTests.NewService());
             WebRtcVoiceRegionModule module = new WebRtcVoiceRegionModule();   // m_gridSessions stays unset: local mode
 
-            Assert.DoesNotThrow(() => RegisterScene(module, scene));
+            {
+                var assertedValue = () => RegisterScene(module, scene);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
             System.Threading.Thread.Sleep(300);   // a window for something that must NOT happen
 
-            Assert.That(flaky.Calls, Is.EqualTo(0));
+            Assert.Equal(0, flaky.Calls);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGridRegionWhoseServiceIsDown_StillStarts()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             GridStoreResilienceTests.FlakyService flaky = new GridStoreResilienceTests.FlakyService(VoiceSessionServiceTests.NewService()) { Up = false };
             WebRtcVoiceRegionModule module = new WebRtcVoiceRegionModule();
             SetPrivate(module, "m_gridSessions", VoiceSessionServiceTests.NewRegion(flaky));
 
-            Assert.DoesNotThrow(() => RegisterScene(module, scene));
+            {
+                var assertedValue = () => RegisterScene(module, scene);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
             WaitUntil(() => flaky.Calls > 0);
 
-            Assert.That(flaky.Calls, Is.EqualTo(1), "it asked, was not answered, and went on");
+            {
+                var assertedValue = flaky.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "it asked, was not answered, and went on");
+            }
         }
     }
 }
