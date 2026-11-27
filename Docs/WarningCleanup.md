@@ -1,5 +1,183 @@
 # Build warning cleanup
 
+## Incremental modern-C# policy
+
+[Directory.Build.props](../Directory.Build.props) enables nullable annotations with
+`<Nullable>annotations</Nullable>` and loads the .NET 10 `10-recommended` analyzer
+set. This lets existing and new files use `string?` and other nullable syntax
+without immediately turning the entire legacy flow-analysis backlog into build
+warnings.
+
+For a converted project, set `<Nullable>enable</Nullable>` in its project file
+after fixing its nullable diagnostics. New files that need full flow analysis
+before the containing project is converted can start with `#nullable enable`.
+Do not use a null-forgiving operator unless the surrounding invariant makes the
+value provably non-null.
+
+[.editorconfig](../.editorconfig) supplies formatting and modern-C# preferences.
+Recommended .NET analyzers are suggestions while the legacy backlog is being
+converted. This is a migration baseline, not a waiver: promote them to warnings
+in a nested `.editorconfig` for the area being converted, then enable
+`TreatWarningsAsErrors` for that project after its diagnostics are clear. For
+example:
+
+```xml
+<PropertyGroup>
+  <Nullable>enable</Nullable>
+  <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+</PropertyGroup>
+```
+
+In that project's nested `.editorconfig`, promote each rule whose baseline entry
+has been retained in the root configuration. Rule-specific entries intentionally
+override category-wide defaults. For example:
+
+```ini
+[*.cs]
+dotnet_diagnostic.CA1707.severity = warning
+dotnet_diagnostic.CA1848.severity = warning
+dotnet_diagnostic.CA5351.severity = warning
+```
+
+Keep promotions local until every project built by the solution can enforce the
+same standard. The final repository-wide switch belongs in
+`Directory.Build.props`; individual suppressions must document a specific
+compatibility reason. Remove a root baseline entry rather than leave it at a
+non-enforcing severity once no matching diagnostics remain. Strict opt-in
+projects must keep warnings-as-errors local until their existing diagnostics,
+including compiler, xUnit and SDK analyzer findings, have been cleared.
+
+## Converting a project
+
+Use the following workflow for one bounded project or feature area at a time.
+Do not enable strict checking for the entire solution while the legacy backlog
+remains.
+
+### 1. Select and build one project
+
+Choose an area with a clear test project and a manageable diagnostic count:
+
+```sh
+dotnet build Source/OpenSim.SomeProject/OpenSim.SomeProject.csproj \
+  -c Debug --no-incremental
+```
+
+The root `.editorconfig` loads the .NET 10 analyzer rules, so the IDE can show
+migration suggestions while the existing solution continues to build. Build
+the project once before changing it so that unrelated failures are identified
+separately from conversion work.
+
+### 2. Enable nullable flow analysis
+
+Add full nullable analysis to the selected project:
+
+```xml
+<PropertyGroup>
+  <Nullable>enable</Nullable>
+</PropertyGroup>
+```
+
+Rebuild and fix all reported `CS86xx` diagnostics. Prefer:
+
+- accurate `T?` annotations for values that are genuinely optional;
+- proper initialization, validation, or required constructor parameters;
+- `TryGet...` patterns instead of unchecked dereferences;
+- explicit failure handling for invalid configuration or external input.
+
+Do not use the null-forgiving operator, `!`, as a default. Use it only when the
+surrounding invariant makes a value provably non-null and the compiler cannot
+represent that invariant.
+
+When only one new or isolated file can be migrated before its containing
+project, enable nullable flow analysis for that file:
+
+```csharp
+#nullable enable
+```
+
+Keep the file-level scope narrow and do not spread it to existing files merely
+to satisfy a warning.
+
+### 3. Promote analyzer rules locally
+
+Create or update a nested `.editorconfig` inside the selected project or
+converted folder. Promote a small, related group of rules from `suggestion` to
+`warning`:
+
+```ini
+[*.cs]
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1707.severity = warning
+dotnet_diagnostic.CA1848.severity = warning
+```
+
+Available legacy-baseline entries are listed in the root `.editorconfig`. Use
+rule-specific entries: they override the root entry for the same diagnostic.
+Do not promote every rule at once unless the resulting work remains reviewable
+as one conversion.
+
+### 4. Fix, test, and commit in focused batches
+
+For each batch:
+
+1. Promote one or several related rules.
+2. Run a non-incremental project build.
+3. Fix the resulting diagnostics without changing unrelated behavior.
+4. Run the complete affected test project.
+5. Add a regression test when the warning exposed a correctness problem.
+6. Commit the focused conversion with a clear message.
+
+Use formatting or code-fix tools selectively. Reformatting an entire legacy
+project can obscure the meaningful changes and make review difficult. Fixes
+must preserve public contracts, wire formats, configuration behavior and test
+assertions unless the conversion deliberately includes an approved behavior
+change.
+
+### 5. Turn on warnings-as-errors
+
+After all enabled rules are clean and the project has been tested, make the
+standard enforceable in that project's `.csproj`:
+
+```xml
+<PropertyGroup>
+  <Nullable>enable</Nullable>
+  <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+</PropertyGroup>
+```
+
+This only affects the converted project. New compiler, nullable, xUnit and
+analyzer warnings then prevent that project from building, while the rest of
+the repository remains on the incremental baseline.
+
+Keep warnings-as-errors local until every diagnostic included by the project
+is clear. Do not add blanket `NoWarn` entries or exemptions to make the gate
+pass.
+
+### 6. Retire the global baseline entry
+
+When a rule no longer has any remaining occurrences in the repository, remove
+its root `.editorconfig` entry:
+
+```ini
+dotnet_diagnostic.CA1305.severity = suggestion
+```
+
+Removing the entry returns that rule to the .NET 10 recommended severity, so a
+new violation becomes visible normally across the repository. This is the
+forward-cleaning gate: legacy work is retained explicitly and disappears as it
+is fixed.
+
+The overall progression is:
+
+```text
+suggestion globally
+    -> warning in one migrated area
+    -> fix and test that area
+    -> warnings-as-errors for the project
+    -> remove the global baseline entry
+    -> migrate the next area
+```
+
 ## Current dependency-update baseline
 
 On the dependency-update branch at `a225f5581b`, a non-incremental Release

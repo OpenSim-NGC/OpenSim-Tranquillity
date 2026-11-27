@@ -2,29 +2,24 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>disable</Nullable>
+    <!--
+      Allow nullable annotations everywhere without enabling flow diagnostics for
+      legacy code. Projects and files that have been converted can opt in to enable.
+    -->
+    <Nullable>annotations</Nullable>
   </PropertyGroup>
   <PropertyGroup>
     <!-- Enable modern .NET 10 analyzers without turning on the most aggressive style rules -->
-    <!-- Not yet.  38k warnings says we have some work to do.-->
-    <!-- <AnalysisLevel>10-recommended</AnalysisLevel> -->
+    <AnalysisLevel>10-recommended</AnalysisLevel>
 
     <!-- Enforce zero warnings in CI and Release builds, while keeping local Debug fast -->
-    <!-- Not yet.  There are still some structural issues in the codebase to address. -->
+    <!-- Opt in per converted project/file; the repository-wide legacy baseline is not strict yet. -->
     <!-- <TreatWarningsAsErrors Condition="'$(Configuration)' != 'Debug'">true</TreatWarningsAsErrors> -->
 
     <!-- Keep high-severity NuGet package vulnerabilities as build errors even in Debug -->
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>high</NuGetAuditLevel>
-
-    <!-- Temporarily exempt noisy legacy codes (they still show as yellow warnings, not red errors) -->
-    <WarningsNotAsErrors>
-      $(WarningsNotAsErrors);
-      CS0618; <!-- Obsolete member usage -->
-      CS1591; <!-- Missing XML documentation comments -->
-      CS8600;CS8601;CS8602;CS8603;CS8604 <!-- Existing nullable reference type warnings -->
-    </WarningsNotAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Nerdbank.GitVersioning" Condition="!Exists('packages.config')">
