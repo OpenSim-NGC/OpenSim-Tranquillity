@@ -122,13 +122,13 @@ public class EstateCovenantSpreadTests : OpenSimTestCase
         using ManualResetEventSlim gate = new(false);
         m_lookupGate = gate;
 
-        Task change = Task.Run(() => manager.TriggerEstateChangeCovenant(UUID.Random()));
-        Task first = await Task.WhenAny(change, Task.Delay(TimeSpan.FromSeconds(10)));
+        Task change = Task.Run(() => manager.TriggerEstateChangeCovenant(UUID.Random()), TestContext.Current.CancellationToken);
+        Task first = await Task.WhenAny(change, Task.Delay(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         gate.Set();
         await change;
 
         Assert.True(first == change, "the covenant change waited for the send to the estate's other regions");
-        Assert.True(m_lookupsDone.Wait(TimeSpan.FromSeconds(30)), "the covenant was not sent");
+        Assert.True(m_lookupsDone.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the covenant was not sent");
         Assert.Equal(1, m_estateLookups);
     }
 
