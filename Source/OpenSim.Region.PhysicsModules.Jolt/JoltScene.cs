@@ -424,7 +424,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             scene.RegisterModuleInterface<PhysicsScene>(this);
 
             _scene = scene;
-            InitialiseRegion(scene.RegionInfo.RegionSizeX, scene.RegionInfo.RegionSizeY, scene.PhysicsRequestAsset,
+            InitialiseRegion(scene.RegionInfo.RegionSizeX, scene.RegionInfo.RegionSizeY,
+                scene.RegionInfo.ObjectCapacity, scene.RegionInfo.AgentCapacity, scene.PhysicsRequestAsset,
                 () => scene.Heightmap != null ? scene.Heightmap.GetFloatsSerialised() : new float[scene.RegionInfo.RegionSizeX * scene.RegionInfo.RegionSizeY],
                 () => (float)scene.RegionInfo.RegionSettings.WaterHeight, scene.FrameTime);
         }
@@ -435,20 +436,35 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         /// <see cref="Initialise"/> first with a config that selects this module.
         /// </summary>
         internal void InitialiseWithoutScene(string regionName, uint sizeX, uint sizeY, float[] heightMap, float waterHeight, float heartbeatSeconds)
+            => InitialiseWithoutScene(regionName, sizeX, sizeY, heightMap, waterHeight, heartbeatSeconds,
+                JoltConfig.StandardObjectCapacity, JoltConfig.StandardAgentCapacity);
+
+        /// <summary>As above, for a region of this object capacity ([Region] MaxPrims) and agent capacity (MaxAgents).</summary>
+        internal void InitialiseWithoutScene(string regionName, uint sizeX, uint sizeY, float[] heightMap, float waterHeight, float heartbeatSeconds,
+            int objectCapacity, int agentCapacity)
         {
             if (!m_Enabled)
                 throw new InvalidOperationException("Initialise with [Startup] physics = Jolt first.");
             RegionName = regionName;
             PhysicsSceneName = Name + "/" + RegionName;
-            InitialiseRegion(sizeX, sizeY, null, () => heightMap, () => waterHeight, heartbeatSeconds);
+            InitialiseRegion(sizeX, sizeY, objectCapacity, agentCapacity, null, () => heightMap, () => waterHeight, heartbeatSeconds);
         }
+
+        // The capacity lines this region has logged (the 80 % warning, and the refused-body and dropped-collision lines),
+        // counted and kept for tests.
+        internal int BodyLimitWarnings { get; private set; }
+        internal string LastBodyLimitWarning { get; private set; }
+        internal int CapacityWarnings { get; private set; }
+        internal string LastCapacityWarning { get; private set; }
+        private readonly BodyLimitWatch _bodyLimitWatch = new BodyLimitWatch();
 
         // AddRegion's work once the scene is known. The heightmap and water height are read where AddRegion
         // always read them, after the backend exists.
         /// <summary>TEST-ONLY: run on the new backend before it is initialised, so a test can make Initialize fail.</summary>
         internal Action<JoltPhysicsBackend> BackendCreatedForTest;
 
-        private void InitialiseRegion(uint sizeX, uint sizeY, RequestAssetDelegate requestAsset, Func<float[]> heightMap, Func<float> waterHeight, float heartbeatSeconds)
+        private void InitialiseRegion(uint sizeX, uint sizeY, int objectCapacity, int agentCapacity,
+            RequestAssetDelegate requestAsset, Func<float[]> heightMap, Func<float> waterHeight, float heartbeatSeconds)
         {
             // Stored BEFORE base.Initialise, because that calls SetTerrain(heightMap) - which needs the
             // region dims to interpret the flat float[] and build the (N+1) field.
@@ -456,7 +472,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             _regionSizeY = (int)sizeY;
 
             // Every knob comes from [Jolt] (JoltConfig). The defaults are exactly what this used to hardcode:
-            // the backend's default settings, MaxBodies = 65536 per 256 m scaled by area, and
+            // the backend's default settings, the engine limits (JoltConfig.ToBackendSettings), and
             // CollisionSteps = 6 - the RIGID-BODY solver sub-stepped 6x inside _system.Update: at
             // OpenSim's ~11 fps a single integration lets a fast prim move ~1.5 m and tunnel through the terrain
             // heightfield. CollisionSteps slices the SOLVER only, NOT the character step (once per Step, before
@@ -469,7 +485,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 m_log.LogInformation($"{LogHeader} region '{RegionName}': {rateNote}");
             _substeps = stepRate > 0f ? new SubstepAccumulator(stepRate) : null;
 
-            PhysicsBackendSettings settings = _joltConfig.ToBackendSettings(sizeX, sizeY, _substeps != null ? stepRate : 0f);
+            PhysicsBackendSettings settings = _joltConfig.ToBackendSettings(sizeX, sizeY, _substeps != null ? stepRate : 0f, objectCapacity, agentCapacity);
             CollisionSteps = Math.Max(1, settings.CollisionSteps);
             settings.RegionName = RegionName;   // names this region when another waits for its job pool (metrics)
             settings.RayCastClock = RayCastClock;
@@ -507,7 +523,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // to the backend for vehicle hover.
             base.Initialise(requestAsset, heightMap(), waterHeight());
 
-            m_log.LogInformation($"{LogHeader} region '{RegionName}' {sizeX}x{sizeY}m: backend initialised, MaxBodies={settings.MaxBodies}. {EngineName}");
+            m_log.LogInformation($"{LogHeader} region '{RegionName}' {sizeX}x{sizeY}m: backend initialised, MaxBodies={settings.MaxBodies}, " +
+                                 $"MaxBodyPairs={settings.MaxBodyPairs}, MaxContactConstraints={settings.MaxContactConstraints} " +
+                                 $"(object capacity {objectCapacity}, agent capacity {agentCapacity}). {EngineName}");
 
             RayWarmUpMs = WarmUpRayCasts();
             m_log.LogInformation($"{LogHeader} region '{RegionName}': ray casts warmed up in {RayWarmUpMs:0.00} ms.");
@@ -3173,6 +3191,13 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             PhysicsCapacityStats s = backend.GetCapacityStats();
             long now = System.DateTime.UtcNow.Ticks;
             CheckGateWait(in s, now, timeStep);
+            string nearFull = _bodyLimitWatch.Check(RegionName, s.LiveBodyCount, s.MaxBodies);
+            if (nearFull != null)
+            {
+                m_log.LogWarning(nearFull);
+                BodyLimitWarnings++;
+                LastBodyLimitWarning = nearFull;
+            }
             if (!_capBaseSet)
             {
                 _capBase = s;
@@ -3195,7 +3220,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             string msg = CapacityReport.Warning(RegionName,
                 _capBase, s, System.Math.Max(1.0, (now - _capBaseTicks) / (double)System.TimeSpan.TicksPerSecond));
             if (msg != null)
+            {
                 m_log.LogWarning(msg);
+                CapacityWarnings++;
+                LastCapacityWarning = msg;
+            }
             _capLastWarnTicks = now;
             _capBase = s;
             _capBaseTicks = now;
