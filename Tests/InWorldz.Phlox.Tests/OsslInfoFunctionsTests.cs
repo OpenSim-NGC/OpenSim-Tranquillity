@@ -10,7 +10,6 @@ using System.Linq;
 using Nini.Config;
 using OpenMetaverse;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

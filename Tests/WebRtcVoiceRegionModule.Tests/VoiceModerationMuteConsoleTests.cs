@@ -19,16 +19,16 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VoiceModerationMuteConsoleTests
     {
         private static List<string> Words(string line) => new List<string>(line.Split(' '));
 
         // --- the store write (the SAME call the SpatialVoiceModerationRequest "mute" operand makes) ---
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MuteAgent_IsReflectedInTheSnapshot_AndIsModerated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new VoiceModerationStore();
             UUID parcel = UUID.Random();
             UUID agent = UUID.Random();
@@ -36,15 +36,19 @@ namespace osWebRtcVoice.Tests
             s.MuteAgent(parcel, agent);
 
             IReadOnlyList<ParcelModerationView> snap = s.Snapshot();
-            Assert.That(snap, Has.Count.EqualTo(1), "\"show voice moderation\" lists the parcel");
-            Assert.That(snap[0].ParcelGlobalId, Is.EqualTo(parcel));
-            Assert.That(snap[0].MutedAgents, Is.EqualTo(new[] { agent }));
-            Assert.That(s.IsModerated(parcel, agent), Is.True, "the feeder's rule 2b reads it");
+            {
+                var assertedValue = snap;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "\"show voice moderation\" lists the parcel");
+            }
+            Assert.Equal(parcel, snap[0].ParcelGlobalId);
+            Assert.Equal(new[] { agent }, snap[0].MutedAgents);
+            Assert.True(s.IsModerated(parcel, agent), "the feeder's rule 2b reads it");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MuteAgent_Twice_IsOneEntry_AndOneUnmuteClearsIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new VoiceModerationStore();
             UUID parcel = UUID.Random();
             UUID agent = UUID.Random();
@@ -52,112 +56,122 @@ namespace osWebRtcVoice.Tests
             s.MuteAgent(parcel, agent);
             s.MuteAgent(parcel, agent);
 
-            Assert.That(s.Snapshot()[0].MutedAgents, Has.Count.EqualTo(1));
-            Assert.That(s.UnmuteAgent(parcel, agent), Is.True, "the console unmute undoes the console mute");
-            Assert.That(s.Snapshot(), Is.Empty);
+            Assert.Single(s.Snapshot()[0].MutedAgents);
+            Assert.True(s.UnmuteAgent(parcel, agent), "the console unmute undoes the console mute");
+            Assert.Empty(s.Snapshot());
         }
 
         // --- argument parsing ---
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Parse_UuidOnly()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID id = UUID.Random();
-            Assert.That(VoiceModerationTargets.ParseMuteArguments(Words(id.ToString()), out string target, out int? parcel), Is.True);
-            Assert.That(target, Is.EqualTo(id.ToString()));
-            Assert.That(parcel, Is.Null);
+            Assert.True(VoiceModerationTargets.ParseMuteArguments(Words(id.ToString()), out string target, out int? parcel));
+            Assert.Equal(id.ToString(), target);
+            Assert.Null(parcel);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Parse_UuidAndParcel()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID id = UUID.Random();
-            Assert.That(VoiceModerationTargets.ParseMuteArguments(Words(id + " 7"), out string target, out int? parcel), Is.True);
-            Assert.That(target, Is.EqualTo(id.ToString()));
-            Assert.That(parcel, Is.EqualTo(7));
+            Assert.True(VoiceModerationTargets.ParseMuteArguments(Words(id + " 7"), out string target, out int? parcel));
+            Assert.Equal(id.ToString(), target);
+            Assert.Equal(7, parcel);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Parse_UnquotedTwoWordName()
         {
-            Assert.That(VoiceModerationTargets.ParseMuteArguments(Words("Test User"), out string target, out int? parcel), Is.True);
-            Assert.That(target, Is.EqualTo("Test User"));
-            Assert.That(parcel, Is.Null);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(VoiceModerationTargets.ParseMuteArguments(Words("Test User"), out string target, out int? parcel));
+            Assert.Equal("Test User", target);
+            Assert.Null(parcel);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Parse_NameAndParcel()
         {
-            Assert.That(VoiceModerationTargets.ParseMuteArguments(Words("Test User 12"), out string target, out int? parcel), Is.True);
-            Assert.That(target, Is.EqualTo("Test User"));
-            Assert.That(parcel, Is.EqualTo(12));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(VoiceModerationTargets.ParseMuteArguments(Words("Test User 12"), out string target, out int? parcel));
+            Assert.Equal("Test User", target);
+            Assert.Equal(12, parcel);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Parse_ALoneNumber_IsATargetNotAParcel()
         {
-            Assert.That(VoiceModerationTargets.ParseMuteArguments(Words("7"), out string target, out int? parcel), Is.True);
-            Assert.That(target, Is.EqualTo("7"));
-            Assert.That(parcel, Is.Null);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(VoiceModerationTargets.ParseMuteArguments(Words("7"), out string target, out int? parcel));
+            Assert.Equal("7", target);
+            Assert.Null(parcel);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Parse_ZeroOrNegativeTrailingNumber_IsNotAParcel()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceModerationTargets.ParseMuteArguments(Words("Test User 0"), out string target, out int? parcel);
-            Assert.That(parcel, Is.Null);
-            Assert.That(target, Is.EqualTo("Test User 0"));
+            Assert.Null(parcel);
+            Assert.Equal("Test User 0", target);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Parse_Nothing_IsRefused()
         {
-            Assert.That(VoiceModerationTargets.ParseMuteArguments(new List<string>(), out _, out _), Is.False);
-            Assert.That(VoiceModerationTargets.ParseMuteArguments(Words("   "), out _, out _), Is.False);
-            Assert.That(VoiceModerationTargets.ParseMuteArguments(null, out _, out _), Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(VoiceModerationTargets.ParseMuteArguments(new List<string>(), out _, out _));
+            Assert.False(VoiceModerationTargets.ParseMuteArguments(Words("   "), out _, out _));
+            Assert.False(VoiceModerationTargets.ParseMuteArguments(null, out _, out _));
         }
 
         // --- target resolution against the region's avatars (a mute aims at someone still present) ---
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_NameOfAPresentAvatar()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID id = UUID.Random();
             var present = new List<VoiceModerationCandidate> { new VoiceModerationCandidate(id, "Test Resident") };
 
-            Assert.That(VoiceModerationTargets.Resolve("test resident", present, out UUID target, out _),
-                Is.EqualTo(VoiceModerationTargetMatch.Resolved));
-            Assert.That(target, Is.EqualTo(id));
+            Assert.Equal(VoiceModerationTargetMatch.Resolved, VoiceModerationTargets.Resolve("test resident", present, out UUID target, out _));
+            Assert.Equal(id, target);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_NameOfNobodyPresent_IsNotFound()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var present = new List<VoiceModerationCandidate> { new VoiceModerationCandidate(UUID.Random(), "Test Resident") };
-            Assert.That(VoiceModerationTargets.Resolve("Example Resident", present, out _, out _),
-                Is.EqualTo(VoiceModerationTargetMatch.NotFound));
+            Assert.Equal(VoiceModerationTargetMatch.NotFound, VoiceModerationTargets.Resolve("Example Resident", present, out _, out _));
         }
 
         // --- parcel choice ---
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChooseParcel_GivenIdWins()
         {
-            Assert.That(VoiceModerationTargets.ChooseMuteParcel(3, 9, out int id), Is.EqualTo(VoiceModerationParcelChoice.Given));
-            Assert.That(id, Is.EqualTo(3));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(VoiceModerationParcelChoice.Given, VoiceModerationTargets.ChooseMuteParcel(3, 9, out int id));
+            Assert.Equal(3, id);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChooseParcel_NoIdGiven_UsesTheParcelTheTargetStandsOn()
         {
-            Assert.That(VoiceModerationTargets.ChooseMuteParcel(null, 9, out int id), Is.EqualTo(VoiceModerationParcelChoice.TargetPosition));
-            Assert.That(id, Is.EqualTo(9));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(VoiceModerationParcelChoice.TargetPosition, VoiceModerationTargets.ChooseMuteParcel(null, 9, out int id));
+            Assert.Equal(9, id);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChooseParcel_NoIdAndTargetAbsent_IsRefused()
         {
-            Assert.That(VoiceModerationTargets.ChooseMuteParcel(null, null, out _), Is.EqualTo(VoiceModerationParcelChoice.NoParcel));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(VoiceModerationParcelChoice.NoParcel, VoiceModerationTargets.ChooseMuteParcel(null, null, out _));
         }
     }
 }

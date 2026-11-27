@@ -16,12 +16,11 @@
  * grid's URI agree.
  */
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class RoomNumberGridIdTests
     {
         private const string GridA = "http://grid-a.example:8002";
@@ -35,72 +34,95 @@ namespace osWebRtcVoice.Tests
 
         // ---- the derivation --------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SameChannel_DifferentGrid_DifferentRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int a = Multiagent(GridA, Channel);
             int b = Multiagent(GridB, Channel);
-            Assert.That(a, Is.Not.EqualTo(b), "two grids on a shared mixer must not share an A2A room");
-            Assert.That(a, Is.GreaterThanOrEqualTo(0));
-            Assert.That(b, Is.GreaterThanOrEqualTo(0));
+            {
+                var assertedValue = a;
+                TestAssert.WithMessage(() => Assert.NotEqual(b, assertedValue), "two grids on a shared mixer must not share an A2A room");
+            }
+            Assert.True(a >= 0);
+            Assert.True(b >= 0);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SameGrid_SameChannel_BothDirections_SameRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The caller's and the callee's provisions carry the identical channel string; both
             // must derive the identical room or the two parties never meet.
             int caller = Multiagent(GridA, Channel);
             int callee = Multiagent(GridA, Channel);
-            Assert.That(callee, Is.EqualTo(caller));
+            Assert.Equal(caller, callee);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SameGrid_DifferentChannel_DifferentRoom()
         {
-            Assert.That(Multiagent(GridA, Channel), Is.Not.EqualTo(Multiagent(GridA, "44444444-4444-4444-4444-444444444444")));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.NotEqual(Multiagent(GridA, "44444444-4444-4444-4444-444444444444"), Multiagent(GridA, Channel));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Multiagent_IsIndependentOfRegion()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // An A2A room is grid-wide, never per region: the two parties may sit in different regions.
             int r1 = JanusAudioBridge.CalcRoomNumber(GridA, Region, "multiagent", 0, Channel);
             int r2 = JanusAudioBridge.CalcRoomNumber(GridA, "22222222-2222-2222-2222-222222222222", "multiagent", 42, Channel);
-            Assert.That(r2, Is.EqualTo(r1));
+            Assert.Equal(r1, r2);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Multiagent_WithGridId_DiffersFromTheOldGridlessDerivation()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The gridless number (channel + type only) is what an empty grid id still yields; a
             // configured grid moves every A2A room off it. Spatial rooms are unaffected (below).
             var hasher = new BHasherMdjb2();
             hasher.Add(Channel);
             hasher.Add("multiagent");
             int oldRoom = JanusAudioBridge.FoldHashToRoom(hasher.Finish().GetHashCode());
-            Assert.That(Multiagent(string.Empty, Channel), Is.EqualTo(oldRoom), "empty grid id: the old derivation, so a gridless standalone keeps working");
-            Assert.That(Multiagent(GridA, Channel), Is.Not.EqualTo(oldRoom));
+            {
+                var assertedValue = Multiagent(string.Empty, Channel);
+                TestAssert.WithMessage(() => Assert.Equal(oldRoom, assertedValue), "empty grid id: the old derivation, so a gridless standalone keeps working");
+            }
+            Assert.NotEqual(oldRoom, Multiagent(GridA, Channel));
         }
 
         // ---- the local arm is untouched ----------------------------------------------------------
 
-        [TestCase(0)]
-        [TestCase(7)]
-        [TestCase(JanusAudioBridge.REGION_ROOM_ID)]
+        [InlineData(0)]
+        [InlineData(7)]
+        [InlineData(JanusAudioBridge.REGION_ROOM_ID)]
+        [Theory(Timeout = 60000)]
         public void LocalArm_IgnoresTheGridId(int parcel)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int none = JanusAudioBridge.CalcRoomNumber(string.Empty, Region, "local", parcel, string.Empty);
             int a = JanusAudioBridge.CalcRoomNumber(GridA, Region, "local", parcel, string.Empty);
             int b = JanusAudioBridge.CalcRoomNumber(GridB, Region, "local", parcel, string.Empty);
-            Assert.That(a, Is.EqualTo(none), "a spatial room number must not move when the grid id is configured");
-            Assert.That(b, Is.EqualTo(none));
+            {
+                var assertedValue = a;
+                TestAssert.WithMessage(() => Assert.Equal(none, assertedValue), "a spatial room number must not move when the grid id is configured");
+            }
+            Assert.Equal(none, b);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void UnknownChannelType_StillThrows()
         {
-            Assert.That(() => JanusAudioBridge.CalcRoomNumber(GridA, Region, "group", 0, Channel), Throws.Exception);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            {
+                var assertedValue = () => JanusAudioBridge.CalcRoomNumber(GridA, Region, "group", 0, Channel);
+                Assert.ThrowsAny<Exception>(() =>
+                {
+                    assertedValue();
+                });
+            }
         }
 
         // ---- ReadGridId ----------------------------------------------------------------------------
@@ -112,39 +134,46 @@ namespace osWebRtcVoice.Tests
             return src;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ReadGridId_ReadsHypergridGatekeeperURI()
         {
-            Assert.That(JanusAudioBridge.ReadGridId(Config("Hypergrid", "GatekeeperURI", "http://grid.example.org:8002")),
-                Is.EqualTo("http://grid.example.org:8002"));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal("http://grid.example.org:8002", JanusAudioBridge.ReadGridId(Config("Hypergrid", "GatekeeperURI", "http://grid.example.org:8002")));
         }
 
-        [TestCase("http://Grid.Example:8002/", "http://grid.example:8002")]
-        [TestCase("  http://grid.example:8002  ", "http://grid.example:8002")]
-        [TestCase("HTTP://GRID.EXAMPLE:8002///", "http://grid.example:8002")]
-        [TestCase("http://grid.example:8002", "http://grid.example:8002")]
+        [InlineData("http://Grid.Example:8002/","http://grid.example:8002")]
+        [InlineData("  http://grid.example:8002  ","http://grid.example:8002")]
+        [InlineData("HTTP://GRID.EXAMPLE:8002///","http://grid.example:8002")]
+        [InlineData("http://grid.example:8002","http://grid.example:8002")]
+        [Theory(Timeout = 60000)]
         public void ReadGridId_NormalisesTheCommonSpellings(string configured, string expected)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Every region of one grid must derive the same id even if their ini files spell the
             // URI differently (case, whitespace, trailing slash) -- the value is a hash input.
-            Assert.That(JanusAudioBridge.ReadGridId(Config("Hypergrid", "GatekeeperURI", configured)), Is.EqualTo(expected));
+            Assert.Equal(expected, JanusAudioBridge.ReadGridId(Config("Hypergrid", "GatekeeperURI", configured)));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ReadGridId_HonoursTheGridInfoSectionChain()
         {
-            Assert.That(JanusAudioBridge.ReadGridId(Config("Const", "GatekeeperURI", "http://c.example:8002")), Is.EqualTo("http://c.example:8002"));
-            Assert.That(JanusAudioBridge.ReadGridId(Config("Startup", "GatekeeperURI", "http://s.example:8002")), Is.EqualTo("http://s.example:8002"));
-            Assert.That(JanusAudioBridge.ReadGridId(Config("GatekeeperService", "ExternalName", "http://gs.example:8002")), Is.EqualTo("http://gs.example:8002"));
-            Assert.That(JanusAudioBridge.ReadGridId(Config("GridService", "Gatekeeper", "http://g.example:8002")), Is.EqualTo("http://g.example:8002"));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal("http://c.example:8002", JanusAudioBridge.ReadGridId(Config("Const", "GatekeeperURI", "http://c.example:8002")));
+            Assert.Equal("http://s.example:8002", JanusAudioBridge.ReadGridId(Config("Startup", "GatekeeperURI", "http://s.example:8002")));
+            Assert.Equal("http://gs.example:8002", JanusAudioBridge.ReadGridId(Config("GatekeeperService", "ExternalName", "http://gs.example:8002")));
+            Assert.Equal("http://g.example:8002", JanusAudioBridge.ReadGridId(Config("GridService", "Gatekeeper", "http://g.example:8002")));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ReadGridId_EmptyWhenUnconfigured()
         {
-            Assert.That(JanusAudioBridge.ReadGridId(new IniConfigSource()), Is.Empty);
-            Assert.That(JanusAudioBridge.ReadGridId(Config("Hypergrid", "HomeURI", "http://h.example:8002")), Is.Empty, "HomeURI is the account home, not the grid identity");
-            Assert.That(JanusAudioBridge.ReadGridId(null), Is.Empty);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Empty(JanusAudioBridge.ReadGridId(new IniConfigSource()));
+            {
+                var assertedValue = JanusAudioBridge.ReadGridId(Config("Hypergrid", "HomeURI", "http://h.example:8002"));
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "HomeURI is the account home, not the grid identity");
+            }
+            Assert.Empty(JanusAudioBridge.ReadGridId(null));
         }
     }
 }

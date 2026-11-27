@@ -15,7 +15,6 @@ using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 using OpenSim.Tests.Common;
 using Xunit;
-using Xunit.Abstractions;
 using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
 
 namespace InWorldz.Phlox.Tests;

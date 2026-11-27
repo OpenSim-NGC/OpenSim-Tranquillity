@@ -13,13 +13,12 @@
  * delegate needs a live Scene holding a child presence, so these tests drive the decision and the
  * registry call in the order the handler runs them.
  */
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2AClientCloseGuardTests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-1111111a0520");
@@ -33,7 +32,10 @@ namespace osWebRtcVoice.Tests
             reg.MarkProvisioned(s.SessionId, Alice, "vs-a");
             reg.MarkProvisioned(s.SessionId, Bob, "vs-b");
             s = reg.TryGet(s.SessionId);
-            Assert.That(s.State, Is.EqualTo(A2ASessionState.Active), "precondition: both parties joined");
+            {
+                var assertedValue = s.State;
+                TestAssert.WithMessage(() => Assert.Equal(A2ASessionState.Active, assertedValue), "precondition: both parties joined");
+            }
             return (reg, s);
         }
 
@@ -44,48 +46,59 @@ namespace osWebRtcVoice.Tests
                 reg.MarkGoneSessions(agent, null);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ShouldMarkGone_RootPresence_IsTrue()
         {
-            Assert.That(A2ARegistry.ShouldMarkGone(presenceFound: true, isChildAgent: false), Is.True);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(A2ARegistry.ShouldMarkGone(presenceFound: true, isChildAgent: false));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ShouldMarkGone_ChildAgent_IsFalse()
         {
-            Assert.That(A2ARegistry.ShouldMarkGone(presenceFound: true, isChildAgent: true), Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(A2ARegistry.ShouldMarkGone(presenceFound: true, isChildAgent: true));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ShouldMarkGone_NoPresence_IsFalse()
         {
-            Assert.That(A2ARegistry.ShouldMarkGone(presenceFound: false, isChildAgent: false), Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(A2ARegistry.ShouldMarkGone(presenceFound: false, isChildAgent: false));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChildAgentClose_LeavesBothProvisionedFlagsSet()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (reg, s) = ActiveCall();
 
             HandlerClose(reg, Alice, presenceFound: true, isChildAgent: true);
 
             A2ASession after = reg.TryGet(s.SessionId);
-            Assert.That(after, Is.Not.Null, "the live call's record survives a child close");
-            Assert.That(after.CallerProvisioned, Is.True, "a child close must not mark the caller gone");
-            Assert.That(after.CalleeProvisioned, Is.True);
+            {
+                var assertedValue = after;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the live call's record survives a child close");
+            }
+            Assert.True(after.CallerProvisioned, "a child close must not mark the caller gone");
+            Assert.True(after.CalleeProvisioned);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RootClose_MarksThePartyGone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (reg, s) = ActiveCall();
 
             HandlerClose(reg, Alice, presenceFound: true, isChildAgent: false);
 
             A2ASession after = reg.TryGet(s.SessionId);
-            Assert.That(after, Is.Not.Null, "one party still in: the record stays (both-logout semantics)");
-            Assert.That(after.CallerProvisioned, Is.False, "the root close marks the caller gone");
-            Assert.That(after.CalleeProvisioned, Is.True);
+            {
+                var assertedValue = after;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "one party still in: the record stays (both-logout semantics)");
+            }
+            Assert.False(after.CallerProvisioned, "the root close marks the caller gone");
+            Assert.True(after.CalleeProvisioned);
         }
     }
 }
