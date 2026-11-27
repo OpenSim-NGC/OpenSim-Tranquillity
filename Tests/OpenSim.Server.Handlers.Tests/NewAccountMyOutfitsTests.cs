@@ -72,7 +72,7 @@ public class NewAccountMyOutfitsTests
     public void CreatingTheInventoryAgainOverRobustKeepsOneMyOutfitsFolder()
     {
         IInventoryService inventory = Inventory(Config());
-        XInventoryConnectorPostHandler handler = new(inventory, null, new ControlPlaneAccess(new IniConfigSource()));
+        XInventoryConnectorPostHandler handler = new(inventory, null!, new ControlPlaneAccess(new IniConfigSource()));
         UUID user = UUID.Random();
 
         for (int i = 0; i < 2; i++)
