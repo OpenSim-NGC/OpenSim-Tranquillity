@@ -32,6 +32,26 @@ Copy the name from the checker's "new failures" output. Text after ` # ` is a no
   saying why.
 - The list should only shrink.
 
+## Locally skipped known failures
+
+Some behavior-sensitive failures are marked in test code with
+`KnownFailure.Skip`, `KnownFailure.SkipWhen`, `KnownFailureFact` or
+`KnownFailureTheory`. Local and VS Code test runs skip them and show the
+reference and reason in Test Explorer. Runtime guards skip only selected theory
+rows; attributes mark a whole fact or theory method. This is used for failures
+that should remain visible during development without making an ordinary local
+run red.
+
+CI sets `RUN_KNOWN_FAILURES=1`, so marked tests execute there. Their exact test
+names must still be listed in `known-failures.txt`; the result checker remains
+the authority that decides whether the failure is accepted. A fix removes both the marker and every matching `known-failures.txt` entry.
+
+To run known failures while investigating or verifying a fix:
+
+```sh
+RUN_KNOWN_FAILURES=1 dotnet test <test-project> -c Debug
+```
+
 ## Test projects not in the solution
 
 These test projects do not compile on `develop`, so they are not in the solution and CI does not run
