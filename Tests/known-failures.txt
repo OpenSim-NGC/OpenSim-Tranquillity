@@ -6,9 +6,6 @@
 OpenSim.Tests.Clients.AssetClient :: (no tests) # the project contains no tests
 Warp3D.Tests :: (no tests) # its three test files are excluded with <Compile Remove> in the project file
 
-# OpenSim.Region.PhysicsModules.Jolt.Tests (flaky)
-OpenSim.Region.PhysicsModules.Jolt.Tests :: OpenSim.Region.PhysicsModules.Jolt.Tests.FirstRayCastTests.The_first_cast_after_the_scene_loads_costs_about_what_a_later_one_does # flaky: compares two timings; passed in the baseline run and failed in a later one
-
 # OpenSim.Region.PhysicsModules.Jolt.Tests (Jolt 2.26 update)
 OpenSim.Region.PhysicsModules.Jolt.Tests :: OpenSim.Region.PhysicsModules.Jolt.Tests.PhysxSpikeTests.T6_a_high_gravity_multiplier_does_not_make_a_resting_box_jitter(rate: 64, n: 3) # Jolt 2.26: high-gravity terrain settling changed
 OpenSim.Region.PhysicsModules.Jolt.Tests :: OpenSim.Region.PhysicsModules.Jolt.Tests.PhysxSpikeTests.T2_a_vehicle_driven_over_rough_ground_with_and_without_the_spike_cut(rate: 32, n: 2) # Jolt 2.26: rough-ground vehicle distribution changed
