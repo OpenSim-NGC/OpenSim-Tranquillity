@@ -3499,7 +3499,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 Matrix4x4 start = Matrix4x4.CreateFromQuaternion(swept.Rotation);
                 start.Translation = swept.From;
                 _sensorCastHits.Clear();
-                _system!.NarrowPhaseQuery.CastShape(shapeRec.NativeShape, Matrix4x4.Transpose(start), path, DefaultCastSettings(), Vector3.Zero,
+                _system!.NarrowPhaseQuery.CastShape(shapeRec.NativeShape, start, path, DefaultCastSettings(), Vector3.Zero,
                     CollisionCollectorType.AllHit, _sensorCastHits, null, FilterFor(QueryFilter.Sensor), null, null);
                 if (_sensorCastHits.Count == 0)
                     continue;
@@ -3509,7 +3509,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 end.Translation = to;
                 _sensorEndOverlaps.Clear();
                 _sensorsOverlappedAtEnd.Clear();
-                _system.NarrowPhaseQuery.CollideShape(shapeRec.NativeShape, Vector3.One, Matrix4x4.Transpose(end), DefaultCollideSettings(), Vector3.Zero,
+                _system.NarrowPhaseQuery.CollideShape(shapeRec.NativeShape, Vector3.One, end, DefaultCollideSettings(), Vector3.Zero,
                     CollisionCollectorType.AllHit, _sensorEndOverlaps, null, FilterFor(QueryFilter.Sensor), null, null);
                 for (int k = 0; k < _sensorEndOverlaps.Count; k++)
                     _sensorsOverlappedAtEnd.Add(_sensorEndOverlaps[k].BodyID2.ID);
@@ -3554,7 +3554,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             Matrix4x4 start = Matrix4x4.CreateFromQuaternion(ch.Rotation);
             start.Translation = from;
             _sensorCastHits.Clear();
-            _system.NarrowPhaseQuery.CastShape(rec.StandingShape, Matrix4x4.Transpose(start), path, DefaultCastSettings(), Vector3.Zero,
+            _system.NarrowPhaseQuery.CastShape(rec.StandingShape, start, path, DefaultCastSettings(), Vector3.Zero,
                 CollisionCollectorType.AllHit, _sensorCastHits, null, FilterFor(QueryFilter.Sensor), null, null);
             if (_sensorCastHits.Count == 0)
                 return;
@@ -3563,7 +3563,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             end.Translation = to;
             _sensorEndOverlaps.Clear();
             _sensorsOverlappedAtEnd.Clear();
-            _system.NarrowPhaseQuery.CollideShape(rec.StandingShape, Vector3.One, Matrix4x4.Transpose(end), DefaultCollideSettings(), Vector3.Zero,
+            _system.NarrowPhaseQuery.CollideShape(rec.StandingShape, Vector3.One, end, DefaultCollideSettings(), Vector3.Zero,
                 CollisionCollectorType.AllHit, _sensorEndOverlaps, null, FilterFor(QueryFilter.Sensor), null, null);
             for (int k = 0; k < _sensorEndOverlaps.Count; k++)
                 _sensorsOverlappedAtEnd.Add(_sensorEndOverlaps[k].BodyID2.ID);
@@ -3628,9 +3628,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 return;
             Vector3 dir = v / speed;
             Vector3 from = ToVec(_bodyInterface.GetPosition(jid));
-            Matrix4x4 at = Matrix4x4.CreateFromQuaternion(_bodyInterface.GetRotation(jid));
-            at.Translation = from;
-            Matrix4x4 cast = Matrix4x4.Transpose(at);   // the convention ShapeCast passes the transform in
+            Matrix4x4 cast = Matrix4x4.CreateFromQuaternion(_bodyInterface.GetRotation(jid));
+            cast.Translation = from;
             _avatarCastHits.Clear();
             _system!.NarrowPhaseQuery.CastShape(shapeRec.NativeShape, cast, v * dt, DefaultCastSettings(), Vector3.Zero,
                 CollisionCollectorType.ClosestHit, _avatarCastHits, null, FilterFor(QueryFilter.Avatar), null, null);
@@ -4689,14 +4688,12 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             }   // _simLock (spans SurfaceNormalOf in the loop above - also unsafe vs a live Update)
         }
 
-        // JoltPhysicsSharp 2.19.x query adaptation (two changes vs 2.18.6; RayCast unaffected):
-        //  (1) CollideShape/CastShape now read the COM transform COLUMN-major. System.Numerics builds it
-        //      row-major (translation in the last ROW); 2.18.6's wrapper transposed internally, 2.19.x does
-        //      NOT - so an un-transposed transform collapses the query shape to ~origin (it then only hits
-        //      terrain, never the target). Fix: pass Matrix4x4.Transpose(com). Transposing a row-major matrix
-        //      is the equivalent column-major transform for ANY rotation, so this is exact, not identity-only.
-        //  (2) The no-settings overloads now pass a ZERO-initialized settings struct (CollisionTolerance=0,
-        //      PenetrationTolerance=0), degenerating GJK/EPA. 2.18.6 seeded Jolt's real defaults; restore below.
+        // JoltPhysicsSharp query adaptation (RayCast needs neither):
+        //  (1) CollideShape/CastShape take the COM transform as System.Numerics builds it, translation in M41..M43.
+        //      The binding converts it for Jolt itself (since 2.25.0, upstream commit f96a8da), so it is passed as built:
+        //      a transposed one loses the translation and inverts the rotation.
+        //  (2) The no-settings overloads pass a ZERO-initialized settings struct (CollisionTolerance=0,
+        //      PenetrationTolerance=0), degenerating GJK/EPA, so Jolt's real defaults are restored below.
         private const float JoltCollisionTolerance = 1.0e-4f;   // Jolt cDefaultCollisionTolerance
         private const float JoltPenetrationTolerance = 1.0e-4f; // Jolt cDefaultPenetrationTolerance
 
@@ -4733,7 +4730,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             {
                 if (_disposed) return 0;   // backend torn down (shutdown race) - no native call
                 _system.NarrowPhaseQuery.CollideShape(
-                    sphere, Vector3.One, Matrix4x4.Transpose(Matrix4x4.CreateTranslation(center)), cs, Vector3.Zero,
+                    sphere, Vector3.One, Matrix4x4.CreateTranslation(center), cs, Vector3.Zero,
                     CollisionCollectorType.AllHit, found, null, FilterFor(filter), null, null);
             }
             return CollectUniqueBodies(found, results);
@@ -4757,7 +4754,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             {
                 if (_disposed) return 0;   // backend torn down (shutdown race) - no native call
                 _system.NarrowPhaseQuery.CollideShape(
-                    box, Vector3.One, Matrix4x4.Transpose(com), cs, Vector3.Zero,
+                    box, Vector3.One, com, cs, Vector3.Zero,
                     CollisionCollectorType.AllHit, found, null, FilterFor(filter), null, null);
             }
             return CollectUniqueBodies(found, results);
@@ -4780,7 +4777,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 // the shape sits at the body's centre of mass, as in the sensor sweep above
                 Matrix4x4 com = Matrix4x4.CreateFromQuaternion(_bodyInterface.GetRotation(jid));
                 com.Translation = ToVec(_bodyInterface.GetCenterOfMassPosition(jid));
-                _system.NarrowPhaseQuery.CollideShape(shapeRec.NativeShape, Vector3.One, Matrix4x4.Transpose(com), DefaultCollideSettings(),
+                _system.NarrowPhaseQuery.CollideShape(shapeRec.NativeShape, Vector3.One, com, DefaultCollideSettings(),
                     Vector3.Zero, CollisionCollectorType.AllHit, found, null, FilterFor(QueryFilter.Static | QueryFilter.Dynamic), null, null);
             }
             for (int i = 0; i < found.Count; i++)
@@ -4814,7 +4811,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             {
                 if (_disposed) return false;   // backend torn down (shutdown race) - no native call
                 _system.NarrowPhaseQuery.CastShape(
-                    shapeRec.NativeShape, Matrix4x4.Transpose(com), castVec, scs, Vector3.Zero,
+                    shapeRec.NativeShape, com, castVec, scs, Vector3.Zero,
                     CollisionCollectorType.ClosestHit, results, null, FilterFor(filter), null, null);
             }
             if (results.Count == 0)
