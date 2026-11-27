@@ -190,13 +190,13 @@ public class XInventoryItemCacheTests : OpenSimTestCase
         };
 
         Task<bool> move = Task.Run(Move);
-        Assert.True(moveArrived.Wait(s_wait), "the move did not reach the server");
+        Assert.True(moveArrived.Wait(s_wait, TestContext.Current.CancellationToken), "the move did not reach the server");
 
         // Read while the server has the move but has not done it yet: the item is still in its old folder.
         Assert.Equal(s_oldFolder, m_connector.GetItem(s_owner, m_item.ID).Folder);
 
         releaseMove.Set();
-        Assert.True(await move.WaitAsync(s_wait));
+        Assert.True(await move.WaitAsync(s_wait, TestContext.Current.CancellationToken));
 
         Assert.Equal(s_newFolder, m_connector.GetItem(s_owner, m_item.ID).Folder);
     }
@@ -213,12 +213,12 @@ public class XInventoryItemCacheTests : OpenSimTestCase
         };
 
         Task<bool> move = Task.Run(Move);
-        Assert.True(moveArrived.Wait(s_wait), "the move did not reach the server");
+        Assert.True(moveArrived.Wait(s_wait, TestContext.Current.CancellationToken), "the move did not reach the server");
 
         Assert.Equal(s_oldFolder, m_connector.GetMultipleItems(s_owner, new[] { m_item.ID })[0].Folder);
 
         releaseMove.Set();
-        Assert.True(await move.WaitAsync(s_wait));
+        Assert.True(await move.WaitAsync(s_wait, TestContext.Current.CancellationToken));
 
         Assert.Equal(s_newFolder, m_connector.GetMultipleItems(s_owner, new[] { m_item.ID })[0].Folder);
     }
@@ -237,12 +237,12 @@ public class XInventoryItemCacheTests : OpenSimTestCase
 
         // The server reads the item in its old folder; its answer is held until the move is done.
         Task<InventoryItemBase> read = Task.Run(() => m_connector.GetItem(s_owner, m_item.ID));
-        Assert.True(readDone.Wait(s_wait), "the read did not reach the server");
+        Assert.True(readDone.Wait(s_wait, TestContext.Current.CancellationToken), "the read did not reach the server");
 
         Assert.True(Move());
 
         releaseRead.Set();
-        Assert.Equal(s_oldFolder, (await read.WaitAsync(s_wait)).Folder);
+        Assert.Equal(s_oldFolder, (await read.WaitAsync(s_wait, TestContext.Current.CancellationToken)).Folder);
 
         Assert.Equal(s_newFolder, m_connector.GetItem(s_owner, m_item.ID).Folder);
     }
