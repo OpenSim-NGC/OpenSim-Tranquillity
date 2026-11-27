@@ -148,11 +148,16 @@ public class EventQueueDropLogTests : IDisposable
     /// Every script in the prim gets the warm-up answer, not only the one that asked. Wait until each script started has
     /// handled it (queue empty, waiting): an answer that reached a slow script after its own flood began would be
     /// dropped from a full queue and change its count.
+    /// <para>
+    /// The first read of the notecard is fetched on the thread pool, which takes real time, while RunUntil moves the
+    /// engine's clock 1 ms on every idle pass and so can pass 60 s of it in well under a second. The wait for the
+    /// answer therefore has no engine-clock limit, only RunUntil's real one. Later reads come from the cache.
+    /// </para>
     /// </summary>
     private void Warm()
     {
         Say("warm");
-        Assert.True(RunUntil(() => H.Said.Contains("A warm")), Said);
+        Assert.True(RunUntil(() => H.Said.Contains("A warm"), maxClockMs: ulong.MaxValue / 2), Said);
         Assert.True(RunUntil(() => m_started.All(i =>
             H.Engine.GetEventQueueFreeSpacePercentage(i) == 1.0f && H.RunStateOf(i) == "Waiting")), Said);
     }
