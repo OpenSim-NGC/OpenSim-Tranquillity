@@ -28,7 +28,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class JanusPeerCtlBatchSinkTests
     {
         private static UUID Id(int n)
@@ -106,9 +105,10 @@ namespace osWebRtcVoice.Tests
 
         // ---- estate no-regression: one room in, one message out, same body ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_EveryAgentInTheFallbackRoom_SendsExactlyOneMessage_WithTheSingleRoomBody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
             var excl = Excl((1, new[] { 2, 3 }), (2, new[] { 1 }));
             using var sink = NewSink(rec, null);
@@ -117,37 +117,43 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlSendResult r = await sink.SendAsync(VisOp.Replace, excl);
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(rec.Sent.Count, Is.EqualTo(1), "one room must mean one admin round-trip, as before per-room emission");
+            Assert.Equal(PeerCtlSendResult.Ok, r);
+            {
+                var assertedValue = rec.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one room must mean one admin round-trip, as before per-room emission");
+            }
 
             // The original single-room sink built exactly this: the room-less body, with the estate room stamped on.
             OSDMap expected = PeerCtlBatchSerializer.BuildRequest(VisOp.Replace, excl);
             expected["room"] = new OSDInteger(fallback);
-            Assert.That(OSDParser.SerializeJsonString(rec.Sent[0]),
-                Is.EqualTo(OSDParser.SerializeJsonString(expected)),
-                "the estate-channel body must be byte-for-byte what it was before per-room emission");
+            {
+                var assertedValue = OSDParser.SerializeJsonString(rec.Sent[0]);
+                TestAssert.WithMessage(() => Assert.Equal(OSDParser.SerializeJsonString(expected), assertedValue), "the estate-channel body must be byte-for-byte what it was before per-room emission");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_EveryAgentRecordedInOneRoom_SendsOneMessageToThatRoom_NotTheFallback()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
             var excl = Excl((1, new[] { 2 }), (2, new[] { 1 }));
             using var sink = NewSink(rec, Resolver((1, 4242), (2, 4242)));
 
             await sink.SendAsync(VisOp.Add, excl);
 
-            Assert.That(rec.Sent.Count, Is.EqualTo(1));
-            Assert.That(rec.Sent[0]["room"].AsInteger(), Is.EqualTo(4242));
-            Assert.That(sink.LastSendFallbackListeners, Is.Zero);
-            Assert.That(sink.LastSendFallbackSources, Is.Zero);
+            Assert.Single(rec.Sent);
+            Assert.Equal(4242, rec.Sent[0]["room"].AsInteger());
+            Assert.Equal(0, sink.LastSendFallbackListeners);
+            Assert.Equal(0, sink.LastSendFallbackSources);
         }
 
         // ---- The MUTE channel must be counted, not just the excl channel ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_MuteOnlyBatch_AddressesTheMuteRoom_AndReportsOneRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // A moderation-mute delta: empty exclusion channel, one mute entry for a recorded listener.
             // Formerly the send delivered it but every counter read the excl channel and reported 0.
             var rec = new Recorder();
@@ -155,20 +161,31 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlSendResult r = await sink.SendAsync(VisOp.Add, Excl(), Excl((1, new[] { 2 })));
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(rec.Sent.Count, Is.EqualTo(1), "the mute is delivered to exactly one room");
-            Assert.That(rec.Sent[0]["room"].AsInteger(), Is.EqualTo(4242));
-            Assert.That((rec.Sent[0]["mute"] as OSDMap)?.ContainsKey(Id(1).ToString()), Is.True,
-                "the mute entry for listener 1 is on the wire");
-            Assert.That(sink.LastSendRooms, Is.EqualTo(1),
-                "rooms addressed is the channel union — a mute-only op reads 1, not 0");
-            Assert.That(sink.LastSendFallbackListeners, Is.Zero, "excl channel had no listeners");
-            Assert.That(sink.LastSendMuteFallbackListeners, Is.Zero, "the mute listener was resolvable, not fallback");
+            Assert.Equal(PeerCtlSendResult.Ok, r);
+            {
+                var assertedValue = rec.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the mute is delivered to exactly one room");
+            }
+            Assert.Equal(4242, rec.Sent[0]["room"].AsInteger());
+            Assert.True(((rec.Sent[0]["mute"] as OSDMap)?.ContainsKey(Id(1).ToString())), "the mute entry for listener 1 is on the wire");
+            {
+                var assertedValue = sink.LastSendRooms;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "rooms addressed is the channel union — a mute-only op reads 1, not 0");
+            }
+            {
+                var assertedValue = sink.LastSendFallbackListeners;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "excl channel had no listeners");
+            }
+            {
+                var assertedValue = sink.LastSendMuteFallbackListeners;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the mute listener was resolvable, not fallback");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_MuteOnly_UnplaceableListener_IsOmitted_AndCountedOnTheMuteCompanion()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The mute channel gets the same treatment as the exclusion channel. A listener the
             // sim cannot place must not have its MUTE stamped on the estate room; a mute is live moderation state, so
             // sending it to a guessed room would be harmful. It is omitted and counted instead.
@@ -177,18 +194,27 @@ namespace osWebRtcVoice.Tests
 
             await sink.SendAsync(VisOp.Add, Excl(), Excl((1, new[] { 2 })));
 
-            Assert.That(rec.Sent, Is.Empty, "no room is addressed, so nothing goes on the wire");
-            Assert.That(sink.LastSendRooms, Is.Zero);
-            Assert.That(sink.LastSendMuteFallbackListeners, Is.EqualTo(1),
-                "the unplaceable mute listener is counted on the mute-fallback companion");
-            Assert.That(sink.LastSendFallbackListeners, Is.Zero, "the excl channel had no listeners");
+            {
+                var assertedValue = rec.Sent;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no room is addressed, so nothing goes on the wire");
+            }
+            Assert.Equal(0, sink.LastSendRooms);
+            {
+                var assertedValue = sink.LastSendMuteFallbackListeners;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the unplaceable mute listener is counted on the mute-fallback companion");
+            }
+            {
+                var assertedValue = sink.LastSendFallbackListeners;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the excl channel had no listeners");
+            }
         }
 
         // ---- the null-resolver window (construction order) ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_BeforeTheServiceAssignsTheResolver_SendsNothing_AndCountsEveryone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The sink is built before VoiceVisibilityService exists, so RoomOf is null until that ctor runs. A
             // send in that window must not throw and must not guess. Addressing the estate room would be
             // wrong: it is a real room number in every region, so the send would look successful and put live
@@ -198,38 +224,52 @@ namespace osWebRtcVoice.Tests
                 Id(999), "TestRegion", 4, rec.SendAsync);
             using (sink)
             {
-                Assert.That(sink.RoomOf, Is.Null, "unset until the service assigns it");
+                {
+                    var assertedValue = sink.RoomOf;
+                    TestAssert.WithMessage(() => Assert.Null(assertedValue), "unset until the service assigns it");
+                }
 
                 PeerCtlSendResult r = await sink.SendAsync(VisOp.Replace, Excl((1, new[] { 2, 3 })));
 
-                Assert.That(r, Is.EqualTo(PeerCtlSendResult.Ok), "an unwired sink degrades quietly, it does not fail");
-                Assert.That(rec.Sent, Is.Empty, "nothing on the wire, least of all to the estate room");
-                Assert.That(sink.LastSendRooms, Is.Zero);
-                Assert.That(sink.LastSendFallbackListeners, Is.EqualTo(1));
-                Assert.That(sink.LastSendFallbackSources, Is.EqualTo(2));
+                {
+                    var assertedValue = r;
+                    TestAssert.WithMessage(() => Assert.Equal(PeerCtlSendResult.Ok, assertedValue), "an unwired sink degrades quietly, it does not fail");
+                }
+                {
+                    var assertedValue = rec.Sent;
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), "nothing on the wire, least of all to the estate room");
+                }
+                Assert.Equal(0, sink.LastSendRooms);
+                Assert.Equal(1, sink.LastSendFallbackListeners);
+                Assert.Equal(2, sink.LastSendFallbackSources);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task RoomOf_AssignedAfterConstruction_TakesEffectOnTheNextSend()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
             using var sink = NewSink(rec, null);
             await sink.SendAsync(VisOp.Add, Excl((1, new[] { 2 })));
-            Assert.That(rec.Sent, Is.Empty, "before the resolver is assigned there is no address, so no send");
+            {
+                var assertedValue = rec.Sent;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "before the resolver is assigned there is no address, so no send");
+            }
 
             sink.RoomOf = Resolver((1, 700), (2, 700));
             await sink.SendAsync(VisOp.Add, Excl((1, new[] { 2 })));
 
-            Assert.That(rec.Sent.Count, Is.EqualTo(1));
-            Assert.That(rec.Sent[0]["room"].AsInteger(), Is.EqualTo(700));
+            Assert.Single(rec.Sent);
+            Assert.Equal(700, rec.Sent[0]["room"].AsInteger());
         }
 
         // ---- partitioning and filtering, end to end through the sink ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_ListenersInTwoRooms_SendsOneMessagePerRoom_WithSameRoomSourcesOnly()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
             // Listener 1 in room 100 excludes 2 (room 100) and 3 (room 200); listener 3 in room 200.
             var excl = Excl((1, new[] { 2, 3 }), (3, new[] { 2 }));
@@ -237,35 +277,46 @@ namespace osWebRtcVoice.Tests
 
             await sink.SendAsync(VisOp.Replace, excl);
 
-            Assert.That(rec.Sent.Count, Is.EqualTo(2));
-            Assert.That(rec.Rooms(), Is.EquivalentTo(new[] { 100, 200 }));
-            Assert.That(sink.LastSendRooms, Is.EqualTo(2));
+            Assert.Equal(2, rec.Sent.Count);
+            Assert.Equivalent(new[] { 100, 200 }, rec.Rooms(), strict: true);
+            Assert.Equal(2, sink.LastSendRooms);
 
             var a = (OSDMap)rec.ForRoom(100)["excl"];
-            Assert.That(a.ContainsKey(Id(1).ToString()), Is.True);
-            Assert.That(((OSDArray)a[Id(1).ToString()]).Count, Is.EqualTo(1), "source 3 is in another room");
+            Assert.True(a.ContainsKey(Id(1).ToString()));
+            {
+                var assertedValue = ((OSDArray)a[Id(1).ToString()]).Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "source 3 is in another room");
+            }
 
             var b = (OSDMap)rec.ForRoom(200)["excl"];
-            Assert.That(b.ContainsKey(Id(3).ToString()), Is.True);
-            Assert.That(((OSDArray)b[Id(3).ToString()]).Count, Is.Zero, "source 2 is in another room");
+            Assert.True(b.ContainsKey(Id(3).ToString()));
+            {
+                var assertedValue = ((OSDArray)b[Id(3).ToString()]).Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "source 2 is in another room");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_EmptyMap_SendsNothing_AndIsOk()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
             using var sink = NewSink(rec, Resolver());
 
             PeerCtlSendResult r = await sink.SendAsync(VisOp.Add, new Dictionary<UUID, IReadOnlyCollection<UUID>>());
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.Ok), "nothing to address is not a failure");
-            Assert.That(rec.Sent, Is.Empty);
-            Assert.That(sink.LastSendRooms, Is.Zero);
+            {
+                var assertedValue = r;
+                TestAssert.WithMessage(() => Assert.Equal(PeerCtlSendResult.Ok, assertedValue), "nothing to address is not a failure");
+            }
+            Assert.Empty(rec.Sent);
+            Assert.Equal(0, sink.LastSendRooms);
         }
 
-        [Test]
-        public void SendAsync_InvariantViolationInOneRoom_SendsNothingAtAll()
+        [Fact(Timeout = 60000)]
+        public async Task SendAsync_InvariantViolationInOneRoom_SendsNothingAtAll()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Every body is built before any is sent, so the serializer's all-or-nothing throw stays
             // all-or-nothing across rooms: no room may be updated while another aborts.
             //
@@ -284,9 +335,14 @@ namespace osWebRtcVoice.Tests
             // Agents 1 and 2 have records in room 100; every other agent's record is the estate room.
             sink.RoomOf = a => a == Id(1) || a == Id(2) ? 100 : sink.FallbackRoom;
 
-            Assert.That(async () => await sink.SendAsync(VisOp.Add, excl),
-                Throws.TypeOf<InvalidOperationException>());
-            Assert.That(rec.Sent, Is.Empty, "no room may have been updated before the throw");
+            {
+                var assertedValue = async () => await sink.SendAsync(VisOp.Add, excl);
+                await Assert.ThrowsAsync<InvalidOperationException>(assertedValue);
+            }
+            {
+                var assertedValue = rec.Sent;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no room may have been updated before the throw");
+            }
         }
 
         // ---- aggregation precedence (severity order) ----
@@ -298,67 +354,77 @@ namespace osWebRtcVoice.Tests
             return await sink.SendAsync(VisOp.Add, Excl((1, new int[0]), (2, new int[0]), (3, new int[0])));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Aggregate_AllOk_IsOk()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
-            Assert.That(await ThreeRooms(_ => AdminSendResult.Ok, rec), Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(rec.Sent.Count, Is.EqualTo(3));
+            Assert.Equal(PeerCtlSendResult.Ok, await ThreeRooms(_ => AdminSendResult.Ok, rec));
+            Assert.Equal(3, rec.Sent.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Aggregate_OkPlusTransportError_IsTransportError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
             PeerCtlSendResult r = await ThreeRooms(
                 room => room == 200 ? AdminSendResult.TransportError : AdminSendResult.Ok, rec);
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.TransportError));
-            Assert.That(rec.Sent.Count, Is.EqualTo(3), "a failure in one room must not suppress the others");
+            Assert.Equal(PeerCtlSendResult.TransportError, r);
+            {
+                var assertedValue = rec.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "a failure in one room must not suppress the others");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Aggregate_OkPlusProtocolError_IsProtocolError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
             PeerCtlSendResult r = await ThreeRooms(
                 room => room == 300 ? AdminSendResult.ProtocolError : AdminSendResult.Ok, rec);
 
             // Must NOT read as Ok: the sender's latch counts consecutive ProtocolErrors, and an Ok
             // here would reset that run and mask a real config/format fault forever.
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.ProtocolError));
-            Assert.That(rec.Sent.Count, Is.EqualTo(3));
+            Assert.Equal(PeerCtlSendResult.ProtocolError, r);
+            Assert.Equal(3, rec.Sent.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Aggregate_TransportErrorPlusProtocolError_IsProtocolError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
             PeerCtlSendResult r = await ThreeRooms(
                 room => room == 100 ? AdminSendResult.TransportError
                       : room == 300 ? AdminSendResult.ProtocolError
                       : AdminSendResult.Ok, rec);
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.ProtocolError), "ProtocolError outranks TransportError");
+            {
+                var assertedValue = r;
+                TestAssert.WithMessage(() => Assert.Equal(PeerCtlSendResult.ProtocolError, assertedValue), "ProtocolError outranks TransportError");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Aggregate_AllTransportErrors_IsTransportError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder();
-            Assert.That(await ThreeRooms(_ => AdminSendResult.TransportError, rec),
-                Is.EqualTo(PeerCtlSendResult.TransportError));
+            Assert.Equal(PeerCtlSendResult.TransportError, await ThreeRooms(_ => AdminSendResult.TransportError, rec));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SingleRoom_PreservesTheResultUnchanged()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rec = new Recorder { Reply = _ => AdminSendResult.ProtocolError };
             using var sink = NewSink(rec, null);
             sink.RoomOf = AllEstate(sink);   // this test's subject is the result, not placement
 
-            Assert.That(await sink.SendAsync(VisOp.Add, Excl((1, new[] { 2 }))),
-                Is.EqualTo(PeerCtlSendResult.ProtocolError));
+            Assert.Equal(PeerCtlSendResult.ProtocolError, await sink.SendAsync(VisOp.Add, Excl((1, new[] { 2 }))));
         }
 
         // ---- the concurrency cap actually bounds ----
@@ -408,40 +474,50 @@ namespace osWebRtcVoice.Tests
             return probe;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Concurrency_BoundsRoomsInFlight()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             ConcurrencyProbe probe = await EightRoomsAt(2);
 
-            Assert.That(probe.Sent.Count, Is.EqualTo(8), "every room is still sent");
-            Assert.That(probe.Max, Is.LessThanOrEqualTo(2), "the cap must actually bound in-flight sends");
-            Assert.That(probe.Max, Is.EqualTo(2), "and must actually parallelise up to it, not run sequentially");
+            {
+                var assertedValue = probe.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(8, assertedValue), "every room is still sent");
+            }
+            Assert.True(probe.Max <= 2, "the cap must actually bound in-flight sends");
+            {
+                var assertedValue = probe.Max;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "and must actually parallelise up to it, not run sequentially");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Concurrency_Zero_IsClampedToSequential_NotAStall()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // SemaphoreSlim(0) would block every send forever and wedge emission until the sender's
             // staleness guard fired - every tick. Zero must degrade to sequential instead.
             ConcurrencyProbe probe = await EightRoomsAt(0);
 
-            Assert.That(probe.Sent.Count, Is.EqualTo(8));
-            Assert.That(probe.Max, Is.EqualTo(1));
+            Assert.Equal(8, probe.Sent.Count);
+            Assert.Equal(1, probe.Max);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Concurrency_Negative_IsClampedToSequential()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             ConcurrencyProbe probe = await EightRoomsAt(-4);
 
-            Assert.That(probe.Sent.Count, Is.EqualTo(8));
-            Assert.That(probe.Max, Is.EqualTo(1));
+            Assert.Equal(8, probe.Sent.Count);
+            Assert.Equal(1, probe.Max);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void DefaultRoomSendConcurrency_IsTheBriefsSmallDefault()
         {
-            Assert.That(JanusPeerCtlBatchSink.DefaultRoomSendConcurrency, Is.EqualTo(4));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(4, JanusPeerCtlBatchSink.DefaultRoomSendConcurrency);
         }
     }
 }

@@ -20,7 +20,6 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 using Phlox.ScriptEngine;
 using Xunit;
-using Xunit.Abstractions;
 using Clock = InWorldz.Phlox.Util.Clock;
 
 namespace InWorldz.Phlox.Tests;

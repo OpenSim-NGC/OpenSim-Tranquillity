@@ -22,10 +22,8 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
-    public class PositionReplyTests
-    {
+    public class PositionReplyTests : IAsyncLifetime
+        {
         private static readonly UUID A = new UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
         private sealed class Capture : ILoggerProvider, ILogger
@@ -58,17 +56,13 @@ namespace osWebRtcVoice.Tests
         private Capture _log;
         private LogCapture _logging;
         private long _now;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
             _now = 10_000;
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             _logging.Dispose();
             _log.Dispose();
@@ -76,22 +70,29 @@ namespace osWebRtcVoice.Tests
 
         // ---- the mapping --------------------------------------------------------------------------
 
-        [TestCase("applied", null, PositionReplyKind.Applied)]
-        [TestCase("error", "stale_seq", PositionReplyKind.StaleSeq)]
-        [TestCase("error", "unknown_room", PositionReplyKind.UnknownRoom)]
-        [TestCase("error", "too_big", PositionReplyKind.TooBig)]
-        [TestCase("error", "malformed", PositionReplyKind.Other)]
-        [TestCase("error", "stale_epoch", PositionReplyKind.Other)]
-        [TestCase("error", null, PositionReplyKind.Other)]
-        [TestCase("empty", null, PositionReplyKind.Other)]
-        [TestCase(null, null, PositionReplyKind.Other)]
+        [InlineData("applied",null,PositionReplyKind.Applied)]
+        [InlineData("error","stale_seq",PositionReplyKind.StaleSeq)]
+        [InlineData("error","unknown_room",PositionReplyKind.UnknownRoom)]
+        [InlineData("error","too_big",PositionReplyKind.TooBig)]
+        [InlineData("error","malformed",PositionReplyKind.Other)]
+        [InlineData("error","stale_epoch",PositionReplyKind.Other)]
+        [InlineData("error",null,PositionReplyKind.Other)]
+        [InlineData("empty",null,PositionReplyKind.Other)]
+        [InlineData(null,null,PositionReplyKind.Other)]
+        [Theory(Timeout = 60000)]
         public void AnInnerReply_IsClassifiedByItsStatusAndReason(string status, string reason, PositionReplyKind expected)
-            => Assert.That(PositionReply.Classify(true, status, reason), Is.EqualTo(expected));
 
-        [Test]
+            {
+    TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+    Assert.Equal(expected, PositionReply.Classify(true, status, reason));
+}
+        [Fact(Timeout = 60000)]
         public void NoInnerReply_IsNotClassified()
-            => Assert.That(PositionReply.Classify(false, null, null), Is.EqualTo(PositionReplyKind.None));
 
+            {
+    TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+    Assert.Equal(PositionReplyKind.None, PositionReply.Classify(false, null, null));
+}
         // ---- the sink counts what the mixer answered ----------------------------------------------
 
         private static string Inner(string status, string reason = null)
@@ -105,56 +106,61 @@ namespace osWebRtcVoice.Tests
 
         private static OSDMap PosBody() => new OSDMap { ["request"] = OSD.FromString("peer_pos"), ["room"] = OSD.FromInteger(7) };
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AnAppliedReply_IsCountedApplied_AndLogsNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using JanusPeerCtlBatchSink sink = Sink(_ => (AdminSendResult.Ok, Inner("applied")));
 
-            Assert.That(await sink.SendPositionsAsync(PosBody()), Is.True);
+            Assert.True(await sink.SendPositionsAsync(PosBody()));
 
-            Assert.That(sink.Replies.Counts.Applied, Is.EqualTo(1));
-            Assert.That(sink.Replies.Counts.Refused, Is.EqualTo(0));
-            Assert.That(_log.AtOrAbove(LogLevel.Information, "peer_pos"), Is.Empty);
+            Assert.Equal(1, sink.Replies.Counts.Applied);
+            Assert.Equal(0, sink.Replies.Counts.Refused);
+            Assert.Empty(_log.AtOrAbove(LogLevel.Information, "peer_pos"));
         }
 
-        [TestCase("stale_seq")]
-        [TestCase("unknown_room")]
-        [TestCase("too_big")]
-        [TestCase("malformed")]
-        [TestCase("stale_epoch")]
+        [InlineData("stale_seq")]
+        [InlineData("unknown_room")]
+        [InlineData("too_big")]
+        [InlineData("malformed")]
+        [InlineData("stale_epoch")]
+        [Theory(Timeout = 60000)]
         public async Task ARefusal_IsCountedByReason_AndTheRequestIsStillSentAsFarAsTheTransportGoes(string reason)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using JanusPeerCtlBatchSink sink = Sink(_ => (AdminSendResult.Ok, Inner("error", reason)));
 
-            Assert.That(await sink.SendPositionsAsync(PosBody()), Is.True, "the transport carried it");
+            Assert.True((await sink.SendPositionsAsync(PosBody())), "the transport carried it");
 
             PositionReplyCounts c = sink.Replies.Counts;
-            Assert.That(c.Applied, Is.EqualTo(0));
-            Assert.That(c.Refused, Is.EqualTo(1));
-            Assert.That((c.StaleSeq, c.UnknownRoom, c.TooBig, c.Other), Is.EqualTo(reason switch
+            Assert.Equal(0, c.Applied);
+            Assert.Equal(1, c.Refused);
+            Assert.Equal(reason switch
             {
                 "stale_seq" => (1L, 0L, 0L, 0L),
                 "unknown_room" => (0L, 1L, 0L, 0L),
                 "too_big" => (0L, 0L, 1L, 0L),
                 _ => (0L, 0L, 0L, 1L),
-            }));
+            }, (c.StaleSeq, c.UnknownRoom, c.TooBig, c.Other));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ATransportFailure_AndAnEmptyBody_AreNotCounted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int n = 0;
             using JanusPeerCtlBatchSink sink = Sink(_ => n++ == 0 ? (AdminSendResult.TransportError, string.Empty) : (AdminSendResult.Ok, string.Empty));
 
-            Assert.That(await sink.SendPositionsAsync(PosBody()), Is.False);
-            Assert.That(await sink.SendPositionsAsync(PosBody()), Is.True);
+            Assert.False(await sink.SendPositionsAsync(PosBody()));
+            Assert.True(await sink.SendPositionsAsync(PosBody()));
 
-            Assert.That(sink.Replies.Counts.Total, Is.EqualTo(0));
+            Assert.Equal(0, sink.Replies.Counts.Total);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TwentyRefusalsInTenSeconds_GiveOneWarning_ThenOneMoreWithTheCount()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using JanusPeerCtlBatchSink sink = Sink(_ => (AdminSendResult.Ok, Inner("error", "stale_seq")));
 
             for (int i = 0; i < 20; i++)
@@ -164,16 +170,26 @@ namespace osWebRtcVoice.Tests
             }
 
             List<string> lines = _log.AtOrAbove(LogLevel.Warning, "refused a peer_pos");
-            Assert.That(lines, Has.Count.EqualTo(1), string.Join(" | ", lines));
-            Assert.That(lines[0], Does.Contain("stale_seq").And.Contain("room 7"));
-            Assert.That(sink.Replies.Counts.StaleSeq, Is.EqualTo(20), "every one is still counted");
+            {
+                var assertedValue = lines;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), string.Join(" | ", lines));
+            }
+            {
+                var assertedValue = lines[0];
+                Assert.Contains("stale_seq", assertedValue);
+                Assert.Contains("room 7", assertedValue);
+            }
+            {
+                var assertedValue = sink.Replies.Counts.StaleSeq;
+                TestAssert.WithMessage(() => Assert.Equal(20, assertedValue), "every one is still counted");
+            }
 
             _now += 60_000;
             await sink.SendPositionsAsync(PosBody());
 
             lines = _log.AtOrAbove(LogLevel.Warning, "refused a peer_pos");
-            Assert.That(lines, Has.Count.EqualTo(2));
-            Assert.That(lines[1], Does.Contain("19 more"));
+            Assert.Equal(2, lines.Count());
+            Assert.Contains("19 more", lines[1]);
         }
 
         // ---- the pump's one-minute summary ---------------------------------------------------------
@@ -192,9 +208,10 @@ namespace osWebRtcVoice.Tests
             public Task<bool> SendPositionsAsync(OSDMap body) => Task.FromResult(true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheSummary_IsOneDebugLineAMinute_WithTheRepliesOfThatMinute()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var sink = new Sink3();
             var pump = new VoicePositionPump(new World(), sink, new PositionSettings(), _ => 7, () => 100000, "Test Region", () => _now);
 
@@ -209,9 +226,17 @@ namespace osWebRtcVoice.Tests
             }
 
             List<string> lines = _log.Where(LogLevel.Debug, "position summary");
-            Assert.That(lines, Has.Count.EqualTo(1), string.Join(" | ", lines));
-            Assert.That(lines[0], Does.Contain("2 applied").And.Contain("1 refused").And.Contain("stale_seq 1"));
-            Assert.That(_log.AtOrAbove(LogLevel.Information, "position summary"), Is.Empty);
+            {
+                var assertedValue = lines;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), string.Join(" | ", lines));
+            }
+            {
+                var assertedValue = lines[0];
+                Assert.Contains("2 applied", assertedValue);
+                Assert.Contains("1 refused", assertedValue);
+                Assert.Contains("stale_seq 1", assertedValue);
+            }
+            Assert.Empty(_log.AtOrAbove(LogLevel.Information, "position summary"));
 
             // a minute with nothing in it writes nothing: the keep-alive snapshots still go out, but the mixer said nothing new
             // and the counts did not move, so only the sent figure is left to report
@@ -221,13 +246,18 @@ namespace osWebRtcVoice.Tests
                 await pump.TickAsync();
             }
             lines = _log.Where(LogLevel.Debug, "position summary");
-            Assert.That(lines, Has.Count.EqualTo(2));
-            Assert.That(lines[1], Does.Contain("0 applied").And.Contain("0 refused"));
+            Assert.Equal(2, lines.Count());
+            {
+                var assertedValue = lines[1];
+                Assert.Contains("0 applied", assertedValue);
+                Assert.Contains("0 refused", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AnIdleFeed_WritesNoSummary()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var sink = new Sink3();
             var pump = new VoicePositionPump(new EmptyWorld(), sink, new PositionSettings(), _ => 7, () => 100000, "Test Region", () => _now);
 
@@ -237,7 +267,7 @@ namespace osWebRtcVoice.Tests
                 await pump.TickAsync();
             }
 
-            Assert.That(_log.Where(LogLevel.Debug, "position summary"), Is.Empty);
+            Assert.Empty(_log.Where(LogLevel.Debug, "position summary"));
         }
 
         private sealed class EmptyWorld : IPositionWorld
@@ -247,9 +277,10 @@ namespace osWebRtcVoice.Tests
 
         // ---- the console ---------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ShowVoiceVisibility_ReportsTheReplyCounts_WhenThePositionFeedIsOn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int n = 0;
             using JanusPeerCtlBatchSink sink = Sink(_ => (AdminSendResult.Ok, n++ < 2 ? Inner("applied") : Inner("error", "too_big")));
             for (int i = 0; i < 3; i++)
@@ -258,9 +289,26 @@ namespace osWebRtcVoice.Tests
             IReadOnlyList<string> off = VoiceVisibilityCommands.Format("Test Region", sink, 0);
             IReadOnlyList<string> on = VoiceVisibilityCommands.Format("Test Region", sink, 0, positionFeed: true);
 
-            Assert.That(off.Any(l => l.Contains("position")), Is.False, "nothing about positions while the feed is off");
+            Assert.False(off.Any(l => l.Contains("position")), "nothing about positions while the feed is off");
             string line = on.Single(l => l.Contains("position replies"));
-            Assert.That(line, Does.Contain("2 applied").And.Contain("1 refused").And.Contain("too_big 1"));
+            {
+                var assertedValue = line;
+                Assert.Contains("2 applied", assertedValue);
+                Assert.Contains("1 refused", assertedValue);
+                Assert.Contains("too_big 1", assertedValue);
+            }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

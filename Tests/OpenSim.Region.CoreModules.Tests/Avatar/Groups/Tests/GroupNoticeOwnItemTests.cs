@@ -54,8 +54,8 @@ public class GroupNoticeOwnItemTests : OpenSimTestCase
     private sealed class Notices
     {
         public UUID NoticeID, ItemID;
-        public string OwnerID;
-        public string Name;
+        public string OwnerID = string.Empty;
+        public string Name = string.Empty;
         public int Added;
     }
 
@@ -74,10 +74,14 @@ public class GroupNoticeOwnItemTests : OpenSimTestCase
                         return new V2Groups.ExtendedGroupMembershipData { GroupID = GroupId, GroupPowers = Powers };
                     case "AddGroupNotice":
                         // (RequestingAgentID, groupID, noticeID, fromName, subject, message, hasAttachment, attType, attName, attItemID, attOwnerID)
-                        kept.NoticeID = (UUID)a[2];
-                        kept.Name = (string)a[8];
-                        kept.ItemID = (UUID)a[9];
-                        kept.OwnerID = (string)a[10];
+                        kept.NoticeID = a[2] is UUID noticeID
+                            ? noticeID : throw new InvalidOperationException("Notice ID argument was not a UUID.");
+                        kept.Name = a[8] as string
+                            ?? throw new InvalidOperationException("Notice attachment name was not a string.");
+                        kept.ItemID = a[9] is UUID itemID
+                            ? itemID : throw new InvalidOperationException("Notice attachment item ID was not a UUID.");
+                        kept.OwnerID = a[10] as string
+                            ?? throw new InvalidOperationException("Notice attachment owner ID was not a string.");
                         kept.Added++;
                         return true;
                     case "GetGroupMembers":
@@ -103,7 +107,8 @@ public class GroupNoticeOwnItemTests : OpenSimTestCase
     }
 
     private static void Send(V2Groups.GroupsModule gm, IClientAPI client, GridInstantMessage im)
-        => typeof(V2Groups.GroupsModule).GetMethod("OnInstantMessage", BindingFlags.Instance | BindingFlags.NonPublic)
+        => (typeof(V2Groups.GroupsModule).GetMethod("OnInstantMessage", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(V2Groups.GroupsModule).FullName, "OnInstantMessage"))
             .Invoke(gm, new object[] { client, im });
 
     /// <summary>A notice as the viewer sends it, its attachment named in the bucket's LLSD.</summary>

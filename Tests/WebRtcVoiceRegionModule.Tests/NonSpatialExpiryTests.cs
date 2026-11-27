@@ -13,14 +13,13 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialExpiryTests
     {
         private sealed class Capture
@@ -54,9 +53,10 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnInvitationLapsesAfterItsTtl_WhenTheMaintenancePassRuns()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, inviteTtl: TimeSpan.FromMinutes(2));
             NonSpatialMaintenance m = NewMaintenance(e, new Capture());
@@ -65,19 +65,23 @@ namespace osWebRtcVoice.Tests
 
             clock.Now = clock.Now.AddMinutes(1);
             m.RunOnce();
-            Assert.That(e.Store.Get(id).Find(Bob).State, Is.EqualTo(MemberState.Invited), "still inside the TTL");
+            {
+                var assertedValue = e.Store.Get(id).Find(Bob).State;
+                TestAssert.WithMessage(() => Assert.Equal(MemberState.Invited, assertedValue), "still inside the TTL");
+            }
 
             clock.Now = clock.Now.AddMinutes(2);
             m.RunOnce();
             NonSpatialMember bob = e.Store.Get(id).Find(Bob);
-            Assert.That(bob.State, Is.EqualTo(MemberState.Departed));
-            Assert.That(bob.Departure, Is.EqualTo(DepartureReason.Expired));
-            Assert.That(bob.HoldsSeat, Is.False);
+            Assert.Equal(MemberState.Departed, bob.State);
+            Assert.Equal(DepartureReason.Expired, bob.Departure);
+            Assert.False(bob.HoldsSeat);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnIdleSessionIsRemoved_WhenTheMaintenancePassRuns()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
@@ -85,14 +89,15 @@ namespace osWebRtcVoice.Tests
             clock.Now = clock.Now.AddHours(9);
             int expired = NewMaintenance(e, new Capture()).RunOnce();
 
-            Assert.That(e.Store.Get(id), Is.Null);
-            Assert.That(e.Store.All(), Is.Empty);
-            Assert.That(expired, Is.GreaterThanOrEqualTo(1));
+            Assert.Null(e.Store.Get(id));
+            Assert.Empty(e.Store.All());
+            Assert.True(expired >= 1);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALongCallWithAPresentMemberSurvivesPastTheIdleTtl()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             HashSet<UUID> here = new() { Alice, Bob };
@@ -109,14 +114,18 @@ namespace osWebRtcVoice.Tests
             }
 
             NonSpatialVoiceSession kept = e.Store.Get(id);
-            Assert.That(kept, Is.Not.Null, "someone is still in the call");
-            Assert.That(kept.SeatsHeld, Is.EqualTo(2));
-            Assert.That(kept.Find(Alice).State, Is.Not.EqualTo(MemberState.Departed));
+            {
+                var assertedValue = kept;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "someone is still in the call");
+            }
+            Assert.Equal(2, kept.SeatsHeld);
+            Assert.NotEqual(MemberState.Departed, kept.Find(Alice).State);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallIsKeptWhileOneMemberIsPresentAndExpiresOnceTheLastOneLeaves()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             HashSet<UUID> here = new() { Bob };   // Alice's viewer is gone; Bob is still there
@@ -127,35 +136,46 @@ namespace osWebRtcVoice.Tests
 
             clock.Now = clock.Now.AddHours(9);
             pass.RunOnce();
-            Assert.That(e.Store.Get(id), Is.Not.Null, "Bob is present, so the call is live");
+            {
+                var assertedValue = e.Store.Get(id);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "Bob is present, so the call is live");
+            }
 
             here.Clear();   // Bob goes too
             clock.Now = clock.Now.AddHours(9);
             pass.RunOnce();
-            Assert.That(e.Store.Get(id), Is.Null, "nobody is left, so the idle time applies");
+            {
+                var assertedValue = e.Store.Get(id);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "nobody is left, so the idle time applies");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallWhoseMembersHaveAllGoneStillExpiresAndReleasesTheirSeats()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             e.IsAgentPresent = _ => false;   // a crash or logout left both seats behind
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA, new List<UUID> { Bob }).Session.SessionId;
             e.Accept(id, Bob, RegionA);
             NonSpatialVoiceSession held = e.Store.Get(id);
-            Assert.That(held.SeatsHeld, Is.EqualTo(2));
+            Assert.Equal(2, held.SeatsHeld);
 
             clock.Now = clock.Now.AddHours(9);
             NewMaintenance(e, new Capture()).RunOnce();
 
-            Assert.That(e.Store.Get(id), Is.Null);
-            Assert.That(held.SeatsHeld, Is.EqualTo(0), "their seats are released");
+            Assert.Null(e.Store.Get(id));
+            {
+                var assertedValue = held.SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "their seats are released");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void APresentPersonWhoHoldsNoSeatDoesNotKeepACallAlive()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             e.IsAgentPresent = a => a == Bob;   // Bob is online but never accepted the invitation
@@ -164,12 +184,13 @@ namespace osWebRtcVoice.Tests
             clock.Now = clock.Now.AddHours(9);
             NewMaintenance(e, new Capture()).RunOnce();
 
-            Assert.That(e.Store.Get(id), Is.Null);
+            Assert.Null(e.Store.Get(id));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void APresenceLookupThatFailsKeepsTheCall_NeverEndsItWithSomeoneInIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             e.IsAgentPresent = _ => throw new InvalidOperationException("scene unavailable");
@@ -178,33 +199,41 @@ namespace osWebRtcVoice.Tests
             clock.Now = clock.Now.AddHours(9);
             NewMaintenance(e, new Capture()).RunOnce();
 
-            Assert.That(e.Store.Get(id), Is.Not.Null);
+            Assert.NotNull(e.Store.Get(id));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnExpiredSessionReleasesItsSeats()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
             e.Accept(id, Bob, RegionA);
             NonSpatialVoiceSession held = e.Store.Get(id);
-            Assert.That(held.SeatsHeld, Is.EqualTo(2));
+            Assert.Equal(2, held.SeatsHeld);
 
             clock.Now = clock.Now.AddHours(9);
             NewMaintenance(e, new Capture()).RunOnce();
 
-            Assert.That(e.Store.Get(id), Is.Null, "the session is gone");
-            Assert.That(held.SeatsHeld, Is.EqualTo(0), "and nobody is left holding a seat in it");
-            Assert.That(held.Find(Alice).Departure, Is.EqualTo(DepartureReason.Expired));
-            Assert.That(held.Find(Bob).Departure, Is.EqualTo(DepartureReason.Expired));
-            Assert.That(held.RingSent, Is.False, "the ring cycle ended with the last seat");
+            {
+                var assertedValue = e.Store.Get(id);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the session is gone");
+            }
+            {
+                var assertedValue = held.SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "and nobody is left holding a seat in it");
+            }
+            Assert.Equal(DepartureReason.Expired, held.Find(Alice).Departure);
+            Assert.Equal(DepartureReason.Expired, held.Find(Bob).Departure);
+            Assert.False(held.RingSent, "the ring cycle ended with the last seat");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADebugLineIsWrittenOnlyWhenSomethingExpired()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             Capture cap = new Capture();
@@ -212,17 +241,21 @@ namespace osWebRtcVoice.Tests
             e.StartAdhoc(Alice, UUID.Random(), RegionA);
 
             m.RunOnce();
-            Assert.That(cap.DebugCount, Is.EqualTo(0), "nothing expired, nothing written");
+            {
+                var assertedValue = cap.DebugCount;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "nothing expired, nothing written");
+            }
 
             clock.Now = clock.Now.AddHours(9);
             m.RunOnce();
-            Assert.That(cap.DebugCount, Is.EqualTo(1));
-            Assert.That(cap.Debug[0], Does.Contain("sessions=1"));
+            Assert.Equal(1, cap.DebugCount);
+            Assert.Contains("sessions=1", cap.Debug[0]);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AFailingPassIsCaughtAndLogged_AndTheNextPassStillRuns()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FlakyStore store = new FlakyStore();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, store: store, idleTtl: TimeSpan.FromHours(8));
@@ -231,19 +264,26 @@ namespace osWebRtcVoice.Tests
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
 
             store.FailAll = true;
-            Assert.That(() => m.RunOnce(), Throws.Nothing);
-            Assert.That(cap.Errors, Has.Count.EqualTo(1));
-            Assert.That(cap.Errors[0].Error, Is.InstanceOf<InvalidOperationException>());
+            {
+                var assertedValue = () => m.RunOnce();
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
+            Assert.Single(cap.Errors);
+            Assert.IsAssignableFrom<InvalidOperationException>(cap.Errors[0].Error);
 
             store.FailAll = false;
             clock.Now = clock.Now.AddHours(9);
             m.RunOnce();
-            Assert.That(store.Get(id), Is.Null);
+            Assert.Null(store.Get(id));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheTimerDrivesThePass_AndStopsWhenStopped()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FlakyStore store = new FlakyStore();
             NonSpatialVoiceSessionEngine e = NewEngine(store: store);
             using NonSpatialMaintenance m = NewMaintenance(e, new Capture(), TimeSpan.FromMilliseconds(40));
@@ -251,23 +291,24 @@ namespace osWebRtcVoice.Tests
             m.Start();
             m.Start();   // a second Start must not add a second timer
             SpinWait.SpinUntil(() => Volatile.Read(ref store.AllCalls) >= 3, TimeSpan.FromSeconds(8));
-            Assert.That(Volatile.Read(ref store.AllCalls), Is.GreaterThanOrEqualTo(3), "the timer ran the pass");
+            Assert.True(Volatile.Read(ref store.AllCalls) >= 3, "the timer ran the pass");
 
             m.Stop();
             Thread.Sleep(100);   // let a tick that was already running finish
             int afterStop = Volatile.Read(ref store.AllCalls);
             Thread.Sleep(300);   // a "did not happen" window: no timer tick may arrive after Stop
-            Assert.That(Volatile.Read(ref store.AllCalls), Is.EqualTo(afterStop));
+            Assert.Equal(afterStop, Volatile.Read(ref store.AllCalls));
 
             m.Start();   // a region added after the last one was removed restarts it
             SpinWait.SpinUntil(() => Volatile.Read(ref store.AllCalls) > afterStop, TimeSpan.FromSeconds(8));
-            Assert.That(Volatile.Read(ref store.AllCalls), Is.GreaterThan(afterStop));
+            Assert.True(Volatile.Read(ref store.AllCalls) > afterStop);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheDefaultIntervalIsThirtySeconds()
         {
-            Assert.That(NonSpatialMaintenance.DefaultInterval, Is.EqualTo(TimeSpan.FromSeconds(30)));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(TimeSpan.FromSeconds(30), NonSpatialMaintenance.DefaultInterval);
         }
     }
 }

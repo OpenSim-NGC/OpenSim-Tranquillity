@@ -8,7 +8,6 @@
 using OpenMetaverse;
 using OpenSim.Framework;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 

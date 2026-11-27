@@ -156,7 +156,7 @@ public class BakeAfterPresenceClosedTests
 
         rig.Avatars.Open.Reset();
         var bake = Task.Run(() => rig.Module.BakeAsync(rig.Presence, BakeReason.CofChanged, CancellationToken.None));
-        Assert.True(rig.Avatars.Entered.Wait(TimeSpan.FromSeconds(60)), "the bake never reached its index read");
+        Assert.True(rig.Avatars.Entered.Wait(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken), "the bake never reached its index read");
 
         rig.Scene.RemoveClient(agent, false);
         Assert.Null(rig.Presence.Appearance);

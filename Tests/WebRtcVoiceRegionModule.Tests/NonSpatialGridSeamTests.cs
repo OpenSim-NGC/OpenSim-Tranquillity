@@ -19,14 +19,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialGridSeamTests
     {
         /// <summary>Counts what the engine asks the store to do, and refuses to be bypassed.</summary>
@@ -46,46 +45,55 @@ namespace osWebRtcVoice.Tests
             public IReadOnlyList<NonSpatialVoiceSession> All() { Alls++; return _inner.All(); }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EveryMutatingOperation_GoesThroughTheStore()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             RecordingStore store = new RecordingStore();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(store: store);
 
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
-            Assert.That(store.StartOrGets, Is.EqualTo(1));
+            Assert.Equal(1, store.StartOrGets);
 
             int before = store.Mutates;
             e.Invite(id, Alice, Bob);
             e.Accept(id, Bob, RegionA);
             e.MarkPresent(id, Bob, RegionA, "vs");
             e.Depart(id, Bob, DepartureReason.ChatLeave);
-            Assert.That(store.Mutates - before, Is.EqualTo(4), "invite, accept, present and depart are each one atomic store op");
+            {
+                var assertedValue = store.Mutates - before;
+                TestAssert.WithMessage(() => Assert.Equal(4, assertedValue), "invite, accept, present and depart are each one atomic store op");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TwoEnginesOverOneStore_AreIndistinguishableFromOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // This is the grid case in miniature: two region modules, one voice session authority.
             InMemoryNonSpatialSessionStore shared = new InMemoryNonSpatialSessionStore();
             NonSpatialVoiceSessionEngine regionA = NonSpatialIdentityTests.NewEngine(store: shared);
             NonSpatialVoiceSessionEngine regionB = NonSpatialIdentityTests.NewEngine(store: shared);
 
             UUID id = regionA.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
-            Assert.That(regionA.Invite(id, Alice, Bob).Ok, Is.True);
+            Assert.True(regionA.Invite(id, Alice, Bob).Ok);
 
             // Bob answers on the OTHER region entirely.
             SessionOutcome accepted = regionB.Accept(id, Bob, RegionB);
 
-            Assert.That(accepted.Ok, Is.True, accepted.Decision);
-            Assert.That(shared.Get(id).SeatsHeld, Is.EqualTo(2));
-            Assert.That(shared.All().Count, Is.EqualTo(1), "one session, not one per region");
-            Assert.That(regionA.Store.Get(id).Find(Bob).OriginRegion, Is.EqualTo(RegionB));
+            Assert.True(accepted.Ok, accepted.Decision);
+            Assert.Equal(2, shared.Get(id).SeatsHeld);
+            {
+                var assertedValue = shared.All().Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one session, not one per region");
+            }
+            Assert.Equal(RegionB, regionA.Store.Get(id).Find(Bob).OriginRegion);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARepeatStartOnTheOtherRegion_FindsTheSameSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             InMemoryNonSpatialSessionStore shared = new InMemoryNonSpatialSessionStore();
             NonSpatialVoiceSessionEngine regionA = NonSpatialIdentityTests.NewEngine(store: shared);
             NonSpatialVoiceSessionEngine regionB = NonSpatialIdentityTests.NewEngine(store: shared);
@@ -93,13 +101,14 @@ namespace osWebRtcVoice.Tests
             SessionOutcome a = regionA.Start(NonSpatialSessionType.P2P, Alice, Bob, UUID.Zero, RegionA);
             SessionOutcome b = regionB.Start(NonSpatialSessionType.P2P, Bob, Alice, UUID.Zero, RegionB);
 
-            Assert.That(b.Created, Is.False);
-            Assert.That(b.Session.SessionId, Is.EqualTo(a.Session.SessionId));
+            Assert.False(b.Created);
+            Assert.Equal(a.Session.SessionId, b.Session.SessionId);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheRoomKeyIsDerivedFromGridAndSession_NotFromTheRegion()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Two regions must resolve the SAME media room with no coordination, or a voice session that
             // crosses a border would land in two rooms.
             InMemoryNonSpatialSessionStore shared = new InMemoryNonSpatialSessionStore();
@@ -110,13 +119,14 @@ namespace osWebRtcVoice.Tests
             string fromA = regionA.Store.Get(id).RoomKey;
             string fromB = regionB.Store.Get(id).RoomKey;
 
-            Assert.That(fromB, Is.EqualTo(fromA));
-            Assert.That(fromA, Is.EqualTo(NonSpatialRoomKey.Derive("example-grid", NonSpatialSessionType.Adhoc, id)));
+            Assert.Equal(fromA, fromB);
+            Assert.Equal(NonSpatialRoomKey.Derive("example-grid", NonSpatialSessionType.Adhoc, id), fromA);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASessionIsFindableByItsRoomKey_WhichIsWhatAProvisionCarries()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // A multiagent provision carries `channel` and nothing else that identifies the voice session
             // (SL llvoicewebrtc.cpp:3342, Firestorm llvoicewebrtc.cpp:3696), so the reverse lookup is load-bearing.
             InMemoryNonSpatialSessionStore shared = new InMemoryNonSpatialSessionStore();
@@ -124,30 +134,32 @@ namespace osWebRtcVoice.Tests
 
             NonSpatialVoiceSession s = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session;
 
-            Assert.That(shared.GetByRoomKey(s.RoomKey)?.SessionId, Is.EqualTo(s.SessionId));
-            Assert.That(shared.GetByRoomKey("nsv1:adhoc:" + UUID.Random()), Is.Null);
-            Assert.That(shared.GetByRoomKey(null), Is.Null);
+            Assert.Equal(s.SessionId, shared.GetByRoomKey(s.RoomKey)?.SessionId);
+            Assert.Null(shared.GetByRoomKey("nsv1:adhoc:" + UUID.Random()));
+            Assert.Null(shared.GetByRoomKey(null));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RemovingASession_RemovesItsRoomKeyIndexToo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             InMemoryNonSpatialSessionStore shared = new InMemoryNonSpatialSessionStore();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(store: shared);
             NonSpatialVoiceSession s = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session;
 
-            Assert.That(shared.Remove(s.SessionId), Is.True);
-            Assert.That(shared.GetByRoomKey(s.RoomKey), Is.Null);
-            Assert.That(shared.Remove(s.SessionId), Is.False);
+            Assert.True(shared.Remove(s.SessionId));
+            Assert.Null(shared.GetByRoomKey(s.RoomKey));
+            Assert.False(shared.Remove(s.SessionId));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MutateOnAMissingSession_ReturnsTheSuppliedDefault_RatherThanThrowing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             InMemoryNonSpatialSessionStore shared = new InMemoryNonSpatialSessionStore();
             SessionOutcome fallback = SessionOutcome.Fail(SessionOutcome.NoSuchSession);
             SessionOutcome got = shared.Mutate(UUID.Random(), _ => new SessionOutcome(true, "x", null), fallback);
-            Assert.That(got.Decision, Is.EqualTo(SessionOutcome.NoSuchSession));
+            Assert.Equal(SessionOutcome.NoSuchSession, got.Decision);
         }
     }
 }
