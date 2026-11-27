@@ -368,8 +368,8 @@ public class LoginBakeFromCofTests
             using var log = new LogCapture();
 
             // the module's own trigger; raised off the test thread in case the fire-and-forget method runs it inline
-            _ = Task.Run(() => rig.Scene.EventManager.TriggerOnMakeRootAgent(rig.Presence));
-            Assert.True(gated.Entered.Wait(TimeSpan.FromSeconds(30)), "no login bake was queued");
+            _ = Task.Run(() => rig.Scene.EventManager.TriggerOnMakeRootAgent(rig.Presence), TestContext.Current.CancellationToken);
+            Assert.True(gated.Entered.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "no login bake was queued");
 
             // the queued bake is held at its Current Outfit read while the agent leaves for another region
             rig.Presence.MakeChildAgent(rig.Scene.RegionInfo.RegionHandle + 1);
@@ -399,7 +399,7 @@ public class LoginBakeFromCofTests
         var rig = Setup(recordTypes: new[] { Shape, Skin }, cofTypes: new[] { Shape, Skin });
         var region = rig.Module.RegionOf(rig.Scene);
 
-        _ = Task.Run(() => rig.Scene.EventManager.TriggerOnMakeRootAgent(rig.Presence));
+        _ = Task.Run(() => rig.Scene.EventManager.TriggerOnMakeRootAgent(rig.Presence), TestContext.Current.CancellationToken);
 
         Assert.True(await Eventually(() => { lock (rig.Client.Sent) return rig.Client.Sent.Count > 0; }, TimeSpan.FromSeconds(60)),
             "the queued login bake sent no appearance");
