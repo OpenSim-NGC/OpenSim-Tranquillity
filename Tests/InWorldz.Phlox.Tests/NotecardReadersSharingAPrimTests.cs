@@ -9,7 +9,6 @@ using System;
 using System.Linq;
 using OpenMetaverse;
 using Xunit;
-using Xunit.Abstractions;
 using static InWorldz.Phlox.Tests.InventoryGivesRig;
 using Clock = InWorldz.Phlox.Util.Clock;
 

@@ -11,7 +11,6 @@ using System.Text;
 using System.Text.Json;
 using OpenMetaverse;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSimNGC.Appearance.Baking.Tests.Golden;
 

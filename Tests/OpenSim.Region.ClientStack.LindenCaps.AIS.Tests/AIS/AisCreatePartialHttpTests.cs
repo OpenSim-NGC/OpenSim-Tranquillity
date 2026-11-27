@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -48,7 +48,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// path already emits no top-level ids - only <c>_created_categories</c>, <c>_created_items</c>,
 /// <c>_embedded</c> and <c>_updated_category_versions</c> - so reusing it verbatim is safe.</para>
 /// </summary>
-[TestFixture]
 public class AisCreatePartialHttpTests
 {
     private const string Cap = "/CAP/5ec40000-0000-4000-8000-000000000000";
@@ -108,7 +107,7 @@ public class AisCreatePartialHttpTests
         var response = new TestOSHttpResponse();
         handler.Handle(new CpRequest("POST", Cap + $"/category/{Clothing}", body), response);
         var parsed = OSDParser.DeserializeLLSDXml(response.RawBuffer);
-        Assert.That(parsed, Is.InstanceOf<OSDMap>(), "an error body must still be an LLSD map (spec 1f)");
+        Assert.True(parsed is OSDMap, "an error body must still be an LLSD map (spec 1f)");
         return (response.StatusCode, (OSDMap)parsed);
     }
 
@@ -125,7 +124,7 @@ public class AisCreatePartialHttpTests
     /// Three categories, the second refused. The first is already in the database, so the response must name it:
     /// without that the client cannot adopt it and its retry makes a duplicate.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_category_create_that_fails_on_the_second_reports_the_first()
     {
         var b = World();
@@ -140,15 +139,12 @@ public class AisCreatePartialHttpTests
         var reported = Ids(body, "_created_categories");
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(500), "the failure is still a failure");
-            Assert.That(reported, Has.Count.EqualTo(1),
-                "the category created before the failure must be reported - this is the AIS-SEC-4 defect");
-            Assert.That(b.Folders.ContainsKey(reported.FirstOrDefault()), Is.True,
-                "and the id reported must be the one that really exists");
-            Assert.That(b.Folders.Values.Count(f => f.Name == "first"), Is.EqualTo(1));
-            Assert.That(b.Folders.Values.Any(f => f.Name == "second" || f.Name == "third"), Is.False,
-                "nothing after the failure may have been written");
-            Assert.That(body.ContainsKey("message"), Is.True, "and the error keys are still there for the log");
+            Assert.Equal(500, status);
+            Assert.Single(reported);
+            Assert.True(b.Folders.ContainsKey(reported.FirstOrDefault()), "and the id reported must be the one that really exists");
+            Assert.Equal(1, b.Folders.Values.Count(f => f.Name == "first"));
+            Assert.DoesNotContain(b.Folders.Values, f => f.Name == "second" || f.Name == "third");
+            Assert.True(body.ContainsKey("message"), "and the error keys are still there for the log");
         });
     }
 
@@ -158,7 +154,7 @@ public class AisCreatePartialHttpTests
     /// Two categories then three links, the second link refused. Everything before it - both categories and the
     /// first link - must be reported, because all of it is in the database.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_link_create_that_fails_on_the_second_reports_the_categories_and_the_first_link()
     {
         var b = World();
@@ -175,16 +171,15 @@ public class AisCreatePartialHttpTests
         var items = Ids(body, "_created_items");
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(500));
-            Assert.That(categories, Has.Count.EqualTo(2), "both categories were created and must be reported");
-            Assert.That(items, Has.Count.EqualTo(1), "so was the first link");
-            Assert.That(categories.All(id => b.Folders.ContainsKey(id)), Is.True);
-            Assert.That(items.All(id => b.Items.ContainsKey(id)), Is.True);
+            Assert.Equal(500, status);
+            Assert.Equal(2, categories.Count);
+            Assert.Single(items);
+            Assert.True(categories.All(id => b.Folders.ContainsKey(id)));
+            Assert.True(items.All(id => b.Items.ContainsKey(id)));
             // the one link that did land points at the first target, and nothing later exists
-            Assert.That(b.Items[items[0]].AssetID, Is.EqualTo(TargetA));
-            Assert.That(b.Items.Values.Any(i => i.AssetID == TargetB || i.AssetID == TargetC), Is.False);
-            Assert.That(body.ContainsKey("_updated_category_versions"), Is.True,
-                "the parent's version moved, so the viewer needs it or it will not re-read the folder");
+            Assert.Equal(TargetA, b.Items[items[0]].AssetID);
+            Assert.DoesNotContain(b.Items.Values, i => i.AssetID == TargetB || i.AssetID == TargetC);
+            Assert.True(body.ContainsKey("_updated_category_versions"), "the parent's version moved, so the viewer needs it or it will not re-read the folder");
         });
     }
 
@@ -195,7 +190,7 @@ public class AisCreatePartialHttpTests
     /// what it was, and the delta keys are absent rather than present-and-empty (absent and empty are the same to
     /// the viewer, and absent is what the success path emits when a collection is empty).
     /// </summary>
-    [Test]
+    [Fact]
     public void a_create_that_fails_on_the_very_first_write_reports_nothing_created()
     {
         var b = World();
@@ -208,12 +203,12 @@ public class AisCreatePartialHttpTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(500), "unchanged from before AIS-SEC-4");
-            Assert.That(body.ContainsKey("_created_categories"), Is.False);
-            Assert.That(body.ContainsKey("_created_items"), Is.False);
-            Assert.That(body.ContainsKey("_embedded"), Is.False);
-            Assert.That(b.Folders.Values.Any(f => f.Name == "first" || f.Name == "second"), Is.False);
-            Assert.That(body["error_code"].AsInteger(), Is.EqualTo(500));
+            Assert.Equal(500, status);
+            Assert.DoesNotContain("_created_categories", body.Keys);
+            Assert.DoesNotContain("_created_items", body.Keys);
+            Assert.DoesNotContain("_embedded", body.Keys);
+            Assert.DoesNotContain(b.Folders.Values, f => f.Name == "first" || f.Name == "second");
+            Assert.Equal(500, body["error_code"].AsInteger());
         });
     }
 
@@ -223,7 +218,7 @@ public class AisCreatePartialHttpTests
     /// Full success, pinned against the behaviour that shipped before the fix so AIS-SEC-4 cannot quietly
     /// change it: status 200, the same four delta/content keys, and no error keys.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_fully_successful_create_is_unchanged()
     {
         var b = World();
@@ -235,22 +230,22 @@ public class AisCreatePartialHttpTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(200));
-            Assert.That(Ids(body, "_created_categories"), Has.Count.EqualTo(2));
-            Assert.That(Ids(body, "_created_items"), Has.Count.EqualTo(2));
-            Assert.That(body.ContainsKey("_embedded"), Is.True);
-            Assert.That(body.ContainsKey("_updated_category_versions"), Is.True);
+            Assert.Equal(200, status);
+            Assert.Equal(2, Ids(body, "_created_categories").Count);
+            Assert.Equal(2, Ids(body, "_created_items").Count);
+            Assert.True(body.ContainsKey("_embedded"));
+            Assert.True(body.ContainsKey("_updated_category_versions"));
 
             // no error keys on a success, and no top-level ids the spec forbids in any body (1f)
-            Assert.That(body.ContainsKey("error_code"), Is.False);
-            Assert.That(body.ContainsKey("message"), Is.False);
-            Assert.That(body.ContainsKey("category_id"), Is.False);
-            Assert.That(body.ContainsKey("item_id"), Is.False);
+            Assert.False(body.ContainsKey("error_code"));
+            Assert.False(body.ContainsKey("message"));
+            Assert.False(body.ContainsKey("category_id"));
+            Assert.False(body.ContainsKey("item_id"));
 
             var embedded = (OSDMap)body["_embedded"];
-            Assert.That(((OSDMap)embedded["categories"]).Count, Is.EqualTo(2));
-            Assert.That(((OSDMap)embedded["links"]).Count, Is.EqualTo(2));
-            Assert.That(b.Folders.Values.Count(f => f.Name.StartsWith("outfit ")), Is.EqualTo(2));
+            Assert.Equal(2, ((OSDMap)embedded["categories"]).Count);
+            Assert.Equal(2, ((OSDMap)embedded["links"]).Count);
+            Assert.Equal(2, b.Folders.Values.Count(f => f.Name.StartsWith("outfit ")));
         });
     }
 
@@ -259,7 +254,7 @@ public class AisCreatePartialHttpTests
     /// explicit that an error body "must not carry <c>item_id</c>/<c>category_id</c> + <c>parent_id</c> pairs it
     /// does not mean" (§1f), and the viewer parses an error body as an update, so a stray pair would be applied.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_partial_failure_body_carries_no_top_level_ids()
     {
         var b = World();
@@ -273,9 +268,9 @@ public class AisCreatePartialHttpTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(body.ContainsKey("category_id"), Is.False);
-            Assert.That(body.ContainsKey("item_id"), Is.False);
-            Assert.That(body.ContainsKey("parent_id"), Is.False);
+            Assert.False(body.ContainsKey("category_id"));
+            Assert.False(body.ContainsKey("item_id"));
+            Assert.False(body.ContainsKey("parent_id"));
         });
     }
 }

@@ -75,7 +75,7 @@ public class YEngineOsslSettingsTests
     }
 
     [Fact]
-    public void TwoHarnessesWithYEngineAreNeverUpAtOnce()
+    public async Task TwoHarnessesWithYEngineAreNeverUpAtOnce()
     {
         var order = new ConcurrentQueue<string>();
         using var first = new SchedulerHarness(withYEngine: true);
@@ -83,13 +83,14 @@ public class YEngineOsslSettingsTests
         {
             using var h = new SchedulerHarness(withYEngine: true);
             order.Enqueue("second up");
-        });
+        }, TestContext.Current.CancellationToken);
 
         // Not happening is what is shown here, so this is a real wait; standing a harness up with YEngine takes about a second.
-        Assert.False(second.Wait(TimeSpan.FromSeconds(4)), "the second harness with YEngine came up while the first was up");
+        Assert.True(second != await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(4), TestContext.Current.CancellationToken)), "the second harness with YEngine came up while the first was up");
         order.Enqueue("first down");
         first.Dispose();   // a second Dispose at the end of the test does nothing
-        Assert.True(second.Wait(TimeSpan.FromSeconds(60)), "the second harness did not come up after the first was disposed");
+        Assert.True(second == await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken)), "the second harness did not come up after the first was disposed");
+        await second;
         Assert.Equal(new[] { "first down", "second up" }, order.ToArray());
     }
 }

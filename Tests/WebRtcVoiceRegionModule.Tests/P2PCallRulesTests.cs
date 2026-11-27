@@ -11,7 +11,7 @@
  */
 using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice.NonSpatial;
@@ -19,7 +19,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class P2PCallRulesTests
     {
         private static readonly UUID CallId = A2ACalls.ComputeSessionId(Alice, Bob);
@@ -33,23 +32,34 @@ namespace osWebRtcVoice.Tests
         private static A2ARegistry New(FakeClock clock = null)
             => clock == null ? new A2ARegistry() : new A2ARegistry(NonSpatialVoiceSessionEngine.DefaultInviteTtl, clock.Get);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCalleeLeavingBeforeAnswering_ChangesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             A2ARegistry reg = New();
             reg.Record(Alice, Bob, out _);
             reg.IssueToken(CallId, Alice);
 
-            Assert.That(reg.Engine.DepartAll(Bob, DepartureReason.PresenceLost), Has.Count.EqualTo(1), "the departure is accepted");
+            {
+                var assertedValue = reg.Engine.DepartAll(Bob, DepartureReason.PresenceLost);
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "the departure is accepted");
+            }
 
             A2ASession call = reg.TryGet(CallId);
-            Assert.That(call.State, Is.EqualTo(A2ASessionState.Invited), "the invitation is still open");
-            Assert.That(reg.MarkProvisioned(CallId, Bob, "vs-bob").State, Is.EqualTo(A2ASessionState.Active), "and Bob can still answer it");
+            {
+                var assertedValue = call.State;
+                TestAssert.WithMessage(() => Assert.Equal(A2ASessionState.Invited, assertedValue), "the invitation is still open");
+            }
+            {
+                var assertedValue = reg.MarkProvisioned(CallId, Bob, "vs-bob").State;
+                TestAssert.WithMessage(() => Assert.Equal(A2ASessionState.Active, assertedValue), "and Bob can still answer it");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ThatTheCalleeWasRung_IsKeptForTheLifeOfTheCall_EvenWhenTheCallerHangsUp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             A2ARegistry reg = New();
             reg.Record(Alice, Bob, out _);
             reg.IssueToken(CallId, Alice);
@@ -58,44 +68,53 @@ namespace osWebRtcVoice.Tests
 
             reg.MarkGone(Alice, "vs-alice");
 
-            Assert.That(reg.TryGet(CallId).InviteSent, Is.True);
+            Assert.True(reg.TryGet(CallId).InviteSent);
             ChatSessionOutcome again = ChatSessionRequestLogic.Decide(CallBody(), Alice, reg);
-            Assert.That(again.Invite, Is.Null, "no second ring for the same invitation");
-            Assert.That(again.Instrument, Does.Contain("suppressed-already-sent"));
+            {
+                var assertedValue = again.Invite;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no second ring for the same invitation");
+            }
+            Assert.Contains("suppressed-already-sent", again.Instrument);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void APartyWhoHungUp_CanBeGivenTheCredentialAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             A2ARegistry reg = New();
             reg.Record(Alice, Bob, out _);
             string token = reg.IssueToken(CallId, Alice).Token;
             reg.MarkProvisioned(CallId, Alice, "vs-alice");
             reg.MarkGone(Alice, "vs-alice");
 
-            Assert.That(reg.IssueToken(CallId, Alice).Token, Is.EqualTo(token));
+            Assert.Equal(token, reg.IssueToken(CallId, Alice).Token);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStartNamingTheSamePeopleAfterTheCallEnded_MakesANewCall()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             A2ARegistry reg = New();
             reg.Record(Alice, Bob, out _);
             string first = reg.IssueToken(CallId, Alice).Token;
             reg.Decline(CallId, Bob, out _);
-            Assert.That(reg.TryGet(CallId), Is.Null);
+            Assert.Null(reg.TryGet(CallId));
 
             A2ASession again = reg.Record(Bob, Alice, out bool created);
 
-            Assert.That(created, Is.True);
-            Assert.That(again.Caller, Is.EqualTo(Bob), "the one who started it this time");
-            Assert.That(again.Token, Is.Null);
-            Assert.That(reg.IssueToken(CallId, Bob).Token, Is.Not.EqualTo(first));
+            Assert.True(created);
+            {
+                var assertedValue = again.Caller;
+                TestAssert.WithMessage(() => Assert.Equal(Bob, assertedValue), "the one who started it this time");
+            }
+            Assert.Null(again.Token);
+            Assert.NotEqual(first, reg.IssueToken(CallId, Bob).Token);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheSweep_EndsALapsedInvitation_AndCountsWhatItReleased()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             A2ARegistry reg = New(clock);
             reg.Record(Alice, Bob, out _);
@@ -103,15 +122,19 @@ namespace osWebRtcVoice.Tests
 
             NonSpatialVoiceSessionEngine.SweepSummary summary = reg.Engine.SweepWithSummary();
 
-            Assert.That(summary.InvitationsExpired, Is.EqualTo(1));
-            Assert.That(summary.SeatsReleased, Is.EqualTo(1), "the caller's seat");
-            Assert.That(summary.Removed, Is.EqualTo(new[] { CallId }));
-            Assert.That(reg.Engine.Store.All(), Is.Empty);
+            Assert.Equal(1, summary.InvitationsExpired);
+            {
+                var assertedValue = summary.SeatsReleased;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the caller's seat");
+            }
+            Assert.Equal(new[] { CallId }, summary.Removed);
+            Assert.Empty(reg.Engine.Store.All());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheSweep_KeepsAnAnsweredCallIdleForTheWholeBackstop_WhileAPartyIsPresent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             A2ARegistry reg = New(clock);
             reg.Engine.IsAgentPresent = _ => true;
@@ -126,13 +149,17 @@ namespace osWebRtcVoice.Tests
                 reg.Engine.Sweep();
             }
 
-            Assert.That(reg.TryGet(CallId), Is.Not.Null, "someone in the call is still here, so it is not idle");
-            Assert.That(reg.Engine.Store.Get(CallId).SeatsHeld, Is.EqualTo(2));
+            {
+                var assertedValue = reg.TryGet(CallId);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "someone in the call is still here, so it is not idle");
+            }
+            Assert.Equal(2, reg.Engine.Store.Get(CallId).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALookUp_KeepsAnAnsweredCallIdleForTheWholeBackstop_WhileAPartyIsPresent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             A2ARegistry reg = New(clock);
             HashSet<UUID> here = new() { Bob };
@@ -144,12 +171,16 @@ namespace osWebRtcVoice.Tests
 
             clock.Now += NonSpatialVoiceSessionEngine.DefaultIdleTtl + TimeSpan.FromHours(1);
 
-            Assert.That(reg.TryGet(CallId), Is.Not.Null, "Bob is still here; Alice's viewer being gone does not end it");
+            {
+                var assertedValue = reg.TryGet(CallId);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "Bob is still here; Alice's viewer being gone does not end it");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheSweep_EndsAnAnsweredCallIdleForTheWholeBackstop_WhenBothPartiesHaveGone_AndReleasesTheirSeats()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             A2ARegistry reg = New(clock);
             reg.Engine.IsAgentPresent = _ => false;
@@ -161,14 +192,18 @@ namespace osWebRtcVoice.Tests
             clock.Now += NonSpatialVoiceSessionEngine.DefaultIdleTtl + TimeSpan.FromMinutes(1);
             NonSpatialVoiceSessionEngine.SweepSummary summary = reg.Engine.SweepWithSummary();
 
-            Assert.That(reg.TryGet(CallId), Is.Null, "nobody is left, so the idle time applies");
-            Assert.That(summary.SeatsReleased, Is.EqualTo(2));
-            Assert.That(summary.Removed, Is.EqualTo(new[] { CallId }));
+            {
+                var assertedValue = reg.TryGet(CallId);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "nobody is left, so the idle time applies");
+            }
+            Assert.Equal(2, summary.SeatsReleased);
+            Assert.Equal(new[] { CallId }, summary.Removed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void APresenceCheckThatThrows_KeepsTheCall_AsItDoesForAGroup()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             A2ARegistry reg = New(clock);
             reg.Engine.IsAgentPresent = _ => throw new InvalidOperationException("scene lookup failed");
@@ -180,34 +215,44 @@ namespace osWebRtcVoice.Tests
             clock.Now += NonSpatialVoiceSessionEngine.DefaultIdleTtl + TimeSpan.FromMinutes(1);
             reg.Engine.Sweep();
 
-            Assert.That(reg.TryGet(CallId), Is.Not.Null);
+            Assert.NotNull(reg.TryGet(CallId));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallIsNotCountedAgainstTheCaps_AndDoesNotCountConferencesOut()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine engine = NewEngine(limits: new NonSpatialLimits { MaxNonSpatialSessions = 2, MaxSessionsPerAgent = 2 });
             A2ACalls calls = new A2ACalls(() => engine);
 
             for (int i = 0; i < 6; i++)
-                Assert.That(calls.Record(Alice, UUID.Random(), RegionA, out _), Is.Not.Null);
+                Assert.NotNull(calls.Record(Alice, UUID.Random(), RegionA, out _));
 
-            Assert.That(engine.StartAdhoc(Alice, UUID.Random(), RegionA).Ok, Is.True);
-            Assert.That(engine.StartAdhoc(Alice, UUID.Random(), RegionA).Ok, Is.True);
-            Assert.That(engine.StartAdhoc(Alice, UUID.Random(), RegionA).Decision, Is.EqualTo(SessionOutcome.GlobalSessionCap),
-                "the caps still bind conferences");
+            Assert.True(engine.StartAdhoc(Alice, UUID.Random(), RegionA).Ok);
+            Assert.True(engine.StartAdhoc(Alice, UUID.Random(), RegionA).Ok);
+            {
+                var assertedValue = engine.StartAdhoc(Alice, UUID.Random(), RegionA).Decision;
+                TestAssert.WithMessage(() => Assert.Equal(SessionOutcome.GlobalSessionCap, assertedValue), "the caps still bind conferences");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallIdIsNeverTakenForAGroupOrConference()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine engine = NewEngine();
             A2ACalls calls = new A2ACalls(() => engine);
             UUID group = engine.Start(NonSpatialSessionType.Group, Alice, NonSpatialIdentityTests.Group, NonSpatialIdentityTests.Group, RegionA).Session.SessionId;
 
-            Assert.That(calls.TryGet(group, Alice), Is.Null, "a group session is not a call");
-            Assert.That(calls.IssueToken(group, Alice), Is.Null);
-            Assert.That(engine.Get(group).Token, Is.Null, "and asking for a call's credential did not mint the group's");
+            {
+                var assertedValue = calls.TryGet(group, Alice);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "a group session is not a call");
+            }
+            Assert.Null(calls.IssueToken(group, Alice));
+            {
+                var assertedValue = engine.Get(group).Token;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "and asking for a call's credential did not mint the group's");
+            }
         }
     }
 }
