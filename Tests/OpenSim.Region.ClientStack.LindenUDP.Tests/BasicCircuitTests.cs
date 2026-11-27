@@ -50,35 +50,17 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 
         public BasicCircuitTests()
         {
-            // xunit builds a new instance for every test, so the NUnit one-time setup runs here.
-            FixtureInit();
-        }
+            base.SetUp();
+            m_scene = new SceneHelpers().SetupScene();
+            StatsManager.SimExtraStats = new SimExtraStatsCollector();           
 
-        public void FixtureInit()
-        {
-            // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
             Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
         }
 
         public override void Dispose()
         {
-            TearDown();
-            base.Dispose();
-        }
-
-        public void TearDown()
-        {
-            // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
-            // threads.  Possibly, later tests should be rewritten so none of them require async stuff (which regression
-            // tests really shouldn't).
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
-        }
-
-        public override void SetUp()
-        {
-            base.SetUp();
-            m_scene = new SceneHelpers().SetupScene();
-            StatsManager.SimExtraStats = new SimExtraStatsCollector();
+            base.Dispose();
         }
 
         [Fact]

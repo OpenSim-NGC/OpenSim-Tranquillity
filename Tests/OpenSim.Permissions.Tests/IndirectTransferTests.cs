@@ -43,13 +43,6 @@ namespace OpenSim.Tests.Permissions
     {
         public IndirectTransferTests()
         {
-            SetUp();
-        }
-
-
-        public void SetUp()
-        {
-            // In case we're dealing with some older version of nunit
             if (Common.TheInstance == null)
             {
                 Common.TheInstance = new Common();
@@ -87,7 +80,7 @@ namespace OpenSim.Tests.Permissions
             Thread.Sleep(6000);
 
             List<InventoryItemBase> items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[1].UUID, objsFolder.ID);
-            Assert.Equal(0, items.Count);
+            Assert.Empty(items);
 
             // A1 makes the objects copyable
             for (int i = 0; i < 6; i++)

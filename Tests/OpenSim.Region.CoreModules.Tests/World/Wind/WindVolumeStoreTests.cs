@@ -480,7 +480,7 @@ public class WindVolumeStoreTests
     // ---- concurrency ----
 
     [Fact]
-    public void SamplingWhileOtherThreadsAddAndRemoveNeverSeesATornVolume()
+    public async Task SamplingWhileOtherThreadsAddAndRemoveNeverSeesATornVolume()
     {
         // Every volume's velocity has three equal components, and every volume covers the sampled point at full
         // strength, so any sample must have X == Y == Z, and a whole number of volumes' worth.
@@ -523,9 +523,10 @@ public class WindVolumeStoreTests
 
         // Run until the readers have made plenty of samples, with a generous cap.
         var deadline = DateTime.UtcNow.AddSeconds(20);
-        while (Interlocked.Read(ref samples) < 300_000 && DateTime.UtcNow < deadline) Thread.Sleep(20);
+        while (Interlocked.Read(ref samples) < 300_000 && DateTime.UtcNow < deadline)
+            await Task.Delay(20, TestContext.Current.CancellationToken);
         stop.Cancel();
-        Task.WaitAll(writers.Concat(readers).ToArray(), TestContext.Current.CancellationToken);
+        await Task.WhenAll(writers.Concat(readers));
 
         Assert.True(Interlocked.Read(ref samples) >= 300_000, "the readers did not make enough samples");
         Assert.Equal(0, bad);

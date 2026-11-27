@@ -308,7 +308,7 @@ namespace OpenSim.Tests.Permissions
 
                 Common.TheScene.InventoryService.DeleteItems(Common.TheAvatars[i].UUID, ids);
                 items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[i].UUID, objsFolder.ID);
-                Assert.Equal(0, items.Count);
+                Assert.Empty(items);
             }
 
         }

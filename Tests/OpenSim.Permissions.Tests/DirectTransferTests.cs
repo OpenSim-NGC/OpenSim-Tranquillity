@@ -41,13 +41,6 @@ namespace OpenSim.Tests.Permissions
     {
         public DirectTransferTests()
         {
-            SetUp();
-        }
-
-
-        public void SetUp()
-        {
-            // In case we're dealing with some older version of nunit
             if (Common.TheInstance == null)
             {
                 Common.TheInstance = new Common();

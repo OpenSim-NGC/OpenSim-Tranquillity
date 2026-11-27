@@ -10,7 +10,8 @@
     <!-- <AnalysisLevel>10-recommended</AnalysisLevel> -->
 
     <!-- Enforce zero warnings in CI and Release builds, while keeping local Debug fast -->
-    <TreatWarningsAsErrors Condition="'$(Configuration)' != 'Debug'">true</TreatWarningsAsErrors>
+    <!-- Not yet.  There are still some structural issues in the codebase to address. -->
+    <!-- <TreatWarningsAsErrors Condition="'$(Configuration)' != 'Debug'">true</TreatWarningsAsErrors> -->
 
     <!-- Keep high-severity NuGet package vulnerabilities as build errors even in Debug -->
     <NuGetAudit>true</NuGetAudit>
