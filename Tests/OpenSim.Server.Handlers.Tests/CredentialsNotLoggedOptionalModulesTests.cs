@@ -25,28 +25,36 @@ namespace OpenSim.Server.Handlers.Tests;
 public class OptionalModulesCredentialLogTests
 {
     private static string FakeSecret(string kind) => kind + "-" + Guid.NewGuid().ToString("N");
+    private static Type RequireType(Assembly assembly, string name)
+        => assembly.GetType(name, throwOnError: true) ?? throw new TypeLoadException(name);
+    private static FieldInfo RequireField(Type type, string name)
+        => type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(type.FullName, name);
+    private static MethodInfo RequireMethod(Type type, string name, BindingFlags flags)
+        => type.GetMethod(name, flags) ?? throw new MissingMethodException(type.FullName, name);
 
     [Xunit.Fact]
     public void IrcChannelConfigurationLogsWhetherAccessPasswordIsSetNotThePassword()
     {
         string password = FakeSecret("fake-irc-access-password");
         Assembly modules = typeof(DataSnapshotManager).Assembly;
-        Type channelState = modules.GetType("OpenSim.Region.OptionalModules.Avatar.Chat.ChannelState", true);
-        Type regionState = modules.GetType("OpenSim.Region.OptionalModules.Avatar.Chat.RegionState", true);
+        Type channelState = RequireType(modules, "OpenSim.Region.OptionalModules.Avatar.Chat.ChannelState");
+        Type regionState = RequireType(modules, "OpenSim.Region.OptionalModules.Avatar.Chat.RegionState");
         object region = System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(regionState);
         foreach (string name in new[] { "Region", "Host", "LocX", "LocY", "IDK" })
-            regionState.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(region, "test");
+            RequireField(regionState, name).SetValue(region, "test");
 
         IConfig config = new IniConfigSource().AddConfig("IRC");
         config.Set("access_password", password);
-        MethodInfo open = channelState.GetMethod("OpenChannel", BindingFlags.Static | BindingFlags.NonPublic);
+        MethodInfo open = RequireMethod(channelState, "OpenChannel", BindingFlags.Static | BindingFlags.NonPublic);
 
         using LogCapture log = new();
         // The configuration names no server, so OpenChannel throws once it has logged the settings it read and
         // before it opens a connection; the log lines are what is under test.
         TargetInvocationException thrown =
             Xunit.Assert.Throws<TargetInvocationException>(() => open.Invoke(null, new object[] { region, config }));
-        Xunit.Assert.Contains("server missing", thrown.InnerException.Message);
+        Xunit.Assert.Contains("server missing",
+            thrown.InnerException?.Message ?? throw new InvalidOperationException("OpenChannel threw without an inner exception."));
 
         Xunit.Assert.False(log.Contains(password), "access password reached the log");
         Xunit.Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Debug, log.LevelOf("AccessPassword : set"));
@@ -59,8 +67,7 @@ public class OptionalModulesCredentialLogTests
         DataSnapshotManager manager = UninitializedService.Create<DataSnapshotManager>(("m_Secret", secret));
         manager.m_hostname = "test.example.org";
         manager.m_listener_port = "9000";
-        MethodInfo notify = typeof(DataSnapshotManager)
-            .GetMethod("NotifyDataServices", BindingFlags.Instance | BindingFlags.NonPublic);
+        MethodInfo notify = RequireMethod(typeof(DataSnapshotManager), "NotifyDataServices", BindingFlags.Instance | BindingFlags.NonPublic);
 
         using LogCapture log = new();
         // Nothing listens on this loopback port, so the request is refused at once; the line logged after the
@@ -85,7 +92,7 @@ public class OptionalModulesCredentialLogTests
             ["estimatedCost"] = 10,
             ["secureSessionId"] = secureSession
         });
-        MethodInfo buy = typeof(DTLNSLMoneyModule).GetMethod("buy_func", BindingFlags.Instance | BindingFlags.NonPublic);
+        MethodInfo buy = RequireMethod(typeof(DTLNSLMoneyModule), "buy_func", BindingFlags.Instance | BindingFlags.NonPublic);
 
         using LogCapture log = new();
         buy.Invoke(module, new object[] { request, new IPEndPoint(IPAddress.Parse("192.0.2.1"), 9000) });
@@ -114,7 +121,7 @@ public class OptionalModulesCredentialLogTests
         string hash = BitConverter.ToString(
             System.Security.Cryptography.MD5.HashData(System.Text.Encoding.ASCII.GetBytes(code + "_" + script.Address)))
             .ToLower().Replace("-", "");
-        MethodInfo method = typeof(DTLNSLMoneyModule).GetMethod(handler);
+        MethodInfo method = RequireMethod(typeof(DTLNSLMoneyModule), handler, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
         using LogCapture log = new();
         method.Invoke(module, new object[] { request, script });

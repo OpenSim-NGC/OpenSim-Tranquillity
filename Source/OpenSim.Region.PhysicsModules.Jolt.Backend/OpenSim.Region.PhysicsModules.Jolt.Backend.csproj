@@ -31,7 +31,7 @@
     <!-- The managed Jolt binding. Pinned to the version that binds to
          JoltPhysics.Native 1.0.4. Changing it means checking the native's record again (JoltNativePackageTests). -->
     <PackageReference Include="JoltPhysicsSharp" Version="2.26.0" />
-    <!-- The native joltc, the one JoltPhysicsSharp 2.19.1 depends on, named here so its version is pinned in one
+    <!-- The native joltc, the one JoltPhysicsSharp 2.26.0 depends on, named here so its version is pinned in one
          place. Its files flow to every application that reaches this project, under runtimes/<rid>/native/.
          JoltNative.Known records the hash of each; a new version fails JoltNativePackageTests until the record is
          checked again. -->

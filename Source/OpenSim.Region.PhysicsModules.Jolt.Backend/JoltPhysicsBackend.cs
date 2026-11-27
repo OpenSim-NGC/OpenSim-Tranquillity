@@ -1011,17 +1011,6 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             _penetrationSlop = solver.PenetrationSlop;
             _positionShare = 1f - MathF.Pow(1f - solver.Baumgarte, Math.Max(1, solver.NumPositionSteps));
 
-            // Determinism (for A/B parity runs): single-threaded ALONE is not enough - Jolt
-            // also needs its DeterministicSimulation flag on to guarantee bit-identical re-runs. It
-            // defaults true in Jolt's PhysicsSettings, but we set it EXPLICITLY when asked rather than lean on a default
-            // that a future lib bump could flip. (Left untouched otherwise, to keep the fast path fast.)
-            if (settings.DeterministicMode)
-            {
-                PhysicsSettings physicsSettings = _system.Settings;
-                physicsSettings.DeterministicSimulation = true;
-                _system.Settings = physicsSettings;
-            }
-
             // Contacts + body activation arrive as C# EVENTS in 2.19.1, not a
             // listener object. The handlers ONLY enqueue / push into the ring - they never touch
             // scene state, never allocate, and never mutate the active set (see the field notes).
@@ -1628,13 +1617,17 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             {
                 // Fully qualified: our own namespace is OpenSim.Region.PhysicsModules.Jolt.Backend, which would otherwise shadow
                 // the JoltPhysicsSharp.Jolt static helper class.
-                JoltPhysicsSharp.Jolt.EstimateCollisionResponse(
-                    body1, body2, manifold, out CollisionEstimationResult response,
-                    settings.CombinedFriction, settings.CombinedRestitution,
+                ContactSettings contactSettings = new()
+                {
+                    CombinedFriction = settings.CombinedFriction,
+                    CombinedRestitution = settings.CombinedRestitution
+                };
+                CollisionEstimationResult response = JoltPhysicsSharp.Jolt.EstimateCollisionResponse(
+                    in body1, in body2, in manifold, in contactSettings,
                     MinVelocityForRestitution, Math.Max(1, _settings.VelocityIterations));
-                ReadOnlySpan<CollisionEstimationResult.Impulse> impulses = response.Impulses;
+                ReadOnlySpan<float> impulses = response.ContactImpulses;
                 for (int i = 0; i < impulses.Length; i++)
-                    impulse += impulses[i].ContactImpulse;
+                    impulse += impulses[i];
                 FreeEstimate(ref response);
             }
 
@@ -3118,10 +3111,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         // _characterGate, for a new controller and for the one that replaces it on a resize.
         private void WireCharacter(JoltCharacterRecord rec, CharacterVirtual character)
         {
-            character.OnContactAdded += (CharacterVirtual cv, in BodyID b2, SubShapeID ss, in RVector3 pos, in Vector3 normal, ref CharacterContactSettings s)
-                => NoteCharacterBodyContact(rec, b2.ID, ss.Value, ToVec(pos), normal, ContactPhase.Begin, ref s);
-            character.OnContactPersisted += (CharacterVirtual cv, in BodyID b2, SubShapeID ss, in RVector3 pos, in Vector3 normal, ref CharacterContactSettings s)
-                => NoteCharacterBodyContact(rec, b2.ID, ss.Value, ToVec(pos), normal, ContactPhase.Persist, ref s);
+            character.OnContactAdded += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
+                => NoteCharacterBodyContact(rec, contact.BodyB.ID, contact.SubShapeIDB.Value, ToVec(contact.RPosition), contact.ContactNormal, ContactPhase.Begin, ref s);
+            character.OnContactPersisted += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
+                => NoteCharacterBodyContact(rec, contact.BodyB.ID, contact.SubShapeIDB.Value, ToVec(contact.RPosition), contact.ContactNormal, ContactPhase.Persist, ref s);
             character.OnContactRemoved += (CharacterVirtual cv, in BodyID b2, SubShapeID ss)
                 => PushCharacterBodyContact(rec, b2.ID, ss.Value, default, default, ContactPhase.End);
 
@@ -3132,10 +3125,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 _charVsChar.Add(character);
                 character.SetCharacterVsCharacterCollision(_charVsChar);
             }
-            character.OnCharacterContactAdded += (CharacterVirtual cv, CharacterVirtual other, SubShapeID ss, in RVector3 pos, in Vector3 normal, ref CharacterContactSettings s)
-                => PushCharacterCharacterContact(rec, other, ToVec(pos), normal, ContactPhase.Begin);
-            character.OnCharacterContactPersisted += (CharacterVirtual cv, CharacterVirtual other, SubShapeID ss, in RVector3 pos, in Vector3 normal, ref CharacterContactSettings s)
-                => PushCharacterCharacterContact(rec, other, ToVec(pos), normal, ContactPhase.Persist);
+            character.OnCharacterContactAdded += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
+                => PushCharacterCharacterContact(rec, contact.CharacterB, ToVec(contact.RPosition), contact.ContactNormal, ContactPhase.Begin);
+            character.OnCharacterContactPersisted += (CharacterVirtual cv, in CharacterContact contact, ref CharacterContactSettings s)
+                => PushCharacterCharacterContact(rec, contact.CharacterB, ToVec(contact.RPosition), contact.ContactNormal, ContactPhase.Persist);
         }
 
         // The supporting plane is one radius below the capsule's centre, and CharacterVirtual takes it only at creation
@@ -3688,7 +3681,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         }
 
         // Push an avatar-vs-AVATAR contact. Both sides are avatars (no BodyId); UserData on each.
-        private void PushCharacterCharacterContact(JoltCharacterRecord ch, CharacterVirtual other, Vector3 point, Vector3 normal, ContactPhase phase)
+        private void PushCharacterCharacterContact(JoltCharacterRecord ch, CharacterVirtual? other, Vector3 point, Vector3 normal, ContactPhase phase)
         {
             uint otherUserData = other != null ? (uint)other.UserData : 0u;
             if (phase == ContactPhase.Persist && !ch.WantsContactEvents)

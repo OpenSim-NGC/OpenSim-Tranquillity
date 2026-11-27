@@ -11,7 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using Microsoft.Extensions.Logging;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -44,7 +44,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// substitution is equivalence and not an approximation — and <see cref="a_diamond_would_be_the_one_case_where_they_differ"/>
 /// records the condition, so if the data model ever gains multi-parenting the assumption fails loudly here.</para>
 /// </summary>
-[TestFixture]
 public class AisErrorHygieneTraversalTests
 {
     private const string Cap = "/CAP/5ec50000-0000-4000-8000-000000000000";
@@ -125,7 +124,7 @@ public class AisErrorHygieneTraversalTests
 
     // ================================================================== Fix A
 
-    [Test]
+    [Fact]
     public void an_unexpected_backend_exception_is_logged_and_not_echoed_to_the_client()
     {
         using var log = new CapturedLog();
@@ -139,26 +138,24 @@ public class AisErrorHygieneTraversalTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(500), "an unexpected fault is still a 500");
+            Assert.Equal(500, status);
 
             // the whole point: nothing of the exception may travel
-            Assert.That(wire, Does.Not.Contain("hunter2"), "a credential reached the client");
-            Assert.That(wire, Does.Not.Contain("db.example.org"), "a host address reached the client");
-            Assert.That(wire, Does.Not.Contain("MySql"), "an internal type name reached the client");
-            Assert.That(wire, Does.Not.Contain(Secret));
-            Assert.That(wire, Does.Not.Contain("InvalidOperationException"));
-            Assert.That(wire, Does.Not.Contain(" at "), "no stack frame text");
+            Assert.DoesNotContain("hunter2", wire);
+            Assert.DoesNotContain("db.example.org", wire);
+            Assert.DoesNotContain("MySql", wire);
+            Assert.DoesNotContain(Secret, wire);
+            Assert.DoesNotContain("InvalidOperationException", wire);
+            Assert.DoesNotContain(" at ", wire);
 
             // and the operator must get what the client did not
             var errors = log.Entries(LogLevel.Error);
-            Assert.That(errors, Is.Not.Empty, "the fault was not logged at Error");
-            Assert.That(errors.Any(e => e.Exception is not null), Is.True,
-                "the exception object itself must reach the logger, not just a message mentioning a fault");
-            Assert.That(errors.Any(e => e.Exception is not null && e.Exception.Message.Contains("hunter2")), Is.True,
-                "and it must be the real exception, so the stack is in the log");
+            Assert.NotEmpty(errors);
+            Assert.True(errors.Any(e => e.Exception is not null), "the exception object itself must reach the logger, not just a message mentioning a fault");
+            Assert.True(errors.Any(e => e.Exception is not null && e.Exception.Message.Contains("hunter2")), "and it must be the real exception, so the stack is in the log");
             var text = string.Join(" | ", errors.Select(e => e.Message));
-            Assert.That(text, Does.Contain("UpdateItem"), "the log names the operation");
-            Assert.That(text, Does.Contain(Agent.ToString()), "and the agent");
+            Assert.Contains("UpdateItem", text);
+            Assert.Contains(Agent.ToString(), text);
         });
     }
 
@@ -166,7 +163,7 @@ public class AisErrorHygieneTraversalTests
     /// Control: an ordinary refusal is untouched. These messages are written by the handler for the client and
     /// must keep travelling - the fix is about exception text, not about all error text.
     /// </summary>
-    [Test]
+    [Fact]
     public void an_ordinary_error_response_is_unchanged()
     {
         using var log = new CapturedLog();
@@ -176,16 +173,15 @@ public class AisErrorHygieneTraversalTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(404));
-            Assert.That(body["message"].AsString(), Does.StartWith("no item "),
-                "the handler's own 404 text is deliberate and still sent");
-            Assert.That(log.Entries(LogLevel.Error), Is.Empty, "a 404 is not a server fault and is not logged as one");
+            Assert.Equal(404, status);
+            Assert.StartsWith("no item ", body["message"].AsString());
+            Assert.Empty(log.Entries(LogLevel.Error));
         });
     }
 
     // ================================================================== Fix B
 
-    [Test]
+    [Fact]
     public void walk_terminates_on_a_cycle_visiting_each_folder_once()
     {
         var b = CyclicWorld();
@@ -195,18 +191,16 @@ public class AisErrorHygieneTraversalTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(ids, Is.EqualTo(new[] { CycA, CycB }),
-                "a cycle must be walked once, not re-walked to the depth cap");
-            Assert.That(ids.Distinct().Count(), Is.EqualTo(ids.Count), "no folder visited twice");
+            Assert.Equal(new[] { CycA, CycB }, ids);
+            Assert.Equal(ids.Count, ids.Distinct().Count());
 
             // the cost, which is the real defect: every level is a backend round trip
             int contentCalls = b.Calls.Count(c => c.StartsWith("GetFolderContent(", StringComparison.Ordinal));
-            Assert.That(contentCalls, Is.LessThanOrEqualTo(3),
-                $"a cycle cost {contentCalls} GetFolderContent round trips; before AIS-SEC-5 it cost one per level to the cap of {AisInventory.MaxDepth}");
+            Assert.True(contentCalls <= 3, $"a cycle cost {contentCalls} GetFolderContent round trips; before AIS-SEC-5 it cost one per level to the cap of {AisInventory.MaxDepth}");
         });
     }
 
-    [Test]
+    [Fact]
     public void the_children_route_on_a_cyclic_graph_answers_the_same_shape_as_before()
     {
         var b = CyclicWorld();
@@ -215,24 +209,23 @@ public class AisErrorHygieneTraversalTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(200));
-            Assert.That(body["category_id"].AsUUID(), Is.EqualTo(CycA));
+            Assert.Equal(200, status);
+            Assert.Equal(CycA, body["category_id"].AsUUID());
 
             // A expands and contains B; B expands and contains A as a BARE category - no _embedded - because
             // the traversal refuses to re-enter a folder it has already expanded. That is exactly what the
             // Without() clone produced, and pinning it is what makes the substitution a non-change.
             var aEmbedded = (OSDMap)body["_embedded"];
             var aCats = (OSDMap)aEmbedded["categories"];
-            Assert.That(aCats.ContainsKey(CycB.ToString()), Is.True);
+            Assert.True(aCats.ContainsKey(CycB.ToString()));
 
             var bNode = (OSDMap)aCats[CycB.ToString()];
-            Assert.That(bNode.ContainsKey("_embedded"), Is.True, "B is expanded");
+            Assert.True(bNode.ContainsKey("_embedded"), "B is expanded");
             var bCats = (OSDMap)((OSDMap)bNode["_embedded"])["categories"];
-            Assert.That(bCats.ContainsKey(CycA.ToString()), Is.True, "and lists A");
+            Assert.True(bCats.ContainsKey(CycA.ToString()), "and lists A");
 
             var aAgain = (OSDMap)bCats[CycA.ToString()];
-            Assert.That(aAgain.ContainsKey("_embedded"), Is.False,
-                "A appears under B as a bare category - the recursion stops rather than looping");
+            Assert.False(aAgain.ContainsKey("_embedded"), "A appears under B as a bare category - the recursion stops rather than looping");
         });
     }
 
@@ -240,7 +233,7 @@ public class AisErrorHygieneTraversalTests
     /// Control: a deep acyclic tree is unaffected, in both the walk and the response nesting. A visited set and
     /// ancestor-path exclusion agree on a forest, and this is the test that would notice if they did not.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_deep_acyclic_tree_is_unchanged()
     {
         var b = new FakeAisBackend(Agent);
@@ -260,19 +253,19 @@ public class AisErrorHygieneTraversalTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(walked.Distinct().Count(), Is.EqualTo(walked.Count), "no repeats in a forest");
-            Assert.That(walked, Has.Count.EqualTo(8), "root, six levels and the sibling");
-            Assert.That(walked[0], Is.EqualTo(Root));
-            Assert.That(walked, Does.Contain(sibling));
+            Assert.Equal(walked.Count, walked.Distinct().Count());
+            Assert.Equal(8, walked.Count);
+            Assert.Equal(Root, walked[0]);
+            Assert.Contains(sibling, walked);
 
             // and the nesting still reaches the bottom of the chain
             var (status, body) = Send(b, "GET", $"/category/{Root}/children?depth={AisInventory.MaxDepth}");
-            Assert.That(status, Is.EqualTo(200));
+            Assert.Equal(200, status);
             OSDMap node = body;
             for (var i = 1; i < chain.Count; i++)
             {
                 var cats = (OSDMap)((OSDMap)node["_embedded"])["categories"];
-                Assert.That(cats.ContainsKey(chain[i].ToString()), Is.True, $"level {i} is present");
+                Assert.True(cats.ContainsKey(chain[i].ToString()), $"level {i} is present");
                 node = (OSDMap)cats[chain[i].ToString()];
             }
         });
@@ -283,15 +276,13 @@ public class AisErrorHygieneTraversalTests
     /// parents. This asserts the data model forbids it, so the equivalence the fix relies on is not folklore. If
     /// <c>InventoryFolderBase</c> ever gains multi-parenting, this fails and points at AIS-SEC-5.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_diamond_would_be_the_one_case_where_they_differ()
     {
         var folder = new InventoryFolderBase(UUID.Random(), "f", Agent, -1, UUID.Random(), 1);
         var first = folder.ParentID;
         folder.ParentID = UUID.Random();
 
-        Assert.That(folder.ParentID, Is.Not.EqualTo(first),
-            "ParentID is a single scalar: setting it replaces the parent rather than adding one, so a folder "
-            + "cannot be the child of two folders and no diamond can reach the traversal");
+        Assert.NotEqual(first, folder.ParentID);
     }
 }

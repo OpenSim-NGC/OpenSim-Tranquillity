@@ -20,8 +20,6 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // the service tests swap the process-wide logger factory
     public class MixerOnlySwitchesTests
     {
         internal sealed class Capture : ILoggerProvider, ILogger
@@ -57,102 +55,115 @@ namespace osWebRtcVoice.Tests
             return src;
         }
 
-        [TestCase("ConnectorsEnabled")]
-        [TestCase("JoinCapabilityEnabled")]
-        [TestCase("VisibilityFeederEnabled")]
-        [TestCase("VisibilityEmitEnabled")]
-        [TestCase("VisibilityArmingEnabled")]
-        [TestCase("PositionFeedEnabled")]
+        [InlineData("ConnectorsEnabled")]
+        [InlineData("JoinCapabilityEnabled")]
+        [InlineData("VisibilityFeederEnabled")]
+        [InlineData("VisibilityEmitEnabled")]
+        [InlineData("VisibilityArmingEnabled")]
+        [InlineData("PositionFeedEnabled")]
+        [Theory(Timeout = 60000)]
         public void OnTheStockPlugin_ASwitchThatIsOn_WarnsNamingTheSwitchAndThePlugin_AndIsSwitchedOff(string name)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var log = new Capture();
             IConfigSource cfg = Config("janus.plugin.audiobridge", name);
 
             IReadOnlyList<string> off = MixerOnlySwitches.DisableOnStockPlugin(cfg, log);
 
-            Assert.That(off, Is.EqualTo(new[] { name }));
-            Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean(name, true), Is.False, "switched off");
+            Assert.Equal(new[] { name }, off);
+            Assert.False(cfg.Configs["WebRtcVoice"].GetBoolean(name, true), "switched off");
             List<string> warnings = log.Warnings();
-            Assert.That(warnings, Has.Count.EqualTo(1));
-            Assert.That(warnings[0], Does.Contain(name).And.Contain("janus.plugin.audiobridge"));
+            Assert.Single(warnings);
+            {
+                var assertedValue = warnings[0];
+                Assert.Contains(name, assertedValue);
+                Assert.Contains("janus.plugin.audiobridge", assertedValue);
+            }
         }
 
-        [TestCase("ConnectorsEnabled")]
-        [TestCase("JoinCapabilityEnabled")]
-        [TestCase("VisibilityFeederEnabled")]
-        [TestCase("VisibilityEmitEnabled")]
-        [TestCase("VisibilityArmingEnabled")]
-        [TestCase("PositionFeedEnabled")]
+        [InlineData("ConnectorsEnabled")]
+        [InlineData("JoinCapabilityEnabled")]
+        [InlineData("VisibilityFeederEnabled")]
+        [InlineData("VisibilityEmitEnabled")]
+        [InlineData("VisibilityArmingEnabled")]
+        [InlineData("PositionFeedEnabled")]
+        [Theory(Timeout = 60000)]
         public void WithNoPluginNameSet_TheDefaultIsTheStockPlugin(string name)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var log = new Capture();
             IConfigSource cfg = Config(null, name);
 
             MixerOnlySwitches.DisableOnStockPlugin(cfg, log);
 
-            Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean(name, true), Is.False);
-            Assert.That(log.Warnings(), Has.Count.EqualTo(1));
+            Assert.False(cfg.Configs["WebRtcVoice"].GetBoolean(name, true));
+            Assert.Single(log.Warnings());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WithNoJanusSection_TheDefaultIsTheStockPlugin()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var src = new IniConfigSource();
             src.AddConfig("WebRtcVoice").Set("VisibilityFeederEnabled", "true");
 
             MixerOnlySwitches.DisableOnStockPlugin(src, new Capture());
 
-            Assert.That(src.Configs["WebRtcVoice"].GetBoolean("VisibilityFeederEnabled", true), Is.False);
+            Assert.False(src.Configs["WebRtcVoice"].GetBoolean("VisibilityFeederEnabled", true));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnTheSlvoicePlugin_NothingChanges_AndNothingIsLogged()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var log = new Capture();
             IConfigSource cfg = Config("janus.plugin.slvoice", MixerOnlySwitches.Names.ToArray());
 
             IReadOnlyList<string> off = MixerOnlySwitches.DisableOnStockPlugin(cfg, log);
 
-            Assert.That(off, Is.Empty);
+            Assert.Empty(off);
             foreach (string name in MixerOnlySwitches.Names)
-                Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean(name, false), Is.True, name);
-            Assert.That(log.Warnings(), Is.Empty);
+                Assert.True(cfg.Configs["WebRtcVoice"].GetBoolean(name, false), name);
+            Assert.Empty(log.Warnings());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASwitchThatIsOff_IsNotMentioned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var log = new Capture();
 
             IReadOnlyList<string> off = MixerOnlySwitches.DisableOnStockPlugin(Config("janus.plugin.audiobridge"), log);
 
-            Assert.That(off, Is.Empty);
-            Assert.That(log.Warnings(), Is.Empty);
+            Assert.Empty(off);
+            Assert.Empty(log.Warnings());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheSwitchesThatDoWorkOnTheStockPlugin_AreLeftAlone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfigSource cfg = Config("janus.plugin.audiobridge", "VoiceModerationEnabled", "A2AVoiceEnabled", "StunServers");
             var log = new Capture();
 
             MixerOnlySwitches.DisableOnStockPlugin(cfg, log);
 
-            Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean("VoiceModerationEnabled", false), Is.True);
-            Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean("A2AVoiceEnabled", false), Is.True);
-            Assert.That(log.Warnings(), Is.Empty);
+            Assert.True(cfg.Configs["WebRtcVoice"].GetBoolean("VoiceModerationEnabled", false));
+            Assert.True(cfg.Configs["WebRtcVoice"].GetBoolean("A2AVoiceEnabled", false));
+            Assert.Empty(log.Warnings());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void CalledTwice_EachSwitchIsReportedOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var log = new Capture();
             IConfigSource cfg = Config("janus.plugin.audiobridge", "JoinCapabilityEnabled", "VisibilityFeederEnabled");
 
             MixerOnlySwitches.DisableOnStockPlugin(cfg, log);
             MixerOnlySwitches.DisableOnStockPlugin(cfg, log);
 
-            Assert.That(log.Warnings(), Has.Count.EqualTo(2));
+            Assert.Equal(2, log.Warnings().Count());
         }
 
         // ---- the Janus service applies it to the room declaration ------------------------------------------
@@ -168,9 +179,10 @@ namespace osWebRtcVoice.Tests
             return new WebRtcJanusService(cfg, () => new FakeJanusHandler(new FakeJanusGateway()));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheService_OnTheStockPlugin_WarnsAboutArming_AndDoesNotDeclareRooms()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var log = new Capture();
             var logging = new LogCapture(log, LogLevel.Trace);
             try
@@ -179,10 +191,9 @@ namespace osWebRtcVoice.Tests
 
                 StartService(cfg);
 
-                Assert.That(log.Warnings().Any(w => w.Contains("VisibilityArmingEnabled") && w.Contains("janus.plugin.audiobridge")), Is.True,
-                    string.Join(" | ", log.Warnings()));
-                Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean("VisibilityArmingEnabled", true), Is.False);
-                Assert.That(log.Lines.Any(l => l.Text.Contains("vis_authority=true")), Is.False, "no 'rooms are declared' line");
+                Assert.True(log.Warnings().Any(w => w.Contains("VisibilityArmingEnabled") && w.Contains("janus.plugin.audiobridge")), string.Join(" | ", log.Warnings()));
+                Assert.False(cfg.Configs["WebRtcVoice"].GetBoolean("VisibilityArmingEnabled", true));
+                Assert.False(log.Lines.Any(l => l.Text.Contains("vis_authority=true")), "no 'rooms are declared' line");
             }
             finally
             {
@@ -191,9 +202,10 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheService_OnTheSlvoicePlugin_KeepsArming()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var log = new Capture();
             var logging = new LogCapture(log, LogLevel.Trace);
             try
@@ -202,9 +214,9 @@ namespace osWebRtcVoice.Tests
 
                 StartService(cfg);
 
-                Assert.That(log.Warnings().Any(w => w.Contains("VisibilityArmingEnabled")), Is.False);
-                Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean("VisibilityArmingEnabled", false), Is.True);
-                Assert.That(log.Lines.Any(l => l.Text.Contains("vis_authority=true")), Is.True);
+                Assert.DoesNotContain(log.Warnings(), w => w.Contains("VisibilityArmingEnabled"));
+                Assert.True(cfg.Configs["WebRtcVoice"].GetBoolean("VisibilityArmingEnabled", false));
+                Assert.Contains(log.Lines, l => l.Text.Contains("vis_authority=true"));
             }
             finally
             {
@@ -213,9 +225,10 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheService_OnTheStockPlugin_WarnsAboutTheJoinCapability_AndDoesNotMintOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var log = new Capture();
             var logging = new LogCapture(log, LogLevel.Trace);
             try
@@ -224,10 +237,9 @@ namespace osWebRtcVoice.Tests
 
                 StartService(cfg);
 
-                Assert.That(log.Warnings().Any(w => w.Contains("JoinCapabilityEnabled") && w.Contains("janus.plugin.audiobridge")), Is.True,
-                    string.Join(" | ", log.Warnings()));
-                Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean("JoinCapabilityEnabled", true), Is.False);
-                Assert.That(log.Lines.Any(l => l.Text.Contains("join capability enabled")), Is.False, "no 'enabled' line");
+                Assert.True(log.Warnings().Any(w => w.Contains("JoinCapabilityEnabled") && w.Contains("janus.plugin.audiobridge")), string.Join(" | ", log.Warnings()));
+                Assert.False(cfg.Configs["WebRtcVoice"].GetBoolean("JoinCapabilityEnabled", true));
+                Assert.False(log.Lines.Any(l => l.Text.Contains("join capability enabled")), "no 'enabled' line");
             }
             finally
             {
@@ -236,9 +248,10 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheService_OnTheSlvoicePlugin_KeepsTheJoinCapability()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var log = new Capture();
             var logging = new LogCapture(log, LogLevel.Trace);
             try
@@ -247,9 +260,9 @@ namespace osWebRtcVoice.Tests
 
                 StartService(cfg);
 
-                Assert.That(log.Warnings().Any(w => w.Contains("JoinCapabilityEnabled")), Is.False);
-                Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean("JoinCapabilityEnabled", false), Is.True);
-                Assert.That(log.Lines.Any(l => l.Text.Contains("join capability enabled")), Is.True);
+                Assert.DoesNotContain(log.Warnings(), w => w.Contains("JoinCapabilityEnabled"));
+                Assert.True(cfg.Configs["WebRtcVoice"].GetBoolean("JoinCapabilityEnabled", false));
+                Assert.Contains(log.Lines, l => l.Text.Contains("join capability enabled"));
             }
             finally
             {

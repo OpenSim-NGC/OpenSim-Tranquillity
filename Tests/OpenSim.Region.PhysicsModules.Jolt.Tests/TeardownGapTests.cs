@@ -195,9 +195,9 @@ public class TeardownGapTests
         {
             call = new Thread(() => { t.B.SetGravity(new Vector3(0f, 0f, -3f)); done.Set(); });
             call.Start();
-            Assert.False(done.Wait(400), "SetGravity changed the system while another thread held the simulation lock");
+            Assert.False(done.Wait(400, TestContext.Current.CancellationToken), "SetGravity changed the system while another thread held the simulation lock");
         }
-        Assert.True(done.Wait(TimeSpan.FromSeconds(30)));
+        Assert.True(done.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         call.Join();
     }
 

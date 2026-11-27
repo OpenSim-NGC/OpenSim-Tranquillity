@@ -24,33 +24,40 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class JanusApiSecretPlacementTests
     {
-        [Test]
+        [Fact(Timeout = 60000)]
         public void APostCarriesTheSecretInTheBody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var req = new JanusMessageReq("keepalive");
             req.AddAPIToken("sekret");
 
             var body = OSDParser.DeserializeJson(req.ToJson()) as OSDMap;
-            Assert.That(body, Is.Not.Null, "the request serialises to a JSON object");
-            Assert.That(body.ContainsKey("apisecret"), Is.True, "the API secret must be in the POST body");
-            Assert.That(body["apisecret"].AsString(), Is.EqualTo("sekret"));
+            {
+                var assertedValue = body;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the request serialises to a JSON object");
+            }
+            Assert.True(body.ContainsKey("apisecret"), "the API secret must be in the POST body");
+            Assert.Equal("sekret", body["apisecret"].AsString());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheSessionLongPollIsTheOnlyPlaceTheSecretGoesIntoAUrl()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var dir = new DirectoryInfo(AppContext.BaseDirectory);
             while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "Addons")))
                 dir = dir.Parent;
-            Assert.That(dir, Is.Not.Null, "could not find the repository root from " + AppContext.BaseDirectory);
+            {
+                var assertedValue = dir;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "could not find the repository root from " + AppContext.BaseDirectory);
+            }
 
             string janus = Path.Combine(dir.FullName, "Addons", "os-webrtc-janus");
             var sites = Directory.EnumerateFiles(janus, "*.cs", SearchOption.AllDirectories)
@@ -60,10 +67,10 @@ namespace osWebRtcVoice.Tests
                                                        .Select(_ => Path.GetFileName(f)))
                                  .ToList();
 
-            Assert.That(sites, Is.EqualTo(new[] { "JanusSession.cs" }),
-                "the query-string API secret must stay confined to the session long poll in "
-                + "JanusSession.GetFromJanus, which Janus gives no alternative to. Found: "
-                + (sites.Count == 0 ? "(none - did GetFromJanus change?)" : string.Join(", ", sites)));
+            {
+                var assertedValue = sites;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { "JanusSession.cs" }, assertedValue), "the query-string API secret must stay confined to the session long poll in " + "JanusSession.GetFromJanus, which Janus gives no alternative to. Found: " + (sites.Count == 0 ? "(none - did GetFromJanus change?)" : string.Join(", ", sites)));
+            }
         }
     }
 }

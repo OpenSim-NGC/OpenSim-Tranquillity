@@ -33,10 +33,8 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]
-    public class JoinCapabilityProvisionTests
-    {
+    public class JoinCapabilityProvisionTests : IAsyncLifetime
+        {
         private const string Secret = "0123456789abcdef0123456789abcdef0123456789abcdef";
 
         private sealed class Capture : ILoggerProvider, ILogger
@@ -63,20 +61,16 @@ namespace osWebRtcVoice.Tests
         private Capture _log;
         private LogCapture _logging;
         private ConcurrentQueue<OSDMap> _bodies;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
-            _bodies = new ConcurrentQueue<OSDMap>();   // NUnit shares one fixture instance across the tests
+            _bodies = new ConcurrentQueue<OSDMap>();
             _gw = new FakeJanusGateway { ModelRooms = true };
             _gw.PluginAnswer = body => { _bodies.Enqueue(body); return null; };
             JoinCapabilityAuthority.Clear();
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             JoinCapabilityAuthority.Clear();
             _logging.Dispose();
@@ -124,12 +118,15 @@ namespace osWebRtcVoice.Tests
         private static string[] Verify(string capability, string secret)
         {
             string[] parts = capability.Split('.');
-            Assert.That(parts, Has.Length.EqualTo(3));
-            Assert.That(parts[0], Is.EqualTo("v1"));
+            Assert.Equal(3, parts.Length);
+            Assert.Equal("v1", parts[0]);
             using var mac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
             string expected = Convert.ToBase64String(mac.ComputeHash(Encoding.UTF8.GetBytes(parts[0] + "." + parts[1])))
                 .TrimEnd('=').Replace('+', '-').Replace('/', '_');
-            Assert.That(parts[2], Is.EqualTo(expected), "the signature is the HMAC of the secret over the payload");
+            {
+                var assertedValue = parts[2];
+                TestAssert.WithMessage(() => Assert.Equal(expected, assertedValue), "the signature is the HMAC of the secret over the payload");
+            }
             string b64 = parts[1].Replace('-', '+').Replace('_', '/');
             b64 = b64.PadRight(b64.Length + (4 - b64.Length % 4) % 4, '=');
             return Encoding.UTF8.GetString(Convert.FromBase64String(b64)).Split('|');
@@ -139,74 +136,94 @@ namespace osWebRtcVoice.Tests
         {
             foreach (var line in _log.Snapshot())
                 foreach (string v in values.Where(v => !string.IsNullOrEmpty(v)))
-                    Assert.That(line.Text, Does.Not.Contain(v), "a capability or secret was logged: " + line.Level);
+                    {
+                        var assertedValue = line.Text;
+                        TestAssert.WithMessage(() => Assert.DoesNotContain(v, assertedValue), "a capability or secret was logged: " + line.Level);
+                    }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SwitchOff_TheCreateAndJoinBodiesCarryNoCapability()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = NewService(joinCapability: false, secret: Secret);
 
             var result = await Provision(svc, UUID.Random());
 
-            Assert.That(result.Reply.ContainsKey("jsep"), Is.True, "the join succeeded");
+            Assert.True(result.Reply.ContainsKey("jsep"), "the join succeeded");
             OSDMap join = BodyOf("join");
-            Assert.That(join.ContainsKey("join_cap"), Is.False);
-            Assert.That(join.ContainsKey("session_id"), Is.False);
-            Assert.That(BodyOf("create").ContainsKey("sim_created"), Is.False);
+            Assert.False(join.ContainsKey("join_cap"));
+            Assert.False(join.ContainsKey("session_id"));
+            Assert.False(BodyOf("create").ContainsKey("sim_created"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SwitchOnWithNoSecret_NothingIsMintedAndTheJoinStillGoes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = NewService(joinCapability: true, secret: null);
 
             var result = await Provision(svc, UUID.Random());
 
-            Assert.That(result.Reply.ContainsKey("jsep"), Is.True);
-            Assert.That(BodyOf("join").ContainsKey("join_cap"), Is.False);
-            Assert.That(BodyOf("create").ContainsKey("sim_created"), Is.False);
-            Assert.That(_log.Snapshot().Any(l => l.Level == LogLevel.Error && l.Text.Contains("JoinCapabilitySecret is empty")), Is.True);
+            Assert.True(result.Reply.ContainsKey("jsep"));
+            Assert.False(BodyOf("join").ContainsKey("join_cap"));
+            Assert.False(BodyOf("create").ContainsKey("sim_created"));
+            Assert.Contains(_log.Snapshot(), l => l.Level == LogLevel.Error && l.Text.Contains("JoinCapabilitySecret is empty"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SwitchOnWithAShortSecret_NothingIsMintedAndOneErrorIsLogged()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string shortSecret = new string('k', 31);
             var svc = NewService(joinCapability: true, secret: shortSecret);
 
             var result = await Provision(svc, UUID.Random());
 
-            Assert.That(result.Reply.ContainsKey("jsep"), Is.True);
-            Assert.That(BodyOf("join").ContainsKey("join_cap"), Is.False);
-            Assert.That(_log.Snapshot().Count(l => l.Level == LogLevel.Error && l.Text.Contains("shorter than 32 characters")), Is.EqualTo(1));
+            Assert.True(result.Reply.ContainsKey("jsep"));
+            Assert.False(BodyOf("join").ContainsKey("join_cap"));
+            Assert.Equal(1, _log.Snapshot().Count(l => l.Level == LogLevel.Error && l.Text.Contains("shorter than 32 characters")));
             AssertNoCapabilityInTheLog(shortSecret);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SwitchOn_TheJoinCarriesACapabilityBoundToThisJoin_AndTheCreateIsMarked()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = NewService(joinCapability: true, secret: Secret);
 
             var result = await Provision(svc, UUID.Random());
 
-            Assert.That(result.Reply.ContainsKey("jsep"), Is.True);
-            Assert.That(BodyOf("create")["sim_created"].AsBoolean(), Is.True);
+            Assert.True(result.Reply.ContainsKey("jsep"));
+            Assert.True(BodyOf("create")["sim_created"].AsBoolean());
             OSDMap join = BodyOf("join");
             string capability = join["join_cap"].AsString();
-            Assert.That(join["session_id"].AsString(), Is.EqualTo(result.ViewerSession));
+            Assert.Equal(result.ViewerSession, join["session_id"].AsString());
             string[] payload = Verify(capability, Secret);
-            Assert.That(payload[0], Is.EqualTo(result.Agent.ToString()), "bound to the agent");
-            Assert.That(payload[1], Is.EqualTo(result.ViewerSession), "bound to the viewer session");
-            Assert.That(payload[2], Is.EqualTo(join["room"].AsInteger().ToString()), "bound to the room");
-            Assert.That(payload[3], Is.EqualTo(JoinCapability.NoEpoch), "no authority has armed the room");
-            Assert.That(payload[4], Is.EqualTo("0"));
+            {
+                var assertedValue = payload[0];
+                TestAssert.WithMessage(() => Assert.Equal(result.Agent.ToString(), assertedValue), "bound to the agent");
+            }
+            {
+                var assertedValue = payload[1];
+                TestAssert.WithMessage(() => Assert.Equal(result.ViewerSession, assertedValue), "bound to the viewer session");
+            }
+            {
+                var assertedValue = payload[2];
+                TestAssert.WithMessage(() => Assert.Equal(join["room"].AsInteger().ToString(), assertedValue), "bound to the room");
+            }
+            {
+                var assertedValue = payload[3];
+                TestAssert.WithMessage(() => Assert.Equal(JoinCapability.NoEpoch, assertedValue), "no authority has armed the room");
+            }
+            Assert.Equal("0", payload[4]);
             AssertNoCapabilityInTheLog(capability, capability.Split('.')[1], Secret.Substring(8));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SwitchOn_ARoomTheRegionArmedCarriesItsEpochAndGeneration()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = NewService(joinCapability: true, secret: Secret);
             UUID region = UUID.Random();
             int room = JanusAudioBridge.CalcRoomNumber(string.Empty, region.ToString(), "local", JanusAudioBridge.REGION_ROOM_ID, string.Empty);
@@ -217,13 +234,14 @@ namespace osWebRtcVoice.Tests
             await Provision(svc, region);
 
             string[] payload = Verify(BodyOf("join")["join_cap"].AsString(), Secret);
-            Assert.That(payload[3], Is.EqualTo(authority.EpochString));
-            Assert.That(payload[4], Is.EqualTo("2"));
+            Assert.Equal(authority.EpochString, payload[3]);
+            Assert.Equal("2", payload[4]);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SwitchOn_AMixerRefusal496NamesTheReasonAndNeverTheCapability()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _gw.PluginAnswer = body =>
             {
                 _bodies.Enqueue(body);
@@ -235,11 +253,22 @@ namespace osWebRtcVoice.Tests
 
             var result = await Provision(svc, UUID.Random());
 
-            Assert.That(result.Reply.ContainsKey("jsep"), Is.False, "the join was refused");
+            Assert.False(result.Reply.ContainsKey("jsep"), "the join was refused");
             string capability = BodyOf("join")["join_cap"].AsString();
-            Assert.That(_log.Snapshot().Any(l => l.Level == LogLevel.Error && l.Text.Contains("cap_expired") && l.Text.Contains("496")), Is.True,
-                string.Join(" | ", _log.Snapshot().Select(l => l.Text)));
+            Assert.True(_log.Snapshot().Any(l => l.Level == LogLevel.Error && l.Text.Contains("cap_expired") && l.Text.Contains("496")), string.Join(" | ", _log.Snapshot().Select(l => l.Text)));
             AssertNoCapabilityInTheLog(capability, capability.Split('.')[1]);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

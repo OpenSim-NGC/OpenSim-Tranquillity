@@ -15,7 +15,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class PositionBatchSerializerTests
     {
         private static readonly UUID A = new UUID("11111111-1111-1111-1111-111111111111");
@@ -28,95 +27,110 @@ namespace osWebRtcVoice.Tests
             return m;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_ProducesTheDocumentedBytes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var m = new PositionMessage { Room = 4242, Seq = 1760000000001, Full = true };
             m.Entries.Add(new PositionEntry(A, 25612800, 25612801, 2200, 800, 500));
 
             string json = OSDParser.SerializeJsonString(PositionBatchSerializer.BuildRequest(m, PositionFeedMode.Observe), true);
 
-            Assert.That(json, Is.EqualTo(
-                "{\"request\":\"peer_pos\",\"room\":4242,\"seq\":1760000000001,\"full\":true,\"mode\":\"observe\"," +
-                "\"pos\":{\"11111111-1111-1111-1111-111111111111\":[25612800,25612801,2200,800,500]}}"));
+            Assert.Equal("{\"request\":\"peer_pos\",\"room\":4242,\"seq\":1760000000001,\"full\":true,\"mode\":\"observe\"," +
+                "\"pos\":{\"11111111-1111-1111-1111-111111111111\":[25612800,25612801,2200,800,500]}}", json);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_PartialUpdateIsMarkedNotFull()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             PositionMessage m = Message(1);
             m.Full = false;
             OSDMap request = PositionBatchSerializer.BuildRequest(m, PositionFeedMode.Observe);
-            Assert.That(request.ContainsKey("full"), Is.True);
-            Assert.That(request["full"].AsBoolean(), Is.False);
+            Assert.True(request.ContainsKey("full"));
+            Assert.False(request["full"].AsBoolean());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_RefusesAZeroUuid()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var m = new PositionMessage { Room = 1, Seq = 1, Full = true };
             m.Entries.Add(new PositionEntry(UUID.Zero, 0, 0, 0, 800, 500));
             Assert.Throws<ArgumentException>(() => PositionBatchSerializer.BuildRequest(m, PositionFeedMode.Observe));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_RefusesANegativeSpeedOrTolerance()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var m = new PositionMessage { Room = 1, Seq = 1, Full = true };
             m.Entries.Add(new PositionEntry(A, 0, 0, 0, -1, 500));
             Assert.Throws<ArgumentException>(() => PositionBatchSerializer.BuildRequest(m, PositionFeedMode.Observe));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_RefusesMoreEntriesThanOneRequestMayCarry()
         {
-            Assert.DoesNotThrow(() => PositionBatchSerializer.BuildRequest(Message(PositionBatchSerializer.MaxEntries), PositionFeedMode.Observe));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            {
+                var assertedValue = () => PositionBatchSerializer.BuildRequest(Message(PositionBatchSerializer.MaxEntries), PositionFeedMode.Observe);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
             Assert.Throws<ArgumentException>(() => PositionBatchSerializer.BuildRequest(Message(PositionBatchSerializer.MaxEntries + 1), PositionFeedMode.Observe));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARoomOf110Participants_FitsInsideTheMixersLimits()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap request = PositionBatchSerializer.BuildRequest(Message(110), PositionFeedMode.Observe);
             string json = OSDParser.SerializeJsonString(request, true);
             int bytes = System.Text.Encoding.UTF8.GetByteCount(json);
 
-            Assert.That(((OSDMap)request["pos"]).Count, Is.EqualTo(110));
-            Assert.That(bytes, Is.GreaterThan(1000), "the request really carries the entries");
-            Assert.That(bytes, Is.LessThan(65536), "the mixer's 64 KB request limit");
-            Assert.That(PositionBatchSerializer.MaxEntries, Is.LessThanOrEqualTo(128), "the mixer's entry limit");
-            TestContext.Out.WriteLine($"110 participants: {bytes} bytes");
+            Assert.Equal(110, ((OSDMap)request["pos"]).Count);
+            Assert.True(bytes > 1000, "the request really carries the entries");
+            Assert.True(bytes < 65536, "the mixer's 64 KB request limit");
+            Assert.True(PositionBatchSerializer.MaxEntries <= 128, "the mixer's entry limit");
+            TestContext.Current.TestOutputHelper.WriteLine($"110 participants: {bytes} bytes");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARoomOf50Participants_IsOneRequestOfAboutFourKilobytes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap request = PositionBatchSerializer.BuildRequest(Message(50), PositionFeedMode.Observe);
             int bytes = System.Text.Encoding.UTF8.GetByteCount(OSDParser.SerializeJsonString(request, true));
 
-            Assert.That(((OSDMap)request["pos"]).Count, Is.EqualTo(50));
-            Assert.That(bytes, Is.InRange(3000, 5000));
-            TestContext.Out.WriteLine($"50 participants: {bytes} bytes");
+            Assert.Equal(50, ((OSDMap)request["pos"]).Count);
+            Assert.InRange(bytes, 3000, 5000);
+            TestContext.Current.TestOutputHelper.WriteLine($"50 participants: {bytes} bytes");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EnforceMode_IsSentAsObserveWhileNothingActsOnIt()
         {
-            Assert.That(PositionFeedModes.Active(PositionFeedMode.Enforce), Is.EqualTo(PositionFeedMode.Observe));
-            Assert.That(PositionFeedModes.WireName(PositionFeedModes.Active(PositionFeedMode.Enforce)), Is.EqualTo("observe"));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(PositionFeedMode.Observe, PositionFeedModes.Active(PositionFeedMode.Enforce));
+            Assert.Equal("observe", PositionFeedModes.WireName(PositionFeedModes.Active(PositionFeedMode.Enforce)));
         }
 
-        [TestCase(null, PositionFeedMode.Observe, true)]
-        [TestCase("", PositionFeedMode.Observe, true)]
-        [TestCase("observe", PositionFeedMode.Observe, true)]
-        [TestCase("OBSERVE", PositionFeedMode.Observe, true)]
-        [TestCase("enforce", PositionFeedMode.Enforce, true)]
-        [TestCase("Enforce ", PositionFeedMode.Enforce, true)]
-        [TestCase("block", PositionFeedMode.Observe, false)]
+        [InlineData(null,PositionFeedMode.Observe,true)]
+        [InlineData("",PositionFeedMode.Observe,true)]
+        [InlineData("observe",PositionFeedMode.Observe,true)]
+        [InlineData("OBSERVE",PositionFeedMode.Observe,true)]
+        [InlineData("enforce",PositionFeedMode.Enforce,true)]
+        [InlineData("Enforce ",PositionFeedMode.Enforce,true)]
+        [InlineData("block",PositionFeedMode.Observe,false)]
+        [Theory(Timeout = 60000)]
         public void ModeWord_IsParsed(string text, PositionFeedMode expected, bool recognised)
         {
-            Assert.That(PositionFeedModes.Parse(text, out bool ok), Is.EqualTo(expected));
-            Assert.That(ok, Is.EqualTo(recognised));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(expected, PositionFeedModes.Parse(text, out bool ok));
+            Assert.Equal(recognised, ok);
         }
     }
 }
