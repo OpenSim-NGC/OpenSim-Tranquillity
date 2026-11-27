@@ -112,7 +112,7 @@ public class SimulationServiceConnectorAnswerTests
         List<UUID> features = new() { offered };
         EntityTransferContext ctx = new();
         Assert.True(new SimulationServiceConnector().QueryAccess(
-            Destination(server.Url), UUID.Random(), null, true, new Vector3(128, 128, 30), features, ctx, out string reason));
+            Destination(server.Url), UUID.Random(), null!, true, new Vector3(128, 128, 30), features, ctx, out string reason));
 
         Assert.Equal(string.Empty, reason);
         Assert.Equal(new[] { first, second }, features);
@@ -130,7 +130,7 @@ public class SimulationServiceConnectorAnswerTests
 
         List<UUID> features = new() { offered };
         Assert.False(new SimulationServiceConnector().QueryAccess(
-            Destination(server.Url), UUID.Random(), null, true, new Vector3(128, 128, 30), features,
+            Destination(server.Url), UUID.Random(), null!, true, new Vector3(128, 128, 30), features,
             new EntityTransferContext(), out string reason));
 
         Assert.Equal("No room", reason);
