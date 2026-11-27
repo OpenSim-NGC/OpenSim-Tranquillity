@@ -17,13 +17,12 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2ASessionConcurrencyTests
     {
         private static readonly UUID Caller = new UUID("aaaaaaaa-0000-0000-0000-000000000001");
@@ -32,9 +31,10 @@ namespace osWebRtcVoice.Tests
         private const int Rounds = 300;
         private const int Joiners = 8;
 
-        [Test]
-        public void ConcurrentCalleeJoins_ExactlyOneBecomesActive()
+        [Fact(Timeout = 60000)]
+        public async Task ConcurrentCalleeJoins_ExactlyOneBecomesActive()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int tooMany = 0, none = 0;
             for (int round = 0; round < Rounds; round++)
             {
@@ -44,34 +44,42 @@ namespace osWebRtcVoice.Tests
                 using Barrier gate = new Barrier(Joiners);
                 Task[] joins = Enumerable.Range(0, Joiners).Select(n => Task.Run(() =>
                 {
-                    gate.SignalAndWait();
+                    gate.SignalAndWait(TestContext.Current.CancellationToken);
                     reg.MarkProvisioned(s.SessionId, Callee, "vs-" + n, out bool becameActive);
                     if (becameActive) Interlocked.Increment(ref winners);
                 })).ToArray();
-                Task.WaitAll(joins);
+                await Task.WhenAll(joins);
                 if (winners > 1) tooMany++;
                 if (winners == 0) none++;
             }
-            Assert.That(tooMany, Is.EqualTo(0), "rounds in which more than one join was told it made the call active");
-            Assert.That(none, Is.EqualTo(0), "rounds in which no join was told it made the call active");
+            {
+                var assertedValue = tooMany;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "rounds in which more than one join was told it made the call active");
+            }
+            {
+                var assertedValue = none;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "rounds in which no join was told it made the call active");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARejoinOfAnActiveCall_IsNotATransition()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             A2ARegistry reg = new A2ARegistry();
             A2ASession s = reg.Record(Caller, Callee, out _);
             reg.MarkProvisioned(s.SessionId, Callee, "vs-1", out bool first);
             reg.MarkProvisioned(s.SessionId, Callee, "vs-2", out bool again);
             reg.MarkProvisioned(s.SessionId, Caller, "vs-3", out bool callerJoin);
-            Assert.That(first, Is.True);
-            Assert.That(again, Is.False, "a reconnect of an already active call is not a new accept");
-            Assert.That(callerJoin, Is.False, "the caller joining never makes the call active");
+            Assert.True(first);
+            Assert.False(again, "a reconnect of an already active call is not a new accept");
+            Assert.False(callerJoin, "the caller joining never makes the call active");
         }
 
-        [Test]
-        public void ReadingARecordWhileItChanges_NeverFails()
+        [Fact(Timeout = 60000)]
+        public async Task ReadingARecordWhileItChanges_NeverFails()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             A2ARegistry reg = new A2ARegistry();
             A2ASession s = reg.Record(Caller, Callee, out _);
             ConcurrentQueue<Exception> failures = new ConcurrentQueue<Exception>();
@@ -97,8 +105,8 @@ namespace osWebRtcVoice.Tests
                 reg.Record(Caller, Callee, out _);
             }
             stop.Cancel();
-            Task.WaitAll(readers);
-            Assert.That(failures.Select(f => f.GetType().Name + ": " + f.Message).Distinct().ToList(), Is.Empty);
+            await Task.WhenAll(readers);
+            Assert.Empty(failures.Select(f => f.GetType().Name + ": " + f.Message).Distinct().ToList());
         }
     }
 }

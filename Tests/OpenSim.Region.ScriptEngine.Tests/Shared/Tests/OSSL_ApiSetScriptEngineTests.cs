@@ -5,6 +5,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+using System.Reflection;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -71,8 +72,12 @@ public class OSSL_ApiSetScriptEngineTests : OpenSimTestCase
         Set("m_PermissionErrortoOwner", false);
         Set("m_MaxThreatLevel", ThreatLevel.VeryLow);
         Set("m_osslconfig", null);
-        ((System.Collections.IDictionary)api.GetField("m_FunctionPerms", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
-            .GetValue(null)).Clear();
+        FieldInfo functionPermsField = api.GetField(
+            "m_FunctionPerms", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(api.FullName, "m_FunctionPerms");
+        System.Collections.IDictionary functionPerms = functionPermsField.GetValue(null) as System.Collections.IDictionary
+            ?? throw new InvalidOperationException("OSSL function permissions were not initialized.");
+        functionPerms.Clear();
     }
 
     public override void Dispose()

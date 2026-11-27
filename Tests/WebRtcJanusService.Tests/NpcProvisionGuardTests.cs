@@ -18,59 +18,63 @@
  * identical to an empty one — covered by the false cases below.
  */
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NpcProvisionGuardTests
     {
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Npc_Disallowed_NotConnector_IsRefused()
         {
-            Assert.That(WebRtcVoiceServiceModule.IsNpcProvisionRefused(
-                pIsNpcPresence: true, pAllowNpcVoice: false, pIsConnectorIdentity: false), Is.True);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(WebRtcVoiceServiceModule.IsNpcProvisionRefused(
+                pIsNpcPresence: true, pAllowNpcVoice: false, pIsConnectorIdentity: false));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Npc_AllowNpcVoiceTrue_IsAdmitted()
         {
-            Assert.That(WebRtcVoiceServiceModule.IsNpcProvisionRefused(
-                pIsNpcPresence: true, pAllowNpcVoice: true, pIsConnectorIdentity: false), Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(WebRtcVoiceServiceModule.IsNpcProvisionRefused(
+                pIsNpcPresence: true, pAllowNpcVoice: true, pIsConnectorIdentity: false));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Npc_ConnectorIdentity_IsAdmitted()
         {
-            Assert.That(WebRtcVoiceServiceModule.IsNpcProvisionRefused(
-                pIsNpcPresence: true, pAllowNpcVoice: false, pIsConnectorIdentity: true), Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(WebRtcVoiceServiceModule.IsNpcProvisionRefused(
+                pIsNpcPresence: true, pAllowNpcVoice: false, pIsConnectorIdentity: true));
         }
 
         // The stock server creates no capabilities for an NPC (Scene.AddNewAgent, no CreateCaps), so an NPC cannot
         // provision voice there. The default of false keeps that; only an explicit AllowNpcVoice = true opens it.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AllowNpcVoice_DefaultsToFalse_WhenTheKeyIsMissing()
         {
-            Assert.That(WebRtcVoiceServiceModule.DefaultAllowNpcVoice, Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(WebRtcVoiceServiceModule.DefaultAllowNpcVoice);
             IConfig empty = new IniConfigSource().AddConfig("WebRtcVoice");
-            Assert.That(WebRtcVoiceServiceModule.ReadAllowNpcVoice(empty), Is.False);
-            Assert.That(WebRtcVoiceServiceModule.IsNpcProvisionRefused(
+            Assert.False(WebRtcVoiceServiceModule.ReadAllowNpcVoice(empty));
+            Assert.True(WebRtcVoiceServiceModule.IsNpcProvisionRefused(
                 pIsNpcPresence: true, pAllowNpcVoice: WebRtcVoiceServiceModule.ReadAllowNpcVoice(empty),
-                pIsConnectorIdentity: false), Is.True);
+                pIsConnectorIdentity: false));
 
             empty.Set("AllowNpcVoice", "true");
-            Assert.That(WebRtcVoiceServiceModule.ReadAllowNpcVoice(empty), Is.True);
+            Assert.True(WebRtcVoiceServiceModule.ReadAllowNpcVoice(empty));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Avatar_IsNeverRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // A real-avatar presence is unaffected by every knob combination.
-            Assert.That(WebRtcVoiceServiceModule.IsNpcProvisionRefused(false, false, false), Is.False);
-            Assert.That(WebRtcVoiceServiceModule.IsNpcProvisionRefused(false, true, false), Is.False);
-            Assert.That(WebRtcVoiceServiceModule.IsNpcProvisionRefused(false, false, true), Is.False);
-            Assert.That(WebRtcVoiceServiceModule.IsNpcProvisionRefused(false, true, true), Is.False);
+            Assert.False(WebRtcVoiceServiceModule.IsNpcProvisionRefused(false, false, false));
+            Assert.False(WebRtcVoiceServiceModule.IsNpcProvisionRefused(false, true, false));
+            Assert.False(WebRtcVoiceServiceModule.IsNpcProvisionRefused(false, false, true));
+            Assert.False(WebRtcVoiceServiceModule.IsNpcProvisionRefused(false, true, true));
         }
     }
 }

@@ -23,7 +23,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -35,7 +35,6 @@ using static osWebRtcVoice.Tests.CrossProcessHarness;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2ACrossProcessTests
     {
         private const string Grid = "example-grid";
@@ -192,9 +191,9 @@ namespace osWebRtcVoice.Tests
         /// <summary>Alice opens the IM window and presses Call in the first process.</summary>
         private static string PlaceCall(Node caller)
         {
-            Assert.That(Chat(caller, Alice, "start p2p voice", Session, Bob).Status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, Chat(caller, Alice, "start p2p voice", Session, Bob).Status);
             (int status, OSDMap body) = Chat(caller, Alice, "call", Session);
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, status);
             return ((OSDMap)body["voice_credentials"])["channel_credentials"].AsString();
         }
 
@@ -220,39 +219,49 @@ namespace osWebRtcVoice.Tests
         private static string BobAccepts(Node two, string token)
         {
             (int status, OSDMap body) = Provision(two, Bob, JoinBody(Session.ToString(), token));
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK), "the callee's accept is admitted in its own process");
+            {
+                var assertedValue = status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "the callee's accept is admitted in its own process");
+            }
             return body["viewer_session"].AsString();
         }
 
         private static string AliceJoins(Node one, string token)
         {
             (int status, OSDMap body) = Provision(one, Alice, JoinBody(Session.ToString(), token));
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, status);
             return body["viewer_session"].AsString();
         }
 
         // ---- the ring ----------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACalleeInAnotherProcess_IsRungThroughASignedCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
 
             PlaceCall(one);
 
-            Assert.That(one.Process.Queue.Enqueued, Is.Empty, "Bob is not here");
+            {
+                var assertedValue = one.Process.Queue.Enqueued;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "Bob is not here");
+            }
             GridInstantMessage ring = one.Carriers.SingleOrDefault();
-            Assert.That(ring, Is.Not.Null, "one carrier, to the process where Bob is root");
-            Assert.That(new UUID(ring.toAgentID), Is.EqualTo(Bob));
-            Assert.That(PayloadOf(ring)["step"].AsString(), Is.EqualTo("ring"));
-            Assert.That(PayloadOf(ring).ContainsKey(CarrierAuth.AuthKey), Is.True, "signed");
-            Assert.That(one.Process.Transfer.SentRootOnly.Single(), Is.True,
-                "root only, or a child presence of Bob in this process would be handed the carrier as an instant message");
+            {
+                var assertedValue = ring;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "one carrier, to the process where Bob is root");
+            }
+            Assert.Equal(Bob, new UUID(ring.toAgentID));
+            Assert.Equal("ring", PayloadOf(ring)["step"].AsString());
+            Assert.True(PayloadOf(ring).ContainsKey(CarrierAuth.AuthKey), "signed");
+            Assert.True(one.Process.Transfer.SentRootOnly.Single(), "root only, or a child presence of Bob in this process would be handed the carrier as an instant message");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACalleeWhoIsOnlyAChildPresenceInTheCallersProcess_IsRungThroughTheCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Node one = MakeNode("Region One", 1000);
             one.Process.AddRoot(Alice);
             one.Process.AddChild(Bob);
@@ -260,119 +269,145 @@ namespace osWebRtcVoice.Tests
 
             PlaceCall(one);
 
-            Assert.That(one.Process.Queue.Enqueued, Does.Not.Contain(Bob), "the answer to a ring on a child goes to another process");
-            Assert.That(one.Carriers, Has.Count.EqualTo(1));
-            Assert.That(one.Process.Transfer.SentRootOnly.Single(), Is.True);
+            {
+                var assertedValue = one.Process.Queue.Enqueued;
+                TestAssert.WithMessage(() => Assert.DoesNotContain(Bob, assertedValue), "the answer to a ring on a child goes to another process");
+            }
+            Assert.Single(one.Carriers);
+            Assert.True(one.Process.Transfer.SentRootOnly.Single());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACalleeInAnotherProcess_IsNotRungWithoutACarrierSecret()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, _) = Pair(secretOne: null);
 
             PlaceCall(one);
 
-            Assert.That(one.Process.Transfer.Sent, Is.Empty);
-            Assert.That(one.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(one.Registry.TryGet(Session).InviteSent, Is.False, "a later call can still ring");
+            Assert.Empty(one.Process.Transfer.Sent);
+            Assert.Empty(one.Process.Queue.Enqueued);
+            Assert.False(one.Registry.TryGet(Session).InviteSent, "a later call can still ring");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnOfflineCallee_IsNotRungThroughTheCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Node one = MakeNode("Region One", 1000);
             one.Process.AddRoot(Alice);
             one.Process.Presence.SetOnline(Alice);
 
             PlaceCall(one);
 
-            Assert.That(one.Process.Transfer.Sent, Is.Empty);
+            Assert.Empty(one.Process.Transfer.Sent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCalleesProcess_AdoptsTheCall_AndDeliversTheInvitationBuiltFromTheSignedFields()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
 
             string token = RingBob(one, two);
 
             var (name, body, to) = two.Process.Queue.Events.Single();
-            Assert.That(name, Is.EqualTo("ChatterBoxInvitation"));
-            Assert.That(to, Is.EqualTo(Bob));
+            Assert.Equal("ChatterBoxInvitation", name);
+            Assert.Equal(Bob, to);
             OSDMap b = (OSDMap)body;
-            Assert.That(b["session_id"].AsUUID(), Is.EqualTo(Session));
-            Assert.That(b["from_id"].AsUUID(), Is.EqualTo(Alice));
-            Assert.That(b["from_name"].AsString(), Is.EqualTo(one.NameOf(Alice)));
+            Assert.Equal(Session, b["session_id"].AsUUID());
+            Assert.Equal(Alice, b["from_id"].AsUUID());
+            Assert.Equal(one.NameOf(Alice), b["from_name"].AsString());
             OSDMap voice = (OSDMap)b["voice"];
-            Assert.That(voice["channel_uri"].AsString(), Is.EqualTo(Session.ToString()));
-            Assert.That(voice["channel_credentials"].AsString(), Is.EqualTo(token), "the token the caller's process issued");
-            Assert.That(voice["invitation_type"].AsInteger(), Is.EqualTo(A2AInvitation.InvitationTypeP2P));
-            Assert.That(two.Registry.TryGet(Session), Is.Not.Null, "the accept that follows can be admitted here");
-            Assert.That(two.Process.Transfer.Sent, Is.Empty, "a received ring is never carried on");
+            Assert.Equal(Session.ToString(), voice["channel_uri"].AsString());
+            {
+                var assertedValue = voice["channel_credentials"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal(token, assertedValue), "the token the caller's process issued");
+            }
+            Assert.Equal(A2AInvitation.InvitationTypeP2P, voice["invitation_type"].AsInteger());
+            {
+                var assertedValue = two.Registry.TryGet(Session);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the accept that follows can be admitted here");
+            }
+            {
+                var assertedValue = two.Process.Transfer.Sent;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a received ring is never carried on");
+            }
         }
 
         // ---- the callee's accept and the room ----------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCalleesAccept_IsAdmittedInItsOwnProcess_WithTheSameTokenAndChannel()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             string token = RingBob(one, two);
 
             BobAccepts(two, token);
 
             OSDMap sent = two.Voice.Requests.Single();
-            Assert.That(sent["channel"].AsString(), Is.EqualTo(Session.ToString()));
-            Assert.That(sent["credentials"].AsString(), Is.EqualTo(token));
-            Assert.That(two.Registry.TryGet(Session).State, Is.EqualTo(A2ASessionState.Active));
+            Assert.Equal(Session.ToString(), sent["channel"].AsString());
+            Assert.Equal(token, sent["credentials"].AsString());
+            Assert.Equal(A2ASessionState.Active, two.Registry.TryGet(Session).State);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCalleesOwnCall_GetsTheSameCredentialAsTheCallers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             string token = RingBob(one, two);
 
             (int status, OSDMap body) = Chat(two, Bob, "call", Session);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(((OSDMap)body["voice_credentials"])["channel_credentials"].AsString(), Is.EqualTo(token));
-            Assert.That(two.Process.Queue.Enqueued, Has.Count.EqualTo(1), "the callee's call rings nobody");
-            Assert.That(two.Process.Transfer.Sent, Is.Empty);
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.Equal(token, ((OSDMap)body["voice_credentials"])["channel_credentials"].AsString());
+            {
+                var assertedValue = two.Process.Queue.Enqueued;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "the callee's call rings nobody");
+            }
+            Assert.Empty(two.Process.Transfer.Sent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACalleeWithAWrongToken_IsRefusedInItsOwnProcess()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             RingBob(one, two);
 
             (int status, _) = Provision(two, Bob, JoinBody(Session.ToString(), "not-the-token"));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(two.Voice.Requests, Is.Empty);
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            Assert.Empty(two.Voice.Requests);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BothPartiesAreProvisionedIntoOneRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             string token = RingBob(one, two);
 
             AliceJoins(one, token);
             BobAccepts(two, token);
 
-            Assert.That(one.Voice.Requests.Single()["channel"].AsString(), Is.EqualTo(two.Voice.Requests.Single()["channel"].AsString()));
+            Assert.Equal(two.Voice.Requests.Single()["channel"].AsString(), one.Voice.Requests.Single()["channel"].AsString());
             int roomOne = JanusAudioBridge.CalcRoomNumber(Grid, one.Scene.RegionInfo.RegionID.ToString(), "multiagent", 0, Session.ToString());
             int roomTwo = JanusAudioBridge.CalcRoomNumber(Grid, two.Scene.RegionInfo.RegionID.ToString(), "multiagent", 0, Session.ToString());
-            Assert.That(roomOne, Is.EqualTo(roomTwo), "the room does not depend on the region that provisions");
+            {
+                var assertedValue = roomOne;
+                TestAssert.WithMessage(() => Assert.Equal(roomTwo, assertedValue), "the room does not depend on the region that provisions");
+            }
         }
 
         // ---- what the caller's viewer is told ----------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheCalleeJoins_TheCallerIsToldAcrossProcesses()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             string token = RingBob(one, two);
             AliceJoins(one, token);
@@ -381,58 +416,63 @@ namespace osWebRtcVoice.Tests
             bool rootOnly = two.Process.Transfer.SentRootOnly.Single();
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(carried, Has.Count.EqualTo(1), "one join carrier, to the caller's process");
-            Assert.That(rootOnly, Is.True);
-            Assert.That(new UUID(carried[0].toAgentID), Is.EqualTo(Alice));
-            Assert.That(PayloadOf(carried[0])["step"].AsString(), Is.EqualTo("join"));
+            {
+                var assertedValue = carried;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "one join carrier, to the caller's process");
+            }
+            Assert.True(rootOnly);
+            Assert.Equal(Alice, new UUID(carried[0].toAgentID));
+            Assert.Equal("join", PayloadOf(carried[0])["step"].AsString());
             var (session, to, updates) = one.AgentLists.Single();
-            Assert.That(session, Is.EqualTo(Session));
-            Assert.That(to, Is.EqualTo(Alice));
-            Assert.That(updates.Select(u => u.agentID), Is.EquivalentTo(new[] { Bob, Alice }));
-            Assert.That(updates.All(u => u.enterOrLeave && u.canVoice), Is.True,
-                "an entry that cannot voice chat is read by the viewer as a decline");
-            Assert.That(one.Registry.TryGet(Session).State, Is.EqualTo(A2ASessionState.Active));
+            Assert.Equal(Session, session);
+            Assert.Equal(Alice, to);
+            Assert.Equivalent(new[] { Bob, Alice }, updates.Select(u => u.agentID), strict: true);
+            Assert.True(updates.All(u => u.enterOrLeave && u.canVoice), "an entry that cannot voice chat is read by the viewer as a decline");
+            Assert.Equal(A2ASessionState.Active, one.Registry.TryGet(Session).State);
             // The callee's own panel is told in its own process, with nothing carried for it.
-            Assert.That(two.AgentLists.Select(l => l.To), Is.EqualTo(new[] { Bob }));
+            Assert.Equal(new[] { Bob }, two.AgentLists.Select(l => l.To));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheCalleeDeclines_TheCallerIsToldItCannotVoiceChat_AndBothRecordsAreGone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             RingBob(one, two);
 
-            Assert.That(Chat(two, Bob, "decline p2p voice", Session).Status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, Chat(two, Bob, "decline p2p voice", Session).Status);
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(carried, Has.Count.EqualTo(1));
-            Assert.That(PayloadOf(carried[0])["step"].AsString(), Is.EqualTo("decline"));
+            Assert.Single(carried);
+            Assert.Equal("decline", PayloadOf(carried[0])["step"].AsString());
             var (session, to, updates) = one.AgentLists.Single();
-            Assert.That(to, Is.EqualTo(Alice));
-            Assert.That(session, Is.EqualTo(Session));
+            Assert.Equal(Alice, to);
+            Assert.Equal(Session, session);
             GroupChatListAgentUpdateData declined = updates.Single();
-            Assert.That(declined.agentID, Is.EqualTo(Bob));
-            Assert.That(declined.canVoice, Is.False, "the viewer ends the call on a peer that cannot voice chat (llimview.cpp:4369)");
-            Assert.That(declined.enterOrLeave, Is.True, "a LEAVE is skipped before can_voice_chat is read (llimview.cpp:4364)");
-            Assert.That(one.Registry.TryGet(Session), Is.Null);
-            Assert.That(two.Registry.TryGet(Session), Is.Null);
+            Assert.Equal(Bob, declined.agentID);
+            Assert.False(declined.canVoice, "the viewer ends the call on a peer that cannot voice chat (llimview.cpp:4369)");
+            Assert.True(declined.enterOrLeave, "a LEAVE is skipped before can_voice_chat is read (llimview.cpp:4364)");
+            Assert.Null(one.Registry.TryGet(Session));
+            Assert.Null(two.Registry.TryGet(Session));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCallerCancelling_DoesNotTellTheCallerThatTheCalleeDeclined()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             PlaceCall(one);
 
             Chat(one, Alice, "decline p2p voice", Session);
 
-            Assert.That(one.Process.Transfer.Sent.Where(IsA2A).Count(m => PayloadOf(m)["step"].AsString() == "decline"), Is.Zero);
-            Assert.That(one.AgentLists, Is.Empty);
+            Assert.Equal(0, one.Process.Transfer.Sent.Where(IsA2A).Count(m => PayloadOf(m)["step"].AsString() == "decline"));
+            Assert.Empty(one.AgentLists);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheCalleeHangsUp_TheCallerIsToldTheyLeft_AndTheCalleesRecordIsGone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             string token = RingBob(one, two);
             AliceJoins(one, token);
@@ -443,19 +483,23 @@ namespace osWebRtcVoice.Tests
             Provision(two, Bob, LogoutBody(bobVs));
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(carried, Has.Count.EqualTo(1));
-            Assert.That(PayloadOf(carried[0])["step"].AsString(), Is.EqualTo("leave"));
+            Assert.Single(carried);
+            Assert.Equal("leave", PayloadOf(carried[0])["step"].AsString());
             var (_, to, updates) = one.AgentLists.Single();
-            Assert.That(to, Is.EqualTo(Alice));
-            Assert.That(updates.Single().agentID, Is.EqualTo(Bob));
-            Assert.That(updates.Single().enterOrLeave, Is.False);
-            Assert.That(two.Registry.TryGet(Session), Is.Null);
-            Assert.That(one.Registry.TryGet(Session), Is.Not.Null, "the caller is still in the call here until it hangs up");
+            Assert.Equal(Alice, to);
+            Assert.Equal(Bob, updates.Single().agentID);
+            Assert.False(updates.Single().enterOrLeave);
+            Assert.Null(two.Registry.TryGet(Session));
+            {
+                var assertedValue = one.Registry.TryGet(Session);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the caller is still in the call here until it hangs up");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheCallerHangsUp_TheCalleeIsToldTheyLeft_AndAfterBothLeaveNoRecordIsLeft()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             string token = RingBob(one, two);
             string aliceVs = AliceJoins(one, token);
@@ -465,20 +509,24 @@ namespace osWebRtcVoice.Tests
             Provision(one, Alice, LogoutBody(aliceVs));
             List<GridInstantMessage> carried = Carry(one, two);
 
-            Assert.That(PayloadOf(carried.Single())["step"].AsString(), Is.EqualTo("leave"));
+            Assert.Equal("leave", PayloadOf(carried.Single())["step"].AsString());
             var (_, to, updates) = two.AgentLists.Last();
-            Assert.That(to, Is.EqualTo(Bob));
-            Assert.That(updates.Single().agentID, Is.EqualTo(Alice));
+            Assert.Equal(Bob, to);
+            Assert.Equal(Alice, updates.Single().agentID);
 
             Provision(two, Bob, LogoutBody(bobVs));
             Carry(two, one);
-            Assert.That(two.Registry.TryGet(Session), Is.Null);
-            Assert.That(one.Registry.TryGet(Session), Is.Null, "the caller's record goes when the caller has left and the callee's leave arrives");
+            Assert.Null(two.Registry.TryGet(Session));
+            {
+                var assertedValue = one.Registry.TryGet(Session);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the caller's record goes when the caller has left and the callee's leave arrives");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheCalleesClientCloses_TheCallerIsToldTheyLeft()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             string token = RingBob(one, two);
             AliceJoins(one, token);
@@ -489,9 +537,9 @@ namespace osWebRtcVoice.Tests
             Invoke(two.Module, "OnVoiceClientClosed", two.Scene, Bob, two.Scene);
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(PayloadOf(carried.Single())["step"].AsString(), Is.EqualTo("leave"));
-            Assert.That(one.AgentLists.Single().To, Is.EqualTo(Alice));
-            Assert.That(two.Registry.TryGet(Session), Is.Null);
+            Assert.Equal("leave", PayloadOf(carried.Single())["step"].AsString());
+            Assert.Equal(Alice, one.AgentLists.Single().To);
+            Assert.Null(two.Registry.TryGet(Session));
         }
 
         // ---- carriers that must be refused --------------------------------------------------------------
@@ -529,44 +577,48 @@ namespace osWebRtcVoice.Tests
 
         private static void Deliver(Node to, GridInstantMessage m) => Invoke(to.Module, "OnIncomingA2ACarrier", m);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingWithTheRightSecret_IsAcceptedAndRungOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair();
 
             Deliver(two, GoodRing());
 
-            Assert.That(two.Process.Queue.Enqueued, Is.EqualTo(new[] { Bob }));
-            Assert.That(two.Registry.TryGet(Session), Is.Not.Null);
+            Assert.Equal(new[] { Bob }, two.Process.Queue.Enqueued);
+            Assert.NotNull(two.Registry.TryGet(Session));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AForgedRing_SignedWithAnotherSecret_IsRefused_AndNothingIsAdopted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair();
 
             Deliver(two, GoodRing(OtherSecret));
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.TryGet(Session), Is.Null);
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Null(two.Registry.TryGet(Session));
             CarrierAuth auth = (CarrierAuth)GetPrivate(two.Module, "m_carrierAuth");
-            Assert.That(auth.RefusalCount(CarrierAuth.BadMac), Is.EqualTo(1));
+            Assert.Equal(1, auth.RefusalCount(CarrierAuth.BadMac));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnUnsignedRing_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair();
 
             Deliver(two, GoodRing(secret: null));
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.TryGet(Session), Is.Null);
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Null(two.Registry.TryGet(Session));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AReplayedRing_IsRefused_AndRingsOnlyOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair();
             GridInstantMessage ring = GoodRing();
 
@@ -576,28 +628,30 @@ namespace osWebRtcVoice.Tests
             two.Process.Queue.Enqueued.Clear();
             Deliver(two, ring);
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.TryGet(Session), Is.Null);
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Null(two.Registry.TryGet(Session));
             CarrierAuth auth = (CarrierAuth)GetPrivate(two.Module, "m_carrierAuth");
-            Assert.That(auth.RefusalCount(CarrierAuth.Replay), Is.EqualTo(1));
+            Assert.Equal(1, auth.RefusalCount(CarrierAuth.Replay));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStaleRing_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair();
             long longAgo = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 3600;
 
             Deliver(two, GoodRing(clock: () => longAgo));
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
+            Assert.Empty(two.Process.Queue.Enqueued);
             CarrierAuth auth = (CarrierAuth)GetPrivate(two.Module, "m_carrierAuth");
-            Assert.That(auth.RefusalCount(CarrierAuth.Stale), Is.EqualTo(1));
+            Assert.Equal(1, auth.RefusalCount(CarrierAuth.Stale));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingRetargetedToAnotherAgent_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair();
             two.Process.AddRoot(Carol);
             GridInstantMessage ring = GoodRing();
@@ -605,13 +659,17 @@ namespace osWebRtcVoice.Tests
 
             Deliver(two, ring);
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty, "neither Carol nor Bob is rung");
-            Assert.That(two.Registry.Count, Is.Zero);
+            {
+                var assertedValue = two.Process.Queue.Enqueued;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "neither Carol nor Bob is rung");
+            }
+            Assert.Equal(0, two.Registry.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingWithATamperedToken_OrSession_OrStep_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair();
 
             GridInstantMessage tamperedToken = GoodRing();
@@ -631,73 +689,82 @@ namespace osWebRtcVoice.Tests
             Deliver(two, asDecline);
             Deliver(two, otherSession);
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.Count, Is.Zero);
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Equal(0, two.Registry.Count);
             CarrierAuth auth = (CarrierAuth)GetPrivate(two.Module, "m_carrierAuth");
-            Assert.That(auth.RefusalCount(CarrierAuth.BadMac), Is.EqualTo(3), "every one fails the MAC, so the step is part of what is signed");
+            {
+                var assertedValue = auth.RefusalCount(CarrierAuth.BadMac);
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "every one fails the MAC, so the step is part of what is signed");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASignedRing_WhoseSessionIsNotThePairs_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair();
             UUID wrong = UUID.Random();
 
             Deliver(two, Craft("ring", Bob, Alice, "Test User", wrong, "tok-" + new string('a', 60), RoomOf(wrong), Secret));
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.TryGet(wrong), Is.Null);
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Null(two.Registry.TryGet(wrong));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASignedRing_WithAnotherRoomKey_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair();
 
             Deliver(two, Craft("ring", Bob, Alice, "Test User", Session, "tok-" + new string('a', 60), "nsv1:group:" + UUID.Random(), Secret));
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.Count, Is.Zero);
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Equal(0, two.Registry.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARing_ForACalleeWhoIsOnlyAChildPresenceHere_IsNotAdoptedOrRung()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Node two = MakeNode("Region Two", 1001);
             two.Process.AddChild(Bob);
 
             Deliver(two, GoodRing());
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.Count, Is.Zero);
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Equal(0, two.Registry.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARing_AtAnInstanceWithAvatarToAvatarCallsOff_IsIgnored()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Node two = MakeNode("Region Two", 1001, a2aOn: false);
             two.Process.AddRoot(Bob);
 
             Deliver(two, GoodRing());
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.Count, Is.Zero);
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Equal(0, two.Registry.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARing_AtAnInstanceWithNoCarrierSecret_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = Pair(secretTwo: null);
 
             Deliver(two, GoodRing());
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.Count, Is.Zero);
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Equal(0, two.Registry.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARing_ForACallThatIsAlreadyAnswered_IsRefused_AndTheLiveCallIsKept()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             string token = RingBob(one, two);
             BobAccepts(two, token);
@@ -705,60 +772,69 @@ namespace osWebRtcVoice.Tests
 
             Deliver(two, Craft("ring", Bob, Alice, "Test User", Session, "tok-" + new string('c', 60), RoomOf(Session), Secret));
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
-            Assert.That(two.Registry.TryGet(Session).Token, Is.EqualTo(token));
-            Assert.That(two.Registry.TryGet(Session).State, Is.EqualTo(A2ASessionState.Active));
+            Assert.Empty(two.Process.Queue.Enqueued);
+            Assert.Equal(token, two.Registry.TryGet(Session).Token);
+            Assert.Equal(A2ASessionState.Active, two.Registry.TryGet(Session).State);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARing_AgainstAnUnansweredCallThatHoldsAnotherToken_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Two people calling each other at the same moment: each process already gave its own caller a token.
             var (one, two) = Pair();
             PlaceCall(one);
-            Assert.That(Chat(two, Bob, "start p2p voice", Session, Alice).Status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(Chat(two, Bob, "call", Session).Status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, Chat(two, Bob, "start p2p voice", Session, Alice).Status);
+            Assert.Equal((int)HttpStatusCode.OK, Chat(two, Bob, "call", Session).Status);
             two.Process.Queue.Enqueued.Clear();
 
             Carry(one, two);
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty, "the token Bob's viewer holds is not replaced");
+            {
+                var assertedValue = two.Process.Queue.Enqueued;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the token Bob's viewer holds is not replaced");
+            }
         }
 
         // ---- the follow-up carriers need the call and its token ----------------------------------------
 
-        [TestCase("join")]
-        [TestCase("decline")]
-        [TestCase("leave")]
+        [InlineData("join")]
+        [InlineData("decline")]
+        [InlineData("leave")]
+        [Theory(Timeout = 60000)]
         public void AStepForACallThisProcessDoesNotHold_IsRefusedAndChangesNothing(string step)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, _) = Pair();
             one.Process.Queue.AgentLists.Clear();
 
             Deliver(one, Craft(step, Alice, Bob, string.Empty, Session, "tok-" + new string('a', 60), RoomOf(Session), Secret));
 
-            Assert.That(one.AgentLists, Is.Empty);
-            Assert.That(one.Registry.Count, Is.Zero);
+            Assert.Empty(one.AgentLists);
+            Assert.Equal(0, one.Registry.Count);
         }
 
-        [TestCase("join")]
-        [TestCase("decline")]
-        [TestCase("leave")]
+        [InlineData("join")]
+        [InlineData("decline")]
+        [InlineData("leave")]
+        [Theory(Timeout = 60000)]
         public void AStepCarryingAnotherToken_IsRefusedAndChangesNothing(string step)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, _) = Pair();
             PlaceCall(one);
             one.Process.Transfer.Sent.Clear();
 
             Deliver(one, Craft(step, Alice, Bob, string.Empty, Session, "tok-" + new string('z', 60), RoomOf(Session), Secret));
 
-            Assert.That(one.AgentLists, Is.Empty);
-            Assert.That(one.Registry.TryGet(Session).State, Is.EqualTo(A2ASessionState.Invited));
+            Assert.Empty(one.AgentLists);
+            Assert.Equal(A2ASessionState.Invited, one.Registry.TryGet(Session).State);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADeclineCannotEndAnAnsweredCall()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = Pair();
             string token = RingBob(one, two);
             AliceJoins(one, token);
@@ -768,28 +844,30 @@ namespace osWebRtcVoice.Tests
 
             Deliver(one, Craft("decline", Alice, Bob, string.Empty, Session, token, RoomOf(Session), Secret));
 
-            Assert.That(one.Registry.TryGet(Session), Is.Not.Null);
-            Assert.That(one.AgentLists, Is.Empty);
+            Assert.NotNull(one.Registry.TryGet(Session));
+            Assert.Empty(one.AgentLists);
         }
 
         // ---- nothing changes without the cross-process path --------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void InOneProcess_TheCallStillRingsLocally_AndNothingIsCarried()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Node one = MakeNode("Region One", 1000);
             one.Process.AddRoot(Alice);
             one.Process.AddRoot(Bob);
 
             PlaceCall(one);
 
-            Assert.That(one.Process.Queue.Enqueued, Is.EqualTo(new[] { Bob }));
-            Assert.That(one.Process.Transfer.Sent, Is.Empty);
+            Assert.Equal(new[] { Bob }, one.Process.Queue.Enqueued);
+            Assert.Empty(one.Process.Transfer.Sent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void InOneProcess_ADeclineAlsoTellsTheCaller()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Node one = MakeNode("Region One", 1000);
             one.Process.AddRoot(Alice);
             one.Process.AddRoot(Bob);
@@ -798,9 +876,9 @@ namespace osWebRtcVoice.Tests
             Chat(one, Bob, "decline p2p voice", Session);
 
             var (_, to, updates) = one.AgentLists.Single();
-            Assert.That(to, Is.EqualTo(Alice));
-            Assert.That(updates.Single().canVoice, Is.False);
-            Assert.That(one.Process.Transfer.Sent, Is.Empty);
+            Assert.Equal(Alice, to);
+            Assert.False(updates.Single().canVoice);
+            Assert.Empty(one.Process.Transfer.Sent);
         }
 
         // ---- SessionStoreMode grid: the processes share one session service and need no CarrierSecret ----------
@@ -838,47 +916,61 @@ namespace osWebRtcVoice.Tests
             return calls.TryGet(Session, reader);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_ACalleeInAnotherProcess_IsRungWithNoSecret_AndTheCarrierHoldsNoCredential()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
 
             string token = PlaceCall(one);
 
             GridInstantMessage ring = one.Carriers.Single();
             OSDMap payload = PayloadOf(ring);
-            Assert.That(payload["step"].AsString(), Is.EqualTo("ring"));
-            Assert.That(payload["token"].AsString(), Is.Empty, "the credential lives in the session service, not on the wire");
-            Assert.That(payload.ContainsKey(CarrierAuth.AuthKey), Is.False, "no secret, nothing signed");
-            Assert.That(one.Process.Transfer.SentRootOnly.Single(), Is.True);
+            Assert.Equal("ring", payload["step"].AsString());
+            {
+                var assertedValue = payload["token"].AsString();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the credential lives in the session service, not on the wire");
+            }
+            Assert.False(payload.ContainsKey(CarrierAuth.AuthKey), "no secret, nothing signed");
+            Assert.True(one.Process.Transfer.SentRootOnly.Single());
 
             Carry(one, two);
 
             var (name, body, to) = two.Process.Queue.Events.Single();
-            Assert.That(name, Is.EqualTo("ChatterBoxInvitation"));
-            Assert.That(to, Is.EqualTo(Bob));
-            Assert.That(((OSDMap)((OSDMap)body)["voice"])["channel_credentials"].AsString(), Is.EqualTo(token),
-                "the viewer is given the service's credential");
-            Assert.That(two.Process.Transfer.Sent, Is.Empty, "a received ring is never carried on");
+            Assert.Equal("ChatterBoxInvitation", name);
+            Assert.Equal(Bob, to);
+            {
+                var assertedValue = ((OSDMap)((OSDMap)body)["voice"])["channel_credentials"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal(token, assertedValue), "the viewer is given the service's credential");
+            }
+            {
+                var assertedValue = two.Process.Transfer.Sent;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a received ring is never carried on");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_TheCalleeJoinsWithTheServicesCredential_AndBothEndUpInOneRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             string token = RingBob(one, two);
 
             AliceJoins(one, token);
             BobAccepts(two, token);
 
-            Assert.That(one.Voice.Requests.Single()["channel"].AsString(), Is.EqualTo(two.Voice.Requests.Single()["channel"].AsString()));
-            Assert.That(CallIn(one, Alice).State, Is.EqualTo(A2ASessionState.Active), "the one record says so in both processes");
-            Assert.That(CallIn(two, Bob).State, Is.EqualTo(A2ASessionState.Active));
+            Assert.Equal(two.Voice.Requests.Single()["channel"].AsString(), one.Voice.Requests.Single()["channel"].AsString());
+            {
+                var assertedValue = CallIn(one, Alice).State;
+                TestAssert.WithMessage(() => Assert.Equal(A2ASessionState.Active, assertedValue), "the one record says so in both processes");
+            }
+            Assert.Equal(A2ASessionState.Active, CallIn(two, Bob).State);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_WhenTheCalleeJoins_TheCallerIsToldAcrossProcesses_AndTheCarrierHoldsNoCredential()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             string token = RingBob(one, two);
             AliceJoins(one, token);
@@ -886,39 +978,41 @@ namespace osWebRtcVoice.Tests
 
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(carried, Has.Count.EqualTo(1));
-            Assert.That(PayloadOf(carried[0])["step"].AsString(), Is.EqualTo("join"));
-            Assert.That(PayloadOf(carried[0])["token"].AsString(), Is.Empty);
+            Assert.Single(carried);
+            Assert.Equal("join", PayloadOf(carried[0])["step"].AsString());
+            Assert.Empty(PayloadOf(carried[0])["token"].AsString());
             var (session, to, updates) = one.AgentLists.Single();
-            Assert.That(to, Is.EqualTo(Alice));
-            Assert.That(session, Is.EqualTo(Session));
-            Assert.That(updates.Select(u => u.agentID), Is.EquivalentTo(new[] { Bob, Alice }));
-            Assert.That(updates.All(u => u.enterOrLeave && u.canVoice), Is.True);
+            Assert.Equal(Alice, to);
+            Assert.Equal(Session, session);
+            Assert.Equivalent(new[] { Bob, Alice }, updates.Select(u => u.agentID), strict: true);
+            Assert.True(updates.All(u => u.enterOrLeave && u.canVoice));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_WhenTheCalleeDeclines_TheCallerIsToldItCannotVoiceChat_AndTheServiceHoldsNoCall()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             RingBob(one, two);
 
-            Assert.That(Chat(two, Bob, "decline p2p voice", Session).Status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, Chat(two, Bob, "decline p2p voice", Session).Status);
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(carried, Has.Count.EqualTo(1));
-            Assert.That(PayloadOf(carried[0])["step"].AsString(), Is.EqualTo("decline"));
+            Assert.Single(carried);
+            Assert.Equal("decline", PayloadOf(carried[0])["step"].AsString());
             var (session, to, updates) = one.AgentLists.Single();
-            Assert.That(to, Is.EqualTo(Alice));
-            Assert.That(session, Is.EqualTo(Session));
-            Assert.That(updates.Single().agentID, Is.EqualTo(Bob));
-            Assert.That(updates.Single().canVoice, Is.False, "the viewer ends the call on a peer that cannot voice chat");
-            Assert.That(CallIn(one, Alice), Is.Null);
-            Assert.That(CallIn(two, Bob), Is.Null);
+            Assert.Equal(Alice, to);
+            Assert.Equal(Session, session);
+            Assert.Equal(Bob, updates.Single().agentID);
+            Assert.False(updates.Single().canVoice, "the viewer ends the call on a peer that cannot voice chat");
+            Assert.Null(CallIn(one, Alice));
+            Assert.Null(CallIn(two, Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_WhenTheCalleeHangsUp_TheCallerIsToldTheyLeft_AndTheCallStaysForTheCaller()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             string token = RingBob(one, two);
             AliceJoins(one, token);
@@ -929,18 +1023,22 @@ namespace osWebRtcVoice.Tests
             Provision(two, Bob, LogoutBody(bobVs));
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(carried, Has.Count.EqualTo(1));
-            Assert.That(PayloadOf(carried[0])["step"].AsString(), Is.EqualTo("leave"));
+            Assert.Single(carried);
+            Assert.Equal("leave", PayloadOf(carried[0])["step"].AsString());
             var (_, to, updates) = one.AgentLists.Single();
-            Assert.That(to, Is.EqualTo(Alice));
-            Assert.That(updates.Single().agentID, Is.EqualTo(Bob));
-            Assert.That(updates.Single().enterOrLeave, Is.False);
-            Assert.That(CallIn(one, Alice), Is.Not.Null, "the caller is still in the call until it hangs up");
+            Assert.Equal(Alice, to);
+            Assert.Equal(Bob, updates.Single().agentID);
+            Assert.False(updates.Single().enterOrLeave);
+            {
+                var assertedValue = CallIn(one, Alice);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the caller is still in the call until it hangs up");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_WhenBothLeaveInDifferentProcesses_TheServiceHoldsNoLiveCallAtOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             string token = RingBob(one, two);
             string aliceVs = AliceJoins(one, token);
@@ -949,17 +1047,24 @@ namespace osWebRtcVoice.Tests
 
             Provision(one, Alice, LogoutBody(aliceVs));
             Carry(one, two);
-            Assert.That(CallIn(two, Bob), Is.Not.Null, "Bob is still in it");
+            {
+                var assertedValue = CallIn(two, Bob);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "Bob is still in it");
+            }
             Provision(two, Bob, LogoutBody(bobVs));
             Carry(two, one);
 
-            Assert.That(CallIn(one, Alice), Is.Null, "no record waits for the idle sweep");
-            Assert.That(CallIn(two, Bob), Is.Null);
+            {
+                var assertedValue = CallIn(one, Alice);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no record waits for the idle sweep");
+            }
+            Assert.Null(CallIn(two, Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_WhenTheCalleesClientCloses_TheCallerIsToldTheyLeft()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             string token = RingBob(one, two);
             AliceJoins(one, token);
@@ -970,43 +1075,49 @@ namespace osWebRtcVoice.Tests
             Invoke(two.Module, "OnVoiceClientClosed", two.Scene, Bob, two.Scene);
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(PayloadOf(carried.Single())["step"].AsString(), Is.EqualTo("leave"));
-            Assert.That(one.AgentLists.Single().To, Is.EqualTo(Alice));
+            Assert.Equal("leave", PayloadOf(carried.Single())["step"].AsString());
+            Assert.Equal(Alice, one.AgentLists.Single().To);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_TwoPeopleCallingEachOtherAtTheSameMoment_ShareOneCall()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             string aliceToken = PlaceCall(one);
-            Assert.That(Chat(two, Bob, "start p2p voice", Session, Alice).Status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, Chat(two, Bob, "start p2p voice", Session, Alice).Status);
             (int status, OSDMap body) = Chat(two, Bob, "call", Session);
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, status);
             string bobToken = ((OSDMap)body["voice_credentials"])["channel_credentials"].AsString();
 
             Carry(one, two);
 
-            Assert.That(bobToken, Is.EqualTo(aliceToken), "one record, one credential");
+            {
+                var assertedValue = bobToken;
+                TestAssert.WithMessage(() => Assert.Equal(aliceToken, assertedValue), "one record, one credential");
+            }
             AliceJoins(one, aliceToken);
             BobAccepts(two, bobToken);
-            Assert.That(CallIn(one, Alice).State, Is.EqualTo(A2ASessionState.Active));
+            Assert.Equal(A2ASessionState.Active, CallIn(one, Alice).State);
         }
 
         // A carrier is only repeated service state: each of these claims something the service does not say.
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_AForgedRing_ForACallThatDoesNotExist_RingsNobody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two) = GridPair();
 
             Deliver(two, Craft("ring", Bob, Alice, "Test User", Session, string.Empty, RoomOf(Session), secret: null));
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
+            Assert.Empty(two.Process.Queue.Enqueued);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_AReplayedRing_IsRefused_AndRingsOnlyOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             PlaceCall(one);
             GridInstantMessage ring = one.Carriers.Single();
@@ -1014,25 +1125,30 @@ namespace osWebRtcVoice.Tests
             Deliver(two, ring);
             Deliver(two, ring);
 
-            Assert.That(two.Process.Queue.Enqueued, Is.EqualTo(new[] { Bob }));
+            Assert.Equal(new[] { Bob }, two.Process.Queue.Enqueued);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_AForgedDecline_ForACallTheCalleeHasNotDeclined_ChangesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             RingBob(one, two);
             one.AgentLists.Clear();
 
             Deliver(one, Craft("decline", Alice, Bob, string.Empty, Session, string.Empty, RoomOf(Session), secret: null));
 
-            Assert.That(one.AgentLists, Is.Empty, "the viewer would have ended the call");
-            Assert.That(CallIn(one, Alice), Is.Not.Null);
+            {
+                var assertedValue = one.AgentLists;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the viewer would have ended the call");
+            }
+            Assert.NotNull(CallIn(one, Alice));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_AForgedLeave_ForAPartyWhoIsStillSeated_ChangesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             string token = RingBob(one, two);
             AliceJoins(one, token);
@@ -1042,12 +1158,13 @@ namespace osWebRtcVoice.Tests
 
             Deliver(one, Craft("leave", Alice, Bob, string.Empty, Session, string.Empty, RoomOf(Session), secret: null));
 
-            Assert.That(one.AgentLists, Is.Empty);
+            Assert.Empty(one.AgentLists);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_AForgedJoin_ForAPartyWhoHasNotJoined_ChangesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair();
             string token = RingBob(one, two);
             AliceJoins(one, token);
@@ -1055,30 +1172,32 @@ namespace osWebRtcVoice.Tests
 
             Deliver(one, Craft("join", Alice, Bob, string.Empty, Session, string.Empty, RoomOf(Session), secret: null));
 
-            Assert.That(one.AgentLists, Is.Empty);
+            Assert.Empty(one.AgentLists);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_ARegionThatHasASecret_StillRequiresTheSignature()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair(secretTwo: Secret);
             PlaceCall(one);
 
             Carry(one, two);   // the sender has no secret, so its ring is unsigned
 
-            Assert.That(two.Process.Queue.Enqueued, Is.Empty);
+            Assert.Empty(two.Process.Queue.Enqueued);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Grid_ASignedRing_IsAccepted_WhenBothRegionsHaveTheSecret()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two) = GridPair(Secret, Secret);
             PlaceCall(one);
-            Assert.That(PayloadOf(one.Carriers.Single()).ContainsKey(CarrierAuth.AuthKey), Is.True);
+            Assert.True(PayloadOf(one.Carriers.Single()).ContainsKey(CarrierAuth.AuthKey));
 
             Carry(one, two);
 
-            Assert.That(two.Process.Queue.Enqueued, Is.EqualTo(new[] { Bob }));
+            Assert.Equal(new[] { Bob }, two.Process.Queue.Enqueued);
         }
     }
 }

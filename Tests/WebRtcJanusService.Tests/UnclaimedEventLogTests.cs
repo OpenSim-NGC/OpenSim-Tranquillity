@@ -26,10 +26,8 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
-    public class UnclaimedEventLogTests
-    {
+    public class UnclaimedEventLogTests : IAsyncLifetime
+        {
         private const string RoomBroadcast =
             "{\"janus\":\"event\",\"session_id\":4242,\"sender\":7,\"plugindata\":{\"plugin\":\"janus.plugin.audiobridge\"," +
             "\"data\":{\"audiobridge\":\"event\",\"room\":1000,\"participants\":[{\"id\":5,\"display\":\"x\",\"setup\":true,\"muted\":false}]}}}";
@@ -44,22 +42,25 @@ namespace osWebRtcVoice.Tests
 
         private static JanusMessageResp Parse(string json) => JanusMessageResp.FromJson(json);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void U1_ARoomBroadcast_WithNoTransaction_IsDebug()
         {
-            Assert.That(JanusSession.UnclaimedEventLevel(Parse(RoomBroadcast)), Is.EqualTo(LogLevel.Debug));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(LogLevel.Debug, JanusSession.UnclaimedEventLevel(Parse(RoomBroadcast)));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void U2_AReplyNamingATransactionNobodyWaitsFor_StaysError()
         {
-            Assert.That(JanusSession.UnclaimedEventLevel(Parse(LateReply)), Is.EqualTo(LogLevel.Error));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(LogLevel.Error, JanusSession.UnclaimedEventLevel(Parse(LateReply)));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void U3_AnEventReportingAnError_StaysError()
         {
-            Assert.That(JanusSession.UnclaimedEventLevel(Parse(ErrorBroadcast)), Is.EqualTo(LogLevel.Error));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(LogLevel.Error, JanusSession.UnclaimedEventLevel(Parse(ErrorBroadcast)));
         }
 
         // ---- through a real long poll --------------------------------------------------------------------
@@ -109,16 +110,12 @@ namespace osWebRtcVoice.Tests
 
         private Capture _log;
         private LogCapture _logging;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             _logging.Dispose();
             _log.Dispose();
@@ -130,7 +127,7 @@ namespace osWebRtcVoice.Tests
             var session = new JanusSession("http://janus.test/voice", "tok", "http://janus.test/admin", "tok", false, handler);
             try
             {
-                Assert.That(await session.CreateSession(), Is.True);
+                Assert.True(await session.CreateSession());
                 handler.Queue(pEvent);
                 DateTime stop = DateTime.UtcNow.AddSeconds(10);
                 List<(LogLevel Level, string Text)> seen;
@@ -145,22 +142,39 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task U4_ARoomBroadcastThroughALongPoll_IsLoggedAtDebug_NotError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             List<(LogLevel Level, string Text)> seen = await LoggedFor(RoomBroadcast);
 
-            Assert.That(seen, Is.Not.Empty, "the event reached the long poll's handler");
-            Assert.That(seen.Select(l => l.Level), Is.All.EqualTo(LogLevel.Debug));
+            {
+                var assertedValue = seen;
+                TestAssert.WithMessage(() => Assert.NotEmpty(assertedValue), "the event reached the long poll's handler");
+            }
+            Assert.All(seen.Select(l => l.Level), item => Assert.Equal(LogLevel.Debug, item));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task U5_ALateReplyThroughALongPoll_IsStillLoggedAtError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             List<(LogLevel Level, string Text)> seen = await LoggedFor(LateReply);
 
-            Assert.That(seen, Is.Not.Empty);
-            Assert.That(seen.Select(l => l.Level), Is.All.EqualTo(LogLevel.Error));
+            Assert.NotEmpty(seen);
+            Assert.All(seen.Select(l => l.Level), item => Assert.Equal(LogLevel.Error, item));
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

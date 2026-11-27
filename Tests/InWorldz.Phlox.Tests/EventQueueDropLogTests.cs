@@ -12,7 +12,6 @@ using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Framework;
 using Xunit;
-using Xunit.Abstractions;
 using static InWorldz.Phlox.Tests.InventoryGivesRig;
 using Clock = InWorldz.Phlox.Util.Clock;
 

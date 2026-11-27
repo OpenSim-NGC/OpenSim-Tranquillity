@@ -41,7 +41,7 @@ public class LandmarkTeleportTests : OpenSimTestCase
     public void AGoodLandmarkStillTeleports()
     {
         UUID region = UUID.Random();
-        AssetLandmark lm = Request($"Landmark version 2\nregion_id {region}\nlocal_pos 10 20 30\nregion_handle 1099511628032000\n", out bool failed);
+        AssetLandmark? lm = Request($"Landmark version 2\nregion_id {region}\nlocal_pos 10 20 30\nregion_handle 1099511628032000\n", out bool failed);
 
         Assert.False(failed);
         Assert.NotNull(lm);
@@ -58,7 +58,7 @@ public class LandmarkTeleportTests : OpenSimTestCase
     public void AShortLandmarkStillTeleports(string format)
     {
         UUID region = UUID.Random();
-        AssetLandmark lm = Request(string.Format(format, region), out bool failed);
+        AssetLandmark? lm = Request(string.Format(format, region), out bool failed);
 
         Assert.False(failed);
         Assert.NotNull(lm);
@@ -72,14 +72,14 @@ public class LandmarkTeleportTests : OpenSimTestCase
     [InlineData("Landmark version 2\nregion_id 1234\n")]
     public void ALandmarkThatCannotBeReadFailsTheTeleport(string data)
     {
-        AssetLandmark lm = Request(data, out bool failed);
+        AssetLandmark? lm = Request(data, out bool failed);
 
         Assert.Null(lm);
         Assert.True(failed);
     }
 
     /// <summary>Sends a TeleportLandmarkRequest for a landmark asset holding <paramref name="data"/>.</summary>
-    private static AssetLandmark Request(string data, out bool failed)
+    private static AssetLandmark? Request(string data, out bool failed)
     {
         Scene scene = new SceneHelpers().SetupScene();
         TestLLUDPServer udp = ClientStackHelpers.AddUdpServer(scene);
@@ -91,7 +91,7 @@ public class LandmarkTeleportTests : OpenSimTestCase
         {
             Data = Encoding.UTF8.GetBytes(data),
         });
-        AssetLandmark requested = null;
+        AssetLandmark? requested = null;
         client.OnTeleportLandmarkRequest += (c, lm) => requested = lm;
 
         TeleportLandmarkRequestPacket request = new();

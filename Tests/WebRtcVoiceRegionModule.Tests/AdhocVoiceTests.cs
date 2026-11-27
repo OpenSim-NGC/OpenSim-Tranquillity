@@ -29,7 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice;
@@ -38,7 +38,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class AdhocVoiceTests
     {
         private const string Grid = "example-grid";
@@ -89,93 +88,117 @@ namespace osWebRtcVoice.Tests
 
         // ---- 1. "call" ---------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void CallOnAConferenceReturnsCredentialsForTheAdhocRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
 
             bool handled = AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Alice, e, RegionA, true,
                                                                out ChatSessionOutcome o);
 
-            Assert.That(handled, Is.True);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK), o.Instrument);
+            Assert.True(handled);
+            {
+                var assertedValue = o.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.OK, assertedValue), o.Instrument);
+            }
             OSDMap creds = (OSDMap)((OSDMap)o.Body)["voice_credentials"];
-            Assert.That(creds["channel_uri"].AsString(), Is.EqualTo(s.RoomKey));
-            Assert.That(creds["channel_uri"].AsString(), Does.StartWith("nsv1:adhoc:"));
-            Assert.That(creds["channel_credentials"].AsString(), Is.Not.Empty);
-            Assert.That(creds["voice_server_type"].AsString(), Is.EqualTo(A2AInvitation.VoiceServerType));
+            Assert.Equal(s.RoomKey, creds["channel_uri"].AsString());
+            Assert.StartsWith("nsv1:adhoc:", creds["channel_uri"].AsString());
+            Assert.NotEmpty(creds["channel_credentials"].AsString());
+            Assert.Equal(A2AInvitation.VoiceServerType, creds["voice_server_type"].AsString());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallForAConferenceThatDoesNotExistIsNotOurs()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The asymmetry with group, stated as a test. A group "call" creates the voice session; this one
             // must not, because a conference id means nothing until "start conference" minted it.
             NonSpatialVoiceSessionEngine e = Engine();
-            Assert.That(AdhocVoiceChatSession.TryHandleCall(Method("call", UUID.Random()), Alice, e, RegionA, true, out _),
-                        Is.False);
-            Assert.That(e.Store.All(), Is.Empty, "and nothing was created on the way past");
+            Assert.False(AdhocVoiceChatSession.TryHandleCall(Method("call", UUID.Random()), Alice, e, RegionA, true, out _));
+            {
+                var assertedValue = e.Store.All();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "and nothing was created on the way past");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallFromSomeoneNotInTheConferenceIsNotOurs()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
-            Assert.That(AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Dave, e, RegionA, true, out _),
-                        Is.False, "falls through to the A2A arm, which 404s as it always did");
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(1));
+            Assert.False(AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Dave, e, RegionA, true, out _), "falls through to the A2A arm, which 404s as it always did");
+            Assert.Equal(1, e.Store.Get(s.SessionId).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARetriedCallDoesNotTakeASecondSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
             AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Bob, e, RegionA, true, out _);
             AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Bob, e, RegionA, true, out ChatSessionOutcome o);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(2), "Alice plus Bob, once");
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            {
+                var assertedValue = e.Store.Get(s.SessionId).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "Alice plus Bob, once");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheTokenIsStableAcrossCallsSoCredentialsAlreadyIssuedStayValid()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
             AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Alice, e, RegionA, true, out ChatSessionOutcome a);
             AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Bob, e, RegionA, true, out ChatSessionOutcome b);
             string ta = ((OSDMap)((OSDMap)a.Body)["voice_credentials"])["channel_credentials"].AsString();
             string tb = ((OSDMap)((OSDMap)b.Body)["voice_credentials"])["channel_credentials"].AsString();
-            Assert.That(tb, Is.EqualTo(ta), "a re-mint would invalidate credentials already in a viewer's hands");
+            {
+                var assertedValue = tb;
+                TestAssert.WithMessage(() => Assert.Equal(ta, assertedValue), "a re-mint would invalidate credentials already in a viewer's hands");
+            }
         }
 
         // ---- 2. "accept invitation" --------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AcceptingTheInvitationTakesTheSeatAndAnswers200WithNoBody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
 
             bool handled = AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId),
                                                                            Bob, e, RegionB, true, out ChatSessionOutcome o);
 
-            Assert.That(handled, Is.True);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK), o.Instrument);
-            Assert.That(o.Body, Is.Null, "the coroutine reads the status; the channel info came with the ring");
-            Assert.That(e.Store.Get(s.SessionId).Find(Bob).HoldsSeat, Is.True);
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(2));
+            Assert.True(handled);
+            {
+                var assertedValue = o.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.OK, assertedValue), o.Instrument);
+            }
+            {
+                var assertedValue = o.Body;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the coroutine reads the status; the channel info came with the ring");
+            }
+            Assert.True(e.Store.Get(s.SessionId).Find(Bob).HoldsSeat);
+            Assert.Equal(2, e.Store.Get(s.SessionId).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnUninvitedAgentCannotAcceptIntoTheConference()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
-            Assert.That(AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId),
-                                                                        Dave, e, RegionA, true, out _), Is.False);
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(1));
+            Assert.False(AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId),
+                                                                        Dave, e, RegionA, true, out _));
+            Assert.Equal(1, e.Store.Get(s.SessionId).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheAcceptPathAndTheCallPathLandInTheSameRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Three people, two different routes in. If these ever produced different room keys the
             // call would be silently split in the mixer, which is the failure worth a test of its own.
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob, Carol);
@@ -183,63 +206,72 @@ namespace osWebRtcVoice.Tests
             AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId), Carol, e, RegionB, true, out _);
 
             string room = ((OSDMap)((OSDMap)viaCall.Body)["voice_credentials"])["channel_uri"].AsString();
-            Assert.That(room, Is.EqualTo(s.RoomKey));
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(3));
-            Assert.That(e.Store.GetByRoomKey(room).SessionId, Is.EqualTo(s.SessionId));
+            Assert.Equal(s.RoomKey, room);
+            Assert.Equal(3, e.Store.Get(s.SessionId).SeatsHeld);
+            Assert.Equal(s.SessionId, e.Store.GetByRoomKey(room).SessionId);
         }
 
         // ---- 3. the cap --------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheConferenceCapIsFiftyByDefaultAndClampedToTheMixerRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (_, NonSpatialVoiceSession s) = Conference();
-            Assert.That(s.Cap, Is.EqualTo(NonSpatialCaps.DefaultConferenceCap));
-            Assert.That(s.Cap, Is.LessThanOrEqualTo(NonSpatialCaps.MixerRoomCap));
-            Assert.That(NonSpatialCaps.CapsAgree(), Is.True);
+            Assert.Equal(NonSpatialCaps.DefaultConferenceCap, s.Cap);
+            Assert.True(s.Cap <= NonSpatialCaps.MixerRoomCap);
+            Assert.True(NonSpatialCaps.CapsAgree());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheSeatBeyondTheCapIsRefusedWith409NotAQuietFailure()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             // The cap of 2 counts Alice, so a start can ring one person; Carol is invited afterwards, while the room still has a seat.
             SessionOutcome start = e.StartAdhoc(Alice, UUID.Random(), RegionA, new List<UUID> { Bob }, requestedCap: 2);
             UUID sid = start.Session.SessionId;
-            Assert.That(e.Invite(sid, Alice, Carol).Ok, Is.True);
+            Assert.True(e.Invite(sid, Alice, Carol).Ok);
             AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", sid), Bob, e, RegionA, true, out _);
 
             AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", sid), Carol, e, RegionA, true,
                                                             out ChatSessionOutcome o);
-            Assert.That((int)o.Status, Is.EqualTo(NonSpatialCaps.CapacityHttpStatus),
-                        "409 is what the viewer maps to ERROR_CHANNEL_FULL");
-            Assert.That(o.Instrument, Does.Contain(AdhocVoiceChatSession.DecisionFull));
-            Assert.That(e.Store.Get(sid).SeatsHeld, Is.EqualTo(2), "never cap+1");
+            {
+                var assertedValue = (int)o.Status;
+                TestAssert.WithMessage(() => Assert.Equal(NonSpatialCaps.CapacityHttpStatus, assertedValue), "409 is what the viewer maps to ERROR_CHANNEL_FULL");
+            }
+            Assert.Contains(AdhocVoiceChatSession.DecisionFull, o.Instrument);
+            {
+                var assertedValue = e.Store.Get(sid).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "never cap+1");
+            }
         }
 
         // ---- 4. the provision ---------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceProvisionIsRecognisedAsNonSpatialAndAdmitted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
             AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Alice, e, RegionA, true, out ChatSessionOutcome call);
             string token = ((OSDMap)((OSDMap)call.Body)["voice_credentials"])["channel_credentials"].AsString();
 
             OSDMap body = Provision(s.RoomKey, token);
-            Assert.That(NonSpatialProvisionAdmission.IsNonSpatialProvision(body), Is.True);
+            Assert.True(NonSpatialProvisionAdmission.IsNonSpatialProvision(body));
 
             NonSpatialProvisionResult r = NonSpatialProvisionAdmission.Decide(body, Alice, null, e, RegionA,
                                                                               adhocEnabled: true);
-            Assert.That(r.Admitted, Is.True, r.Decision);
-            Assert.That(r.Decision, Is.EqualTo(NonSpatialProvisionAdmission.DecisionAdhocAdmitted));
-            Assert.That(r.Session.Type, Is.EqualTo(NonSpatialSessionType.Adhoc));
-            Assert.That(r.Status, Is.EqualTo(200));
+            Assert.True(r.Admitted, r.Decision);
+            Assert.Equal(NonSpatialProvisionAdmission.DecisionAdhocAdmitted, r.Decision);
+            Assert.Equal(NonSpatialSessionType.Adhoc, r.Session.Type);
+            Assert.Equal(200, r.Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ThisIsTheBugP14cCloses_AConferenceProvisionUsedToBeRefusedAsAMissingGroup()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The gate was always type-blind, so the body reached Decide; Decide then insisted on a
             // Group session. With the ad-hoc arm absent (adhocEnabled false) the old answer is still
             // visible, and it is a refusal.
@@ -249,14 +281,17 @@ namespace osWebRtcVoice.Tests
 
             NonSpatialProvisionResult off = NonSpatialProvisionAdmission.Decide(Provision(s.RoomKey, token), Alice, null, e,
                                                                                 RegionA, adhocEnabled: false);
-            Assert.That(off.Admitted, Is.False);
-            Assert.That(off.Decision, Is.EqualTo(NonSpatialProvisionAdmission.DecisionAdhocDisabled),
-                        "and the refusal now says WHY, instead of claiming the session does not exist");
+            Assert.False(off.Admitted);
+            {
+                var assertedValue = off.Decision;
+                TestAssert.WithMessage(() => Assert.Equal(NonSpatialProvisionAdmission.DecisionAdhocDisabled, assertedValue), "and the refusal now says WHY, instead of claiming the session does not exist");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AProvisionFromSomeoneNeverInvitedIsRefusedBeforeTheTokenIsEvenChecked()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The token is one string shared by everyone in the conference, so it cannot be the only
             // thing standing here -- exactly the reasoning the group arm uses for powers.
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
@@ -265,24 +300,26 @@ namespace osWebRtcVoice.Tests
 
             NonSpatialProvisionResult r = NonSpatialProvisionAdmission.Decide(Provision(s.RoomKey, leaked), Dave, null, e,
                                                                               RegionA, adhocEnabled: true);
-            Assert.That(r.Admitted, Is.False);
-            Assert.That(r.Decision, Is.EqualTo(NonSpatialProvisionAdmission.DecisionAdhocNotMember));
+            Assert.False(r.Admitted);
+            Assert.Equal(NonSpatialProvisionAdmission.DecisionAdhocNotMember, r.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AProvisionWithTheWrongTokenIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
             AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Alice, e, RegionA, true, out _);
             NonSpatialProvisionResult r = NonSpatialProvisionAdmission.Decide(Provision(s.RoomKey, "not-the-token"), Alice,
                                                                               null, e, RegionA, adhocEnabled: true);
-            Assert.That(r.Admitted, Is.False);
-            Assert.That(r.Decision, Is.EqualTo(NonSpatialProvisionAdmission.DecisionAdhocBadToken));
+            Assert.False(r.Admitted);
+            Assert.Equal(NonSpatialProvisionAdmission.DecisionAdhocBadToken, r.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupProvisionIsUnaffectedByTheAdhocArm()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // 's path has to stay exactly as it was: same admission, same words.
             NonSpatialVoiceSessionEngine e = Engine();
             UUID grp = UUID.Random();
@@ -299,132 +336,145 @@ namespace osWebRtcVoice.Tests
 
             NonSpatialProvisionResult r = NonSpatialProvisionAdmission.Decide(Provision(g.RoomKey, token), Alice, policy, e,
                                                                               RegionA, adhocEnabled: true);
-            Assert.That(r.Admitted, Is.True, r.Decision);
-            Assert.That(r.Decision, Is.EqualTo(NonSpatialProvisionAdmission.DecisionAdmitted),
-                        "the group word, not the ad-hoc one");
+            Assert.True(r.Admitted, r.Decision);
+            {
+                var assertedValue = r.Decision;
+                TestAssert.WithMessage(() => Assert.Equal(NonSpatialProvisionAdmission.DecisionAdmitted, assertedValue), "the group word, not the ad-hoc one");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnA2AProvisionIsStillNotANonSpatialOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap a2a = Provision(UUID.Random().ToString(), "tok");
-            Assert.That(NonSpatialProvisionAdmission.IsNonSpatialProvision(a2a), Is.False,
-                        "a bare UUID channel is an A2A room and must never reach this arm");
+            Assert.False(NonSpatialProvisionAdmission.IsNonSpatialProvision(a2a), "a bare UUID channel is an A2A room and must never reach this arm");
         }
 
         // ---- 5. seat and teardown -------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheProvisionTagsTheSeatWithTheViewerSessionSoTheLogoutCanFindIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
             AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId), Bob, e, RegionB, true, out _);
             e.MarkPresent(s.SessionId, Bob, RegionB, "vs-bob");
 
             IReadOnlyList<NonSpatialVoiceSession> gone = e.DepartByViewerSession(Bob, "vs-bob", DepartureReason.VoiceTeardown);
-            Assert.That(gone.Select(x => x.SessionId), Is.EquivalentTo(new[] { s.SessionId }));
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(1), "Bob's seat, and only Bob's");
-            Assert.That(e.Store.Get(s.SessionId).Find(Alice).HoldsSeat, Is.True);
+            Assert.Equivalent(new[] { s.SessionId }, gone.Select(x => x.SessionId), strict: true);
+            {
+                var assertedValue = e.Store.Get(s.SessionId).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "Bob's seat, and only Bob's");
+            }
+            Assert.True(e.Store.Get(s.SessionId).Find(Alice).HoldsSeat);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void HangingUpReleasesExactlyOneSeatAndAnotherViewerSessionIsUntouched()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob, Carol);
             AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId), Bob, e, RegionA, true, out _);
             AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId), Carol, e, RegionB, true, out _);
             e.MarkPresent(s.SessionId, Bob, RegionA, "vs-bob");
             e.MarkPresent(s.SessionId, Carol, RegionB, "vs-carol");
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(3));
+            Assert.Equal(3, e.Store.Get(s.SessionId).SeatsHeld);
 
             e.DepartByViewerSession(Bob, "vs-bob", DepartureReason.VoiceTeardown);
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(2));
-            Assert.That(e.Store.Get(s.SessionId).Find(Carol).HoldsSeat, Is.True);
+            Assert.Equal(2, e.Store.Get(s.SessionId).SeatsHeld);
+            Assert.True(e.Store.Get(s.SessionId).Find(Carol).HoldsSeat);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void APresenceCloseReleasesTheConferenceSeatToo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
             AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId), Bob, e, RegionA, true, out _);
             e.DepartAll(Bob, DepartureReason.PresenceLost);
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(1));
+            Assert.Equal(1, e.Store.Get(s.SessionId).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheLastSeatGoesTheRingCycleEndsSoTheConferenceCanRingAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
             e.MarkInvited(s.SessionId, new[] { Bob });
             e.Depart(s.SessionId, Alice, DepartureReason.VoiceTeardown);
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(0));
-            Assert.That(e.Store.Get(s.SessionId).RingSent, Is.False);
-            Assert.That(e.Store.Get(s.SessionId).WasInvited(Bob), Is.False);
+            Assert.Equal(0, e.Store.Get(s.SessionId).SeatsHeld);
+            Assert.False(e.Store.Get(s.SessionId).RingSent);
+            Assert.False(e.Store.Get(s.SessionId).WasInvited(Bob));
         }
 
         // ---- 6. the arms take only what is theirs -----------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void NeitherArmTakesAnythingWhenAdhocVoiceIsDisabled()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
-            Assert.That(AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Alice, e, RegionA, false, out _),
-                        Is.False);
-            Assert.That(AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId), Bob, e,
-                                                                        RegionA, false, out _), Is.False);
-            Assert.That(e.Store.Get(s.SessionId).SeatsHeld, Is.EqualTo(1), "and no seat was taken on the way past");
+            Assert.False(AdhocVoiceChatSession.TryHandleCall(Method("call", s.SessionId), Alice, e, RegionA, false, out _));
+            Assert.False(AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", s.SessionId), Bob, e,
+                                                                        RegionA, false, out _));
+            {
+                var assertedValue = e.Store.Get(s.SessionId).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "and no seat was taken on the way past");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void NeitherArmTouchesAGroupSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The discriminators are disjoint by construction, not by the order the module tries them.
             NonSpatialVoiceSessionEngine e = Engine();
             UUID grp = UUID.Random();
             e.Start(NonSpatialSessionType.Group, Alice, grp, grp, RegionA);
-            Assert.That(AdhocVoiceChatSession.TryHandleCall(Method("call", grp), Alice, e, RegionA, true, out _), Is.False);
-            Assert.That(AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", grp), Alice, e,
-                                                                        RegionA, true, out _), Is.False);
+            Assert.False(AdhocVoiceChatSession.TryHandleCall(Method("call", grp), Alice, e, RegionA, true, out _));
+            Assert.False(AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", grp), Alice, e,
+                                                                        RegionA, true, out _));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlyTheirOwnMethodsAreTaken()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (NonSpatialVoiceSessionEngine e, NonSpatialVoiceSession s) = Conference(Bob);
             foreach (string m in new[] { "start p2p voice", "decline p2p voice", "fetch history", "mute update",
                                          "session update", "start conference", "invite", "decline invitation" })
             {
-                Assert.That(AdhocVoiceChatSession.TryHandleCall(Method(m, s.SessionId), Alice, e, RegionA, true, out _),
-                            Is.False, m);
-                Assert.That(AdhocVoiceChatSession.TryHandleAcceptInvitation(Method(m, s.SessionId), Bob, e, RegionA, true,
-                                                                            out _), Is.False, m);
+                Assert.False(AdhocVoiceChatSession.TryHandleCall(Method(m, s.SessionId), Alice, e, RegionA, true, out _), m);
+                Assert.False(AdhocVoiceChatSession.TryHandleAcceptInvitation(Method(m, s.SessionId), Bob, e, RegionA, true, out _), m);
             }
         }
 
         // ---- 7. end to end ----------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ThreeWayConference_StartRingCallAcceptProvisionHangUp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The whole flow in one pass, in the order a viewer actually produces it.
             NonSpatialVoiceSessionEngine e = Engine();
 
             // Alice starts a conference with Bob and Carol; the re-key reply carries both ids.
             AdhocVoiceChatSession.TryHandleStartConference(StartBody(UUID.Random(), Bob, Carol), Alice, e, RegionA, true,
                                                            out ChatSessionOutcome start);
-            Assert.That(start.StartedRinging, Is.True, "the creator's own seat is the 0 -> 1 transition");
+            Assert.True(start.StartedRinging, "the creator's own seat is the 0 -> 1 transition");
             UUID sid = start.Reply.SessionId;
             NonSpatialVoiceSession s = e.Store.Get(sid);
 
             // Both invitees are ring targets; the initiator is not.
-            Assert.That(AdhocVoiceInvite.Targets(s, Alice), Is.EquivalentTo(new[] { Bob, Carol }));
+            Assert.Equivalent(new[] { Bob, Carol }, AdhocVoiceInvite.Targets(s, Alice), strict: true);
             e.MarkInvited(sid, new[] { Bob, Carol });
 
             // Alice's queued call arrives and gets the room; Bob and Carol accept their popups.
             AdhocVoiceChatSession.TryHandleCall(Method("call", sid), Alice, e, RegionA, true, out ChatSessionOutcome call);
             AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", sid), Bob, e, RegionA, true, out _);
             AdhocVoiceChatSession.TryHandleAcceptInvitation(Method("accept invitation", sid), Carol, e, RegionB, true, out _);
-            Assert.That(e.Store.Get(sid).SeatsHeld, Is.EqualTo(3));
+            Assert.Equal(3, e.Store.Get(sid).SeatsHeld);
 
             // All three provision into the SAME room and are admitted.
             string token = ((OSDMap)((OSDMap)call.Body)["voice_credentials"])["channel_credentials"].AsString();
@@ -432,21 +482,27 @@ namespace osWebRtcVoice.Tests
             {
                 NonSpatialProvisionResult r = NonSpatialProvisionAdmission.Decide(Provision(s.RoomKey, token, vs), who, null,
                                                                                    e, where, adhocEnabled: true);
-                Assert.That(r.Admitted, Is.True, $"{who}: {r.Decision}");
-                Assert.That(r.Session.SessionId, Is.EqualTo(sid), "one conference, one room");
+                Assert.True(r.Admitted, $"{who}: {r.Decision}");
+                {
+                    var assertedValue = r.Session.SessionId;
+                    TestAssert.WithMessage(() => Assert.Equal(sid, assertedValue), "one conference, one room");
+                }
                 e.MarkPresent(sid, who, where, vs);
             }
-            Assert.That(e.Store.Get(sid).SeatsHeld, Is.EqualTo(3), "three provisions, three seats, not six");
+            {
+                var assertedValue = e.Store.Get(sid).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "three provisions, three seats, not six");
+            }
 
             // Carol hangs up: exactly her seat goes.
             e.DepartByViewerSession(Carol, "vs-c", DepartureReason.VoiceTeardown);
-            Assert.That(e.Store.Get(sid).SeatsHeld, Is.EqualTo(2));
+            Assert.Equal(2, e.Store.Get(sid).SeatsHeld);
 
             // Everyone else leaves; the room is empty and the ring cycle is reset.
             e.DepartByViewerSession(Alice, "vs-a", DepartureReason.VoiceTeardown);
             e.DepartByViewerSession(Bob, "vs-b", DepartureReason.VoiceTeardown);
-            Assert.That(e.Store.Get(sid).SeatsHeld, Is.EqualTo(0));
-            Assert.That(e.Store.Get(sid).RingSent, Is.False);
+            Assert.Equal(0, e.Store.Get(sid).SeatsHeld);
+            Assert.False(e.Store.Get(sid).RingSent);
         }
     }
 }

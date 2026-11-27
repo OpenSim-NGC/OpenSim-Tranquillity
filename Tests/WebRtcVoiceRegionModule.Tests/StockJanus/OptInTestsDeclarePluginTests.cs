@@ -13,33 +13,42 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using NUnit.Framework;
-using NUnit.Framework.Internal;
+using Xunit;
 using osWebRtcVoice.Tests.StockJanus;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class OptInTestsDeclarePluginTests
     {
         private static IEnumerable<MethodInfo> OptInTests()
             => typeof(OptInTestsDeclarePluginTests).Assembly.GetTypes()
-                .Where(t => t.Name.StartsWith("StockJanus", StringComparison.Ordinal) && t.GetCustomAttributes<TestFixtureAttribute>().Any())
+                .Where(t => t.Name.StartsWith("StockJanus", StringComparison.Ordinal))
                 .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance))
-                .Where(m => m.GetCustomAttributes<TestAttribute>().Any());
+                .Where(m => m.GetCustomAttributes<FactAttribute>().Any());
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EveryOptInTestDeclaresThePluginItNeeds()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             List<string> bare = OptInTests()
                 .Where(m => m.GetCustomAttribute<NeedsPluginAttribute>() is null && m.DeclaringType.GetCustomAttribute<NeedsPluginAttribute>() is null)
                 .Select(m => m.DeclaringType.Name + "." + m.Name).ToList();
 
-            Assert.That(OptInTests().Count(), Is.GreaterThan(20), "the scan found the opt-in tests");
-            Assert.That(bare, Is.Empty, "declare [NeedsPlugin(...)] on these opt-in tests");
+            Assert.True(OptInTests().Count() > 20, "the scan found the opt-in tests");
+            {
+                var assertedValue = bare;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "declare [NeedsPlugin(...)] on these opt-in tests");
+            }
         }
 
-        private static Test Skipped(JanusPluginKind needs, string url, string plugin)
+        private static string SkipReason(JanusPluginKind needs, string url, string plugin)
+        {
+            string reason = null;
+            WithGateway(url, plugin, () => reason = new NeedsPluginAttribute(needs).GetSkipReason());
+            return reason;
+        }
+
+        private static void WithGateway(string url, string plugin, Action action)
         {
             string oldUrl = Environment.GetEnvironmentVariable(StockJanusEnvironment.UrlVariable);
             string oldPlugin = Environment.GetEnvironmentVariable("WEBRTC_JANUS_TEST_PLUGIN");
@@ -47,9 +56,7 @@ namespace osWebRtcVoice.Tests
             {
                 Environment.SetEnvironmentVariable(StockJanusEnvironment.UrlVariable, url);
                 Environment.SetEnvironmentVariable("WEBRTC_JANUS_TEST_PLUGIN", plugin);
-                Test test = new TestMethod(new MethodWrapperFor(typeof(OptInTestsDeclarePluginTests), nameof(EveryOptInTestDeclaresThePluginItNeeds)));
-                new NeedsPluginAttribute(needs).ApplyToTest(test);
-                return test;
+                action();
             }
             finally
             {
@@ -58,33 +65,47 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        // A MethodInfo wrapper NUnit's TestMethod accepts, for building a Test to apply the attribute to.
-        private sealed class MethodWrapperFor : NUnit.Framework.Internal.MethodWrapper
+        [Theory(Timeout = 60000)]
+        [InlineData(JanusPluginKind.Stock, "janus.plugin.slvoice")]
+        [InlineData(JanusPluginKind.Mixer, "janus.plugin.audiobridge")]
+        public void GatewaySkipReason_WithAnotherPlugin_RefusesFixtureSetup(JanusPluginKind needs, string plugin)
         {
-            public MethodWrapperFor(Type type, string name) : base(type, type.GetMethod(name)) { }
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            WithGateway("http://localhost:1/janus", plugin, () =>
+            {
+                string reason = StockJanusEnvironment.GetConfigurationSkipReason(needs);
+                Assert.NotNull(reason);
+                Assert.Contains(plugin, reason);
+            });
         }
 
-        [TestCase(JanusPluginKind.Stock, "janus.plugin.audiobridge", false)]
-        [TestCase(JanusPluginKind.Stock, "janus.plugin.slvoice", true)]
-        [TestCase(JanusPluginKind.Mixer, "janus.plugin.slvoice", false)]
-        [TestCase(JanusPluginKind.Mixer, "janus.plugin.audiobridge", true)]
-        [TestCase(JanusPluginKind.Any, "janus.plugin.audiobridge", false)]
-        [TestCase(JanusPluginKind.Any, "janus.plugin.slvoice", false)]
+        [InlineData(JanusPluginKind.Stock,"janus.plugin.audiobridge",false)]
+        [InlineData(JanusPluginKind.Stock,"janus.plugin.slvoice",true)]
+        [InlineData(JanusPluginKind.Mixer,"janus.plugin.slvoice",false)]
+        [InlineData(JanusPluginKind.Mixer,"janus.plugin.audiobridge",true)]
+        [InlineData(JanusPluginKind.Any,"janus.plugin.audiobridge",false)]
+        [InlineData(JanusPluginKind.Any,"janus.plugin.slvoice",false)]
+        [Theory(Timeout = 60000)]
         public void AStockOnlyTestSkipsOnTheMixer_AMixerOnlyTestSkipsOnTheStockPlugin_AndTheReasonSaysWhy(JanusPluginKind needs, string plugin, bool skipped)
         {
-            Test t = Skipped(needs, "http://localhost:1/janus", plugin);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            string reason = SkipReason(needs, "http://localhost:1/janus", plugin);
 
-            Assert.That(t.RunState == NUnit.Framework.Interfaces.RunState.Ignored, Is.EqualTo(skipped));
+            Assert.Equal(skipped, reason is not null);
             if (skipped)
-                Assert.That((string)t.Properties.Get(PropertyNames.SkipReason), Does.Contain("needs the").And.Contain(plugin));
+            {
+                Assert.Contains("needs the", reason);
+                Assert.Contains(plugin, reason);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WithNoGatewayNamed_TheAttributeDoesNothing_AndTheFixturesOwnOptInSkipApplies()
         {
-            Test t = Skipped(JanusPluginKind.Mixer, null, "janus.plugin.audiobridge");
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            string reason = SkipReason(JanusPluginKind.Mixer, null, "janus.plugin.audiobridge");
 
-            Assert.That(t.RunState, Is.Not.EqualTo(NUnit.Framework.Interfaces.RunState.Ignored));
+            Assert.Null(reason);
         }
     }
 }
