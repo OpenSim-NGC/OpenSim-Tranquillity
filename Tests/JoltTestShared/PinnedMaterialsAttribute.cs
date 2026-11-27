@@ -7,7 +7,7 @@
 
 using System.Reflection;
 using OpenSim.Region.PhysicsModules.Jolt.Harness;
-using Xunit.Sdk;
+using Xunit.v3;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -24,13 +24,13 @@ public sealed class PinnedMaterialsAttribute : BeforeAfterTestAttribute
     /// <summary>The <c>BasicForcesBehaviour</c> the class's runs take (SecondLife or InWorldz); null leaves the shipped default.</summary>
     public string BasicForces { get; set; }
 
-    public override void Before(MethodInfo methodUnderTest)
+    public override void Before(MethodInfo methodUnderTest, IXunitTest test)
     {
         MaterialPins.Enabled = true;
         MaterialPins.BasicForces ??= BasicForces;
     }
 
-    public override void After(MethodInfo methodUnderTest)
+    public override void After(MethodInfo methodUnderTest, IXunitTest test)
     {
         MaterialPins.Enabled = false;
         MaterialPins.BasicForces = null;

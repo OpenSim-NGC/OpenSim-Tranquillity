@@ -16,13 +16,12 @@
  */
 using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialIdentityTests
     {
         internal static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
@@ -61,132 +60,152 @@ namespace osWebRtcVoice.Tests
 
         // ---- the two ids -------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void P2P_SessionId_IsTheViewerXor_AndNeedsNoRekey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             UUID viewerId = NonSpatialVoiceSessionEngine.DeriveSessionId(NonSpatialSessionType.P2P, Alice, Bob);
 
             SessionOutcome o = e.Start(NonSpatialSessionType.P2P, Alice, Bob, viewerId, RegionA);
 
-            Assert.That(o.Ok, Is.True, o.Decision);
-            Assert.That(o.Session.SessionId, Is.EqualTo(viewerId));
-            Assert.That(o.Session.TempSessionId, Is.EqualTo(viewerId));
-            Assert.That(o.Session.RequiresRekey, Is.False, "p2p ids already agree, so the start reply is a no-op re-key");
+            Assert.True(o.Ok, o.Decision);
+            Assert.Equal(viewerId, o.Session.SessionId);
+            Assert.Equal(viewerId, o.Session.TempSessionId);
+            Assert.False(o.Session.RequiresRekey, "p2p ids already agree, so the start reply is a no-op re-key");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void P2P_SessionId_IsSymmetric_SoEitherPartyDerivesTheSame()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID ab = NonSpatialVoiceSessionEngine.DeriveSessionId(NonSpatialSessionType.P2P, Alice, Bob);
             UUID ba = NonSpatialVoiceSessionEngine.DeriveSessionId(NonSpatialSessionType.P2P, Bob, Alice);
-            Assert.That(ab, Is.EqualTo(ba));
+            Assert.Equal(ba, ab);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Group_SessionId_IsTheGroupId_AndNeedsNoRekey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             SessionOutcome o = e.Start(NonSpatialSessionType.Group, Alice, Group, Group, RegionA);
 
-            Assert.That(o.Ok, Is.True, o.Decision);
-            Assert.That(o.Session.SessionId, Is.EqualTo(Group), "the viewer slams session_id to the group id");
-            Assert.That(o.Session.Owner, Is.EqualTo(Group));
-            Assert.That(o.Session.RequiresRekey, Is.False);
+            Assert.True(o.Ok, o.Decision);
+            {
+                var assertedValue = o.Session.SessionId;
+                TestAssert.WithMessage(() => Assert.Equal(Group, assertedValue), "the viewer slams session_id to the group id");
+            }
+            Assert.Equal(Group, o.Session.Owner);
+            Assert.False(o.Session.RequiresRekey);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Adhoc_SessionId_IsServerOwned_AndForcesARekey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             UUID viewerTemp = UUID.Random();          // llimview.cpp:2542, session_id.generate()
 
             SessionOutcome o = e.StartAdhoc(Alice, viewerTemp, RegionA);
 
-            Assert.That(o.Ok, Is.True, o.Decision);
-            Assert.That(o.Session.TempSessionId, Is.EqualTo(viewerTemp), "the reply must echo what the viewer is waiting on");
-            Assert.That(o.Session.SessionId, Is.Not.EqualTo(viewerTemp), "the server owns the authoritative id");
-            Assert.That(o.Session.RequiresRekey, Is.True, "this is the case the ChatterBoxSessionStartReply exists for");
+            Assert.True(o.Ok, o.Decision);
+            {
+                var assertedValue = o.Session.TempSessionId;
+                TestAssert.WithMessage(() => Assert.Equal(viewerTemp, assertedValue), "the reply must echo what the viewer is waiting on");
+            }
+            {
+                var assertedValue = o.Session.SessionId;
+                TestAssert.WithMessage(() => Assert.NotEqual(viewerTemp, assertedValue), "the server owns the authoritative id");
+            }
+            Assert.True(o.Session.RequiresRekey, "this is the case the ChatterBoxSessionStartReply exists for");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Start_RejectsAdhoc_BecauseItsIdIsKeyedOnTheViewersTempId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             Assert.Throws<ArgumentException>(() => e.Start(NonSpatialSessionType.Adhoc, Alice, Bob, UUID.Random(), RegionA));
         }
 
         // ---- pluggable admission ------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Group_Admission_RefusesANonMember()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine(isMember: (a, g) => a != Carol);
             SessionOutcome start = e.Start(NonSpatialSessionType.Group, Alice, Group, Group, RegionA);
-            Assert.That(start.Ok, Is.True);
+            Assert.True(start.Ok);
 
             SessionOutcome join = e.Accept(start.Session.SessionId, Carol, RegionA);
 
-            Assert.That(join.Ok, Is.False);
-            Assert.That(join.Decision, Is.EqualTo(AdmissionVerdict.NotAMember));
+            Assert.False(join.Ok);
+            Assert.Equal(AdmissionVerdict.NotAMember, join.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Group_Admission_RefusesAMemberWithoutTheJoinPower()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // GP_SESSION_JOIN, roles_constants.h:144 -- the power the viewer gates its own button on.
             NonSpatialVoiceSessionEngine e = NewEngine(hasPower: (a, g) => a != Carol);
             SessionOutcome start = e.Start(NonSpatialSessionType.Group, Alice, Group, Group, RegionA);
 
             SessionOutcome join = e.Accept(start.Session.SessionId, Carol, RegionA);
 
-            Assert.That(join.Ok, Is.False);
-            Assert.That(join.Decision, Is.EqualTo(AdmissionVerdict.NoPower));
+            Assert.False(join.Ok);
+            Assert.Equal(AdmissionVerdict.NoPower, join.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void P2P_IsNeverWidened_ByAnInvite()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             SessionOutcome start = e.Start(NonSpatialSessionType.P2P, Alice, Bob, UUID.Zero, RegionA);
 
             SessionOutcome invite = e.Invite(start.Session.SessionId, Alice, Carol);
 
-            Assert.That(invite.Ok, Is.False);
-            Assert.That(invite.Decision, Is.EqualTo(AdmissionVerdict.WrongType));
+            Assert.False(invite.Ok);
+            Assert.Equal(AdmissionVerdict.WrongType, invite.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Adhoc_OnlyAnInvitedAgentMayTakeASeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             SessionOutcome start = e.StartAdhoc(Alice, UUID.Random(), RegionA);
 
             SessionOutcome uninvited = e.Accept(start.Session.SessionId, Carol, RegionA);
-            Assert.That(uninvited.Ok, Is.False, "knowing the session is not the same as being in it");
-            Assert.That(uninvited.Decision, Is.EqualTo(AdmissionVerdict.NotAMember));
+            Assert.False(uninvited.Ok, "knowing the session is not the same as being in it");
+            Assert.Equal(AdmissionVerdict.NotAMember, uninvited.Decision);
 
-            Assert.That(e.Invite(start.Session.SessionId, Alice, Carol).Ok, Is.True);
-            Assert.That(e.Accept(start.Session.SessionId, Carol, RegionA).Ok, Is.True);
+            Assert.True(e.Invite(start.Session.SessionId, Alice, Carol).Ok);
+            Assert.True(e.Accept(start.Session.SessionId, Carol, RegionA).Ok);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Adhoc_AnySeatedMemberMayInvite_ButAnInviteeMayNot()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             SessionOutcome s = e.StartAdhoc(Alice, UUID.Random(), RegionA);
             UUID id = s.Session.SessionId;
 
             e.Invite(id, Alice, Bob);
-            Assert.That(e.Invite(id, Bob, Carol).Ok, Is.False, "invited-but-not-seated may not invite");
+            Assert.False(e.Invite(id, Bob, Carol).Ok, "invited-but-not-seated may not invite");
 
             e.Accept(id, Bob, RegionA);
-            Assert.That(e.Invite(id, Bob, Carol).Ok, Is.True, "a seated member may");
+            Assert.True(e.Invite(id, Bob, Carol).Ok, "a seated member may");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Engine_ThrowsIfATypeHasNoAdmissionPolicy()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = new NonSpatialVoiceSessionEngine(
                 new InMemoryNonSpatialSessionStore(), new INonSpatialAdmission[] { new P2PAdmission() }, "g");
             Assert.Throws<InvalidOperationException>(() => e.StartAdhoc(Alice, UUID.Random(), RegionA));

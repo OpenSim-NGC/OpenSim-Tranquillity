@@ -3,9 +3,89 @@
 How to run Tranquillity's tests, where new tests go, and what each kind of test can and cannot prove. For build
 instructions see [BUILDING.md](BUILDING.md); for how CI judges a run see [Tests/README-CI.md](../Tests/README-CI.md).
 
+All test projects in `Tranquillity.sln` now use **xUnit.net v3**, with no NUnit dependencies.
+Excluded legacy projects in [Tests/](../Tests/) still contain NUnit tests and have not been converted.
+`dotnet test` uses **VSTest**. The xUnit projects are executables, but
+set `IsTestingPlatformApplication` to `false` so the .NET 10 SDK retains the existing VSTest workflow.
+Do not switch `global.json` to MTP without updating the CI runner and its reporting arguments.
+
+## Running Tests
+
+From the repository root, use VSTest arguments directly with `dotnet test`:
+
+* **Run all tests in this directory:**
+  ```bash
+  dotnet test Tranquillity.sln -c Debug
+  ```
+* **Run a single test class:**
+  ```bash
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug \
+      --filter "FullyQualifiedName~YourNamespace.YourTestClass"
+  ```
+* **Run a single test method (supports `*` wildcards at start/end):**
+  ```bash
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug \
+      --filter "FullyQualifiedName~MethodName"
+  ```
+* **Filter by namespace:**
+  ```bash
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug \
+      --filter "FullyQualifiedName~YourNamespace.SubNamespace"
+  ```
+* **Filter by trait (replaces `TestCategory`):**
+  ```bash
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug --filter "Category=Unit"
+  ```
+* **Exclude traits (e.g., skipping slow or integration tests):**
+  ```bash
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug --filter "Category!=Integration"
+  ```
+* **List all discovered tests without executing them:**
+  ```bash
+  dotnet test Tests/OpenSim.Region.CoreModules.Tests -c Debug --list-tests
+  ```
+
+Combine VSTest filters with `|` (OR) or `&` (AND). xUnit
+`[Trait("Category", "...")]` uses `Category`. Use `--logger trx` to record results.
+
+The xUnit executable can also be run directly with its native runner, for example
+`dotnet run --project Tests/OpenSim.Tests.Common -- -class OpenSim.Tests.Common.OpenSimTestCaseLifecycleTests`.
+Native runner arguments differ from VSTest arguments; use `-?` for help.
+
+## xUnit v3 Architecture & Conventions
+
+* **Standalone Executable Model:** xUnit projects use `<OutputType>Exe</OutputType>` and reference `xunit.v3` (not `xunit` v2), `Microsoft.NET.Test.Sdk` and `xunit.runner.visualstudio`.
+* **Async Lifecycle (`IAsyncLifetime`):** In xUnit v3, `IAsyncLifetime.InitializeAsync()` and `DisposeAsync()` return `ValueTask` instead of `Task`. When a fixture implements both async and synchronous disposal, v3 only calls `DisposeAsync()`. `OpenSimTestCase` forwards this to its virtual `Dispose()` so existing teardown overrides still run.
+* **Output and extension APIs:** `ITestOutputHelper` is in `Xunit`, not `Xunit.Abstractions`. `BeforeAfterTestAttribute` is in `Xunit.v3` and receives both the method and `IXunitTest`.
+* **Async Assertions:** Prefer native async assertions (`Assert.ThrowsAsync<T>`, `Assert.RaisesAsync`) and avoid `.Result` or `.Wait()` on tasks to prevent thread-pool starvation.
+* **Test Context & Cancellation:** Use `TestContext.Current.CancellationToken` when calling async APIs inside tests instead of `CancellationToken.None`.
+* **Console & Output Capture:** Use `ITestOutputHelper` injected via constructor, or `TestContext.Current.TestOutputHelper`, rather than `Console.WriteLine`.
+* **Theory Data:** Prefer strongly typed `TheoryData<T1, T2, ...>` over `IEnumerable<object[]>` for `[MemberData]` and `[ClassData]` sources to preserve compile-time type safety.
+* **Voice fixtures:** The voice suites run serially, install their shared logging router through an assembly fixture, and retain opt-in gateway guards. Gateway clients and owned position-feed HTTP resources use class fixtures. Facts and theories retain their timeout limits and participate in test cancellation. Repeated race checks use theory data, so every repetition is reported separately.
+
+## Structure & Naming
+
+* **Project Mirroring:** Each `Source/<ProjectName>` project should map to `Tests/<ProjectName>.Tests`.
+* **File & Class Naming:** Mirror the production folder structure. Name test classes `<TargetClassName>Tests.cs`.
+* **Method Naming:** Use `MethodName_StateUnderTest_ExpectedBehavior` or clear descriptive names with `[Fact(DisplayName = "...")]` when appropriate.
+* **AAA Pattern:** Organize every test body clearly into **Arrange**, **Act**, and **Assert** blocks separated by a blank line.
+
+## Boundaries & Guardrails
+
+* **Always:**
+  * Run the affected test class or project before marking a task complete.
+  * Keep unit tests isolated from network, filesystem, and system clock dependencies unless explicitly tagged with `[Trait("Category", "Integration")]`.
+* **Never:**
+  * Install `xunit` (v2), `xunit.runner.visualstudio` (v2), or mix v2 and v3 packages in the same project.
+  * Disable or `[Fact(Skip = "...")]` failing tests to make the suite pass without explicit instruction.
+
+
 ## Running tests
 
 Use the .NET SDK selected by `global.json`. From the repository root:
+
+Release treats warnings as errors. Until the remaining warning backlog is resolved, use `-c Debug`
+for validation; see [WarningCleanup.md](WarningCleanup.md) for the current build baseline.
 
 ```sh
 dotnet build Tranquillity.sln -c Release
@@ -31,10 +111,7 @@ them.
 - Tests live in `Tests/`, never in production assemblies. A project is tested by `Tests/<Project>.Tests`, for
   example `Source/OpenSim.Region.CoreModules` by `Tests/OpenSim.Region.CoreModules.Tests`. Inside it, follow the
   folder of the code under test.
-- Use the framework the project already uses. Most test projects use **xUnit**. These use **NUnit**:
-  `OpenSim.Region.ClientStack.LindenCaps.AIS.Tests`, `OpenSim.Framework.Servers.Tests`,
-  `OpenSim.Server.Handlers.Tests` (which also has xUnit tests), `OpenSim.Tests.Clients.AssetClient`,
-  `WebRtcJanusService.Tests` and `WebRtcVoiceRegionModule.Tests`.
+- Use **xUnit v3** for projects in the solution. Excluded legacy NUnit projects remain outside this migration.
 - A new test project must be added to `Tranquillity.sln`, or CI will not run it.
 
 ## Writing a test

@@ -18,7 +18,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -30,7 +30,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class AdhocTextCrossProcessTests
     {
         internal const string Grid = "example-grid";
@@ -122,57 +121,78 @@ namespace osWebRtcVoice.Tests
         private static void ExpectOneLine(Node node, UUID agent, UUID session, string text)
         {
             List<GridInstantMessage> got = node.HeardBy(agent);
-            Assert.That(got, Has.Count.EqualTo(1));
-            Assert.That(got[0].message, Is.EqualTo(text));
-            Assert.That(new UUID(got[0].imSessionID), Is.EqualTo(session));
-            Assert.That(got[0].dialog, Is.EqualTo(AdhocTextSession.DialogSessionSend));
+            Assert.Single(got);
+            Assert.Equal(text, got[0].message);
+            Assert.Equal(session, new UUID(got[0].imSessionID));
+            Assert.Equal(AdhocTextSession.DialogSessionSend, got[0].dialog);
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
+        [InlineData(false)]
+        [InlineData(true)]
+        [Theory(Timeout = 60000)]
         public void TheStartersLine_ReachesAMemberWhoAcceptedInAnotherProcess(bool sharedStore)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(sharedStore, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
 
             Type(one, Alice, session, "hello from the first process");
             List<GridInstantMessage> carried = Carry(one, two);
 
-            Assert.That(carried, Has.Count.EqualTo(1), "one signed text carrier, to Bob");
+            {
+                var assertedValue = carried;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "one signed text carrier, to Bob");
+            }
             ExpectOneLine(two, Bob, session, "hello from the first process");
-            Assert.That(one.HeardBy(Alice), Is.Empty, "the sender is never sent their own line back");
+            {
+                var assertedValue = one.HeardBy(Alice);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the sender is never sent their own line back");
+            }
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
+        [InlineData(false)]
+        [InlineData(true)]
+        [Theory(Timeout = 60000)]
         public void AMembersLine_ReachesTheStarterInTheOtherProcess(bool sharedStore)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(sharedStore, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
 
             Type(two, Bob, session, "hello from the second process");
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(carried, Has.Count.EqualTo(1), "one signed text carrier, to Alice");
+            {
+                var assertedValue = carried;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "one signed text carrier, to Alice");
+            }
             ExpectOneLine(one, Alice, session, "hello from the second process");
-            Assert.That(two.HeardBy(Bob), Is.Empty, "the sender is never sent their own line back");
+            {
+                var assertedValue = two.HeardBy(Bob);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the sender is never sent their own line back");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheTextCarrier_IsSentToRootOnly()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
 
             Type(one, Alice, session, "hello");
 
-            Assert.That(one.Process.Transfer.Sent.Where(m => AdhocTextTransport.TryParse(m, out _, out _, out _, out _, out _)).Count(), Is.EqualTo(1));
-            Assert.That(one.Process.Transfer.SentRootOnly, Is.All.True, "a child presence here must not be handed the carrier as an instant message");
+            Assert.Single(one.Process.Transfer.Sent, m => AdhocTextTransport.TryParse(m, out _, out _, out _, out _, out _));
+            {
+                var assertedValue = one.Process.Transfer.SentRootOnly;
+                TestAssert.WithMessage(() => Assert.All(assertedValue, item => Assert.True(item)), "a child presence here must not be handed the carrier as an instant message");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMemberWhoDeclinedInTheOtherProcess_DoesNotReceive_AndTheAcceptingMemberDoes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob, Carol);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
             two.Engine.Decline(session, Carol);
@@ -181,12 +201,13 @@ namespace osWebRtcVoice.Tests
             Carry(one, two);
 
             ExpectOneLine(two, Bob, session, "for those who stayed");
-            Assert.That(two.HeardBy(Carol), Is.Empty);
+            Assert.Empty(two.HeardBy(Carol));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMemberWhoLeftTheChatInTheOtherProcess_DoesNotReceive()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
             two.Engine.LeaveChat(session, Bob);
@@ -194,12 +215,13 @@ namespace osWebRtcVoice.Tests
             Type(one, Alice, session, "anyone there?");
             Carry(one, two);
 
-            Assert.That(two.HeardBy(Bob), Is.Empty);
+            Assert.Empty(two.HeardBy(Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnInviteeWhoHasNotAcceptedInTheOtherProcess_DoesNotReceive()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob, Carol);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");   // Carol was rung and has not answered
 
@@ -207,12 +229,16 @@ namespace osWebRtcVoice.Tests
             Carry(one, two);
 
             ExpectOneLine(two, Bob, session, "only the people in the chat");
-            Assert.That(two.HeardBy(Carol), Is.Empty, "an invitation is not membership of the conversation");
+            {
+                var assertedValue = two.HeardBy(Carol);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "an invitation is not membership of the conversation");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALineIsNotCarriedToAMemberWhoDeclinedInTheSendersOwnProcess()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob, Carol);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
             one.Engine.Decline(session, Carol);
@@ -220,12 +246,13 @@ namespace osWebRtcVoice.Tests
             Type(one, Alice, session, "not for Carol");
             List<GridInstantMessage> carried = Carry(one, two);
 
-            Assert.That(carried.Select(m => new UUID(m.toAgentID)), Is.EqualTo(new[] { Bob }));
+            Assert.Equal(new[] { Bob }, carried.Select(m => new UUID(m.toAgentID)));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AReplayedCarrier_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
             Type(one, Alice, session, "once only");
@@ -236,9 +263,10 @@ namespace osWebRtcVoice.Tests
             ExpectOneLine(two, Bob, session, "once only");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AForgedCarrier_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
             string roomKey = two.Engine.Store.Get(session).RoomKey;
@@ -258,17 +286,18 @@ namespace osWebRtcVoice.Tests
             Type(one, Alice, session, "the original");
             GridInstantMessage genuine = one.Process.Transfer.Sent.Last();
             one.Process.Transfer.Sent.Clear();
-            Assert.That(AdhocTextTransport.TryParse(genuine, out _, out _, out string text, out _, out _), Is.True);
+            Assert.True(AdhocTextTransport.TryParse(genuine, out _, out _, out string text, out _, out _));
             genuine.binaryBucket = System.Text.Encoding.UTF8.GetBytes(
                 System.Text.Encoding.UTF8.GetString(genuine.binaryBucket).Replace("the original", "the changed!"));
             Invoke(two.Module, "OnIncomingConferenceText", genuine);
 
-            Assert.That(two.HeardBy(Bob), Is.Empty);
+            Assert.Empty(two.HeardBy(Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASignedLineFromANonMember_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
             string roomKey = two.Engine.Store.Get(session).RoomKey;
@@ -277,47 +306,56 @@ namespace osWebRtcVoice.Tests
                 "let me in", null, roomKey, (CarrierAuth)GetPrivate(one.Module, "m_carrierAuth"));
             Invoke(two.Module, "OnIncomingConferenceText", fromStranger);
 
-            Assert.That(two.HeardBy(Bob), Is.Empty);
+            Assert.Empty(two.HeardBy(Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ThePlan_NamesWhoMayBeInTheChatElsewhere_AndLeavesOutDeclinedAndLeft()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob, Carol);
             UUID dave = UUID.Random();
             one.Engine.Invite(session, Alice, dave);
             one.Engine.Decline(session, Carol);
 
-            Assert.That(AdhocTextSession.TryPlan(one.Engine, true, session, Alice, "hi", out AdhocTextPlan plan, out string decision), Is.True);
+            Assert.True(AdhocTextSession.TryPlan(one.Engine, true, session, Alice, "hi", out AdhocTextPlan plan, out string decision));
 
-            Assert.That(decision, Is.EqualTo(AdhocTextSession.DecisionDelivered));
-            Assert.That(plan.Recipients, Is.Empty, "nobody is recorded as in the conversation here but the sender");
-            Assert.That(plan.Elsewhere, Is.EquivalentTo(new[] { Bob, dave }));
+            Assert.Equal(AdhocTextSession.DecisionDelivered, decision);
+            {
+                var assertedValue = plan.Recipients;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "nobody is recorded as in the conversation here but the sender");
+            }
+            Assert.Equivalent(new[] { Bob, dave }, plan.Elsewhere, strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AProcessThatAdoptedTheConversation_CarriesToTheStarterToo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, two, session) = Start(false, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
 
-            Assert.That(AdhocTextSession.TryPlan(two.Engine, true, session, Bob, "hi", out AdhocTextPlan plan, out _), Is.True);
+            Assert.True(AdhocTextSession.TryPlan(two.Engine, true, session, Bob, "hi", out AdhocTextPlan plan, out _));
 
-            Assert.That(plan.Recipients, Is.Empty);
-            Assert.That(plan.Elsewhere, Is.EqualTo(new[] { Alice }), "the adopting process holds no record of the starter");
+            Assert.Empty(plan.Recipients);
+            {
+                var assertedValue = plan.Elsewhere;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { Alice }, assertedValue), "the adopting process holds no record of the starter");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ANonMembersTypedLine_IsRefusedAndNothingIsCarried()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(false, Bob);
             two.Engine.Accept(session, Bob, RegionB, "vs-bob");
             one.Process.AddRoot(Stranger);
 
             Type(one, Stranger, session, "let me in");
 
-            Assert.That(one.Process.Transfer.Sent, Is.Empty);
-            Assert.That(two.HeardBy(Bob), Is.Empty);
+            Assert.Empty(one.Process.Transfer.Sent);
+            Assert.Empty(two.HeardBy(Bob));
         }
     }
 }

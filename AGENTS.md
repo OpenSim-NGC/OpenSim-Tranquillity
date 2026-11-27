@@ -8,9 +8,81 @@ Many people work on this repository, each with their own agents. These rules exi
 else's work, so that what reaches `develop` is tested, and so that operators running Tranquillity can trust it.
 Where your human's instructions are stricter than these rules, follow your human.
 
----
+Context and instructions for AI coding agents working on this .NET 10 repository in Visual Studio Code.
+Technical Stack
 
-## 1. Absolute rules
+## Project Overview
+- **Framework:** .NET 10 (`net10.0`), C# 14
+- **Test Framework:** xUnit.net v3 (`xunit.v3`, `xunit.runner.visualstudio`, `Microsoft.NET.Test.Sdk`)
+- **Primary IDE:** Visual Studio Code with **C# Dev Kit** (`ms-dotnettools.csdevkit`) and **C#** (`ms-dotnettools.csharp`)
+- **Architecture:** [e.g., Clean Architecture / Vertical Slice / Modular Monolith]
+
+## Repository Structure
+- `[ProjectName].slnx` (or `.sln`) — Root solution file used by VS Code C# Dev Kit for workspace and Test Explorer discovery.
+- `.vscode/` — Workspace settings, launch profiles (`launch.json`), and build tasks (`tasks.json`).
+- `Source/[ProjectName].Api/` — Entry point, endpoints/controllers, and DI configuration.
+- `Source/[ProjectName].Core/` — Domain entities, interfaces, and business logic.
+- `Source/[ProjectName].Infrastructure/` — Data access, external services, and repositories.
+- `Tests/[ProjectName].UnitTests/` — Unit tests using xUnit v3.
+- `Tests/[ProjectName].IntegrationTests/` — Integration tests.
+
+## Build, Run & Test Commands
+Always verify changes by building and running the relevant tests before finishing.
+
+- **Restore dependencies:** `dotnet restore`
+- **Build solution:** `dotnet build --no-restore`
+- **Run all tests:** `dotnet test --no-build`
+- **Filter tests by name or class (VSTest mode):**
+  `dotnet test --no-build --filter "FullyQualifiedName~[Namespace.ClassName]"`
+- **Filter tests by Trait (VSTest mode):**
+  `dotnet test --no-build --filter "Category=[CategoryName]"`
+- **Run test project directly (xUnit v3 native executable / MTP):**
+  `dotnet run --project tests/[ProjectName].UnitTests -- -class [Namespace.ClassName]`
+- **Add project references (.NET 10 noun-first syntax):**
+  `dotnet reference add ../[TargetProject]/[TargetProject].csproj`
+- **Add NuGet packages (.NET 10 noun-first syntax):**
+  `dotnet package add [PackageName]`
+
+## VS Code & Workspace Guidelines
+- **Solution Sync:** Whenever creating a new `.csproj`, register it in the root `.slnx` / `.sln` file (`dotnet sln add [PathToCsproj]`) so C# Dev Kit recognizes the project and populates Test Explorer.
+- **Test Discovery Compatibility:** Keep `xunit.runner.visualstudio` (v3.0.0+) and `Microsoft.NET.Test.Sdk` referenced in test projects—or ensure `dotnet.unitTests.runSettingsPath` / `UseMicrosoftTestingPlatformRunner` is properly configured—so VS Code's Test Explorer can discover and debug individual tests.
+- **Formatting & Analyzers:** Respect `.editorconfig` rules; C# Dev Kit / Roslyn analyzers enforce formatting and code style on save and build.
+- **Workspace Config:** Do not modify `.vscode/launch.json`, `.vscode/tasks.json`, or `.vscode/settings.json` unless explicitly asked to update debug profiles or editor settings.
+
+## C# & .NET 10 Coding Conventions
+### Do
+- **Nullable Reference Types:** The repository default is `<Nullable>annotations</Nullable>`. Converted projects must
+  use `<Nullable>enable</Nullable>` and resolve all nullability warnings properly rather than suppressing them with
+  `!` unless strictly justified.
+- **Modern C# Features:** Prefer primary constructors for DI, file-scoped namespaces, collection expressions (`[]`), `record` types for immutable DTOs, and pattern matching.
+- **Async/Await:** Suffix asynchronous methods with `Async`, accept a `CancellationToken cancellationToken = default` parameter on I/O-bound methods, and pass it down the call chain.
+- **Dependency Injection:** Register services using standard `Microsoft.Extensions.DependencyInjection` extension methods (`AddApplication()`, `AddInfrastructure()`).
+
+### Don't
+- **No Blocking Calls:** Never use `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()` on tasks.
+- **No Ignored Warnings:** Do not silence compiler or analyzer warnings with `#pragma warning disable` unless documented.
+- **No Exceptions for Flow Control:** Use result objects, validation responses, or explicit checks instead of throwing exceptions for expected business logic outcomes.
+- **No Magic Strings:** Bind configuration sections via `IOptions<T>` rather than reading raw strings directly.
+
+## xUnit v3 Testing Guidelines
+- **Project Configuration:** xUnit v3 test projects compile as executables (`<OutputType>Exe</OutputType>`) and reference `xunit.v3` (never mix `xunit` v2 and `xunit.v3` packages).
+- **Structure:** Follow the **Arrange, Act, Assert (AAA)** pattern clearly separated by blank lines.
+- **Naming:** Name test methods using `[MethodUnderTest]_[Scenario]_[ExpectedOutcome]` (e.g., `CalculateTotal_WhenCartIsEmpty_ReturnsZero`).
+- **Attributes & Data:**
+  - Do not add class-level test attributes (xUnit discovers public classes automatically).
+  - Mark standard tests with `[Fact]` and parameterized tests with `[Theory]` paired with `[InlineData(...)]`, `[MemberData(...)]`, or strongly typed `TheoryData<T>`.
+  - Use `[Trait("Category", "...")]` for test categorization.
+- **Cancellation Tokens:** Pass `TestContext.Current.CancellationToken` into async methods under test instead of `CancellationToken.None` or `default`.
+- **Lifecycle & Fixtures:**
+  - Use constructor setup and `IDisposable` / `IAsyncLifetime` (`ValueTask InitializeAsync()` / `ValueTask DisposeAsync()`) for per-test setup and cleanup.
+  - Use `IClassFixture<TFixture>` or `ICollectionFixture<TFixture>` for expensive shared context (such as database containers or `WebApplicationFactory`).
+- **Assertions:** Use xUnit's built-in `Assert` methods (`Assert.Equal`, `Assert.ThrowsAsync<T>`, `Assert.Equivalent`, `Assert.Multiple`) [or your project's assertion library, e.g., Shouldly / AwesomeAssertions].
+- **Isolation:** Keep unit tests fast and deterministic. Mock external boundaries (databases, HTTP clients, file system, clock via `TimeProvider`) rather than hitting real infrastructure.
+
+
+Project Rules Specific to the Domain (Grid Software/Virtual Worlds)
+
+## Absolute rules
 
 1. **No secrets anywhere.** No password, token, API key, connection string, capability URL, private grid address
    or personal data (e-mail address, real name, avatar names of other people) in code, tests, commits, pull
@@ -40,7 +112,7 @@ Where your human's instructions are stricter than these rules, follow your human
 8. **English in the repository and on GitHub.** Code, comments, documentation, commit messages, pull requests,
    issue comments. Reply to your human in the language they write to you.
 
-## 2. Reference behaviour: the viewers and OpenSimulator
+## Reference behaviour: the viewers and OpenSimulator
 
 Tranquillity serves existing viewers (Firestorm, the Linden viewer and the other third-party viewers) and talks to
 OpenSimulator grids over Hypergrid. The viewers fix the protocol; Tranquillity follows it.
@@ -54,7 +126,7 @@ OpenSimulator grids over Hypergrid. The viewers fix the protocol; Tranquillity f
 - Existing grids upgrade in place. New configuration options default to the current behaviour unless the change is
   a fix.
 
-## 3. Branches and worktrees
+## Branches and worktrees
 
 The project uses GitFlow ([Docs/ReleaseEngineering.md](Docs/ReleaseEngineering.md)):
 
@@ -73,7 +145,7 @@ git worktree add ../work/tranquillity/<task> -b fix/<task> upstream/develop
 Branch prefixes: `fix/`, `feat/`, `test/`, `docs/`, `ci/`, `refactor/`. Keep temporary files (logs, notes, pull
 request drafts) outside the repository or in a git-ignored folder; never commit them.
 
-## 4. Building
+## Building
 
 - Use the .NET SDK selected by [global.json](global.json) (.NET 10). An older SDK fails with `NETSDK1226` or
   similar; install a newer one rather than editing `global.json`.
@@ -85,7 +157,8 @@ request drafts) outside the repository or in a git-ignored folder; never commit 
 ## 5. Code quality
 
 - **Follow the code around you**: naming (`*Module`, `*Service`, `*Connector`, `*Handler`), layout and style.
-  `Nullable` is disabled and implicit usings are enabled for every project ([Directory.Build.props](Directory.Build.props)).
+  Annotation-only nullable support and implicit usings are enabled for every project
+  ([Directory.Build.props](Directory.Build.props)); converted areas use full nullable flow analysis.
 - **One change, one purpose.** No unrelated reformatting, renames or clean-ups in a fix.
 - **Input from outside is never trusted**: viewer packets, capability bodies, Robust requests, database rows,
   archives, assets and configuration. Check lengths and ranges, bound sizes, and handle the failure with a log
@@ -116,7 +189,7 @@ request drafts) outside the repository or in a git-ignored folder; never commit 
   [ThirdPartyLicenses/](ThirdPartyLicenses/) and a line to [NOTICE.md](NOTICE.md).
 - **Keep [ARCHITECTURE.md](ARCHITECTURE.md) current** when you add a project, a folder or a service.
 
-## 6. Tests
+## Tests
 
 Details are in [Docs/TESTING.md](Docs/TESTING.md).
 

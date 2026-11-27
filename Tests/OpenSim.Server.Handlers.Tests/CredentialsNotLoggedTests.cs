@@ -77,12 +77,13 @@ public partial class CredentialsNotLoggedTests
         HGFriendsServerPostHandler handler = new(StubProxy.Create<IHGFriendsService>(), agents, null);
 
         MethodInfo process = typeof(HGFriendsServerPostHandler)
-            .GetMethod("ProcessRequest", BindingFlags.Instance | BindingFlags.NonPublic);
+            .GetMethod("ProcessRequest", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(HGFriendsServerPostHandler).FullName, "ProcessRequest");
         using MemoryStream body = new(Encoding.UTF8.GetBytes(
             $"METHOD=getfriendperms&KEY={presentedKey}&SESSIONID={sessionID}&PRINCIPALID={UUID.Random()}&FRIEND={UUID.Random()}"));
 
         using LogCapture log = new();
-        process.Invoke(handler, new object[] { "/hgfriends", body, null, null });
+        process.Invoke(handler, new object[] { "/hgfriends", body, null!, null! });
 
         Xunit.Assert.False(log.Contains(presentedKey), "presented key reached the log");
         Xunit.Assert.Equal(LogLevel.Warning, log.LevelOf("did not match existing key"));

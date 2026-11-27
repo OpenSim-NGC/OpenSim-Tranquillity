@@ -8,7 +8,6 @@
 using System.Diagnostics;
 using OpenMetaverse;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 
@@ -54,8 +53,8 @@ public class ListenRegexTimeoutTests
                 h.Engine.ListenManager.DeliverChat(5, "someone", speaker, Victim + i);
                 perLine[i] = sw.Elapsed.TotalMilliseconds;
             }
-        });
-        Assert.True(await Task.WhenAny(deliver, Task.Delay(TimeSpan.FromSeconds(30))) == deliver, "delivery of 20 lines did not finish in 30 s");
+        }, TestContext.Current.CancellationToken);
+        Assert.True(await Task.WhenAny(deliver, Task.Delay(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken)) == deliver, "delivery of 20 lines did not finish in 30 s");
         await deliver;   // surfaces a delivery exception, as Wait did
         total.Stop();
         _out.WriteLine($"total={total.Elapsed.TotalMilliseconds:F0} ms per line=[{string.Join(", ", perLine.Select(t => t.ToString("F0")))}]");
