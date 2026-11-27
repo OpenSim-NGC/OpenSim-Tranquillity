@@ -15,17 +15,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
-    public class UnknownRoomLogTests
-    {
+    public class UnknownRoomLogTests : IAsyncLifetime
+        {
         private const int Room = 4242;
         private static readonly UUID Listener = new UUID("11111111-2222-3333-4444-555555555555");
 
@@ -52,17 +50,13 @@ namespace osWebRtcVoice.Tests
         private Capture _log;
         private LogCapture _logging;
         private long _clock;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
             _clock = 10_000;
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             _logging.Dispose();
             _log.Dispose();
@@ -79,63 +73,89 @@ namespace osWebRtcVoice.Tests
         private void Batch(VisAuthority a, JanusPeerCtlBatchSink.SlvoiceReply reply)
             => a.OnBatchOutcome(Room, VisOp.Replace, 1, new[] { Listener }, true, reply);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheFirstUnknownRoom_ForARoomThatNeverAnswered_IsDebugNotWarning()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VisAuthority a = NewAuthority();
             Batch(a, Unknown());
 
-            Assert.That(_log.At(LogLevel.Warning), Is.Empty, "the room has not been created yet: expected");
-            Assert.That(_log.At(LogLevel.Debug), Has.Count.EqualTo(1));
-            Assert.That(a.CanArmNow(Listener), Is.False, "the listener still backs off and retries as before");
+            {
+                var assertedValue = _log.At(LogLevel.Warning);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the room has not been created yet: expected");
+            }
+            Assert.Single(_log.At(LogLevel.Debug));
+            Assert.False(a.CanArmNow(Listener), "the listener still backs off and retries as before");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASecondUnknownRoom_ForTheSameRoom_IsAWarning()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VisAuthority a = NewAuthority();
             Batch(a, Unknown());
             _clock += 2000;
             Batch(a, Unknown());
 
-            Assert.That(_log.At(LogLevel.Warning), Has.Count.EqualTo(1), "the room is still missing after its first retry");
-            Assert.That(_log.At(LogLevel.Debug), Has.Count.EqualTo(1));
+            {
+                var assertedValue = _log.At(LogLevel.Warning);
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "the room is still missing after its first retry");
+            }
+            Assert.Single(_log.At(LogLevel.Debug));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void UnknownRoom_ForARoomThatAnsweredBefore_IsAWarning()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VisAuthority a = NewAuthority();
             Batch(a, Applied());
             Batch(a, Unknown());
 
-            Assert.That(_log.At(LogLevel.Warning), Has.Count.EqualTo(1), "the mixer lost a room it once had");
-            Assert.That(_log.At(LogLevel.Debug), Is.Empty);
+            {
+                var assertedValue = _log.At(LogLevel.Warning);
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "the mixer lost a room it once had");
+            }
+            Assert.Empty(_log.At(LogLevel.Debug));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void UnknownRoom_ForARoomSomethingProvedExists_IsAWarning()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VisAuthority a = NewAuthority();
             a.RoomExists(Room);
             Batch(a, Unknown());
 
-            Assert.That(_log.At(LogLevel.Warning), Has.Count.EqualTo(1));
-            Assert.That(_log.At(LogLevel.Debug), Is.Empty);
+            Assert.Single(_log.At(LogLevel.Warning));
+            Assert.Empty(_log.At(LogLevel.Debug));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheFirstUnknownRoom_InAHeartbeatReply_IsDebugToo_AndALaterOneWarns()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VisAuthority a = NewAuthority();
             VisAuthority.HeartbeatReply hb = new VisAuthority.HeartbeatReply { IsHeartbeat = true, VisProtocol = 2, MixerInstance = "m1" };
             hb.Rooms[Room] = new VisAuthority.HeartbeatRoomReply { Status = "unknown_room" };
 
             a.OnHeartbeatOutcome(true, hb);
-            Assert.That(_log.At(LogLevel.Warning), Is.Empty);
+            Assert.Empty(_log.At(LogLevel.Warning));
 
             a.OnHeartbeatOutcome(true, hb);
-            Assert.That(_log.At(LogLevel.Warning), Has.Count.EqualTo(1));
+            Assert.Single(_log.At(LogLevel.Warning));
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

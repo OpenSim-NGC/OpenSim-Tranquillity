@@ -16,7 +16,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -28,7 +28,6 @@ using static osWebRtcVoice.Tests.CrossProcessHarness;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2ADeclineTests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
@@ -69,54 +68,61 @@ namespace osWebRtcVoice.Tests
         /// <summary>Alice starts a call to Bob and presses Call; Bob's invitation is delivered.</summary>
         private static void PlaceCall(WebRtcVoiceRegionModule module, Process p)
         {
-            Assert.That(Chat(module, p, Alice, "start p2p voice", Bob), Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(Chat(module, p, Alice, "call"), Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(p.Queue.Enqueued, Is.EqualTo(new[] { Bob }), "Bob's viewer is rung");
+            Assert.Equal((int)HttpStatusCode.OK, Chat(module, p, Alice, "start p2p voice", Bob));
+            Assert.Equal((int)HttpStatusCode.OK, Chat(module, p, Alice, "call"));
+            {
+                var assertedValue = p.Queue.Enqueued;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { Bob }, assertedValue), "Bob's viewer is rung");
+            }
             p.Queue.AgentLists.Clear();
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheCalleeDeclines_TheCallerIsToldItCannotVoiceChat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (module, p) = Region();
             PlaceCall(module, p);
 
-            Assert.That(Chat(module, p, Bob, "decline p2p voice"), Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, Chat(module, p, Bob, "decline p2p voice"));
 
             var (session, to, updates) = p.Queue.AgentLists.Single();
-            Assert.That(to, Is.EqualTo(Alice));
-            Assert.That(session, Is.EqualTo(Session));
+            Assert.Equal(Alice, to);
+            Assert.Equal(Session, session);
             GroupChatListAgentUpdateData declined = updates.Single();
-            Assert.That(declined.agentID, Is.EqualTo(Bob));
-            Assert.That(declined.canVoice, Is.False, "the viewer ends the call on a peer that cannot voice chat (llimview.cpp:4369)");
-            Assert.That(declined.enterOrLeave, Is.True, "a LEAVE is skipped before can_voice_chat is read (llimview.cpp:4364)");
+            Assert.Equal(Bob, declined.agentID);
+            Assert.False(declined.canVoice, "the viewer ends the call on a peer that cannot voice chat (llimview.cpp:4369)");
+            Assert.True(declined.enterOrLeave, "a LEAVE is skipped before can_voice_chat is read (llimview.cpp:4364)");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheCallerCancels_NobodyIsToldTheCalleeDeclined()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (module, p) = Region();
             PlaceCall(module, p);
 
             Chat(module, p, Alice, "decline p2p voice");
 
-            Assert.That(p.Queue.AgentLists, Is.Empty);
+            Assert.Empty(p.Queue.AgentLists);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADeclineFromSomeoneNotInTheCall_TellsNobody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (module, p) = Region();
             PlaceCall(module, p);
 
             Chat(module, p, Carol, "decline p2p voice");
 
-            Assert.That(p.Queue.AgentLists, Is.Empty);
+            Assert.Empty(p.Queue.AgentLists);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADeclineForACallThatIsGone_TellsNobody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (module, p) = Region();
             PlaceCall(module, p);
             Chat(module, p, Bob, "decline p2p voice");
@@ -124,7 +130,10 @@ namespace osWebRtcVoice.Tests
 
             Chat(module, p, Bob, "decline p2p voice");
 
-            Assert.That(p.Queue.AgentLists, Is.Empty, "the second decline finds nothing to end");
+            {
+                var assertedValue = p.Queue.AgentLists;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the second decline finds nothing to end");
+            }
         }
     }
 }

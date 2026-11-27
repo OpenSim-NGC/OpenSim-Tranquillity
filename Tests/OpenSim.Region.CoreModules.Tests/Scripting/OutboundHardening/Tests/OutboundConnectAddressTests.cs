@@ -161,7 +161,7 @@ public class OutboundConnectAddressTests
         using HttpClient client = Client(Filter(net), net);
 
         HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(
-            () => client.GetAsync("http://rebind.example.org/"));
+            () => client.GetAsync("http://rebind.example.org/", TestContext.Current.CancellationToken));
 
         Assert.IsType<OutboundUrlFilterRefusedException>(e);
         Assert.Equal("Request to rebind.example.org disallowed by filter", e.Message);
@@ -177,7 +177,7 @@ public class OutboundConnectAddressTests
             .Serves(Public1, RedirectToB);
         using HttpClient client = Client(Filter(net), net);
 
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/", TestContext.Current.CancellationToken));
 
         Assert.Equal(new[] { Public1 }, net.Connected);
     }
@@ -191,7 +191,7 @@ public class OutboundConnectAddressTests
             .Serves(Public1, RedirectToB);
         using HttpClient client = Client(Filter(net), net);
 
-        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/"));
+        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/", TestContext.Current.CancellationToken));
 
         Assert.StartsWith(OutboundUrlFilterRedirectHandler.RedirectBlockedPrefix, e.Message);
         Assert.Equal(new[] { Public1 }, net.Connected);
@@ -205,13 +205,13 @@ public class OutboundConnectAddressTests
         using HttpClient client = Client(filter, net);
 
         Assert.False(filter.CheckAllowed(new Uri("http://mapped.example.org/")));
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://mapped.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://mapped.example.org/", TestContext.Current.CancellationToken));
 
         // Through the connect step alone, with the address check passing: the lookup answers a public address
         // first and the mapped form second.
         Network rebind = new Network().Host("m2.example.org", new[] { Public1 }, new[] { "::ffff:127.0.0.1" });
         using HttpClient client2 = Client(Filter(rebind), rebind);
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client2.GetAsync("http://m2.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client2.GetAsync("http://m2.example.org/", TestContext.Current.CancellationToken));
 
         Assert.Empty(net.Connected);
         Assert.Empty(rebind.Connected);
@@ -223,7 +223,7 @@ public class OutboundConnectAddressTests
         Network net = new Network().Host("mapped.example.org", new[] { "::ffff:" + Public1 });
         using HttpClient client = Client(Filter(net), net);
 
-        using HttpResponseMessage response = await client.GetAsync("http://mapped.example.org/");
+        using HttpResponseMessage response = await client.GetAsync("http://mapped.example.org/", TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { Public1 }, net.Connected);
     }
@@ -242,7 +242,7 @@ public class OutboundConnectAddressTests
             ConnectCallback = filter.CreateConnectCallback(net.Connect),
         });
 
-        using HttpResponseMessage response = await client.GetAsync("http://multi.example.org/");
+        using HttpResponseMessage response = await client.GetAsync("http://multi.example.org/", TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { Public1 }, net.Connected);
     }
@@ -257,13 +257,13 @@ public class OutboundConnectAddressTests
         OutboundUrlFilter filter = Filter(net, "10.1.0.0/16|10.0.0.9:8080");
         using HttpClient client = Client(filter, net);
 
-        using (HttpResponseMessage r1 = await client.GetAsync("http://net.example.org/"))
+        using (HttpResponseMessage r1 = await client.GetAsync("http://net.example.org/", TestContext.Current.CancellationToken))
             Assert.True(r1.IsSuccessStatusCode);
-        using (HttpResponseMessage r2 = await client.GetAsync("http://port.example.org:8080/"))
+        using (HttpResponseMessage r2 = await client.GetAsync("http://port.example.org:8080/", TestContext.Current.CancellationToken))
             Assert.True(r2.IsSuccessStatusCode);
 
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://other.example.org/"));
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://port.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://other.example.org/", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://port.example.org/", TestContext.Current.CancellationToken));
 
         Assert.Equal(new[] { "10.1.2.3", "10.0.0.9" }, net.Connected);
     }
@@ -274,10 +274,10 @@ public class OutboundConnectAddressTests
         Network net = new Network().Host("a.example.org", new[] { Public1 });
         using HttpClient client = Client(Filter(net), net);
 
-        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/path");
+        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/path", TestContext.Current.CancellationToken);
 
         Assert.True(response.IsSuccessStatusCode);
-        Assert.Equal("ok", await response.Content.ReadAsStringAsync());
+        Assert.Equal("ok", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal(new[] { Public1 }, net.Connected);
         Assert.Contains("Host: a.example.org", net.Streams[0].Written);
     }
@@ -291,9 +291,9 @@ public class OutboundConnectAddressTests
             .Serves(Public1, RedirectToB);
         using HttpClient client = Client(Filter(net), net);
 
-        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/");
+        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/", TestContext.Current.CancellationToken);
 
-        Assert.Equal("ok", await response.Content.ReadAsStringAsync());
+        Assert.Equal("ok", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal(new[] { Public1, Public2 }, net.Connected);
         Assert.Contains("Host: b.example.org", net.Streams[1].Written);
     }
@@ -329,12 +329,12 @@ public class OutboundConnectAddressTests
         using HttpClient client = Client(filter, net);
 
         // At the early check and at the connect step alike.
-        using (HttpResponseMessage r1 = await client.GetAsync("http://ok.example.org/"))
+        using (HttpResponseMessage r1 = await client.GetAsync("http://ok.example.org/", TestContext.Current.CancellationToken))
             Assert.True(r1.IsSuccessStatusCode);
-        using (HttpResponseMessage r2 = await client.GetAsync("http://late-ok.example.org/"))
+        using (HttpResponseMessage r2 = await client.GetAsync("http://late-ok.example.org/", TestContext.Current.CancellationToken))
             Assert.True(r2.IsSuccessStatusCode);
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://no.example.org/"));
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://late-no.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://no.example.org/", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://late-no.example.org/", TestContext.Current.CancellationToken));
 
         Assert.True(filter.CheckAllowed(new Uri("http://ok.example.org/")));
         Assert.False(filter.CheckAllowed(new Uri("http://no.example.org/")));
@@ -374,7 +374,7 @@ public class OutboundConnectAddressTests
         using HttpClient client = new(new OutboundUrlFilterRedirectHandler(filter, inner, 10)) { Timeout = TimeSpan.FromSeconds(30) };
 
         // The first lookup is the early check; the second is the connect step, which never answers.
-        await Assert.ThrowsAnyAsync<Exception>(() => client.GetAsync("http://slow.example.org/"));
+        await Assert.ThrowsAnyAsync<Exception>(() => client.GetAsync("http://slow.example.org/", TestContext.Current.CancellationToken));
 
         Assert.True(cancelled, "the lookup was not cancelled by the handler's connect timeout");
         Assert.Empty(net.Connected);
@@ -420,9 +420,9 @@ public class OutboundConnectAddressTests
         List<string> proxyEndPoints = new();
         using HttpClient client = ProxiedClient(Filter(net), net, Ok, proxyEndPoints);
 
-        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/path");
+        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/path", TestContext.Current.CancellationToken);
 
-        Assert.Equal("ok", await response.Content.ReadAsStringAsync());
+        Assert.Equal("ok", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal(new[] { "proxy.example.org:3128" }, proxyEndPoints);
         Assert.Empty(net.Connected);
     }
@@ -438,7 +438,7 @@ public class OutboundConnectAddressTests
         List<string> proxyEndPoints = new();
         using HttpClient client = ProxiedClient(Filter(net), net, RedirectToDirect, proxyEndPoints);
 
-        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/"));
+        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/", TestContext.Current.CancellationToken));
 
         Assert.IsType<OutboundUrlFilterRefusedException>(e);
         Assert.Equal(new[] { "proxy.example.org:3128" }, proxyEndPoints);
@@ -454,9 +454,9 @@ public class OutboundConnectAddressTests
         List<string> proxyEndPoints = new();
         using HttpClient client = ProxiedClient(Filter(net), net, RedirectToDirect, proxyEndPoints);
 
-        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/");
+        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/", TestContext.Current.CancellationToken);
 
-        Assert.Equal("ok", await response.Content.ReadAsStringAsync());
+        Assert.Equal("ok", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal(new[] { "proxy.example.org:3128" }, proxyEndPoints);
         Assert.Equal(new[] { Public2 }, net.Connected);
     }
@@ -488,7 +488,7 @@ public class OutboundConnectAddressTests
         Uri url = new("http://rebind.example.org/");
         using HttpClient client = new(new OutboundUrlFilterRedirectHandler(filter, filter.CreateHandler(null), 10));
 
-        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync(url));
+        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync(url, TestContext.Current.CancellationToken));
 
         Assert.IsType<OutboundUrlFilterRefusedException>(e);
     }

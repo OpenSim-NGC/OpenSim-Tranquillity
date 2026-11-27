@@ -17,7 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -26,18 +26,15 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    public class CarrierAuthTests
-    {
+    public class CarrierAuthTests : IAsyncLifetime
+        {
         private const string Secret = "example-carrier-secret-0123456789-abcdef";
         private const string OtherSecret = "another-carrier-secret-0123456789-ghij";
         private const long T0 = 1_800_000_000;
         private static readonly UUID Carol = new UUID("33333333-3333-3333-3333-333333333333");
 
         private long _now;
-
-        [SetUp]
-        public void SetUp() => _now = T0;
+        private void SetUp() => _now = T0;
 
         private CarrierAuth Auth(string secret = Secret) => new CarrierAuth(secret, () => _now);
 
@@ -67,34 +64,39 @@ namespace osWebRtcVoice.Tests
 
         // ---- the signer ---------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASecretUnderThirtyTwoCharactersIsNotUsable()
         {
-            Assert.That(CarrierAuth.CheckSecret(null), Is.EqualTo("not-set"));
-            Assert.That(CarrierAuth.CheckSecret(""), Is.EqualTo("not-set"));
-            Assert.That(CarrierAuth.CheckSecret(new string('x', 31)), Is.EqualTo("too-short"));
-            Assert.That(CarrierAuth.CheckSecret(new string('x', 32)), Is.Null);
-            Assert.That(Auth(new string('x', 31)).Enabled, Is.False);
-            Assert.That(Auth(new string('x', 32)).Enabled, Is.True);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal("not-set", CarrierAuth.CheckSecret(null));
+            Assert.Equal("not-set", CarrierAuth.CheckSecret(""));
+            Assert.Equal("too-short", CarrierAuth.CheckSecret(new string('x', 31)));
+            Assert.Null(CarrierAuth.CheckSecret(new string('x', 32)));
+            Assert.False(Auth(new string('x', 31)).Enabled);
+            Assert.True(Auth(new string('x', 32)).Enabled);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WithNoSecretNothingIsSigned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             CarrierAuth off = CarrierAuth.Off();
-            Assert.That(off.Enabled, Is.False);
-            Assert.That(off.Seal(new CarrierFields { Kind = CarrierAuth.KindRing }), Is.Null);
+            Assert.False(off.Enabled);
+            Assert.Null(off.Seal(new CarrierFields { Kind = CarrierAuth.KindRing }));
 
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), off);
-            Assert.That(Encoding.UTF8.GetString(im.binaryBucket), Does.Not.Contain(CarrierAuth.AuthKey),
-                        "an unsigned build carries no auth block");
+            {
+                var assertedValue = Encoding.UTF8.GetString(im.binaryBucket);
+                TestAssert.WithMessage(() => Assert.DoesNotContain(CarrierAuth.AuthKey, assertedValue), "an unsigned build carries no auth block");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WithNoSecretEveryIncomingCarrierIsRefusedAndNothingIsAdopted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             // A carrier signed by a region that does have the secret.
@@ -104,22 +106,23 @@ namespace osWebRtcVoice.Tests
             CarrierAuth off = CarrierAuth.Off();
             RingIntake r = Offer(im, off, b);
 
-            Assert.That(r.Claimed, Is.True);
-            Assert.That(r.Ok, Is.False);
-            Assert.That(r.Reason, Is.EqualTo(CarrierAuth.NoSecret));
-            Assert.That(b.Store.All(), Is.Empty);
-            Assert.That(off.RefusalCount(CarrierAuth.NoSecret), Is.EqualTo(1));
+            Assert.True(r.Claimed);
+            Assert.False(r.Ok);
+            Assert.Equal(CarrierAuth.NoSecret, r.Reason);
+            Assert.Empty(b.Store.All());
+            Assert.Equal(1, off.RefusalCount(CarrierAuth.NoSecret));
 
             NonSpatialVoiceSessionEngine c = Engine();
             ThreeWayText(c, out _, out NonSpatialVoiceSession sc);
             TextIntake t = CarrierIntake.AcceptText(Text(sc, Alice, Bob, "hello", Auth()), off, c);
-            Assert.That(t.Ok, Is.False);
-            Assert.That(t.Reason, Is.EqualTo(CarrierAuth.NoSecret));
+            Assert.False(t.Ok);
+            Assert.Equal(CarrierAuth.NoSecret, t.Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheMacCoversEveryFieldAndTheKind()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             CarrierAuth auth = Auth();
             UUID session = UUID.Random();
             CarrierFields f = new CarrierFields
@@ -141,39 +144,45 @@ namespace osWebRtcVoice.Tests
                 new CarrierFields { Kind = CarrierAuth.KindRing, Target = Bob, SessionId = session, SessionType = "Adhoc", RoomKey = "k", Caller = Alice, Credential = "c", Text = "x" },
             };
             foreach (CarrierFields other in altered)
-                Assert.That(Auth().Verify(other, sealedBlock), Is.EqualTo(CarrierAuth.BadMac));
-            Assert.That(Auth().Verify(f, sealedBlock), Is.Null, "the unaltered fields verify");
+                Assert.Equal(CarrierAuth.BadMac, Auth().Verify(other, sealedBlock));
+            {
+                var assertedValue = Auth().Verify(f, sealedBlock);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the unaltered fields verify");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void FieldsCannotRunIntoEachOther()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // "ab" + "c" and "a" + "bc" must not sign alike.
             CarrierAuth auth = Auth();
             CarrierFields one = new CarrierFields { Kind = "ring", RoomKey = "ab", Credential = "c" };
             CarrierFields two = new CarrierFields { Kind = "ring", RoomKey = "a", Credential = "bc" };
-            Assert.That(Auth().Verify(two, auth.Seal(one)), Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, Auth().Verify(two, auth.Seal(one)));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RefusalsAreCountedByReason_AndLoggedOnTheFirstThenEveryHundredth()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             CarrierAuth auth = Auth();
-            Assert.That(auth.RecordRefusal(CarrierAuth.BadMac), Is.EqualTo(1));
-            Assert.That(auth.RecordRefusal(CarrierAuth.BadMac), Is.EqualTo(2));
-            Assert.That(auth.RecordRefusal(CarrierAuth.Stale), Is.EqualTo(1));
-            Assert.That(auth.RefusalCount(CarrierAuth.BadMac), Is.EqualTo(2));
-            Assert.That(CarrierAuth.ShouldLog(1), Is.True);
-            Assert.That(CarrierAuth.ShouldLog(2), Is.False);
-            Assert.That(CarrierAuth.ShouldLog(100), Is.True);
-            Assert.That(CarrierAuth.ShouldLog(101), Is.False);
+            Assert.Equal(1, auth.RecordRefusal(CarrierAuth.BadMac));
+            Assert.Equal(2, auth.RecordRefusal(CarrierAuth.BadMac));
+            Assert.Equal(1, auth.RecordRefusal(CarrierAuth.Stale));
+            Assert.Equal(2, auth.RefusalCount(CarrierAuth.BadMac));
+            Assert.True(CarrierAuth.ShouldLog(1));
+            Assert.False(CarrierAuth.ShouldLog(2));
+            Assert.True(CarrierAuth.ShouldLog(100));
+            Assert.False(CarrierAuth.ShouldLog(101));
         }
 
         // ---- a ring ---------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGenuineConferenceRingIsAcceptedAndTheAcceptIsAdmittedOnTheFarSide()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), Auth());
@@ -181,16 +190,17 @@ namespace osWebRtcVoice.Tests
             NonSpatialVoiceSessionEngine b = Engine();
             RingIntake r = Offer(im, Auth(), b);
 
-            Assert.That(r.Ok, Is.True, r.Decision + " " + r.Reason);
-            Assert.That(r.Decision, Is.EqualTo("ring-adopted"));
-            Assert.That(r.Body.ContainsKey(CarrierAuth.AuthKey), Is.False, "the viewer is handed the body without the auth block");
-            Assert.That(b.Store.Get(s.SessionId).RingSent, Is.True);
-            Assert.That(b.Accept(s.SessionId, Bob, RegionB).Ok, Is.True);
+            Assert.True(r.Ok, r.Decision + " " + r.Reason);
+            Assert.Equal("ring-adopted", r.Decision);
+            Assert.False(r.Body.ContainsKey(CarrierAuth.AuthKey), "the viewer is handed the body without the auth block");
+            Assert.True(b.Store.Get(s.SessionId).RingSent);
+            Assert.True(b.Accept(s.SessionId, Bob, RegionB).Ok);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGenuineGroupRingIsAccepted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             UUID grp = UUID.Random();
             NonSpatialVoiceSession g = a.Start(NonSpatialSessionType.Group, Alice, grp, grp, RegionA).Session;
@@ -200,13 +210,14 @@ namespace osWebRtcVoice.Tests
             NonSpatialVoiceSessionEngine b = Engine();
             RingIntake r = Offer(im, Auth(), b);
 
-            Assert.That(r.Ok, Is.True, r.Decision + " " + r.Reason);
-            Assert.That(b.Store.Get(grp).Type, Is.EqualTo(NonSpatialSessionType.Group));
+            Assert.True(r.Ok, r.Decision + " " + r.Reason);
+            Assert.Equal(NonSpatialSessionType.Group, b.Store.Get(grp).Type);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingWithNoMacIsRefusedAndAdoptsNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), auth: null);
@@ -214,62 +225,67 @@ namespace osWebRtcVoice.Tests
             NonSpatialVoiceSessionEngine b = Engine();
             RingIntake r = Offer(im, Auth(), b);
 
-            Assert.That(r.Ok, Is.False);
-            Assert.That(r.Reason, Is.EqualTo(CarrierAuth.MissingMac));
-            Assert.That(b.Store.All(), Is.Empty);
+            Assert.False(r.Ok);
+            Assert.Equal(CarrierAuth.MissingMac, r.Reason);
+            Assert.Empty(b.Store.All());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingWithAWrongMacIsRefusedAndAdoptsNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             NonSpatialVoiceSessionEngine b = Engine();
 
             // Signed with a different secret.
             RingIntake other = Offer(Ring(Bob, s, ConferenceBody(a, s), Auth(OtherSecret)), Auth(), b);
-            Assert.That(other.Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, other.Reason);
 
             // A genuine ring retargeted at someone else.
             GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             im.toAgentID = Carol.Guid;
-            Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, Offer(im, Auth(), b).Reason);
 
             // A genuine ring whose session id was swapped.
             im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             im.imSessionID = UUID.Random().Guid;
-            Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, Offer(im, Auth(), b).Reason);
 
             // A genuine conference ring turned into a group ring.
             im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             Rewrite(im, GroupVoiceRingTransport.BucketMagic,
                     m => ((OSDMap)m["voice"])["invitation_type"] = OSD.FromInteger(0));
-            Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, Offer(im, Auth(), b).Reason);
 
             // A genuine ring with another credential put in.
             im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             Rewrite(im, GroupVoiceRingTransport.BucketMagic,
                     m => ((OSDMap)m["voice"])["channel_credentials"] = OSD.FromString("swapped"));
-            Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, Offer(im, Auth(), b).Reason);
 
             // A garbage MAC.
             im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             Rewrite(im, GroupVoiceRingTransport.BucketMagic,
                     m => ((OSDMap)m[CarrierAuth.AuthKey])["mac"] = OSD.FromString(new string('0', 64)));
-            Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, Offer(im, Auth(), b).Reason);
 
             // A MAC that is not hexadecimal at all.
             im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             Rewrite(im, GroupVoiceRingTransport.BucketMagic,
                     m => ((OSDMap)m[CarrierAuth.AuthKey])["mac"] = OSD.FromString("not hex"));
-            Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.MalformedMac));
+            Assert.Equal(CarrierAuth.MalformedMac, Offer(im, Auth(), b).Reason);
 
-            Assert.That(b.Store.All(), Is.Empty, "none of them adopted anything");
+            {
+                var assertedValue = b.Store.All();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "none of them adopted anything");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStaleRingIsRefusedAndAnAgedButInWindowOneIsNot()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             OSDMap body = ConferenceBody(a, s);
@@ -278,16 +294,17 @@ namespace osWebRtcVoice.Tests
             NonSpatialVoiceSessionEngine b = Engine();
             _now = T0 + CarrierAuth.WindowSeconds + CarrierAuth.SkewSeconds + 1;
             RingIntake stale = Offer(im, Auth(), b);
-            Assert.That(stale.Reason, Is.EqualTo(CarrierAuth.Stale));
-            Assert.That(b.Store.All(), Is.Empty);
+            Assert.Equal(CarrierAuth.Stale, stale.Reason);
+            Assert.Empty(b.Store.All());
 
             _now = T0 + CarrierAuth.WindowSeconds;
-            Assert.That(Offer(im, Auth(), b).Ok, Is.True, "inside the window");
+            Assert.True(Offer(im, Auth(), b).Ok, "inside the window");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingIssuedFarInTheFutureIsRefusedButSmallClockSkewIsTolerated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             OSDMap body = ConferenceBody(a, s);
@@ -296,33 +313,35 @@ namespace osWebRtcVoice.Tests
             _now = T0 + 500;
             GridInstantMessage future = Ring(Bob, s, body, Auth());
             _now = T0;
-            Assert.That(Offer(future, Auth(), b).Reason, Is.EqualTo(CarrierAuth.Stale));
+            Assert.Equal(CarrierAuth.Stale, Offer(future, Auth(), b).Reason);
 
             _now = T0 + CarrierAuth.SkewSeconds;
             GridInstantMessage skewed = Ring(Bob, s, body, Auth());
             _now = T0;
-            Assert.That(Offer(skewed, Auth(), b).Ok, Is.True);
+            Assert.True(Offer(skewed, Auth(), b).Ok);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AReplayedRingIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), Auth());
 
             NonSpatialVoiceSessionEngine b = Engine();
             CarrierAuth receiver = Auth();
-            Assert.That(Offer(im, receiver, b).Ok, Is.True);
+            Assert.True(Offer(im, receiver, b).Ok);
             RingIntake again = Offer(im, receiver, b);
 
-            Assert.That(again.Ok, Is.False);
-            Assert.That(again.Reason, Is.EqualTo(CarrierAuth.Replay));
+            Assert.False(again.Ok);
+            Assert.Equal(CarrierAuth.Replay, again.Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingWithoutARoomKeyIsRefusedEvenWhenItIsSigned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             OSDMap body = ConferenceBody(a, s);
@@ -332,107 +351,125 @@ namespace osWebRtcVoice.Tests
             NonSpatialVoiceSessionEngine b = Engine();
             RingIntake r = Offer(im, Auth(), b);
 
-            Assert.That(r.Ok, Is.False);
-            Assert.That(r.Reason, Is.Null, "the signature was fine");
-            Assert.That(r.Decision, Is.EqualTo("refused-room-key-missing"));
-            Assert.That(b.Store.All(), Is.Empty);
+            Assert.False(r.Ok);
+            {
+                var assertedValue = r.Reason;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the signature was fine");
+            }
+            Assert.Equal("refused-room-key-missing", r.Decision);
+            Assert.Empty(b.Store.All());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AWrongRoomKeyIsStillRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             OSDMap body = ConferenceBody(a, s);
             ((OSDMap)body["voice"])["channel_uri"] = OSD.FromString("not-the-derived-key");
             NonSpatialVoiceSessionEngine b = Engine();
             RingIntake r = Offer(Ring(Bob, s, body, Auth()), Auth(), b);
-            Assert.That(r.Ok, Is.False);
-            Assert.That(r.Decision, Is.EqualTo("refused-room-key-mismatch"));
-            Assert.That(b.Store.All(), Is.Empty);
+            Assert.False(r.Ok);
+            Assert.Equal("refused-room-key-mismatch", r.Decision);
+            Assert.Empty(b.Store.All());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusedCarrierNeverReachesTheNonceStore()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             NonSpatialVoiceSessionEngine b = Engine();
             CarrierAuth receiver = Auth();
             for (int i = 0; i < 50; i++)
                 Offer(Ring(Bob, s, ConferenceBody(a, s), Auth(OtherSecret)), receiver, b);
-            Assert.That(receiver.NonceCount, Is.EqualTo(0), "only a valid MAC may spend a nonce slot");
+            {
+                var assertedValue = receiver.NonceCount;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "only a valid MAC may spend a nonce slot");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ANonceStoreThatIsFullRefusesNewCarriersUntilOldNoncesAge()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             CarrierAuth signer = Auth();
             CarrierAuth receiver = Auth();
             CarrierFields f = new CarrierFields { Kind = CarrierAuth.KindRing, Target = Bob, SessionId = UUID.Random(), RoomKey = "k" };
             for (int i = 0; i < CarrierAuth.MaxNonces; i++)
-                Assert.That(receiver.Verify(f, signer.Seal(f)), Is.Null);
+                Assert.Null(receiver.Verify(f, signer.Seal(f)));
 
-            Assert.That(receiver.Verify(f, signer.Seal(f)), Is.EqualTo(CarrierAuth.NonceStoreFull));
+            Assert.Equal(CarrierAuth.NonceStoreFull, receiver.Verify(f, signer.Seal(f)));
 
             _now = T0 + CarrierAuth.WindowSeconds + 2 * CarrierAuth.SkewSeconds + 1;
-            Assert.That(receiver.Verify(f, signer.Seal(f)), Is.Null, "the old nonces aged out");
-            Assert.That(receiver.NonceCount, Is.EqualTo(1));
+            {
+                var assertedValue = receiver.Verify(f, signer.Seal(f));
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the old nonces aged out");
+            }
+            Assert.Equal(1, receiver.NonceCount);
         }
 
         // ---- a forged ring and a session this instance already holds ---------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AForgedRingCannotLatchRingSentOnASessionThisInstanceHolds()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine b = Engine();
             NonSpatialVoiceSession mine = Conference(b, Bob);   // started here
             string tokenBefore = b.IssueToken(mine.SessionId, Alice);
             OSDMap body = ConferenceBody(b, mine);
             // The last seat goes, which ends the ring cycle: the next real call here must ring again.
             b.Depart(mine.SessionId, Alice, DepartureReason.VoiceTeardown);
-            Assert.That(mine.RingSent, Is.False);
+            Assert.False(mine.RingSent);
             int membersBefore = mine.Members.Count;
 
-            Assert.That(Offer(Ring(Carol, mine, body, null), Auth(), b).Ok, Is.False);
-            Assert.That(Offer(Ring(Carol, mine, body, Auth(OtherSecret)), Auth(), b).Ok, Is.False);
+            Assert.False(Offer(Ring(Carol, mine, body, null), Auth(), b).Ok);
+            Assert.False(Offer(Ring(Carol, mine, body, Auth(OtherSecret)), Auth(), b).Ok);
 
-            Assert.That(mine.RingSent, Is.False, "a forged ring must not suppress the real ring");
-            Assert.That(mine.Token, Is.EqualTo(tokenBefore));
-            Assert.That(mine.Members, Has.Count.EqualTo(membersBefore));
-            Assert.That(mine.Find(Carol), Is.Null);
+            Assert.False(mine.RingSent, "a forged ring must not suppress the real ring");
+            Assert.Equal(tokenBefore, mine.Token);
+            Assert.Equal(membersBefore, mine.Members.Count());
+            Assert.Null(mine.Find(Carol));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGenuineRingNamingASessionStartedHereChangesNothingAboutIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine b = Engine();
             NonSpatialVoiceSession mine = Conference(b, Bob);
             string tokenBefore = b.IssueToken(mine.SessionId, Alice);
             OSDMap body = ConferenceBody(b, mine);
             ((OSDMap)body["voice"])["channel_credentials"] = OSD.FromString("a-different-credential");
             b.Depart(mine.SessionId, Alice, DepartureReason.VoiceTeardown);   // ends the ring cycle
-            Assert.That(mine.RingSent, Is.False);
+            Assert.False(mine.RingSent);
 
             RingIntake r = Offer(Ring(Carol, mine, body, Auth()), Auth(), b);
 
-            Assert.That(r.Ok, Is.True, "the viewer still gets the invitation");
-            Assert.That(r.Decision, Is.EqualTo("ring-session-held"));
-            Assert.That(mine.RingSent, Is.False);
-            Assert.That(mine.Token, Is.EqualTo(tokenBefore));
-            Assert.That(mine.Find(Carol), Is.Null, "no member was added to a session started here");
-            Assert.That(mine.WasInvited(Carol), Is.False);
+            Assert.True(r.Ok, "the viewer still gets the invitation");
+            Assert.Equal("ring-session-held", r.Decision);
+            Assert.False(mine.RingSent);
+            Assert.Equal(tokenBefore, mine.Token);
+            {
+                var assertedValue = mine.Find(Carol);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no member was added to a session started here");
+            }
+            Assert.False(mine.WasInvited(Carol));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASecondGenuineRingMayInviteAnotherTargetIntoAnAdoptedConferenceAndNothingElse()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob, Carol);
             OSDMap body = ConferenceBody(a, s);
 
             NonSpatialVoiceSessionEngine b = Engine();
-            Assert.That(Offer(Ring(Bob, s, body, Auth()), Auth(), b).Ok, Is.True);
+            Assert.True(Offer(Ring(Bob, s, body, Auth()), Auth(), b).Ok);
             NonSpatialVoiceSession adopted = b.Store.Get(s.SessionId);
             string tokenBefore = adopted.Token;
             DateTime seenBefore = adopted.LastSeenUtc;
@@ -440,18 +477,28 @@ namespace osWebRtcVoice.Tests
             ((OSDMap)body["voice"])["channel_credentials"] = OSD.FromString("a-different-credential");
             RingIntake second = Offer(Ring(Carol, s, body, Auth()), Auth(), b);
 
-            Assert.That(second.Ok, Is.True);
-            Assert.That(second.Decision, Is.EqualTo("ring-adopt-idempotent"));
-            Assert.That(adopted.Find(Carol)?.State, Is.EqualTo(MemberState.Invited), "so Carol's accept is admitted here");
-            Assert.That(adopted.WasInvited(Carol), Is.True);
-            Assert.That(adopted.Token, Is.EqualTo(tokenBefore), "the credential is not replaced");
-            Assert.That(adopted.LastSeenUtc, Is.EqualTo(seenBefore));
-            Assert.That(adopted.SeatsHeld, Is.EqualTo(0), "a ring seats nobody");
+            Assert.True(second.Ok);
+            Assert.Equal("ring-adopt-idempotent", second.Decision);
+            {
+                var assertedValue = adopted.Find(Carol)?.State;
+                TestAssert.WithMessage(() => Assert.Equal(MemberState.Invited, assertedValue), "so Carol's accept is admitted here");
+            }
+            Assert.True(adopted.WasInvited(Carol));
+            {
+                var assertedValue = adopted.Token;
+                TestAssert.WithMessage(() => Assert.Equal(tokenBefore, assertedValue), "the credential is not replaced");
+            }
+            Assert.Equal(seenBefore, adopted.LastSeenUtc);
+            {
+                var assertedValue = adopted.SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "a ring seats nobody");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingOfTheOtherTypeCannotTouchAnExistingSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine b = Engine();
             UUID id = UUID.Random();
             b.AdoptRemoteRing(id, NonSpatialRoomKey.Derive("example-grid", NonSpatialSessionType.Adhoc, id), "tok", 50,
@@ -460,8 +507,8 @@ namespace osWebRtcVoice.Tests
             SessionOutcome o = b.AdoptRemoteRing(id, NonSpatialRoomKey.Derive("example-grid", NonSpatialSessionType.Group, id),
                                                  "tok2", 50, Alice, new[] { Carol }, NonSpatialSessionType.Group);
 
-            Assert.That(o.Ok, Is.False);
-            Assert.That(b.Store.Get(id).Find(Carol), Is.Null);
+            Assert.False(o.Ok);
+            Assert.Null(b.Store.Get(id).Find(Carol));
         }
 
         // ---- conference text -------------------------------------------------------------------------
@@ -480,95 +527,104 @@ namespace osWebRtcVoice.Tests
             => AdhocTextTransport.Build(to, from, "Test User", s.SessionId, RegionA, line, null,
                                         roomKey == "use-session" ? s.RoomKey : roomKey, auth);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGenuineTextLineIsAccepted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession s);
 
             TextIntake t = CarrierIntake.AcceptText(Text(s, Alice, Bob, "hello there", Auth()), Auth(), e);
 
-            Assert.That(t.Ok, Is.True, t.Decision + " " + t.Reason);
-            Assert.That(t.Message, Is.EqualTo("hello there"));
-            Assert.That(t.Sender, Is.EqualTo(Alice));
-            Assert.That(t.Target, Is.EqualTo(Bob));
+            Assert.True(t.Ok, t.Decision + " " + t.Reason);
+            Assert.Equal("hello there", t.Message);
+            Assert.Equal(Alice, t.Sender);
+            Assert.Equal(Bob, t.Target);
         }
 
         // ---- the accepted-carrier log line --------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnAcceptedTextLineIsMarkedAuthenticatedAndNamesItsOrigin()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession s);
 
             TextIntake t = CarrierIntake.AcceptText(Text(s, Alice, Bob, "hello there", Auth()), Auth(), e);
 
-            Assert.That(t.Authenticated, Is.True);
-            Assert.That(t.OriginRegion, Is.EqualTo(RegionA));
+            Assert.True(t.Authenticated);
+            Assert.Equal(RegionA, t.OriginRegion);
             string line = CarrierAuth.AcceptedLine(CarrierAuth.KindText, t.SessionId, NonSpatialSessionType.Adhoc, t.OriginRegion);
-            Assert.That(line, Does.Contain("kind=text"));
-            Assert.That(line, Does.Contain("session=" + s.SessionId));
-            Assert.That(line, Does.Contain("type=Adhoc"));
-            Assert.That(line, Does.Contain("from=" + RegionA));
-            Assert.That(line, Does.Not.Contain("hello there"), "contents never reach the log");
+            Assert.Contains("kind=text", line);
+            Assert.Contains("session=" + s.SessionId, line);
+            Assert.Contains("type=Adhoc", line);
+            Assert.Contains("from=" + RegionA, line);
+            {
+                var assertedValue = line;
+                TestAssert.WithMessage(() => Assert.DoesNotContain("hello there", assertedValue), "contents never reach the log");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnAcceptedRingCarriesItsTypeAndOrigin()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), Auth());
 
             RingIntake r = Offer(im, Auth(), Engine());
 
-            Assert.That(r.Authenticated, Is.True);
-            Assert.That(r.Type, Is.EqualTo(NonSpatialSessionType.Adhoc));
-            Assert.That(r.OriginRegion, Is.EqualTo(RegionA));
+            Assert.True(r.Authenticated);
+            Assert.Equal(NonSpatialSessionType.Adhoc, r.Type);
+            Assert.Equal(RegionA, r.OriginRegion);
             string line = CarrierAuth.AcceptedLine(CarrierAuth.KindRing, r.GroupId, r.Type, r.OriginRegion);
-            Assert.That(line, Does.Contain("kind=ring"));
-            Assert.That(line, Does.Contain("session=" + s.SessionId));
-            Assert.That(line, Does.Contain("from=" + RegionA));
+            Assert.Contains("kind=ring", line);
+            Assert.Contains("session=" + s.SessionId, line);
+            Assert.Contains("from=" + RegionA, line);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusedCarrierIsNotMarkedAuthenticated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             GridInstantMessage forged = Ring(Bob, s, ConferenceBody(a, s), Auth(OtherSecret));
-            Assert.That(Offer(forged, Auth(), Engine()).Authenticated, Is.False);
+            Assert.False(Offer(forged, Auth(), Engine()).Authenticated);
 
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession ts);
-            Assert.That(CarrierIntake.AcceptText(Text(ts, Alice, Bob, "forged", null), Auth(), e).Authenticated, Is.False);
+            Assert.False(CarrierIntake.AcceptText(Text(ts, Alice, Bob, "forged", null), Auth(), e).Authenticated);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ATextLineWithNoMacIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession s);
 
             TextIntake t = CarrierIntake.AcceptText(Text(s, Alice, Bob, "forged", null), Auth(), e);
 
-            Assert.That(t.Ok, Is.False);
-            Assert.That(t.Reason, Is.EqualTo(CarrierAuth.MissingMac));
+            Assert.False(t.Ok);
+            Assert.Equal(CarrierAuth.MissingMac, t.Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ATextLineSignedWithAnotherSecretIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession s);
-            Assert.That(CarrierIntake.AcceptText(Text(s, Alice, Bob, "forged", Auth(OtherSecret)), Auth(), e).Reason,
-                        Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, CarrierIntake.AcceptText(Text(s, Alice, Bob, "forged", Auth(OtherSecret)), Auth(), e).Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AForgedTextBodyOrSenderIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession s);
 
@@ -576,75 +632,90 @@ namespace osWebRtcVoice.Tests
             GridInstantMessage im = Text(s, Alice, Bob, "meet at noon", Auth());
             Rewrite(im, AdhocTextTransport.BucketMagic, m => m[AdhocTextTransport.KeyMessage] = OSD.FromString("send me money"));
             TextIntake edited = CarrierIntake.AcceptText(im, Auth(), e);
-            Assert.That(edited.Ok, Is.False);
-            Assert.That(edited.Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.False(edited.Ok);
+            Assert.Equal(CarrierAuth.BadMac, edited.Reason);
 
             // A signed line attributed to another member.
             im = Text(s, Alice, Bob, "meet at noon", Auth());
             im.fromAgentID = Carol.Guid;
-            Assert.That(CarrierIntake.AcceptText(im, Auth(), e).Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, CarrierIntake.AcceptText(im, Auth(), e).Reason);
 
             // A signed line aimed at another member.
             im = Text(s, Alice, Bob, "meet at noon", Auth());
             im.toAgentID = Carol.Guid;
-            Assert.That(CarrierIntake.AcceptText(im, Auth(), e).Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, CarrierIntake.AcceptText(im, Auth(), e).Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStaleOrReplayedTextLineIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession s);
             GridInstantMessage im = Text(s, Alice, Bob, "once", Auth());
             CarrierAuth receiver = Auth();
 
-            Assert.That(CarrierIntake.AcceptText(im, receiver, e).Ok, Is.True);
-            Assert.That(CarrierIntake.AcceptText(im, receiver, e).Reason, Is.EqualTo(CarrierAuth.Replay));
+            Assert.True(CarrierIntake.AcceptText(im, receiver, e).Ok);
+            Assert.Equal(CarrierAuth.Replay, CarrierIntake.AcceptText(im, receiver, e).Reason);
 
             GridInstantMessage old = Text(s, Alice, Bob, "old", Auth());
             _now = T0 + 1000;
-            Assert.That(CarrierIntake.AcceptText(old, Auth(), e).Reason, Is.EqualTo(CarrierAuth.Stale));
+            Assert.Equal(CarrierAuth.Stale, CarrierIntake.AcceptText(old, Auth(), e).Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASignedTextLineWithAMissingOrWrongRoomKeyIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession s);
 
             TextIntake missing = CarrierIntake.AcceptText(Text(s, Alice, Bob, "hi", Auth(), roomKey: ""), Auth(), e);
-            Assert.That(missing.Ok, Is.False);
-            Assert.That(missing.Decision, Is.EqualTo(CarrierIntake.DecisionRoomKeyMismatch));
+            Assert.False(missing.Ok);
+            Assert.Equal(CarrierIntake.DecisionRoomKeyMismatch, missing.Decision);
 
             TextIntake wrong = CarrierIntake.AcceptText(Text(s, Alice, Bob, "hi", Auth(), roomKey: "other"), Auth(), e);
-            Assert.That(wrong.Ok, Is.False);
-            Assert.That(wrong.Decision, Is.EqualTo(CarrierIntake.DecisionRoomKeyMismatch));
+            Assert.False(wrong.Ok);
+            Assert.Equal(CarrierIntake.DecisionRoomKeyMismatch, wrong.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASignedLineFromANonMemberIsStillRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession s);
             UUID stranger = new UUID("99999999-9999-9999-9999-999999999999");
 
             TextIntake t = CarrierIntake.AcceptText(Text(s, stranger, Bob, "hi", Auth()), Auth(), e);
 
-            Assert.That(t.Ok, Is.False);
-            Assert.That(t.Decision, Is.EqualTo(AdhocTextSession.DecisionNotMember));
+            Assert.False(t.Ok);
+            Assert.Equal(AdhocTextSession.DecisionNotMember, t.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingIsNotReadAsTextAndTextIsNotReadAsARing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine a = Engine();
             NonSpatialVoiceSession s = Conference(a, Bob);
             GridInstantMessage ring = Ring(Bob, s, ConferenceBody(a, s), Auth());
-            Assert.That(CarrierIntake.AcceptText(ring, Auth(), a).Claimed, Is.False);
+            Assert.False(CarrierIntake.AcceptText(ring, Auth(), a).Claimed);
 
             NonSpatialVoiceSessionEngine e = Engine();
             ThreeWayText(e, out _, out NonSpatialVoiceSession ts);
-            Assert.That(Offer(Text(ts, Alice, Bob, "hi", Auth()), Auth(), e).Claimed, Is.False);
+            Assert.False(Offer(Text(ts, Alice, Bob, "hi", Auth()), Auth(), e).Claimed);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

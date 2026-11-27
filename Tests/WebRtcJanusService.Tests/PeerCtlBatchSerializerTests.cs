@@ -19,7 +19,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class PeerCtlBatchSerializerTests
     {
         private static UUID Id(int n)
@@ -42,91 +41,138 @@ namespace osWebRtcVoice.Tests
             return d;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OpString_MapsEachOp()
         {
-            Assert.That(PeerCtlBatchSerializer.OpString(VisOp.Add), Is.EqualTo("add"));
-            Assert.That(PeerCtlBatchSerializer.OpString(VisOp.Remove), Is.EqualTo("remove"));
-            Assert.That(PeerCtlBatchSerializer.OpString(VisOp.Replace), Is.EqualTo("replace"));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal("add", PeerCtlBatchSerializer.OpString(VisOp.Add));
+            Assert.Equal("remove", PeerCtlBatchSerializer.OpString(VisOp.Remove));
+            Assert.Equal("replace", PeerCtlBatchSerializer.OpString(VisOp.Replace));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_ProducesRoomLessBody_WithRequestOpAndExcl()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap body = PeerCtlBatchSerializer.BuildRequest(VisOp.Add, Excl((1, new[] { 2, 3 })));
 
-            Assert.That(body["request"].AsString(), Is.EqualTo("peer_ctl_batch"));
-            Assert.That(body["op"].AsString(), Is.EqualTo("add"));
+            Assert.Equal("peer_ctl_batch", body["request"].AsString());
+            Assert.Equal("add", body["op"].AsString());
             // Room-less: the sink stamps "room", the serializer must NOT.
-            Assert.That(body.ContainsKey("room"), Is.False, "serializer must stay room-agnostic");
+            Assert.False(body.ContainsKey("room"), "serializer must stay room-agnostic");
 
             var excl = (OSDMap)body["excl"];
             var sources = (OSDArray)excl[Id(1).ToString()];
-            Assert.That(sources.Count, Is.EqualTo(2));
-            Assert.That(sources[0].AsString(), Is.EqualTo(Id(2).ToString()));
-            Assert.That(sources[1].AsString(), Is.EqualTo(Id(3).ToString()));
+            Assert.Equal(2, sources.Count);
+            Assert.Equal(Id(2).ToString(), sources[0].AsString());
+            Assert.Equal(Id(3).ToString(), sources[1].AsString());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_EmptySourceList_IsPreservedAsExplicitClear()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // An empty source array is a MEANINGFUL "clear this listener" (Replace clear-tracking),
             // not an error — it must survive serialization as an empty array.
             OSDMap body = PeerCtlBatchSerializer.BuildRequest(VisOp.Replace, Excl((1, new int[0])));
             var excl = (OSDMap)body["excl"];
-            Assert.That(excl.ContainsKey(Id(1).ToString()), Is.True);
-            Assert.That(((OSDArray)excl[Id(1).ToString()]).Count, Is.EqualTo(0));
+            Assert.True(excl.ContainsKey(Id(1).ToString()));
+            Assert.Empty(((OSDArray)excl[Id(1).ToString()]));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_ZeroListenerUUID_ThrowsInvariant()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var bad = new Dictionary<UUID, IReadOnlyCollection<UUID>> { [UUID.Zero] = new List<UUID> { Id(2) } };
-            Assert.That(() => PeerCtlBatchSerializer.BuildRequest(VisOp.Add, bad),
-                Throws.TypeOf<InvalidOperationException>());
+            {
+                var assertedValue = () => PeerCtlBatchSerializer.BuildRequest(VisOp.Add, bad);
+                Assert.Throws<InvalidOperationException>(() =>
+                {
+                    assertedValue();
+                });
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_ZeroSourceUUID_ThrowsInvariant()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var bad = new Dictionary<UUID, IReadOnlyCollection<UUID>> { [Id(1)] = new List<UUID> { UUID.Zero } };
-            Assert.That(() => PeerCtlBatchSerializer.BuildRequest(VisOp.Add, bad),
-                Throws.TypeOf<InvalidOperationException>());
+            {
+                var assertedValue = () => PeerCtlBatchSerializer.BuildRequest(VisOp.Add, bad);
+                Assert.Throws<InvalidOperationException>(() =>
+                {
+                    assertedValue();
+                });
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildRequest_NullExcl_Throws()
         {
-            Assert.That(() => PeerCtlBatchSerializer.BuildRequest(VisOp.Add, null),
-                Throws.TypeOf<ArgumentNullException>());
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            {
+                var assertedValue = () => PeerCtlBatchSerializer.BuildRequest(VisOp.Add, null);
+                Assert.Throws<ArgumentNullException>(() =>
+                {
+                    assertedValue();
+                });
+            }
         }
 
         // ---- EnsureDisjoint: an (L,S) in BOTH add and remove is a feeder bug — must throw ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EnsureDisjoint_OverlappingPair_ThrowsNamingTheOverlap()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var added = Excl((1, new[] { 2, 3 }));
             var removed = Excl((1, new[] { 3 }));   // (listener 1, source 3) in both
-            Assert.That(() => PeerCtlBatchSerializer.EnsureDisjoint(added, removed),
-                Throws.TypeOf<InvalidOperationException>()
-                      .With.Message.Contains(Id(3).ToString()));
+            {
+                var assertedValue = () => PeerCtlBatchSerializer.EnsureDisjoint(added, removed);
+                var thrownException = Assert.Throws<InvalidOperationException>(() =>
+                {
+                    assertedValue();
+                });
+                Assert.Contains(Id(3).ToString(), thrownException.Message);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EnsureDisjoint_SameListenerDifferentSources_DoesNotThrow()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Add source 2, remove source 4 for the same listener — legitimate, disjoint per pair.
             var added = Excl((1, new[] { 2 }));
             var removed = Excl((1, new[] { 4 }));
-            Assert.That(() => PeerCtlBatchSerializer.EnsureDisjoint(added, removed), Throws.Nothing);
+            {
+                var assertedValue = () => PeerCtlBatchSerializer.EnsureDisjoint(added, removed);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EnsureDisjoint_NullSides_DoNotThrow()
         {
-            Assert.That(() => PeerCtlBatchSerializer.EnsureDisjoint(null, Excl((1, new[] { 2 }))), Throws.Nothing);
-            Assert.That(() => PeerCtlBatchSerializer.EnsureDisjoint(Excl((1, new[] { 2 })), null), Throws.Nothing);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            {
+                var assertedValue = () => PeerCtlBatchSerializer.EnsureDisjoint(null, Excl((1, new[] { 2 })));
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
+            {
+                var assertedValue = () => PeerCtlBatchSerializer.EnsureDisjoint(Excl((1, new[] { 2 })), null);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
         }
     }
 }
