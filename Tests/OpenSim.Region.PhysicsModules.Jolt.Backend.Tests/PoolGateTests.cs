@@ -9,7 +9,6 @@ using System.Diagnostics;
 using System.Numerics;
 using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -66,7 +65,7 @@ public class PoolGateTests
         var stepped = new ManualResetEventSlim(false);
         var stepper = new Thread(() => { b.Step(); stepped.Set(); }) { IsBackground = true, Name = "region-B-step" };
         stepper.Start();
-        var waiting = bWaits.Wait(Limit) && !stepped.IsSet;
+        var waiting = bWaits.Wait(Limit, TestContext.Current.CancellationToken) && !stepped.IsSet;
 
         bool created, cast;
         TimeSpan createTook, castTook;
@@ -88,7 +87,7 @@ public class PoolGateTests
             hold.Dispose();   // same thread that took it (Monitor)
         }
 
-        Assert.True(stepped.Wait(Limit), "B's Step did not complete after the pool gate was released");
+        Assert.True(stepped.Wait(Limit, TestContext.Current.CancellationToken), "B's Step did not complete after the pool gate was released");
         b.B.SetPoolHooksForTest(null, null);
         Assert.True(created, "CreateBody blocked while B's Step waited for the pool - B's _simLock was held across the wait");
         Assert.True(cast, "RayCast blocked while B's Step waited for the pool - B's _simLock was held across the wait");

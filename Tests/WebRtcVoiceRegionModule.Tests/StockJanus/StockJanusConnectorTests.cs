@@ -36,30 +36,25 @@ using osWebRtcVoice.Tests.StockJanus;
 
 namespace osWebRtcVoice.Tests
 {
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-    [TestFixture, NUnit.Framework.Timeout(240000)]
-#pragma warning restore CS0618
     [NeedsPlugin(JanusPluginKind.Mixer)]
-    public class StockJanusConnectorTests
-    {
+    public class StockJanusConnectorTests(RawJanus janus) : IAsyncLifetime, IClassFixture<RawJanus>
+        {
         private static readonly TimeSpan Settle = TimeSpan.FromSeconds(40);
 
-        private readonly RawJanus _janus = new();
+        private readonly RawJanus _janus = janus;
         private string _joinCapSecret;
         private string _connectors;
-
-        [OneTimeSetUp]
-        public void RequireGatewayPythonAndConnectors()
+        private void RequireGatewayPythonAndConnectors()
         {
-            StockJanusEnvironment.IgnoreUnlessConfigured();
+            StockJanusEnvironment.IgnoreUnlessConfigured(JanusPluginKind.Mixer);
             _joinCapSecret = StockJanusEnvironment.Get("WEBRTC_JANUS_TEST_JOIN_CAP_SECRET");
             if (string.IsNullOrEmpty(_joinCapSecret))
-                Assert.Ignore("WEBRTC_JANUS_TEST_JOIN_CAP_SECRET is not set: it is the mixer's JS_JOIN_CAP_SECRET");
+                Assert.Skip("WEBRTC_JANUS_TEST_JOIN_CAP_SECRET is not set: it is the mixer's JS_JOIN_CAP_SECRET");
             if (string.IsNullOrEmpty(StockJanusEnvironment.Python))
-                Assert.Ignore("WEBRTC_JANUS_TEST_PYTHON is not set");
+                Assert.Skip("WEBRTC_JANUS_TEST_PYTHON is not set");
             _connectors = StockJanusEnvironment.Get("WEBRTC_JANUS_TEST_CONNECTORS_DIR");
             if (string.IsNullOrEmpty(_connectors) || !File.Exists(Path.Combine(_connectors, "recorder", "recorder.py")))
-                Assert.Ignore("WEBRTC_JANUS_TEST_CONNECTORS_DIR is not set to the mixer repository's connectors directory");
+                Assert.Skip("WEBRTC_JANUS_TEST_CONNECTORS_DIR is not set to the mixer repository's connectors directory");
         }
 
         /// <summary>A connector program started as a child process. Its output is kept, never the environment it was given.</summary>
@@ -197,27 +192,37 @@ namespace osWebRtcVoice.Tests
 
         private static string NewSecret() => Convert.ToHexString(Guid.NewGuid().ToByteArray()) + Convert.ToHexString(Guid.NewGuid().ToByteArray());
 
-        [Test]
+        [Fact(Timeout = 240000)]
         public void TheRecorder_WithoutTheOptIn_RefusesToStart()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var recorder = new Program(StockJanusEnvironment.Python, _connectors, "recorder.recorder",
                 Env(UUID.Random().ToString(), 1, null, null, optIn: false));
 
-            Assert.That(recorder.WaitForExit(TimeSpan.FromSeconds(30)), Is.True, "it exits: " + recorder.Output);
+            Assert.True(recorder.WaitForExit(TimeSpan.FromSeconds(30)), "it exits: " + recorder.Output);
 
-            Assert.That(recorder.ExitCode, Is.Not.EqualTo(0));
-            Assert.That(recorder.Output, Does.Contain("RECORDING_OPT_IN=<unset>").And.Contain("FATAL"));
+            Assert.NotEqual(0, recorder.ExitCode);
+            {
+                var assertedValue = recorder.Output;
+                Assert.Contains("RECORDING_OPT_IN=<unset>", assertedValue);
+                Assert.Contains("FATAL", assertedValue);
+            }
         }
 
-        [TestCase("recorder.recorder", true)]
-        [TestCase("injector.injector", false)]
+        [InlineData("recorder.recorder",true)]
+        [InlineData("injector.injector",false)]
+        [Theory(Timeout = 240000)]
         public async Task AProgramJoinsWithACapabilityTheRegionMinted(string module, bool recording)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create(CapabilityOn);
             UUID regionId = region.Scene.RegionInfo.RegionID;
             int? room = region.Service.EnsureSpatialRoom(regionId, JanusAudioBridge.REGION_ROOM_ID);
-            Assert.That(room, Is.Not.Null, "the region made the room");
-            Assert.That(await _janus.RoomExistsAsync(room.Value), Is.True, "the mixer holds it, with no avatar in it");
+            {
+                var assertedValue = room;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the region made the room");
+            }
+            Assert.True((await _janus.RoomExistsAsync(room.Value)), "the mixer holds it, with no avatar in it");
 
             string secret = NewSecret();
             VoiceConnectorRecord record = Record("Prog", secret, room.Value);
@@ -228,19 +233,20 @@ namespace osWebRtcVoice.Tests
 
             bool joined = await _janus.WaitForParticipantsAsync(room.Value, 1, Settle);
 
-            Assert.That(joined, Is.True, "the program is in the room. Output: " + program.Output);
-            Assert.That(program.HasExited, Is.False, program.Output);
-            Assert.That(host.Fetches, Is.GreaterThanOrEqualTo(1), "it fetched a capability from the region");
-            Assert.That(host.Statuses, Has.All.EqualTo(200));
+            Assert.True(joined, "the program is in the room. Output: " + program.Output);
+            Assert.False(program.HasExited, program.Output);
+            Assert.True(host.Fetches >= 1, "it fetched a capability from the region");
+            Assert.All(host.Statuses, item => Assert.Equal(200, item));
         }
 
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task AProgramWhoseCapabilityWasSignedWithAnotherKey_IsNotAdmitted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create(CapabilityOn);
             UUID regionId = region.Scene.RegionInfo.RegionID;
             int? room = region.Service.EnsureSpatialRoom(regionId, JanusAudioBridge.REGION_ROOM_ID);
-            Assert.That(room, Is.Not.Null);
+            Assert.NotNull(room);
 
             string secret = NewSecret();
             VoiceConnectorRecord record = Record("Forged", secret, room.Value);
@@ -250,10 +256,24 @@ namespace osWebRtcVoice.Tests
                 Env(record.NpcId.ToString(), room.Value, host.Url, secret, optIn: true));
 
             // A window in which something must NOT happen: the program keeps trying and the mixer keeps refusing.
-            await Task.Delay(TimeSpan.FromSeconds(15));
+            await Task.Delay(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
 
-            Assert.That(host.Fetches, Is.GreaterThanOrEqualTo(1), "it did ask: " + program.Output);
-            Assert.That(await _janus.ParticipantCountAsync(room.Value), Is.EqualTo(0), "the mixer did not admit it. Output: " + program.Output);
+            Assert.True(host.Fetches >= 1, "it did ask: " + program.Output);
+            {
+                var assertedValue = await _janus.ParticipantCountAsync(room.Value);
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the mixer did not admit it. Output: " + program.Output);
+            }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            RequireGatewayPythonAndConnectors();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

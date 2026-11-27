@@ -26,10 +26,8 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]
-    public class JanusSecretLoggingTests
-    {
+    public class JanusSecretLoggingTests : IAsyncLifetime
+        {
         private const string ApiSecret = "api-secret-0123456789abcdef0123456789abcdef";
         private const string AdminSecret = "admin-secret-0123456789abcdef0123456789abcd";
 
@@ -95,16 +93,12 @@ namespace osWebRtcVoice.Tests
         private Capture _log;
         private LogCapture _logging;
         private readonly List<JanusSession> _sessions = new();
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
         }
-
-        [TearDown]
-        public async Task TearDown()
+        private async Task TearDown()
         {
             foreach (JanusSession s in _sessions)
             {
@@ -123,7 +117,7 @@ namespace osWebRtcVoice.Tests
             var s = new JanusSession("http://janus.test/voice", ApiSecret, "http://janus.test/admin", AdminSecret,
                                      messageDetails, fake);
             _sessions.Add(s);
-            Assert.That(await s.CreateSession(), Is.True, "fake create succeeds and starts the long poll");
+            Assert.True((await s.CreateSession()), "fake create succeeds and starts the long poll");
             return (s, fake);
         }
 
@@ -142,13 +136,20 @@ namespace osWebRtcVoice.Tests
 
         private static void AssertNoSecrets(string text, string what)
         {
-            Assert.That(text, Does.Not.Contain(ApiSecret), what + " must not carry the API secret");
-            Assert.That(text, Does.Not.Contain(AdminSecret), what + " must not carry the admin secret");
+            {
+                var assertedValue = text;
+                TestAssert.WithMessage(() => Assert.DoesNotContain(ApiSecret, assertedValue), what + " must not carry the API secret");
+            }
+            {
+                var assertedValue = text;
+                TestAssert.WithMessage(() => Assert.DoesNotContain(AdminSecret, assertedValue), what + " must not carry the admin secret");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheBaseRequestLogFormHidesBothSecrets()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var req = new JanusMessageReq("keepalive");
             req.AddAPIToken(ApiSecret);
             req.RawBody["admin_secret"] = AdminSecret;
@@ -156,15 +157,28 @@ namespace osWebRtcVoice.Tests
             string forLog = req.ToJsonForLog();
 
             AssertNoSecrets(forLog, "the log form of a request");
-            Assert.That(forLog, Does.Contain("keepalive"), "the rest of the request is still logged");
-            Assert.That(forLog, Does.Contain(req.TransactionId), "the transaction id stays: it is what an operator correlates on");
-            Assert.That(req.ToJson(), Does.Contain(ApiSecret), "the wire form still carries the API secret");
-            Assert.That(req.ToJson(), Does.Contain(AdminSecret), "the wire form still carries the admin secret");
+            {
+                var assertedValue = forLog;
+                TestAssert.WithMessage(() => Assert.Contains("keepalive", assertedValue), "the rest of the request is still logged");
+            }
+            {
+                var assertedValue = forLog;
+                TestAssert.WithMessage(() => Assert.Contains(req.TransactionId, assertedValue), "the transaction id stays: it is what an operator correlates on");
+            }
+            {
+                var assertedValue = req.ToJson();
+                TestAssert.WithMessage(() => Assert.Contains(ApiSecret, assertedValue), "the wire form still carries the API secret");
+            }
+            {
+                var assertedValue = req.ToJson();
+                TestAssert.WithMessage(() => Assert.Contains(AdminSecret, assertedValue), "the wire form still carries the admin secret");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ThePluginMessageLogFormHidesBothSecretsAndTheJoinCapability()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const string capability = "join-capability-token-value";
             var req = new PluginMsgReq(new OSDMap());
             req.AddStringToBody("join_cap", capability);
@@ -174,60 +188,93 @@ namespace osWebRtcVoice.Tests
             string forLog = req.ToJsonForLog();
 
             AssertNoSecrets(forLog, "the log form of a plugin message");
-            Assert.That(forLog, Does.Not.Contain(capability), "the join capability stays hidden");
-            Assert.That(req.ToJson(), Does.Contain(ApiSecret), "the wire form still carries the API secret");
+            {
+                var assertedValue = forLog;
+                TestAssert.WithMessage(() => Assert.DoesNotContain(capability, assertedValue), "the join capability stays hidden");
+            }
+            {
+                var assertedValue = req.ToJson();
+                TestAssert.WithMessage(() => Assert.Contains(ApiSecret, assertedValue), "the wire form still carries the API secret");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ALoggedRequestCarriesNeitherSecret()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (s, _) = await ConnectedSession(messageDetails: true);
 
             await s.SendToJanus(new JanusMessageReq("message"), s.SessionUri);
 
             string line = await WaitForLine(_log, "SendToJanus. URI=");
-            Assert.That(line, Is.Not.Null, "the request line is logged when MessageDetails is on");
+            {
+                var assertedValue = line;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the request line is logged when MessageDetails is on");
+            }
             AssertNoSecrets(line, "the logged request");
             AssertNoSecrets(string.Join("\n", _log.Lines()), "any log line");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ALoggedUriHasItsQueryRedacted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (s, _) = await ConnectedSession(messageDetails: true);
 
             await s.SendToJanus(new JanusMessageReq("message"), s.SessionUri + "?apisecret=" + ApiSecret + "&x=1");
 
             string line = await WaitForLine(_log, "SendToJanus. URI=" + s.SessionUri);
-            Assert.That(line, Is.Not.Null, "the request to the session URI is logged");
+            {
+                var assertedValue = line;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the request to the session URI is logged");
+            }
             AssertNoSecrets(line, "the logged URI");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheLongPollUrlIsLoggedWithoutTheSecretButStillSentWithIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (_, fake) = await ConnectedSession(messageDetails: true);
 
             string line = await WaitForLine(_log, "GetFromJanus: URI=");
-            Assert.That(line, Is.Not.Null, "the long-poll URL is logged when MessageDetails is on");
+            {
+                var assertedValue = line;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the long-poll URL is logged when MessageDetails is on");
+            }
             AssertNoSecrets(line, "the logged long-poll URL");
             AssertNoSecrets(string.Join("\n", _log.Lines()), "any log line");
 
             var sw = Stopwatch.StartNew();
             while (fake.GetUrls.IsEmpty && sw.ElapsedMilliseconds < 5000)
-                await Task.Delay(20);
-            Assert.That(fake.GetUrls.TryPeek(out string sent), Is.True, "the fake saw the long poll");
-            Assert.That(sent, Does.Contain("?apisecret=" + ApiSecret), "Janus needs the secret in the GET query");
+                await Task.Delay(20, TestContext.Current.CancellationToken);
+            Assert.True(fake.GetUrls.TryPeek(out string sent), "the fake saw the long poll");
+            {
+                var assertedValue = sent;
+                TestAssert.WithMessage(() => Assert.Contains("?apisecret=" + ApiSecret, assertedValue), "Janus needs the secret in the GET query");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task WithMessageDetailsOffNeitherSecretIsLogged()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (s, _) = await ConnectedSession(messageDetails: false);
 
             await s.SendToJanus(new JanusMessageReq("message"), s.SessionUri);
 
             AssertNoSecrets(string.Join("\n", _log.Lines()), "any log line");
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await TearDown();
         }
     }
 }

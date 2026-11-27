@@ -24,7 +24,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class JanusTeardownRequestTests
     {
         private sealed class RecordedRequest
@@ -131,31 +130,45 @@ namespace osWebRtcVoice.Tests
         {
             var fake = new FakeJanus();
             var session = new JanusSession("http://janus.example.org/voice", "tok", "http://janus.example.org/admin", "tok", false, fake);
-            Assert.That(await session.CreateSession(), Is.True);
+            Assert.True(await session.CreateSession());
             var bridge = new JanusAudioBridge(session, "janus.plugin.slvoice");
-            Assert.That(await bridge.Activate(null), Is.True, "the handle attached");
+            Assert.True((await bridge.Activate(null)), "the handle attached");
             var viewer = new JanusViewerSession(null) { Session = session, AudioBridge = bridge };
             return (fake, viewer, bridge);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ShutdownDetachesTheHandleOnceAndTheSessionDestroyIsNotAddressedToIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (fake, viewer, _) = await ConnectedViewer();
 
             await viewer.Shutdown();
 
             var sent = fake.Requests;
-            Assert.That(sent.Where(r => r.Janus == "detach").Count(), Is.EqualTo(1), "each handle is detached at most once");
+            {
+                var assertedValue = sent.Where(r => r.Janus == "detach").Count();
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "each handle is detached at most once");
+            }
             var destroy = sent.Single(r => r.Janus == "destroy");
-            Assert.That(destroy.HandleInBody, Is.Null, "a session request does not name a handle");
-            Assert.That(sent.Where(r => r.RefusedWith != 0), Is.Empty, "Janus refused nothing, so it logged no error");
-            Assert.That(fake.LiveSessions, Is.EqualTo(0), "the session was destroyed now, not left to Janus's idle timeout");
+            {
+                var assertedValue = destroy.HandleInBody;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "a session request does not name a handle");
+            }
+            {
+                var assertedValue = sent.Where(r => r.RefusedWith != 0);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "Janus refused nothing, so it logged no error");
+            }
+            {
+                var assertedValue = fake.LiveSessions;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the session was destroyed now, not left to Janus's idle timeout");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task OnceJanusSaysTheSessionIsGoneNothingMoreIsSentToIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (fake, viewer, bridge) = await ConnectedViewer();
             viewer.Room = new JanusRoom(bridge, 1);
             fake.DropSession();
@@ -164,10 +177,11 @@ namespace osWebRtcVoice.Tests
             await viewer.Shutdown();
 
             var after = fake.Requests.Skip(before).ToList();
-            Assert.That(after.Count, Is.EqualTo(1), "only the leave, which finds out the session is gone; got: "
-                                                    + string.Join(", ", after.Select(r => r.Janus)));
-            Assert.That(after.Any(r => r.Janus == "detach" || r.Janus == "destroy"), Is.False,
-                        "no detach and no destroy for a session Janus no longer has");
+            {
+                var assertedValue = after.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "only the leave, which finds out the session is gone; got: " + string.Join(", ", after.Select(r => r.Janus)));
+            }
+            Assert.False(after.Any(r => r.Janus == "detach" || r.Janus == "destroy"), "no detach and no destroy for a session Janus no longer has");
         }
     }
 }

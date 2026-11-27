@@ -96,7 +96,7 @@ public class BackendTests
         Assert.All(plain.Mask!, v => Assert.InRange(v, 250, 255));
         // and the backend's output is five-component
         var (req, _) = ClassicRequest();
-        foreach (var r in new SkiaBakeBackend().Bake(req)) Assert.Equal(5, J2kCodec.ParseSiz(r.J2kBytes).Csiz);
+        foreach (var r in new SkiaBakeBackend().Bake(req, TestContext.Current.CancellationToken)) Assert.Equal(5, J2kCodec.ParseSiz(r.J2kBytes).Csiz);
     }
 
     [Fact]
@@ -156,14 +156,14 @@ public class BackendTests
         // a texture the request does not carry is reported on the channel that needs it, and only there
         var missingTex = req.Textures.Keys.First();
         var trimmed = req with { Textures = req.Textures.Where(kv => kv.Key != missingTex).ToDictionary(kv => kv.Key, kv => kv.Value) };
-        var results2 = new SkiaBakeBackend().Bake(trimmed);
+        var results2 = new SkiaBakeBackend().Bake(trimmed, TestContext.Current.CancellationToken);
         Assert.Contains(results2, r => r.Fidelity.MissingTextures.Contains(missingTex));
 
         // an unsupported wearable type lands in Refusals on every channel; corrupt text is an exception
         var odd = req with { Wearables = req.Wearables.Append(new WearableInput(UUID.Random(), 99, WearableText((WearableKind)99, "Mystery", new Dictionary<int, float>(), new Dictionary<TextureSlot, UUID>()))).ToList() };
-        Assert.All(new SkiaBakeBackend().Bake(odd), r => Assert.Contains(r.Fidelity.Refusals, s => s.Contains("not composited")));
+        Assert.All(new SkiaBakeBackend().Bake(odd, TestContext.Current.CancellationToken), r => Assert.Contains(r.Fidelity.Refusals, s => s.Contains("not composited")));
         var corrupt = req with { Wearables = req.Wearables.Append(new WearableInput(UUID.Random(), 4, "garbage")).ToList() };
-        Assert.Throws<ArgumentException>(() => new SkiaBakeBackend().Bake(corrupt));
+        Assert.Throws<ArgumentException>(() => new SkiaBakeBackend().Bake(corrupt, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -176,10 +176,10 @@ public class BackendTests
     public void requesting_a_subset_of_channels_bakes_only_those_and_changes_no_bytes()
     {
         var (req, _) = ClassicRequest();
-        var full = new SkiaBakeBackend().Bake(req);
+        var full = new SkiaBakeBackend().Bake(req, TestContext.Current.CancellationToken);
 
         var subset = new[] { BakeChannel.Upper, BakeChannel.Eyes };
-        var partial = new SkiaBakeBackend().Bake(req with { Channels = subset });
+        var partial = new SkiaBakeBackend().Bake(req with { Channels = subset }, TestContext.Current.CancellationToken);
         Assert.Equal(subset, partial.Select(r => r.Channel).ToArray());
         foreach (var r in partial)
         {
@@ -190,10 +190,10 @@ public class BackendTests
         }
 
         // naming a channel the outfit does not feed does not conjure it
-        Assert.Empty(new SkiaBakeBackend().Bake(req with { Channels = new[] { BakeChannel.Skirt } }));
+        Assert.Empty(new SkiaBakeBackend().Bake(req with { Channels = new[] { BakeChannel.Skirt } }, TestContext.Current.CancellationToken));
         // an empty set bakes nothing; null (the default) bakes everything
-        Assert.Empty(new SkiaBakeBackend().Bake(req with { Channels = Array.Empty<BakeChannel>() }));
-        Assert.Equal(full.Count, new SkiaBakeBackend().Bake(req with { Channels = null }).Count);
+        Assert.Empty(new SkiaBakeBackend().Bake(req with { Channels = Array.Empty<BakeChannel>() }, TestContext.Current.CancellationToken));
+        Assert.Equal(full.Count, new SkiaBakeBackend().Bake(req with { Channels = null }, TestContext.Current.CancellationToken).Count);
     }
 
     [Fact]
@@ -353,7 +353,7 @@ public class BackendTests
     {
         var shape = new WearableInput(UUID.Random(), (int)WearableKind.Shape, WearableText(WearableKind.Shape, "S", new Dictionary<int, float> { [80] = 0f }, new Dictionary<TextureSlot, UUID>()));
         var skirt = new WearableInput(UUID.Zero, (int)WearableKind.Skirt, "");   // worn, no asset
-        var results = new SkiaBakeBackend().Bake(new BakeRequest(new[] { shape, skirt }, new Dictionary<int, float>(), new Dictionary<UUID, TextureInput>(), 64));
+        var results = new SkiaBakeBackend().Bake(new BakeRequest(new[] { shape, skirt }, new Dictionary<int, float>(), new Dictionary<UUID, TextureInput>(), 64), TestContext.Current.CancellationToken);
 
         var s = results.Single(r => r.Channel == BakeChannel.Skirt);
         Assert.True(s.NothingDrawn, "an all-skipped skirt channel must report NothingDrawn: " + string.Join(" | ", s.Fidelity.Notes));
@@ -381,8 +381,7 @@ public class BackendTests
         var bald = UUID.Random();
         var hair = new WearableInput(UUID.Random(), (int)WearableKind.Hair, WearableText(WearableKind.Hair, "bald", new Dictionary<int, float> { [114] = 0.5f }, new Dictionary<TextureSlot, UUID> { [TextureSlot.Hair] = bald }));
         var textures = new Dictionary<UUID, TextureInput> { [bald] = new TextureInput(bald, J2kCodec.Encode(CompositorTests.Flat(4, 4, 255, 255, 255, 0))) };
-        var synthetic = new SkiaBakeBackend().Bake(new BakeRequest(new[] { shape, hair }, new Dictionary<int, float>(), textures, 64))
-            .Single(r => r.Channel == BakeChannel.Hair);
+        var synthetic = new SkiaBakeBackend().Bake(new BakeRequest(new[] { shape, hair }, new Dictionary<int, float>(), textures, 64), TestContext.Current.CancellationToken).Single(r => r.Channel == BakeChannel.Hair);
         Assert.False(synthetic.NothingDrawn, "a drawn but transparent layer has drawn: " + string.Join(" | ", synthetic.Fidelity.Notes));
         Assert.Contains(synthetic.Fidelity.Notes, n => n.StartsWith("base drawn"));
         var img = J2kCodec.Decode(synthetic.J2kBytes);

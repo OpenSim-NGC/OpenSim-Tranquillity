@@ -24,7 +24,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class JanusPeerCtlBatchSinkSplitTests
     {
         private const int Limit = PeerCtlBatchSplitter.MixerMaxRequestBytes;
@@ -116,20 +115,23 @@ namespace osWebRtcVoice.Tests
 
         // ---- a room that fits is one request, exactly as before ------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_ARoomThatFits_IsOneRequest()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer();
             using var sink = NewSink(mixer, _ => RoomA);
             var excl = Everyone(10);
 
             PeerCtlSendResult r = await sink.SendAsync(VisOp.Replace, excl);
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(mixer.Sent.Count, Is.EqualTo(1));
-            Assert.That(sink.LastSendRequests, Is.EqualTo(1));
-            Assert.That(mixer.Sent[0].ToString(),
-                Is.EqualTo(Expected(VisOp.Replace, excl, null, RoomA).ToString()), "the same request the sink has always sent");
+            Assert.Equal(PeerCtlSendResult.Ok, r);
+            Assert.Single(mixer.Sent);
+            Assert.Equal(1, sink.LastSendRequests);
+            {
+                var assertedValue = mixer.Sent[0].ToString();
+                TestAssert.WithMessage(() => Assert.Equal(Expected(VisOp.Replace, excl, null, RoomA).ToString(), assertedValue), "the same request the sink has always sent");
+            }
         }
 
         private static OSDMap Expected(VisOp op, IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> excl,
@@ -142,40 +144,44 @@ namespace osWebRtcVoice.Tests
 
         // ---- a room of 110 over the limit -------------------------------------------------------------------
 
-        [TestCase(VisOp.Replace)]
-        [TestCase(VisOp.Add)]
-        [TestCase(VisOp.Remove)]
+        [InlineData(VisOp.Replace)]
+        [InlineData(VisOp.Add)]
+        [InlineData(VisOp.Remove)]
+        [Theory(Timeout = 60000)]
         public async Task SendAsync_ARoomOf110WhereEveryoneIsExcluded_GoesInPartsThatEachFit(VisOp op)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer();
             using var sink = NewSink(mixer, _ => RoomA);
             var excl = Everyone(110);
 
             PeerCtlSendResult r = await sink.SendAsync(op, excl);
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(mixer.Sent.Count, Is.GreaterThan(1));
-            Assert.That(sink.LastSendRequests, Is.EqualTo(mixer.Sent.Count));
-            Assert.That(sink.LastSendRooms, Is.EqualTo(1));
+            Assert.Equal(PeerCtlSendResult.Ok, r);
+            Assert.True(mixer.Sent.Count > 1);
+            Assert.Equal(mixer.Sent.Count, sink.LastSendRequests);
+            Assert.Equal(1, sink.LastSendRooms);
             foreach (OSDMap request in mixer.Sent)
             {
-                Assert.That(PeerCtlBatchSplitter.CompactBytes(request), Is.LessThanOrEqualTo(Limit));
-                Assert.That(request["room"].AsInteger(), Is.EqualTo(RoomA));
-                Assert.That(request["op"].AsString(), Is.EqualTo(PeerCtlBatchSerializer.OpString(op)));
-                Assert.That(request.ContainsKey("mute"), Is.EqualTo(op == VisOp.Replace),
-                    "a replace always carries the mute key, an add or remove with no mutes does not");
+                Assert.True(PeerCtlBatchSplitter.CompactBytes(request) <= Limit);
+                Assert.Equal(RoomA, request["room"].AsInteger());
+                Assert.Equal(PeerCtlBatchSerializer.OpString(op), request["op"].AsString());
+                {
+                    var assertedValue = request.ContainsKey("mute");
+                    TestAssert.WithMessage(() => Assert.Equal(op == VisOp.Replace, assertedValue), "a replace always carries the mute key, an add or remove with no mutes does not");
+                }
             }
             // every listener once, with the column it was given, in the order given
-            Assert.That(mixer.Sent.SelectMany(q => Listeners(q, "excl")), Is.EqualTo(excl.Keys.Select(k => k.ToString())));
+            Assert.Equal(excl.Keys.Select(k => k.ToString()), mixer.Sent.SelectMany(q => Listeners(q, "excl")));
             foreach (OSDMap request in mixer.Sent)
                 foreach (KeyValuePair<string, OSD> kv in (OSDMap)request["excl"])
-                    Assert.That(((OSDArray)kv.Value).Select(v => v.AsString()),
-                        Is.EqualTo(excl[UUID.Parse(kv.Key)].Select(u => u.ToString())));
+                    Assert.Equal(excl[UUID.Parse(kv.Key)].Select(u => u.ToString()), ((OSDArray)kv.Value).Select(v => v.AsString()));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_ARoomOf110WhereEveryoneIsMuted_KeepsEachListenersColumnInOnePart()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer();
             using var sink = NewSink(mixer, _ => RoomA);
             var excl = new Dictionary<UUID, IReadOnlyCollection<UUID>>();
@@ -188,32 +194,40 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlSendResult r = await sink.SendAsync(VisOp.Replace, excl, mute);
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(mixer.Sent.Count, Is.GreaterThan(1));
+            Assert.Equal(PeerCtlSendResult.Ok, r);
+            Assert.True(mixer.Sent.Count > 1);
             foreach (OSDMap request in mixer.Sent)
             {
-                Assert.That(PeerCtlBatchSplitter.CompactBytes(request), Is.LessThanOrEqualTo(Limit));
-                Assert.That(Listeners(request, "mute"), Is.EquivalentTo(Listeners(request, "excl")));
+                Assert.True(PeerCtlBatchSplitter.CompactBytes(request) <= Limit);
+                Assert.Equivalent(Listeners(request, "excl"), Listeners(request, "mute"), strict: true);
             }
-            Assert.That(mixer.Sent.SelectMany(q => Listeners(q, "mute")).Count(), Is.EqualTo(110));
-            Assert.That(sink.LastSendStats.MuteEntries, Is.EqualTo(110), "the counts of the parts add up");
-            Assert.That(sink.LastSendStats.Entries, Is.EqualTo(110));
+            Assert.Equal(110, mixer.Sent.SelectMany(q => Listeners(q, "mute")).Count());
+            {
+                var assertedValue = sink.LastSendStats.MuteEntries;
+                TestAssert.WithMessage(() => Assert.Equal(110, assertedValue), "the counts of the parts add up");
+            }
+            Assert.Equal(110, sink.LastSendStats.Entries);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_PartsOfARoomGoOneAfterAnother()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer();
             using var sink = NewSink(mixer, _ => RoomA);
 
             await sink.SendAsync(VisOp.Replace, Everyone(110));
 
-            Assert.That(mixer.MostInFlight, Is.EqualTo(1), "a room's parts are never in flight together");
+            {
+                var assertedValue = mixer.MostInFlight;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "a room's parts are never in flight together");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_ARoomOverTheLimitDoesNotHoldBackAnotherRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer();
             // ids 1..110 are in room A, ids 201..205 in room B
             using var sink = NewSink(mixer, a => a.GetBytes()[15] >= 201 || a.GetBytes()[14] != 0 ? RoomB : RoomA);
@@ -223,45 +237,54 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlSendResult r = await sink.SendAsync(VisOp.Replace, excl);
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(sink.LastSendRooms, Is.EqualTo(2));
-            Assert.That(mixer.ForRoom(RoomB).Count, Is.EqualTo(1));
-            Assert.That(mixer.ForRoom(RoomA).Count, Is.GreaterThan(1));
-            Assert.That(sink.LastSendRequests, Is.EqualTo(mixer.Sent.Count));
+            Assert.Equal(PeerCtlSendResult.Ok, r);
+            Assert.Equal(2, sink.LastSendRooms);
+            Assert.Single(mixer.ForRoom(RoomB));
+            Assert.True(mixer.ForRoom(RoomA).Count > 1);
+            Assert.Equal(mixer.Sent.Count, sink.LastSendRequests);
         }
 
         // ---- a part that does not go through ----------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_APartThatFailsInTransport_EndsThatRoomsSend_AndIsTheResult()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer { Transport = (index, _) => index == 1 ? AdminSendResult.TransportError : AdminSendResult.Ok };
             using var sink = NewSink(mixer, _ => RoomA);
 
             PeerCtlSendResult r = await sink.SendAsync(VisOp.Replace, Everyone(110));
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.TransportError));
-            Assert.That(mixer.Sent.Count, Is.EqualTo(2), "the parts after the failed one are not sent");
-            Assert.That(sink.LastSendRequests, Is.GreaterThan(2), "they were built");
+            Assert.Equal(PeerCtlSendResult.TransportError, r);
+            {
+                var assertedValue = mixer.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the parts after the failed one are not sent");
+            }
+            Assert.True(sink.LastSendRequests > 2, "they were built");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_APartTheMixerDoesNotApply_EndsThatRoomsSend()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer { Inner = (index, _) => index == 0 ? "error" : "applied" };
             using var sink = NewSink(mixer, _ => RoomA);
 
             PeerCtlSendResult r = await sink.SendAsync(VisOp.Replace, Everyone(110));
 
-            Assert.That(r, Is.EqualTo(PeerCtlSendResult.Ok), "an unapplied answer has never changed the result");
-            Assert.That(mixer.Sent.Count, Is.EqualTo(1));
+            {
+                var assertedValue = r;
+                TestAssert.WithMessage(() => Assert.Equal(PeerCtlSendResult.Ok, assertedValue), "an unapplied answer has never changed the result");
+            }
+            Assert.Single(mixer.Sent);
         }
 
         // ---- arming: each part is its own generation ----------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendAsync_Armed_EachPartCarriesTheNextGenerationAndTheBaseOfItsOwnListeners()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer();
             using var sink = NewSink(mixer, _ => RoomA);
             var authority = new VisAuthority(0x0000018f00000001UL, "split", () => 1000);
@@ -271,30 +294,34 @@ namespace osWebRtcVoice.Tests
             int replaceParts = mixer.Sent.Count;
             await sink.SendAsync(VisOp.Add, Everyone(110));
 
-            Assert.That(replaceParts, Is.GreaterThan(1));
+            Assert.True(replaceParts > 1);
             var generations = mixer.Sent.Select(q => q["policy_generation"].AsInteger()).ToList();
-            Assert.That(generations, Is.EqualTo(Enumerable.Range(1, mixer.Sent.Count).ToList()), "rising, one for each request");
+            {
+                var assertedValue = generations;
+                TestAssert.WithMessage(() => Assert.Equal(Enumerable.Range(1, mixer.Sent.Count).ToList(), assertedValue), "rising, one for each request");
+            }
             foreach (OSDMap request in mixer.Sent)
             {
-                Assert.That(PeerCtlBatchSplitter.CompactBytes(request), Is.LessThanOrEqualTo(Limit));
-                Assert.That(request["room_epoch"].AsString(), Is.EqualTo(authority.EpochString));
+                Assert.True(PeerCtlBatchSplitter.CompactBytes(request) <= Limit);
+                Assert.Equal(authority.EpochString, request["room_epoch"].AsString());
                 if (request["op"].AsString() == "add")
-                    Assert.That(((OSDMap)request["base"]).Keys, Is.EquivalentTo(Listeners(request, "excl")));
+                    Assert.Equivalent(Listeners(request, "excl"), ((OSDMap)request["base"]).Keys, strict: true);
                 else
-                    Assert.That(request.ContainsKey("base"), Is.False);
+                    Assert.False(request.ContainsKey("base"));
             }
-            Assert.That(authority.CurrentGeneration(RoomA), Is.EqualTo((uint)mixer.Sent.Count));
+            Assert.Equal((uint)mixer.Sent.Count, authority.CurrentGeneration(RoomA));
             // every part was applied, so a listener in any part is armed at its part's generation
-            Assert.That(authority.IsArmed(RoomA, Id(1)), Is.True);
-            Assert.That(authority.IsArmed(RoomA, Id(110)), Is.True);
-            Assert.That(authority.ListenerGeneration(RoomA, Id(1)), Is.GreaterThan(0u));
+            Assert.True(authority.IsArmed(RoomA, Id(1)));
+            Assert.True(authority.IsArmed(RoomA, Id(110)));
+            Assert.True(authority.ListenerGeneration(RoomA, Id(1)) > 0u);
         }
 
         // ---- one named room: a call's mute of everyone ---------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendToRoomAsync_AMuteOfEveryoneInAFullRoom_GoesInPartsAndAnswersAsOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer();
             using var sink = NewSink(mixer, _ => null);
             // a call mutes 110 members: every column holds all 110, the listener's own entry included
@@ -306,23 +333,27 @@ namespace osWebRtcVoice.Tests
             (PeerCtlSendResult result, JanusPeerCtlBatchSink.SlvoiceReply reply) =
                 await sink.SendToRoomAsync(RoomA, VisOp.Replace, null, columns);
 
-            Assert.That(result, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(mixer.Sent.Count, Is.GreaterThan(1));
+            Assert.Equal(PeerCtlSendResult.Ok, result);
+            Assert.True(mixer.Sent.Count > 1);
             foreach (OSDMap request in mixer.Sent)
             {
-                Assert.That(PeerCtlBatchSplitter.CompactBytes(request), Is.LessThanOrEqualTo(Limit));
-                Assert.That(request["room"].AsInteger(), Is.EqualTo(RoomA));
-                Assert.That(request.ContainsKey("room_epoch"), Is.False, "a call's room has no declared authority");
+                Assert.True(PeerCtlBatchSplitter.CompactBytes(request) <= Limit);
+                Assert.Equal(RoomA, request["room"].AsInteger());
+                Assert.False(request.ContainsKey("room_epoch"), "a call's room has no declared authority");
             }
-            Assert.That(mixer.Sent.SelectMany(q => Listeners(q, "mute")).Count(), Is.EqualTo(110));
-            Assert.That(reply.Status, Is.EqualTo("applied"));
-            Assert.That(reply.MuteEntries, Is.EqualTo(110), "the answer counts every part");
-            Assert.That(sink.LastSendStats.MuteEntries, Is.EqualTo(110));
+            Assert.Equal(110, mixer.Sent.SelectMany(q => Listeners(q, "mute")).Count());
+            Assert.Equal("applied", reply.Status);
+            {
+                var assertedValue = reply.MuteEntries;
+                TestAssert.WithMessage(() => Assert.Equal(110, assertedValue), "the answer counts every part");
+            }
+            Assert.Equal(110, sink.LastSendStats.MuteEntries);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendToRoomAsync_APartTheMixerAnswersUnknownRoom_IsTheAnswer_AndTheRestIsNotSent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer { Inner = (index, _) => index == 0 ? "applied" : "unknown_room" };
             using var sink = NewSink(mixer, _ => null);
             var everyone = Enumerable.Range(1, 110).Select(Id).ToList();
@@ -331,14 +362,15 @@ namespace osWebRtcVoice.Tests
             (PeerCtlSendResult result, JanusPeerCtlBatchSink.SlvoiceReply reply) =
                 await sink.SendToRoomAsync(RoomA, VisOp.Replace, null, columns);
 
-            Assert.That(result, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(mixer.Sent.Count, Is.EqualTo(2));
-            Assert.That(reply.Reason, Is.EqualTo("unknown_room"));
+            Assert.Equal(PeerCtlSendResult.Ok, result);
+            Assert.Equal(2, mixer.Sent.Count);
+            Assert.Equal("unknown_room", reply.Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendToRoomAsync_ARoomThatFits_IsOneRequestAndTheMixersOwnReply()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new Mixer();
             using var sink = NewSink(mixer, _ => null);
             var everyone = Enumerable.Range(1, 5).Select(Id).ToList();
@@ -347,9 +379,9 @@ namespace osWebRtcVoice.Tests
             (PeerCtlSendResult result, JanusPeerCtlBatchSink.SlvoiceReply reply) =
                 await sink.SendToRoomAsync(RoomA, VisOp.Replace, null, columns);
 
-            Assert.That(result, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(mixer.Sent.Count, Is.EqualTo(1));
-            Assert.That(reply.MuteEntries, Is.EqualTo(5));
+            Assert.Equal(PeerCtlSendResult.Ok, result);
+            Assert.Single(mixer.Sent);
+            Assert.Equal(5, reply.MuteEntries);
         }
     }
 }
