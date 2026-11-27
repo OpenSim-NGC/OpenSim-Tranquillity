@@ -47,7 +47,7 @@ public class HttpServerSharedSendThreadTests
     [Fact]
     public async Task StoppingOneListenerLeavesTheOthersAnswering()
     {
-        BaseHttpServer first = Start();
+        BaseHttpServer? first = Start();
         BaseHttpServer second = Start();
         try
         {

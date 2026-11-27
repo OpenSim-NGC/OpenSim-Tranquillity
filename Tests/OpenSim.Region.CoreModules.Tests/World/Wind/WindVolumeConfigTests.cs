@@ -62,7 +62,7 @@ public class WindVolumeConfigTests
     public void AValueThatIsNotANumberTakesTheDefaultAndWeatherStaysOn(string key)
     {
         IWindVolumeStore? store = null;
-        Exception thrown = Record.Exception(() => store = WindModule.CreateWindVolumes(Weather(key, "abc")));
+        Exception? thrown = Record.Exception(() => store = WindModule.CreateWindVolumes(Weather(key, "abc")));
 
         Assert.Null(thrown);
         Assert.True(store!.Enabled);
@@ -76,7 +76,7 @@ public class WindVolumeConfigTests
         foreach (string text in new[] { "NaN", "Infinity", "-Infinity" })
         {
             IWindVolumeStore? store = null;
-            Exception thrown = Record.Exception(() => store = WindModule.CreateWindVolumes(Weather(key, text)));
+            Exception? thrown = Record.Exception(() => store = WindModule.CreateWindVolumes(Weather(key, text)));
 
             Assert.Null(thrown);
             Assert.Equal(Limit(new WindVolumeLimits(), key), Limit(store!.Limits, key));
@@ -87,7 +87,7 @@ public class WindVolumeConfigTests
     public void AWholeNumberWithAFractionForACountTakesTheDefault()
     {
         IWindVolumeStore? store = null;
-        Exception thrown = Record.Exception(() => store = WindModule.CreateWindVolumes(Weather("max_volumes_region", "4.5")));
+        Exception? thrown = Record.Exception(() => store = WindModule.CreateWindVolumes(Weather("max_volumes_region", "4.5")));
 
         Assert.Null(thrown);
         Assert.Equal(new WindVolumeLimits().MaxVolumesRegion, store!.Limits.MaxVolumesRegion);
@@ -153,7 +153,7 @@ public class WindVolumeConfigTests
         weather.Set("max_speed", "fast");
 
         var module = new WindModule();
-        Exception thrown = Record.Exception(() => module.Initialise(config));
+        Exception? thrown = Record.Exception(() => module.Initialise(config));
 
         Assert.Null(thrown);
         Assert.True(module.WindVolumes.Enabled);

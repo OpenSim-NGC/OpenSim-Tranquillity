@@ -52,7 +52,7 @@ public sealed class MoneyConsoleRunnerServiceTests
         var executeTask = svc.StartAsync(cts.Token);
 
         // Give the service a moment — it should be waiting, not prompting.
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         cts.Cancel();
         await executeTask;
 
@@ -85,7 +85,7 @@ public sealed class MoneyConsoleRunnerServiceTests
         lifetime.FireApplicationStarted();
 
         // Wait for the first prompt with a generous timeout.
-        bool prompted = await promptSem.WaitAsync(TimeSpan.FromSeconds(5));
+        bool prompted = await promptSem.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         cts.Cancel();
         await svc.StopAsync(CancellationToken.None);

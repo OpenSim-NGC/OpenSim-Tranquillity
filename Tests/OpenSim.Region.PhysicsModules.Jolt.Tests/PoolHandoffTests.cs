@@ -11,7 +11,6 @@ using System.Numerics;
 using System.Reflection;
 using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -299,13 +298,13 @@ public class PoolHandoffTests
             var waits = WaitsAtGate(holder, "Waiter");
             var hold = holder.B.HoldPoolGateForTest();
             var stepper = Start("waiter-step", () => waiterResult = Step(waiter));
-            Assert.True(waits.Wait(Limit), "the waiter did not reach the pool");
+            Assert.True(waits.Wait(Limit, TestContext.Current.CancellationToken), "the waiter did not reach the pool");
             // Removing a region destroys its physics system, which waits for every pool gate (an Update in flight may be
             // reading joltc's map of systems), so the removal waits behind the holder like the step does. The waiter holds
             // no region lock while it waits, so its scene-thread calls would still return.
             var removed = new ManualResetEventSlim(false);
             var remover = Start("waiter-remove", () => { waiter.Dispose(); removed.Set(); });
-            Assert.False(removed.Wait(500), "the region was removed while the pool gate was held");
+            Assert.False(removed.Wait(500, TestContext.Current.CancellationToken), "the region was removed while the pool gate was held");
             hold.Dispose();
             Join(stepper, "the removed region's waiting step");
             Join(remover, "removing the waiting region");
@@ -343,16 +342,16 @@ public class PoolHandoffTests
             };
             StepResult holderResult = default;
             var holding = Start("holder-step", () => holderResult = Step(holder));
-            Assert.True(inside.Wait(Limit), "the holder did not take the pool");
+            Assert.True(inside.Wait(Limit, TestContext.Current.CancellationToken), "the holder did not take the pool");
             var waits = WaitsAtGate(waiter, "Waiter");
             var waiting = Start("waiter-step", () => Step(waiter));
-            Assert.True(waits.Wait(Limit), "the second region did not reach the pool");
+            Assert.True(waits.Wait(Limit, TestContext.Current.CancellationToken), "the second region did not reach the pool");
 
             // The holder has the pool but not yet its region lock: removing it waits for the pool like any create or destroy
             // of a physics system, so it completes only after the holder's step has ended and passed the pool on.
             var removed = new ManualResetEventSlim(false);
             var remover = Start("holder-remove", () => { holder.Dispose(); removed.Set(); });
-            Assert.False(removed.Wait(500), "the region was removed while its own step held the pool");
+            Assert.False(removed.Wait(500, TestContext.Current.CancellationToken), "the region was removed while its own step held the pool");
             release.Set();
             Join(holding, "the removed region's step");
             Join(waiting, "the waiting region's step");
@@ -404,7 +403,7 @@ public class PoolHandoffTests
             var waits = WaitsAtGate(holder, "Waiter");
             var hold = holder.B.HoldPoolGateForTest();
             var stepper = Start("waiter-step", () => r = Step(waiter));
-            Assert.True(waits.Wait(Limit), "the waiter did not reach the pool");
+            Assert.True(waits.Wait(Limit, TestContext.Current.CancellationToken), "the waiter did not reach the pool");
             hold.Dispose();
             Join(stepper, "the waiting step");
             Assert.True(r.Waits.PoolWaited);
@@ -450,10 +449,10 @@ public class PoolHandoffTests
                     release.Wait(Limit);   // Region B has the pool and has not named itself yet
                 });
             var bStep = Start("region-b-step", () => Step(b));
-            Assert.True(bTook.Wait(Limit), "Region B did not take the pool");
+            Assert.True(bTook.Wait(Limit, TestContext.Current.CancellationToken), "Region B did not take the pool");
             StepResult r = default;
             var aStep = Start("region-a-step", () => r = Step(a));
-            Assert.True(aWaits.Wait(Limit), "Region A did not reach the pool");
+            Assert.True(aWaits.Wait(Limit, TestContext.Current.CancellationToken), "Region A did not reach the pool");
             release.Set();
             Join(bStep, "Region B's step");
             Join(aStep, "Region A's step");
@@ -487,13 +486,13 @@ public class PoolHandoffTests
                     release.Wait(Limit);
                 }
             });
-            Assert.True(held.Wait(Limit));
+            Assert.True(held.Wait(Limit, TestContext.Current.CancellationToken));
             // Set by the step itself when it finds the lock held, so the lock is released only once the step must wait.
             var busy = new ManualResetEventSlim(false);
             t.B.RegionLockBusyForTest = () => busy.Set();
             StepResult r = default;
             var stepper = Start("locked-step", () => r = Step(t));
-            Assert.True(busy.Wait(Limit), "the step did not reach the region lock");
+            Assert.True(busy.Wait(Limit, TestContext.Current.CancellationToken), "the step did not reach the region lock");
             release.Set();
             Join(stepper, "the step");
             Join(locker, "the lock holder");

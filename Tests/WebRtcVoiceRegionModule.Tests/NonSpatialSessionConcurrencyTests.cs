@@ -18,7 +18,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice.NonSpatial;
@@ -26,7 +26,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialSessionConcurrencyTests
     {
         private static OSDMap Call(UUID group) => new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(group) };
@@ -48,9 +47,10 @@ namespace osWebRtcVoice.Tests
             return (p, e);
         }
 
-        [Test]
-        public void ReadingASessionWhileMembersJoin_NeverSeesTheTableChange()
+        [Fact(Timeout = 60000)]
+        public async Task ReadingASessionWhileMembersJoin_NeverSeesTheTableChange()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int Agents = 400;
             UUID grp = UUID.Random();
             UUID[] agents = Enumerable.Range(0, Agents).Select(n => UUID.Random()).ToArray();
@@ -86,16 +86,19 @@ namespace osWebRtcVoice.Tests
                 if (o is not null && o.Status == System.Net.HttpStatusCode.OK) Interlocked.Increment(ref admitted);
             });
             stop.Cancel();
-            Task.WaitAll(readers);
+            await Task.WhenAll(readers);
 
-            Assert.That(failures.Select(f => f.GetType().Name + ": " + f.Message).Distinct().ToList(), Is.Empty,
-                "a reader of a live session must not fail while members join");
-            Assert.That(e.Store.Get(grp).SeatsHeld, Is.EqualTo(admitted));
+            {
+                var assertedValue = failures.Select(f => f.GetType().Name + ": " + f.Message).Distinct().ToList();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a reader of a live session must not fail while members join");
+            }
+            Assert.Equal(admitted, e.Store.Get(grp).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ManyGroupsStartedAtOnce_EveryCallAnswers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int Groups = 40, PerGroup = 25;
             UUID[] groups = Enumerable.Range(0, Groups).Select(n => UUID.Random()).ToArray();
             List<(UUID agent, UUID group)> calls = new List<(UUID, UUID)>();
@@ -111,7 +114,7 @@ namespace osWebRtcVoice.Tests
                 catch (Exception ex) { failures.Enqueue(ex); }
             });
 
-            Assert.That(failures.Select(f => f.GetType().Name + ": " + f.Message).Distinct().ToList(), Is.Empty);
+            Assert.Empty(failures.Select(f => f.GetType().Name + ": " + f.Message).Distinct().ToList());
         }
     }
 }
