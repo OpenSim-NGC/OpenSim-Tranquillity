@@ -240,7 +240,7 @@ public class RemoteConsoleSessionTests : IDisposable
         string lines;
         try
         {
-            Assert.True(prompted.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(prompted.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
             m_console.Output("[SCENE]: a log line after the prompt");
 
             UUID id = StartSession(out login);
