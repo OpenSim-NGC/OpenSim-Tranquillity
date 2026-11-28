@@ -21,6 +21,7 @@ namespace OpenSim.Server.Base.Tests.Hosting;
 /// <c>ConfigurationLoaderTests</c>. Includes are resolved relative to the current
 /// working directory, so each test runs inside an isolated temp directory.
 /// </summary>
+[Collection("WorkingDirectorySensitive")]
 public sealed class GridServerConfigSourceTests : IDisposable
 {
     private readonly string _basePath;

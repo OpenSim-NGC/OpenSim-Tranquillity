@@ -24,6 +24,10 @@ public sealed class LegacyIniConfigSourceAccessorTests : IDisposable
 
     public void Dispose() => Directory.Delete(_tempDir, recursive: true);
 
+    // IniDirectory defaults to "config" under the working directory, which other test classes change; a folder
+    // of this class's own that does not exist keeps these tests to the files they name.
+    private string NoConfigDirectory => Path.Combine(_tempDir, "no-config");
+
     private string WriteIni(string name, string content)
     {
         string path = Path.Combine(_tempDir, name);
@@ -37,6 +41,7 @@ public sealed class LegacyIniConfigSourceAccessorTests : IDisposable
         var accessor = new LegacyIniConfigSourceAccessor(new ServerStartupOptions
         {
             IniMaster = Path.Combine(_tempDir, "missing.ini"),
+            IniDirectory = NoConfigDirectory,
         });
 
         Assert.NotNull(accessor.ConfigSource);
@@ -53,6 +58,7 @@ public sealed class LegacyIniConfigSourceAccessorTests : IDisposable
         {
             IniMaster = master,
             IniFiles = [overrideFile],
+            IniDirectory = NoConfigDirectory,
         });
 
         Assert.Equal("9001", accessor.ConfigSource.Configs["Startup"].GetString("ServerPort"));
