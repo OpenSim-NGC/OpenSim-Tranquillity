@@ -34,7 +34,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ProvisionResponseShapeTests
     {
         private static OSDMap FakeAnswer()
@@ -42,59 +41,72 @@ namespace osWebRtcVoice.Tests
 
         // ---- response shape assertions ------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Success_CarriesJsepViewerSessionAndRoom_InThatOrder()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap answer = FakeAnswer();
             string vs = UUID.Random().ToString();
             OSDMap m = ProvisionResponseBuilder.BuildSuccess(answer, vs, 1967062692);
 
-            Assert.That(m.Keys, Is.EqualTo(new[] { "jsep", "viewer_session", "room" }).AsCollection,
-                "success map keys, in insertion order");
-            Assert.That(m["jsep"], Is.SameAs(answer), "jsep is the answer map itself, not a copy");
-            Assert.That(m["viewer_session"].Type, Is.EqualTo(OSDType.String));
-            Assert.That(m["viewer_session"].AsString(), Is.EqualTo(vs));
+            {
+                var assertedValue = m.Keys;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { "jsep", "viewer_session", "room" }, assertedValue), "success map keys, in insertion order");
+            }
+            {
+                var assertedValue = m["jsep"];
+                TestAssert.WithMessage(() => Assert.Same(answer, assertedValue), "jsep is the answer map itself, not a copy");
+            }
+            Assert.Equal(OSDType.String, m["viewer_session"].Type);
+            Assert.Equal(vs, m["viewer_session"].AsString());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Success_RoomIsAnInteger_CarryingTheJoinedRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap m = ProvisionResponseBuilder.BuildSuccess(FakeAnswer(), "s", 226001844);
-            Assert.That(m["room"].Type, Is.EqualTo(OSDType.Integer), "room must be an LLSD integer (TryGetInt on the region side)");
-            Assert.That(m["room"].AsInteger(), Is.EqualTo(226001844));
-            Assert.That(m.TryGetInt("room", out int r), Is.True);
-            Assert.That(r, Is.EqualTo(226001844));
+            {
+                var assertedValue = m["room"].Type;
+                TestAssert.WithMessage(() => Assert.Equal(OSDType.Integer, assertedValue), "room must be an LLSD integer (TryGetInt on the region side)");
+            }
+            Assert.Equal(226001844, m["room"].AsInteger());
+            Assert.True(m.TryGetInt("room", out int r));
+            Assert.Equal(226001844, r);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Room_IsPresentOnlyOnTheSuccessPath()
         {
-            Assert.That(ProvisionResponseBuilder.BuildSuccess(FakeAnswer(), "s", 1).ContainsKey("room"), Is.True);
-            Assert.That(ProvisionResponseBuilder.BuildFailure("no jsep", 0).ContainsKey("room"), Is.False, "generic failure carries no room");
-            Assert.That(ProvisionResponseBuilder.BuildFailure("room is full", 495).ContainsKey("room"), Is.False, "ROOM_FULL failure carries no room");
-            Assert.That(ProvisionResponseBuilder.BuildClosed().ContainsKey("room"), Is.False, "logout ack carries no room");
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(ProvisionResponseBuilder.BuildSuccess(FakeAnswer(), "s", 1).ContainsKey("room"));
+            Assert.False(ProvisionResponseBuilder.BuildFailure("no jsep", 0).ContainsKey("room"), "generic failure carries no room");
+            Assert.False(ProvisionResponseBuilder.BuildFailure("room is full", 495).ContainsKey("room"), "ROOM_FULL failure carries no room");
+            Assert.False(ProvisionResponseBuilder.BuildClosed().ContainsKey("room"), "logout ack carries no room");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Failure_CarriesErrorCodeOnlyWhenNonZero()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap plain = ProvisionResponseBuilder.BuildFailure("JoinRoom failed", 0);
-            Assert.That(plain.Keys, Is.EqualTo(new[] { "response", "error" }).AsCollection);
-            Assert.That(plain["response"].AsString(), Is.EqualTo("failed"));
-            Assert.That(plain["error"].AsString(), Is.EqualTo("JoinRoom failed"));
+            Assert.Equal(new[] { "response", "error" }, plain.Keys);
+            Assert.Equal("failed", plain["response"].AsString());
+            Assert.Equal("JoinRoom failed", plain["error"].AsString());
 
             OSDMap full = ProvisionResponseBuilder.BuildFailure("room is full", 495);
-            Assert.That(full.Keys, Is.EqualTo(new[] { "response", "error", "error_code" }).AsCollection);
-            Assert.That(full["error_code"].Type, Is.EqualTo(OSDType.Integer));
-            Assert.That(full["error_code"].AsInteger(), Is.EqualTo(495));
+            Assert.Equal(new[] { "response", "error", "error_code" }, full.Keys);
+            Assert.Equal(OSDType.Integer, full["error_code"].Type);
+            Assert.Equal(495, full["error_code"].AsInteger());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Closed_IsExactlyResponseClosed()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap m = ProvisionResponseBuilder.BuildClosed();
-            Assert.That(m.Keys, Is.EqualTo(new[] { "response" }).AsCollection);
-            Assert.That(m["response"].AsString(), Is.EqualTo("closed"));
+            Assert.Equal(new[] { "response" }, m.Keys);
+            Assert.Equal("closed", m["response"].AsString());
         }
 
         // ---- Extraction equivalence: builder == the pre-extraction literals ------------------
@@ -131,17 +143,30 @@ namespace osWebRtcVoice.Tests
         private static void AssertIdentical(OSDMap expected, OSDMap actual, string which)
         {
             // Both serialisation paths the map travels: LLSD XML to the viewer, JSON over the connector hop.
-            Assert.That(OSDParser.SerializeLLSDXmlString(actual), Is.EqualTo(OSDParser.SerializeLLSDXmlString(expected)), which + ": LLSD XML");
-            Assert.That(OSDParser.SerializeJsonString(actual), Is.EqualTo(OSDParser.SerializeJsonString(expected)), which + ": JSON");
+            {
+                var assertedValue = OSDParser.SerializeLLSDXmlString(actual);
+                TestAssert.WithMessage(() => Assert.Equal(OSDParser.SerializeLLSDXmlString(expected), assertedValue), which + ": LLSD XML");
+            }
+            {
+                var assertedValue = OSDParser.SerializeJsonString(actual);
+                TestAssert.WithMessage(() => Assert.Equal(OSDParser.SerializeJsonString(expected), assertedValue), which + ": JSON");
+            }
             // And structurally: same keys in the same order, same OSD type per key.
-            Assert.That(actual.Keys, Is.EqualTo(expected.Keys).AsCollection, which + ": key order");
+            {
+                var assertedValue = actual.Keys;
+                TestAssert.WithMessage(() => Assert.Equal(expected.Keys, assertedValue), which + ": key order");
+            }
             foreach (string k in expected.Keys)
-                Assert.That(actual[k].Type, Is.EqualTo(expected[k].Type), which + ": type of " + k);
+                {
+                    var assertedValue = actual[k].Type;
+                    TestAssert.WithMessage(() => Assert.Equal(expected[k].Type, assertedValue), which + ": type of " + k);
+                }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Extraction_ReproducesThePreExtractionLiterals_ByteForByte()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap answer = FakeAnswer();
             string vs = UUID.Random().ToString();
 

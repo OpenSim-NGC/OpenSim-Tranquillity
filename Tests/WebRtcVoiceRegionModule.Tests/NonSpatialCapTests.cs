@@ -11,7 +11,7 @@
  * will then refuse, and that a capacity refusal produces the same observable either way.
  */
 using System;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice;
 using osWebRtcVoice.NonSpatial;
@@ -19,48 +19,53 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialCapTests
     {
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheMirroredMixerCap_MatchesTheMixersOwnErrorCodeConstant()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // WebRtcJanusService.cs is the codebase's existing mirror of janus_slvoice.c:112.
-            Assert.That(NonSpatialCaps.MixerRoomFullErrorCode, Is.EqualTo(WebRtcJanusService.JANUS_ROOM_FULL_ERROR_CODE));
+            Assert.Equal(WebRtcJanusService.JANUS_ROOM_FULL_ERROR_CODE, NonSpatialCaps.MixerRoomFullErrorCode);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EveryCapTheEngineCanHandOut_IsOneTheMixerWillHonour()
         {
-            Assert.That(NonSpatialCaps.CapsAgree(), Is.True);
-            Assert.That(NonSpatialCaps.DefaultConferenceCap, Is.EqualTo(50));
-            Assert.That(NonSpatialCaps.DefaultConferenceCap, Is.LessThanOrEqualTo(NonSpatialCaps.MixerRoomCap));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(NonSpatialCaps.CapsAgree());
+            Assert.Equal(50, NonSpatialCaps.DefaultConferenceCap);
+            Assert.True(NonSpatialCaps.DefaultConferenceCap <= NonSpatialCaps.MixerRoomCap);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARequestAboveTheMixerCap_IsClampedToIt_NotGranted()
         {
-            Assert.That(NonSpatialCaps.Effective(NonSpatialSessionType.Adhoc, 500), Is.EqualTo(NonSpatialCaps.MixerRoomCap));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(NonSpatialCaps.MixerRoomCap, NonSpatialCaps.Effective(NonSpatialSessionType.Adhoc, 500));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARequestBelowTheDefault_IsHonoured_AndNeverDropsBelowTwo()
         {
-            Assert.That(NonSpatialCaps.Effective(NonSpatialSessionType.Adhoc, 8), Is.EqualTo(8));
-            Assert.That(NonSpatialCaps.Effective(NonSpatialSessionType.Adhoc, 1), Is.EqualTo(2));
-            Assert.That(NonSpatialCaps.Effective(NonSpatialSessionType.Adhoc, 0), Is.EqualTo(NonSpatialCaps.DefaultConferenceCap));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(8, NonSpatialCaps.Effective(NonSpatialSessionType.Adhoc, 8));
+            Assert.Equal(2, NonSpatialCaps.Effective(NonSpatialSessionType.Adhoc, 1));
+            Assert.Equal(NonSpatialCaps.DefaultConferenceCap, NonSpatialCaps.Effective(NonSpatialSessionType.Adhoc, 0));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void P2P_IsAlwaysTwo_WhateverIsAskedFor()
         {
-            Assert.That(NonSpatialCaps.Effective(NonSpatialSessionType.P2P, 50), Is.EqualTo(2));
-            Assert.That(NonSpatialCaps.Effective(NonSpatialSessionType.P2P, 0), Is.EqualTo(2));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(2, NonSpatialCaps.Effective(NonSpatialSessionType.P2P, 50));
+            Assert.Equal(2, NonSpatialCaps.Effective(NonSpatialSessionType.P2P, 0));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceAdmitsExactlyFiftySeats_AndRefusesTheFiftyFirst()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(clock);
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;   // creator = seat 1
@@ -68,58 +73,63 @@ namespace osWebRtcVoice.Tests
             for (int i = 0; i < NonSpatialCaps.DefaultConferenceCap - 1; i++)
             {
                 UUID a = UUID.Random();
-                Assert.That(e.Invite(id, Alice, a).Ok, Is.True, "invite " + i);
-                Assert.That(e.Accept(id, a, RegionA).Ok, Is.True, "accept " + i);
+                Assert.True(e.Invite(id, Alice, a).Ok, "invite " + i);
+                Assert.True(e.Accept(id, a, RegionA).Ok, "accept " + i);
             }
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(NonSpatialCaps.DefaultConferenceCap));
-            Assert.That(e.Store.Get(id).IsFull, Is.True);
+            Assert.Equal(NonSpatialCaps.DefaultConferenceCap, e.Store.Get(id).SeatsHeld);
+            Assert.True(e.Store.Get(id).IsFull);
 
             UUID late = UUID.Random();
             SessionOutcome invite = e.Invite(id, Alice, late);
-            Assert.That(invite.Ok, Is.False, "inviting into a full room is refused now, not disappointed later");
-            Assert.That(invite.Decision, Is.EqualTo(SessionOutcome.Capacity));
+            Assert.False(invite.Ok, "inviting into a full room is refused now, not disappointed later");
+            Assert.Equal(SessionOutcome.Capacity, invite.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACapacityRefusalMapsToTheSameObservableAsTheMixers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The mixer's chain is 495 -> HTTP 409 -> the viewer's ERROR_CHANNEL_FULL. The engine's
             // early gate must land on the same 409 so one failure mode reaches the user, not two.
-            Assert.That(NonSpatialCaps.CapacityHttpStatus, Is.EqualTo(409));
+            Assert.Equal(409, NonSpatialCaps.CapacityHttpStatus);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASeatFreedByAnyLifecycle_IsImmediatelyReusable()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(clock);
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA, requestedCap: 2).Session.SessionId;
             // Both are invited while there is still room; invitations hold no seat, so both stand.
-            Assert.That(e.Invite(id, Alice, Bob).Ok, Is.True);
-            Assert.That(e.Invite(id, Alice, Carol).Ok, Is.True);
-            Assert.That(e.Accept(id, Bob, RegionA).Ok, Is.True);   // seats: Alice + Bob = full
+            Assert.True(e.Invite(id, Alice, Bob).Ok);
+            Assert.True(e.Invite(id, Alice, Carol).Ok);
+            Assert.True(e.Accept(id, Bob, RegionA).Ok);   // seats: Alice + Bob = full
 
-            Assert.That(e.Accept(id, Carol, RegionA).Decision, Is.EqualTo(SessionOutcome.Capacity),
-                        "a standing invitation does not entitle you to a seat that is gone");
+            {
+                var assertedValue = e.Accept(id, Carol, RegionA).Decision;
+                TestAssert.WithMessage(() => Assert.Equal(SessionOutcome.Capacity, assertedValue), "a standing invitation does not entitle you to a seat that is gone");
+            }
 
             e.Depart(id, Bob, DepartureReason.ChatLeave);
-            Assert.That(e.Accept(id, Carol, RegionA).Ok, Is.True, "the freed seat is reusable at once");
+            Assert.True(e.Accept(id, Carol, RegionA).Ok, "the freed seat is reusable at once");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ReInvitingSomeoneWhoAlreadyHoldsASeat_IsNotACapacityRefusal()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(clock);
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA, requestedCap: 2).Session.SessionId;
             e.Invite(id, Alice, Bob);
             e.Accept(id, Bob, RegionA);
-            Assert.That(e.Store.Get(id).IsFull, Is.True);
+            Assert.True(e.Store.Get(id).IsFull);
 
             SessionOutcome again = e.Invite(id, Alice, Bob);
 
-            Assert.That(again.Ok, Is.True);
-            Assert.That(again.Decision, Is.EqualTo("invite-idempotent-seated"));
+            Assert.True(again.Ok);
+            Assert.Equal("invite-idempotent-seated", again.Decision);
         }
     }
 }

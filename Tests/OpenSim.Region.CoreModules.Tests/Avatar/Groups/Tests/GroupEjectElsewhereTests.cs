@@ -107,7 +107,8 @@ public class GroupEjectElsewhereTests : OpenSimTestCase
             fromAgentName = "Ejector", message = "You have been ejected from 'Example Group' by Ejector.",
             binaryBucket = Array.Empty<byte>(),
         };
-        gm.GetType().GetMethod("OnGridInstantMessage", BindingFlags.Instance | BindingFlags.NonPublic)
+        (gm.GetType().GetMethod("OnGridInstantMessage", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(gm.GetType().FullName, "OnGridInstantMessage"))
             .Invoke(gm, new object[] { notice });
 
         Assert.Equal(new[] { GroupId }, dropped);
@@ -166,7 +167,7 @@ public class GroupEjectElsewhereTests : OpenSimTestCase
             Assert.Contains(sent, s => s.Dialog == 210 && s.RootOnly);
     }
 
-    private static object Removed(ref bool removed)
+    private static object? Removed(ref bool removed)
     {
         removed = true;
         return null;
@@ -189,7 +190,8 @@ public class GroupEjectElsewhereTests : OpenSimTestCase
             imSessionID = GroupId.Guid, dialog = 210, fromAgentID = EjectorId.Guid, toAgentID = EjecteeId.Guid,
             fromAgentName = "Someone", message = "You have been ejected", binaryBucket = Array.Empty<byte>(),
         };
-        gm.GetType().GetMethod("OnInstantMessage", BindingFlags.Instance | BindingFlags.NonPublic)
+        (gm.GetType().GetMethod("OnInstantMessage", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(gm.GetType().FullName, "OnInstantMessage"))
             .Invoke(gm, new object[] { sender.ControllingClient, forged });
 
         Assert.Empty(dropped);

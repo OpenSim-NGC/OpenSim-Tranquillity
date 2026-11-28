@@ -52,7 +52,7 @@ public class ScriptEngineChoiceArchiveTests : OpenSimTestCase
         script.Flags = WithPhlox(script.Flags | 0x40000000u);
 
         var saved = new ManualResetEvent(false);
-        string saveMessage = null;
+        string? saveMessage = null;
         source.EventManager.OnOarFileSaved += (guid, message) => { saveMessage = message; saved.Set(); };
         var oar = new MemoryStream();
         saveArchiver.ArchiveRegion(oar, Guid.NewGuid());
@@ -63,7 +63,7 @@ public class ScriptEngineChoiceArchiveTests : OpenSimTestCase
         Scene target = new SceneHelpers().SetupScene();
         SceneHelpers.SetupSceneModules(target, loadArchiver, new SerialiserModule(), new TerrainModule());
         var loaded = new ManualResetEvent(false);
-        string loadMessage = null;
+        string? loadMessage = null;
         target.EventManager.OnOarFileLoaded += (guid, scenes, message) => { loadMessage = message; loaded.Set(); };
         loadArchiver.DearchiveRegion(new MemoryStream(oar.ToArray()));
         Assert.True(loaded.WaitOne(60000), "the OAR was not loaded");

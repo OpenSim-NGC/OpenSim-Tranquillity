@@ -71,7 +71,7 @@ public sealed class HttpDownloadTests : IDisposable
             using Stream second = ArchiveHelpers.URIFetch(m_server.BaseUri);
             using StreamReader reader = new(second);
             Assert.Equal("second", reader.ReadToEnd());
-        }).WaitAsync(TimeSpan.FromSeconds(6));
+        }, TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(6), TestContext.Current.CancellationToken);
     }
 
     [Fact]

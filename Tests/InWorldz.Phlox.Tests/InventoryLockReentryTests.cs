@@ -108,9 +108,9 @@ public class InventoryLockReentryTests
                 // Waited for on this thread, never with await: after an await the scope would end on another thread, the lock
                 // would not be given back by the thread that took it, and the writer would get in only when the dictionary's
                 // own 60 s lock-timeout replaces the lock - a 60 s test that passed for the wrong reason.
-                Assert.False(writerDone.Wait(300), "a writer got in while the outer read scope was still held");
+                Assert.False(writerDone.Wait(300, TestContext.Current.CancellationToken), "a writer got in while the outer read scope was still held");
             }
-            Assert.True(writerDone.Wait(TestWait.Default), "the writer did not get in after the outer read scope ended");
+            Assert.True(writerDone.Wait(TestWait.Default, TestContext.Current.CancellationToken), "the writer did not get in after the outer read scope ended");
             Assert.DoesNotContain(log.Lines, l => l.Contains("Recursive"));
         }
         finally { LoggerProvider.LoggerFactory = previous; }

@@ -11,7 +11,6 @@ using OpenMetaverse;
 using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using OpenSim.Region.PhysicsModules.Jolt.Vehicles;
 using Xunit;
-using Xunit.Abstractions;
 using Rig = OpenSim.Region.PhysicsModules.Jolt.Tests.StepRateRig;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;

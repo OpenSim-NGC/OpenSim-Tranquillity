@@ -13,7 +13,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice.NonSpatial;
@@ -21,7 +21,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2AGridCallTests
     {
         private static readonly UUID CallId = A2ACalls.ComputeSessionId(Alice, Bob);
@@ -50,40 +49,48 @@ namespace osWebRtcVoice.Tests
         /// <summary>Alice on region A starts and calls, then both join: Alice on region A, Bob on region B.</summary>
         private static string FormCall(Grid g)
         {
-            Assert.That(g.A.Record(Alice, Bob, RegionA, out bool created), Is.Not.Null);
-            Assert.That(created, Is.True);
+            Assert.NotNull(g.A.Record(Alice, Bob, RegionA, out bool created));
+            Assert.True(created);
             string token = g.A.IssueToken(CallId, Alice).Token;
-            Assert.That(g.A.MarkProvisioned(CallId, Alice, RegionA, "vs-alice"), Is.Not.Null);
-            Assert.That(g.B.MarkProvisioned(CallId, Bob, RegionB, "vs-bob"), Is.Not.Null);
+            Assert.NotNull(g.A.MarkProvisioned(CallId, Alice, RegionA, "vs-alice"));
+            Assert.NotNull(g.B.MarkProvisioned(CallId, Bob, RegionB, "vs-bob"));
             return token;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACall_IsOneSessionInTheStore_WithBothEndsSeated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             string token = FormCall(g);
 
-            Assert.That(g.Service.SessionCount, Is.EqualTo(1), "one call, not one record per region");
+            {
+                var assertedValue = g.Service.SessionCount;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one call, not one record per region");
+            }
             NonSpatialVoiceSession stored = g.Stored();
-            Assert.That(stored.Type, Is.EqualTo(NonSpatialSessionType.P2P));
-            Assert.That(stored.SeatsHeld, Is.EqualTo(2), "both ends seated");
-            Assert.That(stored.Find(Alice).OriginRegion, Is.EqualTo(RegionA));
-            Assert.That(stored.Find(Bob).OriginRegion, Is.EqualTo(RegionB));
-            Assert.That(stored.Find(Alice).ViewerSession, Is.EqualTo("vs-alice"));
-            Assert.That(stored.Find(Bob).ViewerSession, Is.EqualTo("vs-bob"));
+            Assert.Equal(NonSpatialSessionType.P2P, stored.Type);
+            {
+                var assertedValue = stored.SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "both ends seated");
+            }
+            Assert.Equal(RegionA, stored.Find(Alice).OriginRegion);
+            Assert.Equal(RegionB, stored.Find(Bob).OriginRegion);
+            Assert.Equal("vs-alice", stored.Find(Alice).ViewerSession);
+            Assert.Equal("vs-bob", stored.Find(Bob).ViewerSession);
 
             // Region B sees the call region A started, with the credential, and the call is active there too.
             A2ASession seenByB = g.B.TryGet(CallId, Bob);
-            Assert.That(seenByB.State, Is.EqualTo(A2ASessionState.Active));
-            Assert.That(seenByB.Token, Is.EqualTo(token));
-            Assert.That(seenByB.CallerProvisioned && seenByB.CalleeProvisioned, Is.True);
+            Assert.Equal(A2ASessionState.Active, seenByB.State);
+            Assert.Equal(token, seenByB.Token);
+            Assert.True(seenByB.CallerProvisioned && seenByB.CalleeProvisioned);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCalleesRegionAdmitsTheCredentialTheCallersRegionIssued()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             g.A.Record(Alice, Bob, RegionA, out _);
             string token = g.A.IssueToken(CallId, Alice).Token;
@@ -95,86 +102,115 @@ namespace osWebRtcVoice.Tests
                 ["credentials"] = OSD.FromString(token),
             };
 
-            Assert.That(A2AProvisionAdmission.Decide(body, Bob, g.B).Kind, Is.EqualTo(ProvisionKind.Multiagent));
-            Assert.That(A2AProvisionAdmission.Decide(body, Carol, g.B).Decision, Is.EqualTo(A2AProvisionAdmission.DecisionNotParty));
+            Assert.Equal(ProvisionKind.Multiagent, A2AProvisionAdmission.Decide(body, Bob, g.B).Kind);
+            Assert.Equal(A2AProvisionAdmission.DecisionNotParty, A2AProvisionAdmission.Decide(body, Carol, g.B).Decision);
             body["credentials"] = OSD.FromString(new string('0', 64));
-            Assert.That(A2AProvisionAdmission.Decide(body, Bob, g.B).Decision, Is.EqualTo(A2AProvisionAdmission.DecisionBadToken));
+            Assert.Equal(A2AProvisionAdmission.DecisionBadToken, A2AProvisionAdmission.Decide(body, Bob, g.B).Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void HangingUp_ReleasesBothSeats_AndTheCallEnds()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             FormCall(g);
 
             IReadOnlyList<NonSpatialVoiceSession> first = g.SessionsA.DepartByViewerSession(Alice, "vs-alice", DepartureReason.VoiceTeardown);
-            Assert.That(g.A.Ended(first), Is.Empty, "Bob is still in the call");
-            Assert.That(g.Stored().SeatsHeld, Is.EqualTo(1), "Alice's seat is back");
-            Assert.That(g.Stored().Find(Bob).HoldsSeat, Is.True);
+            {
+                var assertedValue = g.A.Ended(first);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "Bob is still in the call");
+            }
+            {
+                var assertedValue = g.Stored().SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "Alice's seat is back");
+            }
+            Assert.True(g.Stored().Find(Bob).HoldsSeat);
 
             IReadOnlyList<NonSpatialVoiceSession> second = g.SessionsB.DepartByViewerSession(Bob, "vs-bob", DepartureReason.VoiceTeardown);
 
             List<A2ASession> ended = g.B.Ended(second);
-            Assert.That(ended, Has.Count.EqualTo(1));
-            Assert.That(ended[0].SessionId, Is.EqualTo(CallId));
-            Assert.That(g.B.TryGet(CallId, Bob), Is.Null, "the call is over for both regions");
-            Assert.That(g.A.TryGet(CallId, Alice), Is.Null);
-            Assert.That(g.Stored().SeatsHeld, Is.EqualTo(0), "both seats are back");
+            Assert.Single(ended);
+            Assert.Equal(CallId, ended[0].SessionId);
+            {
+                var assertedValue = g.B.TryGet(CallId, Bob);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the call is over for both regions");
+            }
+            Assert.Null(g.A.TryGet(CallId, Alice));
+            {
+                var assertedValue = g.Stored().SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "both seats are back");
+            }
             g.Service.Sweep();
-            Assert.That(g.Service.SessionCount, Is.EqualTo(0), "and the store lets the call go");
+            {
+                var assertedValue = g.Service.SessionCount;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "and the store lets the call go");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AfterHangUp_ANewCallHasANewCredential()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             string first = FormCall(g);
             g.SessionsA.DepartByViewerSession(Alice, "vs-alice", DepartureReason.VoiceTeardown);
             g.SessionsB.DepartByViewerSession(Bob, "vs-bob", DepartureReason.VoiceTeardown);
 
-            Assert.That(g.B.Record(Bob, Alice, RegionB, out bool created), Is.Not.Null);
+            Assert.NotNull(g.B.Record(Bob, Alice, RegionB, out bool created));
             string second = g.B.IssueToken(CallId, Bob).Token;
 
-            Assert.That(created, Is.True);
-            Assert.That(second, Is.Not.EqualTo(first));
-            Assert.That(g.Service.SessionCount, Is.EqualTo(1));
+            Assert.True(created);
+            Assert.NotEqual(first, second);
+            Assert.Equal(1, g.Service.SessionCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARegionClosingTheCallersClient_EndsTheCallOnlyWhenTheOtherPartyIsGoneToo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             FormCall(g);
 
-            Assert.That(g.A.Ended(g.SessionsA.DepartAll(Alice, DepartureReason.PresenceLost)), Is.Empty);
-            Assert.That(g.B.TryGet(CallId, Bob).CalleeProvisioned, Is.True, "Bob is still joined, as region B sees it");
+            Assert.Empty(g.A.Ended(g.SessionsA.DepartAll(Alice, DepartureReason.PresenceLost)));
+            Assert.True(g.B.TryGet(CallId, Bob).CalleeProvisioned, "Bob is still joined, as region B sees it");
 
-            Assert.That(g.B.Ended(g.SessionsB.DepartAll(Bob, DepartureReason.PresenceLost)), Has.Count.EqualTo(1));
-            Assert.That(g.Stored().SeatsHeld, Is.EqualTo(0));
+            Assert.Single(g.B.Ended(g.SessionsB.DepartAll(Bob, DepartureReason.PresenceLost)));
+            Assert.Equal(0, g.Stored().SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnUnansweredInvitation_LapsesInTheServiceAfterTheInviteTtl_FreeingTheCallersSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             g.A.Record(Alice, Bob, RegionA, out _);
             g.A.IssueToken(CallId, Alice);
-            Assert.That(g.Stored().SeatsHeld, Is.EqualTo(1), "the caller is seated from the start");
+            {
+                var assertedValue = g.Stored().SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the caller is seated from the start");
+            }
 
             g.Clock.Now += NonSpatialVoiceSessionEngine.DefaultInviteTtl - TimeSpan.FromSeconds(1);
-            Assert.That(g.B.TryGet(CallId, Bob), Is.Not.Null, "still within the invitation's life");
+            {
+                var assertedValue = g.B.TryGet(CallId, Bob);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "still within the invitation's life");
+            }
 
             g.Clock.Now += TimeSpan.FromSeconds(2);
-            Assert.That(g.B.TryGet(CallId, Bob), Is.Null, "past it, the call is gone on every region");
-            Assert.That(g.A.IssueToken(CallId, Alice), Is.Null);
-            Assert.That(g.Stored().SeatsHeld, Is.EqualTo(0));
+            {
+                var assertedValue = g.B.TryGet(CallId, Bob);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "past it, the call is gone on every region");
+            }
+            Assert.Null(g.A.IssueToken(CallId, Alice));
+            Assert.Equal(0, g.Stored().SeatsHeld);
             g.Service.Sweep();
-            Assert.That(g.Service.SessionCount, Is.EqualTo(0));
+            Assert.Equal(0, g.Service.SessionCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallIsOutsideTheSessionCaps()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             VoiceSessionService service = VoiceSessionServiceTests.NewService(clock,
                 new NonSpatialLimits { MaxNonSpatialSessions = 1, MaxSessionsPerAgent = 1 });
@@ -182,19 +218,23 @@ namespace osWebRtcVoice.Tests
             A2ACalls calls = new A2ACalls(() => region);
 
             for (int i = 0; i < 5; i++)
-                Assert.That(calls.Record(Alice, UUID.Random(), RegionA, out _), Is.Not.Null, "call " + i);
+                {
+                    var assertedValue = calls.Record(Alice, UUID.Random(), RegionA, out _);
+                    TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "call " + i);
+                }
 
-            Assert.That(region.StartAdhoc(Alice, UUID.Random(), RegionA).Ok, Is.True, "and they do not use up the room conferences have");
+            Assert.True(region.StartAdhoc(Alice, UUID.Random(), RegionA).Ok, "and they do not use up the room conferences have");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WithNoStore_NothingIsRecorded_AndTheViewerIsToldTheServiceIsUnavailable()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             A2ACalls calls = new A2ACalls(() => null);
 
-            Assert.That(calls.Record(Alice, Bob, RegionA, out bool created), Is.Null);
-            Assert.That(created, Is.False);
-            Assert.That(calls.TryGet(CallId, Alice), Is.Null);
+            Assert.Null(calls.Record(Alice, Bob, RegionA, out bool created));
+            Assert.False(created);
+            Assert.Null(calls.TryGet(CallId, Alice));
 
             OSDMap start = new OSDMap
             {
@@ -202,7 +242,7 @@ namespace osWebRtcVoice.Tests
                 ["session-id"] = OSD.FromUUID(CallId),
                 ["params"] = OSD.FromUUID(Bob),
             };
-            Assert.That(ChatSessionRequestLogic.Decide(start, Alice, calls).Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, ChatSessionRequestLogic.Decide(start, Alice, calls).Status);
         }
     }
 }

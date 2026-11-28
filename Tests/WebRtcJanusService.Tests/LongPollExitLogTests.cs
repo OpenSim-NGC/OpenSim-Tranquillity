@@ -17,8 +17,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
     public class LongPollExitLogTests
     {
         // Answers create and destroy, and ends the long poll at once with a 404.
@@ -38,20 +36,24 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheLongPollEnding_IsLoggedAtDebug_AndNotAboveIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using LogCapture log = new LogCapture();
             using var session = new JanusSession("http://janus.test/voice", "tok", "http://janus.test/admin", "tok", false, new EndingJanus());
 
-            Assert.That(await session.CreateSession(), Is.True);
+            Assert.True(await session.CreateSession());
             var clock = System.Diagnostics.Stopwatch.StartNew();
             while (!log.Lines.Any(l => l.Text.Contains("Exiting long poll loop")) && clock.ElapsedMilliseconds < 8000)
-                await Task.Delay(20);
+                await Task.Delay(20, TestContext.Current.CancellationToken);
 
             // At least one: a session another test left behind may end during the same moment.
-            Assert.That(log.At(LogLevel.Debug, "Exiting long poll loop").Count, Is.GreaterThanOrEqualTo(1), "written, at Debug");
-            Assert.That(log.AtInfoOrAbove("Exiting long poll loop"), Is.Empty, "and not at Information or above");
+            Assert.True(log.At(LogLevel.Debug, "Exiting long poll loop").Count >= 1, "written, at Debug");
+            {
+                var assertedValue = log.AtInfoOrAbove("Exiting long poll loop");
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "and not at Information or above");
+            }
         }
     }
 }

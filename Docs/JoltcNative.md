@@ -10,7 +10,7 @@
 
 The Jolt physics module (`Source/OpenSim.Region.PhysicsModules.Jolt`) runs on joltc, the C API over
 Jolt Physics that JoltPhysicsSharp binds to. It uses the stock joltc of the `JoltPhysics.Native`
-package that JoltPhysicsSharp 2.19.1 depends on, on Windows x64 and Linux x64. A build puts the
+package that JoltPhysicsSharp 2.26.0 depends on, on Windows x64 and Linux x64. A build puts the
 package's files in the output under `runtimes/<rid>/native/`, and the module checks the file's hash
 against its record (`JoltNative.Known`) before loading it.
 
@@ -49,11 +49,11 @@ before the new hashes are recorded.
 
 | Package | File | SHA-256 |
 |---|---|---|
-| `JoltPhysics.Native 1.0.4` | `win-x64/joltc.dll` | `67becfc70cfbda643ab9b75aba895042900c3e339b001080ba4107e4929b0910` |
-| `JoltPhysics.Native 1.0.4` | `linux-x64/libjoltc.so` | `5fc051708bdd05031a816796612a2f87e17ed32cc198f195a43b2305b3d990fd` |
-| `JoltPhysics.Native 1.0.4` | `win-arm64/joltc.dll` | `b0a7d05151a8e504765a39e23b2ec196b88b3bf2ce3e8b884161e6925e7578e4` |
-| `JoltPhysics.Native 1.0.4` | `linux-arm64/libjoltc.so` | `fde70508c826370b5cf6bb54c6ea9ceeab0c37c826bcd71579ebb9b4ac3e0d61` |
-| `JoltPhysics.Native 1.0.4` | `osx/libjoltc.dylib` | `39e4a8728307e48026d965d8ab661348a8808a9a2afddde6ce58272b37d83e91` |
+| `JoltPhysics.Native 1.3.0` | `win-x64/joltc.dll` | `2df8e823a82fcba0e5fcf33f0e162760ce88c1bde481436a36a356c478f17844` |
+| `JoltPhysics.Native 1.3.0` | `linux-x64/libjoltc.so` | `1accf71dc32c4125c161c989af26d1edac9c8361ad7b3da0ef23b55ec5d43232` |
+| `JoltPhysics.Native 1.3.0` | `win-arm64/joltc.dll` | `3b57e253211baf1a0bda773a997329ac5c1e9c48ae3b6630457dedbbdff94d37` |
+| `JoltPhysics.Native 1.3.0` | `linux-arm64/libjoltc.so` | `ee6bc8bd85b2faac0d74094d97443a35e73604d60a1fc203788a831ce9b78e6a` |
+| `JoltPhysics.Native 1.3.0` | `osx/libjoltc.dylib` | `ad00673d2597313468e6b7f521c90be3084431bab6defd13198a08fd94612739` |
 
 ## Check a file
 
