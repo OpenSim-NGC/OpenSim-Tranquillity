@@ -26,13 +26,12 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class PeerCtlReplyStatsTests
     {
         private static UUID Id(int n) => new UUID($"{n:D8}-0000-0000-0000-000000000000");
@@ -68,159 +67,181 @@ namespace osWebRtcVoice.Tests
 
         // ---- ParseInnerReply (pure) ----------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParseInnerReply_ParsesAllFields_IncludingDeferred()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = JanusPeerCtlBatchSink.ParseInnerReply(Body(entries: 2, muteEntries: 1, skipped: 0, deferred: 3));
-            Assert.That(r.Present, Is.True);
-            Assert.That(r.Malformed, Is.False);
-            Assert.That(r.Status, Is.EqualTo("applied"));
-            Assert.That(r.Entries, Is.EqualTo(2));
-            Assert.That(r.MuteEntries, Is.EqualTo(1));
-            Assert.That(r.Skipped, Is.EqualTo(0));
-            Assert.That(r.DeferredListeners, Is.EqualTo(3));
+            Assert.True(r.Present);
+            Assert.False(r.Malformed);
+            Assert.Equal("applied", r.Status);
+            Assert.Equal(2, r.Entries);
+            Assert.Equal(1, r.MuteEntries);
+            Assert.Equal(0, r.Skipped);
+            Assert.Equal(3, r.DeferredListeners);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParseInnerReply_OldMixer_AbsentFields_DefaultZero_NotMalformed()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Pre-mute / pre-deferral mixer: response with only slvoice+entries+skipped, no mute_entries,
             // no deferred_listeners. Must parse cleanly to zeros (no-info), NOT be flagged malformed.
             const string body = "{\"janus\":\"success\",\"response\":{\"slvoice\":\"applied\",\"op\":\"add\",\"room\":1,\"entries\":1,\"skipped\":0}}";
             var r = JanusPeerCtlBatchSink.ParseInnerReply(body);
-            Assert.That(r.Present, Is.True);
-            Assert.That(r.Malformed, Is.False);
-            Assert.That(r.MuteEntries, Is.EqualTo(0));
-            Assert.That(r.DeferredListeners, Is.EqualTo(0), "absent deferred_listeners reads as zero (no info)");
+            Assert.True(r.Present);
+            Assert.False(r.Malformed);
+            Assert.Equal(0, r.MuteEntries);
+            {
+                var assertedValue = r.DeferredListeners;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "absent deferred_listeners reads as zero (no info)");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParseInnerReply_NoResponseObject_IsMalformed()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = JanusPeerCtlBatchSink.ParseInnerReply("{\"janus\":\"success\",\"transaction\":\"t\"}");
-            Assert.That(r.Present, Is.False);
-            Assert.That(r.Malformed, Is.True);
+            Assert.False(r.Present);
+            Assert.True(r.Malformed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParseInnerReply_EmptyOrNullBody_IsAbsentDefault()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r1 = JanusPeerCtlBatchSink.ParseInnerReply(string.Empty);
-            Assert.That(r1.Present, Is.False);
-            Assert.That(r1.Malformed, Is.False, "an empty body is absent, not malformed (no new log)");
+            Assert.False(r1.Present);
+            Assert.False(r1.Malformed, "an empty body is absent, not malformed (no new log)");
             var r2 = JanusPeerCtlBatchSink.ParseInnerReply(null);
-            Assert.That(r2.Present, Is.False);
-            Assert.That(r2.Malformed, Is.False);
+            Assert.False(r2.Present);
+            Assert.False(r2.Malformed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParseInnerReply_NonAppliedStatus_IsCaptured()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = JanusPeerCtlBatchSink.ParseInnerReply(Body(slvoice: "error"));
-            Assert.That(r.Present, Is.True);
-            Assert.That(r.Status, Is.EqualTo("error"));
-            Assert.That(r.Malformed, Is.False, "a present status is not malformed; it is just not \"applied\"");
+            Assert.True(r.Present);
+            Assert.Equal("error", r.Status);
+            Assert.False(r.Malformed, "a present status is not malformed; it is just not \"applied\"");
         }
 
         // ---- ClassifyReply (pure severity policy) --------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Classify_DeferredOnly_IsInfoNotWarn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = JanusPeerCtlBatchSink.ParseInnerReply(Body(deferred: 4));
             (bool warn, bool info) = JanusPeerCtlBatchSink.ClassifyReply(in r);
-            Assert.That(warn, Is.False, "the deferral self-heal is not a fault");
-            Assert.That(info, Is.True, "deferred_listeners>0 is INFO");
+            Assert.False(warn, "the deferral self-heal is not a fault");
+            Assert.True(info, "deferred_listeners>0 is INFO");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Classify_Skipped_IsWarn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = JanusPeerCtlBatchSink.ParseInnerReply(Body(skipped: 2));
-            Assert.That(JanusPeerCtlBatchSink.ClassifyReply(in r).Warn, Is.True, "skipped>0 is real loss -> WARN");
+            Assert.True(JanusPeerCtlBatchSink.ClassifyReply(in r).Warn, "skipped>0 is real loss -> WARN");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Classify_NonApplied_IsWarn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = JanusPeerCtlBatchSink.ParseInnerReply(Body(slvoice: "error"));
-            Assert.That(JanusPeerCtlBatchSink.ClassifyReply(in r).Warn, Is.True, "a non-applied status -> WARN");
+            Assert.True(JanusPeerCtlBatchSink.ClassifyReply(in r).Warn, "a non-applied status -> WARN");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Classify_Malformed_IsWarn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = JanusPeerCtlBatchSink.ParseInnerReply("{\"janus\":\"success\"}");
-            Assert.That(JanusPeerCtlBatchSink.ClassifyReply(in r).Warn, Is.True, "a malformed inner reply -> WARN");
+            Assert.True(JanusPeerCtlBatchSink.ClassifyReply(in r).Warn, "a malformed inner reply -> WARN");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Classify_QuietApplied_LogsNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = JanusPeerCtlBatchSink.ParseInnerReply(Body(skipped: 0));
             (bool warn, bool info) = JanusPeerCtlBatchSink.ClassifyReply(in r);
-            Assert.That(warn, Is.False);
-            Assert.That(info, Is.False, "an applied, all-zero reply logs nothing (quiet steady state)");
+            Assert.False(warn);
+            Assert.False(info, "an applied, all-zero reply logs nothing (quiet steady state)");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Classify_AbsentReply_LogsNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = JanusPeerCtlBatchSink.ParseInnerReply(string.Empty);
             (bool warn, bool info) = JanusPeerCtlBatchSink.ClassifyReply(in r);
-            Assert.That(warn, Is.False);
-            Assert.That(info, Is.False, "an absent reply (old mixer) logs nothing -- identical to a mixer that sends no inner stats");
+            Assert.False(warn);
+            Assert.False(info, "an absent reply (old mixer) logs nothing -- identical to a mixer that sends no inner stats");
         }
 
         // ---- Sink surfacing (LastSendStats) --------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Sink_SurfacesDeferredListeners_OnLastSendStats()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var sink = SinkReturning(_ => (AdminSendResult.Ok, Body(deferred: 3)));
             PeerCtlSendResult res = await sink.SendAsync(VisOp.Add, Excl(Id(1), Id(2)));
-            Assert.That(res, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(sink.LastSendStats.DeferredListeners, Is.EqualTo(3));
-            Assert.That(sink.LastSendStats.RepliesParsed, Is.EqualTo(1));
-            Assert.That(sink.LastSendStats.Anomalies, Is.EqualTo(0));
+            Assert.Equal(PeerCtlSendResult.Ok, res);
+            Assert.Equal(3, sink.LastSendStats.DeferredListeners);
+            Assert.Equal(1, sink.LastSendStats.RepliesParsed);
+            Assert.Equal(0, sink.LastSendStats.Anomalies);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Sink_SkippedInner_SurfacedAsAnomaly_ResultStillOk()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var sink = SinkReturning(_ => (AdminSendResult.Ok, Body(skipped: 2)));
             PeerCtlSendResult res = await sink.SendAsync(VisOp.Add, Excl(Id(1), Id(2)));
-            Assert.That(res, Is.EqualTo(PeerCtlSendResult.Ok), "skipped is a mixer detail, not a transport failure");
-            Assert.That(sink.LastSendStats.Skipped, Is.EqualTo(2));
-            Assert.That(sink.LastSendStats.Anomalies, Is.EqualTo(1));
+            {
+                var assertedValue = res;
+                TestAssert.WithMessage(() => Assert.Equal(PeerCtlSendResult.Ok, assertedValue), "skipped is a mixer detail, not a transport failure");
+            }
+            Assert.Equal(2, sink.LastSendStats.Skipped);
+            Assert.Equal(1, sink.LastSendStats.Anomalies);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Sink_MalformedInner_ReportedButResultStaysOk()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The transport succeeded (janus:"success"); a malformed inner reply is reported (anomaly),
             // NOT converted into a transport/protocol failure -- doing so would wrongly trip the sender's
             // latch / staleness guard (a behaviour change). This is the deliberate call.
             var sink = SinkReturning(_ => (AdminSendResult.Ok, "{\"janus\":\"success\"}"));
             PeerCtlSendResult res = await sink.SendAsync(VisOp.Add, Excl(Id(1), Id(2)));
-            Assert.That(res, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(sink.LastSendStats.Anomalies, Is.EqualTo(1));
+            Assert.Equal(PeerCtlSendResult.Ok, res);
+            Assert.Equal(1, sink.LastSendStats.Anomalies);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Sink_AbsentInner_ZeroStats_NoInfo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var sink = SinkReturning(_ => (AdminSendResult.Ok, string.Empty));   // old mixer / empty body
             PeerCtlSendResult res = await sink.SendAsync(VisOp.Add, Excl(Id(1), Id(2)));
-            Assert.That(res, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(sink.LastSendStats.RepliesParsed, Is.EqualTo(0));
-            Assert.That(sink.LastSendStats.DeferredListeners, Is.EqualTo(0));
-            Assert.That(sink.LastSendStats.Anomalies, Is.EqualTo(0));
+            Assert.Equal(PeerCtlSendResult.Ok, res);
+            Assert.Equal(0, sink.LastSendStats.RepliesParsed);
+            Assert.Equal(0, sink.LastSendStats.DeferredListeners);
+            Assert.Equal(0, sink.LastSendStats.Anomalies);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Sink_MultiRoom_AggregatesDeferredAcrossRooms()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Two listeners in two rooms, each excluding a source in its OWN room -> two rooms addressed.
             Func<UUID, int?> roomOf = u => u == Id(1) || u == Id(3) ? 100 : u == Id(2) || u == Id(4) ? 200 : (int?)null;
             var excl = new Dictionary<UUID, IReadOnlyCollection<UUID>>
@@ -232,9 +253,12 @@ namespace osWebRtcVoice.Tests
                 req => (AdminSendResult.Ok, Body(deferred: req["room"].AsInteger() == 100 ? 2 : 5)),
                 roomOf);
             PeerCtlSendResult res = await sink.SendAsync(VisOp.Add, excl);
-            Assert.That(res, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(sink.LastSendStats.DeferredListeners, Is.EqualTo(7), "summed across the two rooms");
-            Assert.That(sink.LastSendStats.RepliesParsed, Is.EqualTo(2));
+            Assert.Equal(PeerCtlSendResult.Ok, res);
+            {
+                var assertedValue = sink.LastSendStats.DeferredListeners;
+                TestAssert.WithMessage(() => Assert.Equal(7, assertedValue), "summed across the two rooms");
+            }
+            Assert.Equal(2, sink.LastSendStats.RepliesParsed);
         }
     }
 }

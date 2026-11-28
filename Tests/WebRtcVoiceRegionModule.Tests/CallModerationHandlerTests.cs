@@ -12,7 +12,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice.NonSpatial;
@@ -20,7 +20,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class CallModerationHandlerTests
     {
         private static readonly UUID Group = NonSpatialIdentityTests.Group;
@@ -77,7 +76,7 @@ namespace osWebRtcVoice.Tests
             {
                 bool handled = CallModerationHandler.TryHandle(body, who, Enabled ? Policy : new CallModerationPolicy { Settings = CallModerationSettings.Off, IsMember = Policy.IsMember, Powers = Policy.Powers },
                                                                Engine, Effects, out ChatSessionOutcome o);
-                Assert.That(handled, Is.EqualTo(expectHandled));
+                Assert.Equal(expectHandled, handled);
                 return o;
             }
         }
@@ -106,62 +105,69 @@ namespace osWebRtcVoice.Tests
                 },
             };
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AModeratorMutesAMembersVoice_ItIsRecordedAndEnforced()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
 
             ChatSessionOutcome o = r.Post(Alice, MuteUpdate(Group, Bob, "voice", true));
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK), o.Instrument);
-            Assert.That(r.Session.IsVoiceMuted(Bob), Is.True);
-            Assert.That(r.Effects.Enforced, Is.EqualTo(1));
-            Assert.That(r.Effects.Changes, Is.EqualTo(new[] { (ModerationOp.VoiceMute, Bob, Alice, true) }));
+            {
+                var assertedValue = o.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.OK, assertedValue), o.Instrument);
+            }
+            Assert.True(r.Session.IsVoiceMuted(Bob));
+            Assert.Equal(1, r.Effects.Enforced);
+            Assert.Equal(new[] { (ModerationOp.VoiceMute, Bob, Alice, true) }, r.Effects.Changes);
 
             ChatSessionOutcome again = r.Post(Alice, MuteUpdate(Group, Bob, "voice", true));
-            Assert.That(again.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(again.Instrument, Does.Contain(CallModerationHandler.DecisionUnchanged));
-            Assert.That(r.Session.ModerationGeneration, Is.EqualTo(1));
+            Assert.Equal(HttpStatusCode.OK, again.Status);
+            Assert.Contains(CallModerationHandler.DecisionUnchanged, again.Instrument);
+            Assert.Equal(1, r.Session.ModerationGeneration);
 
             r.Post(Alice, MuteUpdate(Group, Bob, "voice", false));
-            Assert.That(r.Session.IsVoiceMuted(Bob), Is.False);
+            Assert.False(r.Session.IsVoiceMuted(Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ATextMuteIsRecordedAndNeedsNoVoiceServer()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             r.Effects.Can = false;
 
             ChatSessionOutcome o = r.Post(Alice, MuteUpdate(Group, Bob, "text", true));
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(r.Session.IsTextMuted(Bob), Is.True);
-            Assert.That(r.Session.IsVoiceMuted(Bob), Is.False);
-            Assert.That(r.Effects.Enforced, Is.EqualTo(0));
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            Assert.True(r.Session.IsTextMuted(Bob));
+            Assert.False(r.Session.IsVoiceMuted(Bob));
+            Assert.Equal(0, r.Effects.Enforced);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MuteAllAndUnmuteAll()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
 
-            Assert.That(r.Post(Alice, SessionUpdate(Group, true)).Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(r.Session.VoiceModerated, Is.True);
-            Assert.That(r.Session.IsVoiceMuted(Dave), Is.True, "a later joiner is muted");
+            Assert.Equal(HttpStatusCode.OK, r.Post(Alice, SessionUpdate(Group, true)).Status);
+            Assert.True(r.Session.VoiceModerated);
+            Assert.True(r.Session.IsVoiceMuted(Dave), "a later joiner is muted");
 
             r.Post(Alice, MuteUpdate(Group, Bob, "voice", false));
-            Assert.That(r.Session.IsVoiceMuted(Bob), Is.False, "let speak by name");
+            Assert.False(r.Session.IsVoiceMuted(Bob), "let speak by name");
 
-            Assert.That(r.Post(Alice, SessionUpdate(Group, false)).Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(r.Session.VoiceModerated, Is.False);
-            Assert.That(r.Session.IsVoiceMuted(Carol), Is.False);
-            Assert.That(r.Effects.Enforced, Is.EqualTo(3));
+            Assert.Equal(HttpStatusCode.OK, r.Post(Alice, SessionUpdate(Group, false)).Status);
+            Assert.False(r.Session.VoiceModerated);
+            Assert.False(r.Session.IsVoiceMuted(Carol));
+            Assert.Equal(3, r.Effects.Enforced);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARequesterWhoDoesNotHoldTheModeratePowerIsRefused_AndNothingIsRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
 
             ChatSessionOutcome o = r.Post(Bob, MuteUpdate(Group, Carol, "voice", true));
@@ -170,73 +176,77 @@ namespace osWebRtcVoice.Tests
 
             foreach (ChatSessionOutcome x in new[] { o, all, text })
             {
-                Assert.That(x.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-                Assert.That(x.Instrument, Does.Contain(CallModerationHandler.DecisionNotModerator));
+                Assert.Equal(HttpStatusCode.Forbidden, x.Status);
+                Assert.Contains(CallModerationHandler.DecisionNotModerator, x.Instrument);
             }
-            Assert.That(r.Session.ModerationGeneration, Is.EqualTo(0));
-            Assert.That(r.Effects.Enforced, Is.EqualTo(0));
+            Assert.Equal(0, r.Session.ModerationGeneration);
+            Assert.Equal(0, r.Effects.Enforced);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnOutsiderWithThePowerButNoMembershipIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             r.Powers[Dave] = CallModerationPolicy.PowerModerateChat;   // holds the bit, is not in the group
 
-            Assert.That(r.Post(Dave, MuteUpdate(Group, Bob, "voice", true)).Status, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.Equal(HttpStatusCode.Forbidden, r.Post(Dave, MuteUpdate(Group, Bob, "voice", true)).Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ThePowerIsAskedOnEveryRequest_AndLosingItEndsTheRight()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
-            Assert.That(r.Post(Alice, MuteUpdate(Group, Bob, "voice", true)).Status, Is.EqualTo(HttpStatusCode.OK));
+            Assert.Equal(HttpStatusCode.OK, r.Post(Alice, MuteUpdate(Group, Bob, "voice", true)).Status);
 
             r.Powers[Alice] = 0;
-            Assert.That(r.Post(Alice, MuteUpdate(Group, Bob, "voice", false)).Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(r.Session.IsVoiceMuted(Bob), Is.True, "the refused request changed nothing");
+            Assert.Equal(HttpStatusCode.Forbidden, r.Post(Alice, MuteUpdate(Group, Bob, "voice", false)).Status);
+            Assert.True(r.Session.IsVoiceMuted(Bob), "the refused request changed nothing");
 
             r.Powers[Carol] = CallModerationPolicy.PowerModerateChat;   // gained mid-call: effective on the next request
-            Assert.That(r.Post(Carol, MuteUpdate(Group, Bob, "voice", false)).Status, Is.EqualTo(HttpStatusCode.OK));
+            Assert.Equal(HttpStatusCode.OK, r.Post(Carol, MuteUpdate(Group, Bob, "voice", false)).Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AModeratorIsNeverMuted_AndNobodyMutesThemself()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             r.Powers[Carol] = CallModerationPolicy.PowerModerateChat;
 
             ChatSessionOutcome self = r.Post(Alice, MuteUpdate(Group, Alice, "voice", true));
             ChatSessionOutcome other = r.Post(Alice, MuteUpdate(Group, Carol, "text", true));
 
-            Assert.That(self.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(self.Instrument, Does.Contain(CallModerationHandler.DecisionSelf));
-            Assert.That(other.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(other.Instrument, Does.Contain(CallModerationHandler.DecisionTargetModerator));
-            Assert.That(r.Session.ModerationGeneration, Is.EqualTo(0));
+            Assert.Equal(HttpStatusCode.Forbidden, self.Status);
+            Assert.Contains(CallModerationHandler.DecisionSelf, self.Instrument);
+            Assert.Equal(HttpStatusCode.Forbidden, other.Status);
+            Assert.Contains(CallModerationHandler.DecisionTargetModerator, other.Instrument);
+            Assert.Equal(0, r.Session.ModerationGeneration);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnUnknownSessionIs404_AConferenceAndACallBetweenTwoAreRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             SessionOutcome conf = r.Engine.StartAdhoc(Alice, UUID.Random(), RegionA);
             SessionOutcome p2p = r.Engine.Start(NonSpatialSessionType.P2P, Alice, Bob, UUID.Random(), RegionA);
 
-            Assert.That(r.Post(Alice, MuteUpdate(UUID.Random(), Bob, "voice", true)).Status, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.Equal(HttpStatusCode.NotFound, r.Post(Alice, MuteUpdate(UUID.Random(), Bob, "voice", true)).Status);
             ChatSessionOutcome c = r.Post(Alice, MuteUpdate(conf.Session.SessionId, Bob, "voice", true));
-            Assert.That(c.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(c.Instrument, Does.Contain(CallModerationHandler.DecisionAdhoc));
+            Assert.Equal(HttpStatusCode.Forbidden, c.Status);
+            Assert.Contains(CallModerationHandler.DecisionAdhoc, c.Instrument);
             ChatSessionOutcome all = r.Post(Alice, SessionUpdate(conf.Session.SessionId, true));
-            Assert.That(all.Instrument, Does.Contain(CallModerationHandler.DecisionAdhoc));
-            Assert.That(r.Post(Alice, MuteUpdate(p2p.Session.SessionId, Bob, "voice", true)).Instrument,
-                        Does.Contain(CallModerationHandler.DecisionP2P));
-            Assert.That(conf.Session.ModerationGeneration, Is.EqualTo(0));
+            Assert.Contains(CallModerationHandler.DecisionAdhoc, all.Instrument);
+            Assert.Contains(CallModerationHandler.DecisionP2P, r.Post(Alice, MuteUpdate(p2p.Session.SessionId, Bob, "voice", true)).Instrument);
+            Assert.Equal(0, conf.Session.ModerationGeneration);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MalformedBodiesAreRefusedAndChangeNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             OSDMap noAgent = MuteUpdate(Group, Bob, "voice", true);
             ((OSDMap)noAgent["params"]).Remove("agent_id");
@@ -258,165 +268,204 @@ namespace osWebRtcVoice.Tests
             foreach (OSDMap bad in new[] { noAgent, both, neither, notBool, otherKey, noParams, noMode, modeNotBool, noSession })
             {
                 ChatSessionOutcome o = r.Post(Alice, bad);
-                Assert.That(o.Status, Is.EqualTo(HttpStatusCode.BadRequest), o.Instrument);
+                {
+                    var assertedValue = o.Status;
+                    TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.BadRequest, assertedValue), o.Instrument);
+                }
             }
-            Assert.That(r.Session.ModerationGeneration, Is.EqualTo(0));
-            Assert.That(r.Effects.Enforced, Is.EqualTo(0));
+            Assert.Equal(0, r.Session.ModerationGeneration);
+            Assert.Equal(0, r.Effects.Enforced);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WithTheFeatureOffNothingIsHandled_AndOtherMethodsAreNotTaken()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new() { Enabled = false };
             r.Post(Alice, MuteUpdate(Group, Bob, "voice", true), expectHandled: false);
             r.Post(Alice, SessionUpdate(Group, true), expectHandled: false);
-            Assert.That(r.Session.ModerationGeneration, Is.EqualTo(0));
+            Assert.Equal(0, r.Session.ModerationGeneration);
 
             Rig on = new();
             on.Post(Alice, new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(Group) }, expectHandled: false);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AVoiceMuteThatCannotBeHeardIsRefusedBeforeAnythingIsRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             r.Effects.Can = false;
 
             ChatSessionOutcome one = r.Post(Alice, MuteUpdate(Group, Bob, "voice", true));
             ChatSessionOutcome all = r.Post(Alice, SessionUpdate(Group, true));
 
-            Assert.That(one.Status, Is.EqualTo(HttpStatusCode.NotImplemented));
-            Assert.That(one.Instrument, Does.Contain(CallModerationHandler.DecisionVoiceUnsupported));
-            Assert.That(all.Status, Is.EqualTo(HttpStatusCode.NotImplemented));
-            Assert.That(r.Session.ModerationGeneration, Is.EqualTo(0));
-            Assert.That(r.Effects.Changes, Is.Empty);
+            Assert.Equal(HttpStatusCode.NotImplemented, one.Status);
+            Assert.Contains(CallModerationHandler.DecisionVoiceUnsupported, one.Instrument);
+            Assert.Equal(HttpStatusCode.NotImplemented, all.Status);
+            Assert.Equal(0, r.Session.ModerationGeneration);
+            Assert.Empty(r.Effects.Changes);
         }
 
-        [TestCase(ParticipantMuteResult.Unsupported, HttpStatusCode.NotImplemented)]
-        [TestCase(ParticipantMuteResult.Failed, HttpStatusCode.ServiceUnavailable)]
+        [InlineData(ParticipantMuteResult.Unsupported,HttpStatusCode.NotImplemented)]
+        [InlineData(ParticipantMuteResult.Failed,HttpStatusCode.ServiceUnavailable)]
+        [Theory(Timeout = 60000)]
         public void AVoiceMuteThatIsRecordedButCannotBeApplied_IsTakenBackOutAndNeverAnswered200(ParticipantMuteResult result, HttpStatusCode status)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             r.Effects.Result = result;
 
             ChatSessionOutcome one = r.Post(Alice, MuteUpdate(Group, Bob, "voice", true));
-            Assert.That(one.Status, Is.EqualTo(status));
-            Assert.That(r.Session.IsVoiceMuted(Bob), Is.False, "the record does not say what the room does not do");
+            Assert.Equal(status, one.Status);
+            Assert.False(r.Session.IsVoiceMuted(Bob), "the record does not say what the room does not do");
 
             ChatSessionOutcome all = r.Post(Alice, SessionUpdate(Group, true));
-            Assert.That(all.Status, Is.EqualTo(status));
-            Assert.That(r.Session.VoiceModerated, Is.False);
-            Assert.That(r.Effects.Changes, Is.Empty, "nobody was told of a change that was not made");
+            Assert.Equal(status, all.Status);
+            Assert.False(r.Session.VoiceModerated);
+            {
+                var assertedValue = r.Effects.Changes;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "nobody was told of a change that was not made");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMuteOfAnAgentTheCallDoesNotHold_IsRefusedAndNothingIsRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
 
             ChatSessionOutcome o = r.Post(Alice, MuteUpdate(Group, Dave, "voice", true));
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.NotFound));
-            Assert.That(o.Instrument, Does.Contain(CallModerationHandler.DecisionTargetNotInCall));
-            Assert.That(r.Session.IsVoiceMuted(Dave), Is.False);
-            Assert.That(r.Session.ModerationGeneration, Is.EqualTo(0));
-            Assert.That(r.Effects.Enforced, Is.EqualTo(0), "the room was not asked to mute anyone");
+            Assert.Equal(HttpStatusCode.NotFound, o.Status);
+            Assert.Contains(CallModerationHandler.DecisionTargetNotInCall, o.Instrument);
+            Assert.False(r.Session.IsVoiceMuted(Dave));
+            Assert.Equal(0, r.Session.ModerationGeneration);
+            {
+                var assertedValue = r.Effects.Enforced;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the room was not asked to mute anyone");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMemberWhoHasLeft_CannotBeMuted_ButCanBeUnmuted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
-            Assert.That(r.Post(Alice, MuteUpdate(Group, Bob, "voice", true)).Status, Is.EqualTo(HttpStatusCode.OK));
+            Assert.Equal(HttpStatusCode.OK, r.Post(Alice, MuteUpdate(Group, Bob, "voice", true)).Status);
             r.Engine.Depart(Group, Bob, DepartureReason.VoiceTeardown);
             r.Engine.Depart(Group, Carol, DepartureReason.VoiceTeardown);
 
             ChatSessionOutcome muteCarol = r.Post(Alice, MuteUpdate(Group, Carol, "voice", true));
-            Assert.That(muteCarol.Status, Is.EqualTo(HttpStatusCode.NotFound), "a member who left holds no seat to mute");
-            Assert.That(r.Session.IsVoiceMuted(Carol), Is.False);
+            {
+                var assertedValue = muteCarol.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.NotFound, assertedValue), "a member who left holds no seat to mute");
+            }
+            Assert.False(r.Session.IsVoiceMuted(Carol));
 
             ChatSessionOutcome unmuteBob = r.Post(Alice, MuteUpdate(Group, Bob, "voice", false));
-            Assert.That(unmuteBob.Status, Is.EqualTo(HttpStatusCode.OK), "a mute left on someone who left can be cleared");
-            Assert.That(r.Session.IsVoiceMuted(Bob), Is.False);
+            {
+                var assertedValue = unmuteBob.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.OK, assertedValue), "a mute left on someone who left can be cleared");
+            }
+            Assert.False(r.Session.IsVoiceMuted(Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnUnresolvableTarget_IsRefusedBeforeAnythingIsRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             r.Effects.Resolves = false;   // the voice server shows no participant for the agent's id
 
             ChatSessionOutcome o = r.Post(Alice, MuteUpdate(Group, Bob, "voice", true));
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.NotFound));
-            Assert.That(o.Instrument, Does.Contain(CallModerationHandler.DecisionTargetUnresolved));
-            Assert.That(r.Session.IsVoiceMuted(Bob), Is.False);
-            Assert.That(r.Session.ModerationGeneration, Is.EqualTo(0), "nothing was recorded");
-            Assert.That(r.Effects.Enforced, Is.EqualTo(0));
-            Assert.That(r.Effects.Changes, Is.Empty);
+            Assert.Equal(HttpStatusCode.NotFound, o.Status);
+            Assert.Contains(CallModerationHandler.DecisionTargetUnresolved, o.Instrument);
+            Assert.False(r.Session.IsVoiceMuted(Bob));
+            {
+                var assertedValue = r.Session.ModerationGeneration;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "nothing was recorded");
+            }
+            Assert.Equal(0, r.Effects.Enforced);
+            Assert.Empty(r.Effects.Changes);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AParticipantThatVanishesBeforeTheMute_IsRefused_TheRecordIsRestored_AndTheRoomToldTheEarlierState()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             r.Effects.Result = ParticipantMuteResult.NotInRoom;
 
             ChatSessionOutcome o = r.Post(Alice, MuteUpdate(Group, Bob, "voice", true));
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.NotFound));
-            Assert.That(o.Instrument, Does.Contain(CallModerationHandler.DecisionTargetUnresolved));
-            Assert.That(r.Session.IsVoiceMuted(Bob), Is.False, "not a mute: the record does not hold it");
-            Assert.That(r.Effects.Changes, Is.Empty);
-            Assert.That(r.Effects.EnforcedTargets, Is.EqualTo(new[] { Bob, UUID.Zero }), "asked once for Bob, then the earlier state to the whole room");
-            Assert.That(r.Effects.Told[1], Is.EqualTo((false, 0)), "the earlier state: nobody muted");
+            Assert.Equal(HttpStatusCode.NotFound, o.Status);
+            Assert.Contains(CallModerationHandler.DecisionTargetUnresolved, o.Instrument);
+            Assert.False(r.Session.IsVoiceMuted(Bob), "not a mute: the record does not hold it");
+            Assert.Empty(r.Effects.Changes);
+            {
+                var assertedValue = r.Effects.EnforcedTargets;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { Bob, UUID.Zero }, assertedValue), "asked once for Bob, then the earlier state to the whole room");
+            }
+            {
+                var assertedValue = r.Effects.Told[1];
+                TestAssert.WithMessage(() => Assert.Equal((false, 0), assertedValue), "the earlier state: nobody muted");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMuteAllThatFailsPartway_IsTakenBackOut_AndTheRoomToldTheEarlierStateAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             r.Effects.Result = ParticipantMuteResult.Failed;
 
             ChatSessionOutcome all = r.Post(Alice, SessionUpdate(Group, true));
 
-            Assert.That(all.Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
-            Assert.That(r.Session.VoiceModerated, Is.False);
-            Assert.That(r.Effects.Enforced, Is.EqualTo(2), "the mute, then the earlier state, so no member stays muted at the room");
-            Assert.That(r.Effects.Told[0].Moderated, Is.True);
-            Assert.That(r.Effects.Told[1].Moderated, Is.False);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, all.Status);
+            Assert.False(r.Session.VoiceModerated);
+            {
+                var assertedValue = r.Effects.Enforced;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the mute, then the earlier state, so no member stays muted at the room");
+            }
+            Assert.True(r.Effects.Told[0].Moderated);
+            Assert.False(r.Effects.Told[1].Moderated);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMuteAllWithNobodyInTheRoomYet_IsRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = new();
             r.Effects.Result = ParticipantMuteResult.NotInRoom;
 
-            Assert.That(r.Post(Alice, SessionUpdate(Group, true)).Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(r.Session.VoiceModerated, Is.True, "each member is muted as it joins");
+            Assert.Equal(HttpStatusCode.OK, r.Post(Alice, SessionUpdate(Group, true)).Status);
+            Assert.True(r.Session.VoiceModerated, "each member is muted as it joins");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheModeratePowerIsTheViewersBit()
         {
-            Assert.That(CallModerationPolicy.PowerModerateChat, Is.EqualTo(1UL << 37));
-            Assert.That(CallModerationPolicy.PowerModerateChat, Is.EqualTo((ulong)GroupPowers.ModerateChat));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(1UL << 37, CallModerationPolicy.PowerModerateChat);
+            Assert.Equal((ulong)GroupPowers.ModerateChat, CallModerationPolicy.PowerModerateChat);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheSettingsDefaultToOff_AndReadTheirKeys()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Nini.Config.IniConfigSource src = new();
             Nini.Config.IConfig cfg = src.AddConfig("WebRtcVoice");
-            Assert.That(CallModerationSettings.Read(cfg).Enabled, Is.False);
-            Assert.That(CallModerationSettings.Read(cfg).RevalidateSeconds, Is.EqualTo(60));
-            Assert.That(CallModerationSettings.Read(null).Enabled, Is.False);
+            Assert.False(CallModerationSettings.Read(cfg).Enabled);
+            Assert.Equal(60, CallModerationSettings.Read(cfg).RevalidateSeconds);
+            Assert.False(CallModerationSettings.Read(null).Enabled);
 
             cfg.Set("CallModerationEnabled", "true");
             cfg.Set("CallModerationRevalidateSeconds", "0");
-            Assert.That(CallModerationSettings.Read(cfg).Enabled, Is.True);
-            Assert.That(CallModerationSettings.Read(cfg).RevalidateSeconds, Is.EqualTo(0));
+            Assert.True(CallModerationSettings.Read(cfg).Enabled);
+            Assert.Equal(0, CallModerationSettings.Read(cfg).RevalidateSeconds);
         }
     }
 }

@@ -21,7 +21,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VoiceStateFeederTests
     {
         private const int Room = -999;
@@ -79,9 +78,10 @@ namespace osWebRtcVoice.Tests
         // ======================================================================================
         // 1. Iain's ban scenario: A banned from P -> A <-> P-occupants mutually hidden; a third
         //    avatar hears all. Symmetry asserted both directions.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BanScenario_BannedAndOccupantsMutuallyHidden_ThirdHearsAll()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             ParcelView P = w.AddZone(1, Parcel(Id(101), banned: new HashSet<UUID> { Id(1) }));
             ParcelView Q = w.AddZone(2, Parcel(Id(102)));
@@ -92,20 +92,21 @@ namespace osWebRtcVoice.Tests
 
             VisibilityMatrix m = VisibilityMatrix.Build(w);
 
-            Assert.That(m.IsExcluded(b, a), Is.True, "occupant B must not hear A (A banned from P)");
-            Assert.That(m.IsExcluded(a, b), Is.True, "A must not hear occupant B (symmetric)");
-            Assert.That(m.IsExcluded(c, a), Is.False, "third avatar hears A");
-            Assert.That(m.IsExcluded(a, c), Is.False);
-            Assert.That(m.IsExcluded(c, b), Is.False, "third avatar hears B");
-            Assert.That(m.IsExcluded(b, c), Is.False);
+            Assert.True(m.IsExcluded(b, a), "occupant B must not hear A (A banned from P)");
+            Assert.True(m.IsExcluded(a, b), "A must not hear occupant B (symmetric)");
+            Assert.False(m.IsExcluded(c, a), "third avatar hears A");
+            Assert.False(m.IsExcluded(a, c));
+            Assert.False(m.IsExcluded(c, b), "third avatar hears B");
+            Assert.False(m.IsExcluded(b, c));
         }
 
         // ======================================================================================
         // 2. SeeAVs parcel: occupants hidden from outside AND outside hidden from occupants
         //    (symmetric, per Decision 1b). Co-occupants still hear each other.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SeeAvs_OccupantAndOutsiderMutuallyHidden_CoOccupantsHearEachOther()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             ParcelView H = w.AddZone(3, Parcel(Id(103), seeAVs: false));
             ParcelView Q = w.AddZone(2, Parcel(Id(102)));
@@ -116,17 +117,18 @@ namespace osWebRtcVoice.Tests
 
             VisibilityMatrix m = VisibilityMatrix.Build(w);
 
-            Assert.That(m.IsExcluded(o1, x), Is.True, "outsider hidden from occupant");
-            Assert.That(m.IsExcluded(x, o1), Is.True, "occupant hidden from outsider (symmetric)");
-            Assert.That(m.IsExcluded(o1, o2), Is.False, "co-occupants of a hidden parcel hear each other");
-            Assert.That(m.IsExcluded(o2, o1), Is.False);
+            Assert.True(m.IsExcluded(o1, x), "outsider hidden from occupant");
+            Assert.True(m.IsExcluded(x, o1), "occupant hidden from outsider (symmetric)");
+            Assert.False(m.IsExcluded(o1, o2), "co-occupants of a hidden parcel hear each other");
+            Assert.False(m.IsExcluded(o2, o1));
         }
 
         // ======================================================================================
         // 3. Estate deny-voice: AllowVoice == false empties audibility (every source excluded).
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EstateVoiceDisabled_MatrixExcludesEveryone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             ParcelView Q = w.AddZone(2, Parcel(Id(102)));
             w.EstateVal = new EstateView(allowVoice: false, taxFree: false, isBanned: _ => false);
@@ -136,16 +138,17 @@ namespace osWebRtcVoice.Tests
 
             VisibilityMatrix m = VisibilityMatrix.Build(w);
 
-            Assert.That(m.IsExcluded(a, b), Is.True);
-            Assert.That(m.IsExcluded(b, a), Is.True);
+            Assert.True(m.IsExcluded(a, b));
+            Assert.True(m.IsExcluded(b, a));
         }
 
         // ======================================================================================
         // 4. Child agent: parcel from position; matrix updates when position crosses a boundary
         //    between ticks.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChildAgent_ParcelFromPosition_MatrixUpdatesOnBoundaryCross()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             ParcelView H = w.AddZone(3, Parcel(Id(103), seeAVs: false));
             w.AddZone(2, Parcel(Id(102)));                    // Q (normal)
@@ -155,25 +158,26 @@ namespace osWebRtcVoice.Tests
             w.Agents.Add(Child(c, zone: 2));                  // child starts outside, on Q
 
             var feeder = new VoiceStateFeeder(w, Room);
-            Assert.That(feeder.Current.IsExcluded(r, c), Is.True, "child outside H is hidden from R");
-            Assert.That(feeder.Current.IsExcluded(c, r), Is.True);
+            Assert.True(feeder.Current.IsExcluded(r, c), "child outside H is hidden from R");
+            Assert.True(feeder.Current.IsExcluded(c, r));
 
             w.Agents[ci] = Child(c, zone: 3);                 // child walks into H
             VisibilityBatch batch = feeder.Tick();
 
-            Assert.That(feeder.Current.IsExcluded(r, c), Is.False, "co-located now: not hidden");
-            Assert.That(feeder.Current.IsExcluded(c, r), Is.False);
-            Assert.That(batch.Removed[r], Does.Contain(c));
-            Assert.That(batch.Removed[c], Does.Contain(r));
+            Assert.False(feeder.Current.IsExcluded(r, c), "co-located now: not hidden");
+            Assert.False(feeder.Current.IsExcluded(c, r));
+            Assert.Contains(c, batch.Removed[r]);
+            Assert.Contains(r, batch.Removed[c]);
         }
 
         // ======================================================================================
         // 5. Delta correctness - the SeeAVs fan-out. A mover stepping onto an (empty) hidden
         //    parcel becomes hidden from EVERY outsider: the add-side fan-out the churn example
         //    (semantics doc 3.2.1) originally omitted. Sized so the fan-out count is 17.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SeeAvsFanOut_MoverEntersHiddenParcel_AddsExclusionWithEveryOutsider()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int Outsiders = 17;
             var w = new FakeWorld();
             w.AddZone(3, Parcel(Id(103), seeAVs: false));     // H (hidden, empty)
@@ -190,23 +194,39 @@ namespace osWebRtcVoice.Tests
             w.Agents.Add(Child(mover, zone: 2));              // mover starts on Q with the outsiders
 
             var feeder = new VoiceStateFeeder(w, Room);
-            Assert.That(feeder.Current.Listeners, Is.Empty, "all on one normal parcel: no exclusions");
+            {
+                var assertedValue = feeder.Current.Listeners;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "all on one normal parcel: no exclusions");
+            }
 
             w.Agents[mi] = Child(mover, zone: 3);             // mover crosses into empty hidden H
             VisibilityBatch batch = feeder.Tick();
 
-            Assert.That(batch.Removed, Is.Empty, "H was empty: nothing to un-hide");
-            Assert.That(batch.Added.Count, Is.EqualTo(Outsiders + 1), "mover + each outsider touched");
-            Assert.That(batch.Added[mover].Count, Is.EqualTo(Outsiders), "mover hidden from all 17 outsiders");
+            {
+                var assertedValue = batch.Removed;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "H was empty: nothing to un-hide");
+            }
+            {
+                var assertedValue = batch.Added.Count;
+                TestAssert.WithMessage(() => Assert.Equal(Outsiders + 1, assertedValue), "mover + each outsider touched");
+            }
+            {
+                var assertedValue = batch.Added[mover].Count;
+                TestAssert.WithMessage(() => Assert.Equal(Outsiders, assertedValue), "mover hidden from all 17 outsiders");
+            }
             foreach (UUID o in outsiders)
-                Assert.That(batch.Added[o], Is.EquivalentTo(new[] { mover }), "each outsider gains exactly the mover");
+                {
+                    var assertedValue = batch.Added[o];
+                    TestAssert.WithMessage(() => Assert.Equivalent(new[] { mover }, assertedValue, strict: true), "each outsider gains exactly the mover");
+                }
         }
 
         // ======================================================================================
         // 6. Snapshot-replace reproduces the same set as incremental add/remove accumulation.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SnapshotReplace_EqualsIncrementalAccumulation()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             ParcelView H = w.AddZone(3, Parcel(Id(103), seeAVs: false));
             ParcelView Q = w.AddZone(2, Parcel(Id(102)));
@@ -228,7 +248,10 @@ namespace osWebRtcVoice.Tests
             {
                 IReadOnlyCollection<UUID> snap = DeltaComputer.SnapshotFor(m2, l, Room).Added[l];
                 HashSet<UUID> accSet = acc.TryGetValue(l, out HashSet<UUID> s) ? s : new HashSet<UUID>();
-                Assert.That(accSet, Is.EquivalentTo(snap), $"accumulated set for listener {l} must match its snapshot");
+                {
+                    var assertedValue = accSet;
+                    TestAssert.WithMessage(() => Assert.Equivalent(snap, assertedValue, strict: true), $"accumulated set for listener {l} must match its snapshot");
+                }
             }
         }
 
@@ -236,9 +259,10 @@ namespace osWebRtcVoice.Tests
         // 7. Degenerate case (Decision 2b): a banned avatar physically INSIDE the banning parcel
         //    is still mutually excluded from that parcel's occupants (membership-based, not
         //    position-based). Legit occupants still hear each other.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BannedAvatarInsideBanningParcel_StillMutuallyExcludedFromOccupants()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             UUID a = Id(1);
             ParcelView P = w.AddZone(1, Parcel(Id(101), banned: new HashSet<UUID> { a }));
@@ -249,12 +273,12 @@ namespace osWebRtcVoice.Tests
 
             VisibilityMatrix m = VisibilityMatrix.Build(w);
 
-            Assert.That(m.IsExcluded(b, a), Is.True, "occupant must not hear the banned avatar even if it is inside P");
-            Assert.That(m.IsExcluded(a, b), Is.True, "symmetric");
-            Assert.That(m.IsExcluded(c, a), Is.True);
-            Assert.That(m.IsExcluded(a, c), Is.True);
-            Assert.That(m.IsExcluded(b, c), Is.False, "two legit occupants still hear each other");
-            Assert.That(m.IsExcluded(c, b), Is.False);
+            Assert.True(m.IsExcluded(b, a), "occupant must not hear the banned avatar even if it is inside P");
+            Assert.True(m.IsExcluded(a, b), "symmetric");
+            Assert.True(m.IsExcluded(c, a));
+            Assert.True(m.IsExcluded(a, c));
+            Assert.False(m.IsExcluded(b, c), "two legit occupants still hear each other");
+            Assert.False(m.IsExcluded(c, b));
         }
 
         // ======================================================================================
@@ -264,9 +288,10 @@ namespace osWebRtcVoice.Tests
         // parcel-ban step (VisibilityRules.cs:34) carries no TaxFree guard. The banned cross-parcel
         // pair can only be excluded by that ban rule (voice is on, no estate ban, SeeAVs on both,
         // different parcels), so this pins that TaxFree does not suppress it.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParcelBanUnderTaxFree_StillMutuallyExcluded_TaxFreeDoesNotVoidTheBan()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             w.EstateVal = new EstateView(allowVoice: true, taxFree: true, isBanned: _ => false);
             ParcelView P = w.AddZone(1, Parcel(Id(101), banned: new HashSet<UUID> { Id(1) }));
@@ -278,19 +303,20 @@ namespace osWebRtcVoice.Tests
 
             VisibilityMatrix m = VisibilityMatrix.Build(w);
 
-            Assert.That(m.IsExcluded(b, a), Is.True, "under TaxFree the parcel ban still excludes: occupant B must not hear banned A");
-            Assert.That(m.IsExcluded(a, b), Is.True, "symmetric under TaxFree");
-            Assert.That(m.IsExcluded(c, a), Is.False, "unbanned third avatar still hears A under TaxFree");
-            Assert.That(m.IsExcluded(a, c), Is.False);
+            Assert.True(m.IsExcluded(b, a), "under TaxFree the parcel ban still excludes: occupant B must not hear banned A");
+            Assert.True(m.IsExcluded(a, b), "symmetric under TaxFree");
+            Assert.False(m.IsExcluded(c, a), "unbanned third avatar still hears A under TaxFree");
+            Assert.False(m.IsExcluded(a, c));
         }
 
         // ======================================================================================
         // Voice-ENABLE under TaxFree: a parcel with voice turned off gets no voice whether or not the
         // estate is TaxFree. TaxFree only means the sim skips parcel access checks; it is not a way
         // to switch a parcel's voice back on.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VoiceOffParcelUnderTaxFree_IsNotAudible()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             w.AddZone(1, Parcel(Id(101), allowVoice: false));   // parcel voice-chat OFF
             UUID a = Id(1), b = Id(2);
@@ -299,20 +325,21 @@ namespace osWebRtcVoice.Tests
 
             w.EstateVal = new EstateView(allowVoice: true, taxFree: true, isBanned: _ => false);
             VisibilityMatrix taxFree = VisibilityMatrix.Build(w);
-            Assert.That(taxFree.IsExcluded(a, b), Is.True, "TaxFree does not override the parcel voice-off flag");
-            Assert.That(taxFree.IsExcluded(b, a), Is.True, "symmetric");
+            Assert.True(taxFree.IsExcluded(a, b), "TaxFree does not override the parcel voice-off flag");
+            Assert.True(taxFree.IsExcluded(b, a), "symmetric");
 
             w.EstateVal = new EstateView(allowVoice: true, taxFree: false, isBanned: _ => false);
             VisibilityMatrix noTaxFree = VisibilityMatrix.Build(w);
-            Assert.That(noTaxFree.IsExcluded(a, b), Is.True, "and the same without TaxFree");
+            Assert.True(noTaxFree.IsExcluded(a, b), "and the same without TaxFree");
         }
 
         // ======================================================================================
         // Voice moderation: mute-everyone on a parcel makes every speaker on it inaudible
         // to ALL listeners. Source-side, so a muted speaker still HEARS others.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ModerationMuteEveryone_ExcludesSpeakerForAllListeners()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             ParcelView M = w.AddZone(1, Parcel(Id(201), muteEveryone: true));   // moderated parcel
             ParcelView Q = w.AddZone(2, Parcel(Id(202)));                       // normal
@@ -324,18 +351,19 @@ namespace osWebRtcVoice.Tests
             VisibilityMatrix m = VisibilityMatrix.Build(w);
 
             // Option A: moderation is now the MUTE channel (row stays, greyed), NOT the exclusion set.
-            Assert.That(m.IsMuted(l1, s), Is.True, "moderated speaker is muted for a listener on another parcel");
-            Assert.That(m.IsMuted(l2, s), Is.True, "moderated speaker is muted even for a co-located listener");
-            Assert.That(m.IsExcluded(l1, s), Is.False, "moderation does NOT exclude/remove the row (it mutes)");
-            Assert.That(m.IsExcluded(l2, s), Is.False, "moderation does NOT exclude/remove the row (it mutes)");
-            Assert.That(m.IsMuted(s, l1), Is.False, "source-side: the muted speaker still hears others");
+            Assert.True(m.IsMuted(l1, s), "moderated speaker is muted for a listener on another parcel");
+            Assert.True(m.IsMuted(l2, s), "moderated speaker is muted even for a co-located listener");
+            Assert.False(m.IsExcluded(l1, s), "moderation does NOT exclude/remove the row (it mutes)");
+            Assert.False(m.IsExcluded(l2, s), "moderation does NOT exclude/remove the row (it mutes)");
+            Assert.False(m.IsMuted(s, l1), "source-side: the muted speaker still hears others");
         }
 
         // ======================================================================================
         // An individually-muted agent is excluded; an un-muted co-occupant of the same parcel is not.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ModerationIndividualMute_ExcludesOnlyThatAgent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             UUID muted = Id(1), other = Id(2), listener = Id(3);
             ParcelView M = w.AddZone(1, Parcel(Id(201), moderated: new HashSet<UUID> { muted }));
@@ -345,17 +373,18 @@ namespace osWebRtcVoice.Tests
 
             VisibilityMatrix m = VisibilityMatrix.Build(w);
 
-            Assert.That(m.IsMuted(listener, muted), Is.True, "individually-muted agent is muted (row stays, greyed)");
-            Assert.That(m.IsExcluded(listener, muted), Is.False, "moderation mutes, it does not exclude/remove");
-            Assert.That(m.IsMuted(listener, other), Is.False, "an un-muted co-occupant is not muted");
-            Assert.That(m.IsExcluded(listener, other), Is.False, "an un-muted co-occupant is still audible");
+            Assert.True(m.IsMuted(listener, muted), "individually-muted agent is muted (row stays, greyed)");
+            Assert.False(m.IsExcluded(listener, muted), "moderation mutes, it does not exclude/remove");
+            Assert.False(m.IsMuted(listener, other), "an un-muted co-occupant is not muted");
+            Assert.False(m.IsExcluded(listener, other), "an un-muted co-occupant is still audible");
         }
 
         // ======================================================================================
         // A parcel with no moderation excludes nobody by moderation.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ModerationAbsent_NoOneExcluded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             ParcelView P = w.AddZone(1, Parcel(Id(201)));   // no moderation
             UUID a = Id(1), b = Id(2);
@@ -364,17 +393,18 @@ namespace osWebRtcVoice.Tests
 
             VisibilityMatrix m = VisibilityMatrix.Build(w);
 
-            Assert.That(m.IsExcluded(a, b), Is.False);
-            Assert.That(m.IsExcluded(b, a), Is.False);
+            Assert.False(m.IsExcluded(a, b));
+            Assert.False(m.IsExcluded(b, a));
         }
 
         // ======================================================================================
         // PARCEL-STICKY, not avatar-sticky: the rule reads the source's CURRENT parcel, so a
         // moderated avatar who moves off the moderated parcel is no longer moderated. (Uses a child
         // agent, whose parcel is position-derived, to move between ticks.)
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ModerationParcelSticky_MoverLeavingModeratedParcelIsAudibleAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             UUID mover = Id(1), listener = Id(2);
             w.AddZone(1, Parcel(Id(201), moderated: new HashSet<UUID> { mover }));   // M: mover muted here
@@ -384,19 +414,20 @@ namespace osWebRtcVoice.Tests
             w.Agents.Add(Child(mover, zone: 1));   // mover starts ON the moderated parcel M
 
             VisibilityMatrix m1 = VisibilityMatrix.Build(w);
-            Assert.That(m1.IsMuted(listener, mover), Is.True, "muted while on the moderated parcel");
+            Assert.True(m1.IsMuted(listener, mover), "muted while on the moderated parcel");
 
             w.Agents[mi] = Child(mover, zone: 2);  // mover walks onto Q
             VisibilityMatrix m2 = VisibilityMatrix.Build(w);
-            Assert.That(m2.IsMuted(listener, mover), Is.False, "parcel-sticky: no longer moderated after leaving the parcel");
+            Assert.False(m2.IsMuted(listener, mover), "parcel-sticky: no longer moderated after leaving the parcel");
         }
 
         // ======================================================================================
         // Hardening: a derivation exception on a tick is reported and swallowed - the
         // last good matrix is kept and the next tick re-derives (the timer is never killed).
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Tick_WhenDerivationThrows_LogsAndKeepsLastMatrix_ThenRecovers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             ParcelView H = w.AddZone(3, Parcel(Id(103), seeAVs: false));
             w.AddZone(2, Parcel(Id(102)));
@@ -407,41 +438,51 @@ namespace osWebRtcVoice.Tests
 
             Exception captured = null;
             var feeder = new VoiceStateFeeder(w, Room, ex => captured = ex);
-            Assert.That(feeder.Current.IsExcluded(r, c), Is.True);
+            Assert.True(feeder.Current.IsExcluded(r, c));
 
             w.ThrowOnSnapshot = true;
             VisibilityBatch bad = feeder.Tick();
-            Assert.That(captured, Is.Not.Null, "derivation exception must be reported, not thrown");
-            Assert.That(bad.IsEmpty, Is.True, "no batch emitted on a failed tick");
-            Assert.That(feeder.Current.IsExcluded(r, c), Is.True, "last good matrix preserved across failure");
+            {
+                var assertedValue = captured;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "derivation exception must be reported, not thrown");
+            }
+            Assert.True(bad.IsEmpty, "no batch emitted on a failed tick");
+            Assert.True(feeder.Current.IsExcluded(r, c), "last good matrix preserved across failure");
 
             w.ThrowOnSnapshot = false;
             w.Agents[ci] = Child(c, zone: 3);                // recover: child steps into H
             VisibilityBatch good = feeder.Tick();
-            Assert.That(feeder.Current.IsExcluded(r, c), Is.False, "next tick re-derives after recovery");
-            Assert.That(good.Removed[r], Does.Contain(c));
+            Assert.False(feeder.Current.IsExcluded(r, c), "next tick re-derives after recovery");
+            Assert.Contains(c, good.Removed[r]);
         }
 
         // ======================================================================================
         // Debug guard: the tick thread is captured on first tick and is stable across
         // ticks (single-threaded mutation). The Debug.Assert inside the feeder fires only on a
         // cross-thread mutation; here we assert the observable invariant holds under normal use.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TickThread_CapturedOnFirstTick_AndStable()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             w.AddZone(2, Parcel(Id(102)));
             w.Agents.Add(Child(Id(90), zone: 2));
 
             var feeder = new VoiceStateFeeder(w, Room);
-            Assert.That(feeder.TickThreadId, Is.EqualTo(0), "no tick thread before the first tick");
+            {
+                var assertedValue = feeder.TickThreadId;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no tick thread before the first tick");
+            }
 
             feeder.Tick();
             int t = feeder.TickThreadId;
-            Assert.That(t, Is.EqualTo(System.Environment.CurrentManagedThreadId));
+            Assert.Equal(System.Environment.CurrentManagedThreadId, t);
 
             feeder.Tick();
-            Assert.That(feeder.TickThreadId, Is.EqualTo(t), "tick thread stays fixed across ticks");
+            {
+                var assertedValue = feeder.TickThreadId;
+                TestAssert.WithMessage(() => Assert.Equal(t, assertedValue), "tick thread stays fixed across ticks");
+            }
         }
 
         // Apply a delta batch onto an accumulator (test helper mirroring the mixer's merge).
@@ -474,9 +515,10 @@ namespace osWebRtcVoice.Tests
         // cached before the stall.
         // ======================================================================================
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AfterInvalidate_TheNextTickDescribesTheCurrentWorld_NotThePreStallView()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var w = new FakeWorld();
             ParcelView P = w.AddZone(1, Parcel(Id(201), banned: new HashSet<UUID> { Id(1) }));
             ParcelView Q = w.AddZone(2, Parcel(Id(202)));
@@ -485,7 +527,7 @@ namespace osWebRtcVoice.Tests
             w.Agents.Add(Root(b, P));   // B occupies P
 
             var feeder = new VoiceStateFeeder(w, Room);
-            Assert.That(feeder.Current.IsExcluded(b, a), Is.True, "before the stall: B cannot hear the banned A");
+            Assert.True(feeder.Current.IsExcluded(b, a), "before the stall: B cannot hear the banned A");
 
             // The stall. While the feeder is not ticking the world moves on: B leaves P for Q, and a newcomer C
             // arrives. A cached view would still be hiding A from B and would not know C exists at all.
@@ -494,16 +536,15 @@ namespace osWebRtcVoice.Tests
             w.Agents.Add(Root(c, Q));
 
             feeder.Invalidate();
-            Assert.That(feeder.HasPendingInvalidation, Is.True, "Invalidate arms the rebuild the resume path needs");
+            Assert.True(feeder.HasPendingInvalidation, "Invalidate arms the rebuild the resume path needs");
             feeder.Tick();
 
-            Assert.That(feeder.HasPendingInvalidation, Is.False, "the rebuild consumed the invalidation");
-            Assert.That(feeder.Current.IsExcluded(b, a), Is.False,
-                "after the resume B is on Q with A: the pre-stall exclusion must be gone");
-            Assert.That(feeder.Current.IsExcluded(a, b), Is.False);
+            Assert.False(feeder.HasPendingInvalidation, "the rebuild consumed the invalidation");
+            Assert.False(feeder.Current.IsExcluded(b, a), "after the resume B is on Q with A: the pre-stall exclusion must be gone");
+            Assert.False(feeder.Current.IsExcluded(a, b));
             // and the newcomer is known, which a replayed snapshot could not have told us
-            Assert.That(feeder.Current.IsExcluded(c, a), Is.False, "C arrived during the stall and hears A");
-            Assert.That(feeder.Current.IsExcluded(a, c), Is.False);
+            Assert.False(feeder.Current.IsExcluded(c, a), "C arrived during the stall and hears A");
+            Assert.False(feeder.Current.IsExcluded(a, c));
         }
 
         // ======================================================================================
@@ -515,32 +556,36 @@ namespace osWebRtcVoice.Tests
         // set, nothing consumes it, and the next tick derives happily from the pre-stall cache.
         // ======================================================================================
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AWatchdogAlarm_MakesTheNextTickRebuild_AndOnlyThatTick()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var latch = new FeederResumeLatch();
             int invalidated = 0;
 
             // A tick with no alarm behind it must not rebuild: rebuilding every tick would throw away the delta
             // machinery the feeder exists for.
-            Assert.That(latch.ResumeIfStalled(() => invalidated++), Is.False, "no alarm, no resume");
-            Assert.That(invalidated, Is.EqualTo(0));
+            Assert.False(latch.ResumeIfStalled(() => invalidated++), "no alarm, no resume");
+            Assert.Equal(0, invalidated);
 
             latch.Trip();                       // <- exactly what OnFeederAlarm does, off the Watchdog's thread
-            Assert.That(latch.IsTripped, Is.True);
+            Assert.True(latch.IsTripped);
 
-            Assert.That(latch.ResumeIfStalled(() => invalidated++), Is.True, "the tick after the alarm resumes");
-            Assert.That(invalidated, Is.EqualTo(1), "and it invalidated, so the derivation rebuilds from the world");
-            Assert.That(latch.IsTripped, Is.False, "the latch is consumed");
+            Assert.True(latch.ResumeIfStalled(() => invalidated++), "the tick after the alarm resumes");
+            {
+                var assertedValue = invalidated;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "and it invalidated, so the derivation rebuilds from the world");
+            }
+            Assert.False(latch.IsTripped, "the latch is consumed");
 
             // One alarm, one rebuild. The tick after that is an ordinary delta tick again.
-            Assert.That(latch.ResumeIfStalled(() => invalidated++), Is.False, "a consumed latch does not re-fire");
-            Assert.That(invalidated, Is.EqualTo(1));
+            Assert.False(latch.ResumeIfStalled(() => invalidated++), "a consumed latch does not re-fire");
+            Assert.Equal(1, invalidated);
 
             // A stall that begins again is a fresh resume, not swallowed by the previous one.
             latch.Trip();
-            Assert.That(latch.ResumeIfStalled(() => invalidated++), Is.True, "a second stall rebuilds again");
-            Assert.That(invalidated, Is.EqualTo(2));
+            Assert.True(latch.ResumeIfStalled(() => invalidated++), "a second stall rebuilds again");
+            Assert.Equal(2, invalidated);
         }
 
     }

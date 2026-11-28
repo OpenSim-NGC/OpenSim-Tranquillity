@@ -97,13 +97,13 @@ public class ForeignAssetIdTests : OpenSimTestCase
 
         IAssetService local = StubProxy.Create<IAssetService>((method, args) => method.Name switch
         {
-            "Get" when args.Length == 1 => (true, g.Local.TryGetValue((string)args[0], out AssetBase a) ? a : null),
+            "Get" when args.Length == 1 => (true, g.Local.TryGetValue((string)args[0], out AssetBase? a) ? a : null),
             "Store" => (true, Put(g.Local, (AssetBase)args[0])),
             _ => (false, null),
         });
         IAssetService foreign = StubProxy.Create<IAssetService>((method, args) => method.Name switch
         {
-            "Get" when args.Length == 3 => (true, g.Foreign.TryGetValue((string)args[0], out AssetBase f) ? f : null),
+            "Get" when args.Length == 3 => (true, g.Foreign.TryGetValue((string)args[0], out AssetBase? f) ? f : null),
             _ => (false, null),
         });
 

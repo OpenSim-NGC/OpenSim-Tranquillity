@@ -9,7 +9,6 @@ using System;
 using OpenMetaverse;
 using OpenSim.Framework;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

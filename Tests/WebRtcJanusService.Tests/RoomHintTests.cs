@@ -25,8 +25,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // the per-room create gates are process-wide statics
     public class RoomHintTests
     {
         private static UUID Id(int n)
@@ -64,9 +62,10 @@ namespace osWebRtcVoice.Tests
 
         /// <summary>H1: this process created the room, the mixer has since destroyed it. The ensure creates it again -
         /// the failure a stale hint of an earlier build caused.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task H1_ARoomThisProcessCreated_DestroyedByTheMixer_TheEnsureCreatesItAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int room = 880101;
             var m = new FakeMixer();
             await JanusAudioBridge.SelectRoomCoalesced(room, CreateOf(m, room));
@@ -75,16 +74,23 @@ namespace osWebRtcVoice.Tests
 
             JanusRoom ensured = await JanusAudioBridge.SelectRoomCoalesced(room, CreateOf(m, room));
 
-            Assert.That(m.Creates, Is.EqualTo(before + 1), "the ensure asked the mixer to create");
-            Assert.That(m.Rooms, Does.Contain(room), "and the mixer has the room now");
-            Assert.That(ensured?.RoomId, Is.EqualTo(room));
+            {
+                var assertedValue = m.Creates;
+                TestAssert.WithMessage(() => Assert.Equal(before + 1, assertedValue), "the ensure asked the mixer to create");
+            }
+            {
+                var assertedValue = m.Rooms;
+                TestAssert.WithMessage(() => Assert.Contains(room, assertedValue), "and the mixer has the room now");
+            }
+            Assert.Equal(room, ensured?.RoomId);
         }
 
         /// <summary>H2: the room is really there. Asking again is not an error - already-exists is success - and
         /// RoomExists fires exactly once.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task H2_EnsureWithTheRoomPresent_NoError_RoomExistsFiresOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int room = 880201;
             var m = new FakeMixer();
             await JanusAudioBridge.SelectRoomCoalesced(room, CreateOf(m, room));   // really exists
@@ -94,15 +100,25 @@ namespace osWebRtcVoice.Tests
                 () => JanusAudioBridge.SelectRoomCoalesced(room, CreateOf(m, room)).Result?.RoomId,
                 r => fired++);
 
-            Assert.That(ensured, Is.EqualTo(room), "no error: already-exists is success");
-            Assert.That(m.Creates, Is.EqualTo(before + 1), "the mixer was asked, even right after a create");
-            Assert.That(fired, Is.EqualTo(1), "RoomExists fired exactly once");
+            {
+                var assertedValue = ensured;
+                TestAssert.WithMessage(() => Assert.Equal(room, assertedValue), "no error: already-exists is success");
+            }
+            {
+                var assertedValue = m.Creates;
+                TestAssert.WithMessage(() => Assert.Equal(before + 1, assertedValue), "the mixer was asked, even right after a create");
+            }
+            {
+                var assertedValue = fired;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "RoomExists fired exactly once");
+            }
         }
 
         /// <summary>H3: the create fails. Nothing is proven, so RoomExists does NOT fire and the backoff is NOT reset.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task H3_AFailedCreate_FiresNoRoomExists_AndLeavesTheBackoff()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int room = 880301;
             var m = new FakeMixer();
             await JanusAudioBridge.SelectRoomCoalesced(room, CreateOf(m, room));
@@ -114,16 +130,22 @@ namespace osWebRtcVoice.Tests
             UUID l = Id(1);
             auth.OnBatchOutcome(room, VisOp.Replace, auth.NextGeneration(room), new List<UUID> { l }, true,
                 new JanusPeerCtlBatchSink.SlvoiceReply { Present = true, Status = "error", Reason = "unknown_room" });
-            Assert.That(auth.CanArmNow(l), Is.False, "precondition: backing off");
+            Assert.False(auth.CanArmNow(l), "precondition: backing off");
             int fired = 0;
 
             int? ensured = ConnectorRoomResolver.EnsureAndProve(
                 () => JanusAudioBridge.SelectRoomCoalesced(room, CreateOf(m, room)).Result?.RoomId,
                 r => { fired++; auth.RoomExists(r); });
 
-            Assert.That(ensured, Is.Null, "a failed create is not a room");
-            Assert.That(fired, Is.Zero, "RoomExists did not fire");
-            Assert.That(auth.CanArmNow(l), Is.False, "the backoff was not reset");
+            {
+                var assertedValue = ensured;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "a failed create is not a room");
+            }
+            {
+                var assertedValue = fired;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "RoomExists did not fire");
+            }
+            Assert.False(auth.CanArmNow(l), "the backoff was not reset");
         }
     }
 }
