@@ -895,6 +895,15 @@ public class TestClient : IClientAPI, IClientCore
         OnUpdateEstateAccessDeltaRequest?.Invoke(this, invoice, estateAccessType, user);
     }
 
+    /// <summary>
+    /// Test seam: raise <see cref="OnEstateChangeCovenantRequest"/> as LLClientView does for an EstateOwnerMessage
+    /// "estatechangecovenantid" from an estate manager.
+    /// </summary>
+    public void TriggerEstateChangeCovenant(UUID covenant)
+    {
+        OnEstateChangeCovenantRequest?.Invoke(this, covenant);
+    }
+
     public void SendTriggeredSound(UUID soundID, UUID ownerID, UUID objectID, UUID parentID, ulong handle, Vector3 position, float gain)
     {
     }

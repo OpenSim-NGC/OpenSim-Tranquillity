@@ -43,6 +43,10 @@ public class EstateModule : ISharedRegionModule
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected List<Scene> m_Scenes = new List<Scene>();
+
+    // The covenant each of this simulator's regions had when it was last sent to, or received from, the estate's
+    // other regions.
+    private readonly Dictionary<UUID, UUID> m_knownCovenants = new Dictionary<UUID, UUID>();
     protected bool m_InInfoUpdate = false;
     private string token = "7db8eh2gvgg45jj";
     protected bool m_enabled = false;
@@ -113,6 +117,9 @@ public class EstateModule : ISharedRegionModule
         if (!m_enabled)
             return;
 
+        lock (m_knownCovenants)
+            m_knownCovenants[scene.RegionInfo.RegionID] = scene.RegionInfo.RegionSettings.Covenant;
+
         IEstateModule em = scene.RequestModuleInterface<IEstateModule>();
 
         em.OnRegionInfoChange += OnRegionInfoChange;
@@ -129,6 +136,8 @@ public class EstateModule : ISharedRegionModule
 
         lock (m_Scenes)
             m_Scenes.Remove(scene);
+        lock (m_knownCovenants)
+            m_knownCovenants.Remove(scene.RegionInfo.RegionID);
     }
 
     public string Name
@@ -158,8 +167,40 @@ public class EstateModule : ISharedRegionModule
         if (s == null)
             return;
 
-        if (!m_InInfoUpdate)
-            m_EstateConnector.SendUpdateCovenant(s.RegionInfo.EstateSettings.EstateID, s.RegionInfo.RegionSettings.Covenant);
+        if (m_InInfoUpdate)
+            return;
+
+        // The region info change is raised for every region setting (water height, terrain, flags, a console
+        // command...), and again by EstateManagementModule's timer 10 seconds later. Only a new covenant has to
+        // reach the estate's other regions.
+        UUID covenant = s.RegionInfo.RegionSettings.Covenant;
+        lock (m_knownCovenants)
+        {
+            if (m_knownCovenants.TryGetValue(RegionID, out UUID known) && known == covenant)
+                return;
+        }
+
+        m_EstateConnector.SendUpdateCovenant(s.RegionInfo.EstateSettings.EstateID, covenant);
+    }
+
+    /// <summary>
+    /// Sets the covenant of this simulator's regions of the estate, and notes it as known to the estate so that
+    /// a later region change does not send it again.
+    /// </summary>
+    internal void SetLocalCovenant(uint estateID, UUID covenant)
+    {
+        lock (m_Scenes)
+        {
+            foreach (Scene s in m_Scenes)
+            {
+                if (s.RegionInfo.EstateSettings.EstateID != estateID)
+                    continue;
+
+                s.RegionInfo.RegionSettings.Covenant = covenant;
+                lock (m_knownCovenants)
+                    m_knownCovenants[s.RegionInfo.RegionID] = covenant;
+            }
+        }
     }
 
     private void OnEstateInfoChange(UUID RegionID)
