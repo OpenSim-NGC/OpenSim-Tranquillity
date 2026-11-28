@@ -968,9 +968,14 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             Vector3 center, Vector3 halfExtents, Quaternion orientation,
             QueryFilter filter, Span<BodyId> results);
 
+        /// <summary>
+        /// Sweeps a shape, given where its centre of mass starts, and reports the nearest thing it meets. With
+        /// <paramref name="movingBody"/> the sweep is that body's own way: the body itself is not counted, and only a
+        /// surface that faces the motion is, so what the body rests on or slides along is not a hit.
+        /// </summary>
         bool ShapeCast(
             ShapeId shape, Vector3 origin, Quaternion orientation, Vector3 direction,
-            float maxDistance, QueryFilter filter, out RayHit hit);
+            float maxDistance, QueryFilter filter, out RayHit hit, BodyId movingBody = default);
 
         /// <summary>
         /// Whether the body, where it is now, sinks deeper than <paramref name="tolerance"/> into another static or dynamic

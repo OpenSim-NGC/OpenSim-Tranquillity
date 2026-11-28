@@ -302,4 +302,65 @@ public class VehicleRepeatedCrossingTests
         Assert.True(before > 5f, $"it was flying ({before:F1})");
         Assert.True(after > 0.7f * before, $"the motor still drives it after landing ({before:F1} before, {after:F1} after)");
     }
+
+    // An arriving object is set back, at the end of its first heartbeat in the new region, to where the time that has
+    // really passed since its border sample puts it (JoltPrim.FinishArrival): with a hand-over shorter than the heartbeat,
+    // behind where that heartbeat's steps took it. The region here runs as a region server does, four 45 Hz steps to a
+    // heartbeat of 1/11 s, and the object is handed its sample's age 2 ms before the heartbeat, as Scene.AddSceneObject
+    // does (PhysicsActor.CrossedIn). The vehicle's stall check reads the rate of change of the position from step to step;
+    // it must not read that set-back as the vehicle being held, which puts the carried linear motor's clock far past its
+    // decay and ends the motor.
+    private static (float before, float after) RunArrivalWithSampleAge(SharedVehicle type, float speed, float sampleAge, string behaviour)
+    {
+        const double Heartbeat = 11.0;
+        const int CrossAt = 11;              // 1 s
+        const int ReadAt = CrossAt + 22;     // 2 s after the crossing
+        double arrivalClock = 0.0;
+        float before = 0f, after = 0f;
+        var sc = new Scenario
+        {
+            Name = "vehicle-arrival-sample-age-" + type,
+            DefaultDuration = _ => (ReadAt + 2) / (float)Heartbeat,
+            Setup = r =>
+            {
+                ((JoltScene)r.PhysicsScene).ArrivalClock = () => arrivalClock;
+                r.Actor = VehicleRestore.AddToPhysics(r.PhysicsScene, null, new Vector3(40f, 128f, 60f), Size, Quaternion.Identity, true, false, false,
+                                                      Vector3.Zero, Vector3.Zero, Run.ActorLocalId, a => { r.AsSimulatorAdds(a); a.Density = 1000f; });
+                r.ActorSize = Size;
+                ScriptSetup(r, type);
+                r.SetVector(SharedVehicle.LINEAR_MOTOR_DIRECTION, new Vector3(speed, 0f, 0f));
+            },
+            Input = r =>
+            {
+                int k = (int)Math.Round(r.Now * Heartbeat);
+                arrivalClock = r.Now;
+                if (k == CrossAt)
+                {
+                    before = Along(r.Actor.Velocity);
+                    Cross(r, new Vector3(0.61f, 128f, 60f));   // an east-going crossing puts it down at the west edge
+                    r.Actor.CrossedIn(sampleAge);
+                    arrivalClock = r.Now + 0.002;
+                }
+                else if (k == ReadAt)
+                    after = Along(r.Actor.Velocity);
+            },
+        };
+        var options = new HarnessOptions { RateHz = Heartbeat, PhysicsRateHz = 45.0, SimulatorDefaults = true, StartSpeed = speed }.SecondLife();
+        options.Jolt["VehicleBehaviour"] = behaviour;
+        Harness.Harness.Run(sc, options);
+        return (before, after);
+    }
+
+    // The hand-overs measured between two regions in one process (28 ms) and the shortest seen at 60 m/s (5 ms). The
+    // aircraft settings are those of a scripted aircraft that crosses at speed.
+    [Theory]
+    [InlineData(30f, 0.028f)]
+    [InlineData(60f, 0.005f)]
+    public void A_vehicle_set_back_to_its_sample_after_crossing_keeps_its_motor(float speed, float sampleAge)
+    {
+        var (before, after) = RunArrivalWithSampleAge(SharedVehicle.TYPE_AIRPLANE, speed, sampleAge, "InWorldz");
+        _out.WriteLine($"Airplane at {speed} m/s, sample {sampleAge * 1000:0} ms old: {before:F1} m/s before, {after:F1} m/s 2 s after");
+        Assert.True(before > 0.8f * speed, $"it was driving east at about {speed} m/s ({before:F1})");
+        Assert.True(after > 0.9f * before, $"the motor still drives it 2 s after the crossing ({before:F1} before, {after:F1} after)");
+    }
 }

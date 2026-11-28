@@ -3100,6 +3100,19 @@ public partial class Scene : SceneBase
         // (IncomingCreateObject with a hold) sets the stamp after this
         newObject.ArrivedWithRidersAtMs = double.NaN;
 
+        // An engine that does not use the age gets neither it nor the cut that goes with it: the object is placed where
+        // it was sent to
+        if (PhysicsScene?.AppliesCrossingSampleAge != true)
+        {
+            newObject.CrossingSampleAgeMs = double.NaN;
+            newObject.CrossingCutOffset = Vector3.Zero;
+        }
+
+        // when the object was handed to this region, for the age of its position and velocity (GiveArrivalAge)
+        newObject.CrossingHandedOverAtMs = double.IsFinite(newObject.CrossingSampleAgeMs) ? CrossingClock() : double.NaN;
+
+        newPosition = AddCrossingCut(newObject, newPosition);
+
         bool taken;
         try
         {
@@ -3107,12 +3120,22 @@ public partial class Scene : SceneBase
         }
         catch (Exception e)
         {
+            newObject.CrossingSampleAgeMs = double.NaN;
+            newObject.CrossingCutOffset = Vector3.Zero;
+            newObject.CrossingCarriesAvatars = false;
+            newObject.CrossingHandedOverAtMs = double.NaN;
             // The object may be in the region already, half taken in. The sending region keeps its original when this
             // answers false, so the copy here goes: two copies of one object must not be left.
             m_log.LogError(e, $"[INTERREGION]: Taking in {newObject.Name} {newObject.UUID} failed with {e.GetType().Name}: {e.Message}");
             DiscardIncomingObject(newObject);
             return false;
         }
+
+        // an age that was not given to an engine is not kept for later, nor is what went with it
+        newObject.CrossingSampleAgeMs = double.NaN;
+        newObject.CrossingCutOffset = Vector3.Zero;
+        newObject.CrossingCarriesAvatars = false;
+        newObject.CrossingHandedOverAtMs = double.NaN;
 
         if (!taken)
             return false;
@@ -3121,6 +3144,43 @@ public partial class Scene : SceneBase
         EventManager.TriggerOnIncomingSceneObject(newObject);
 
         return true;
+    }
+
+    /// <summary>
+    /// A sending region that cuts a fast object back to just past its edge sends that position, and with the sample's age
+    /// how far it cut it (SceneObjectGroup.CrossingCutOffset). The object is then placed where it had really got to,
+    /// before its age is applied (GiveArrivalAge), and kept inside this region as an arriving object's position is
+    /// (EntityTransferModule.GetObjectDestination). An object held for its riders is placed where it was sent to:
+    /// carried riders are sent to that position plus their offset. So is an object with avatars aboard that the cut would
+    /// move into another parcel: the sending region checked the avatars' access at the position it sent. And so is any
+    /// object the cut would move into a parcel that refuses it, which would turn the crossing down. On return the
+    /// object's cut is how far it was really moved, which is what its engine is told (PhysicsActor.CrossedIn).
+    /// </summary>
+    private Vector3 AddCrossingCut(SceneObjectGroup so, Vector3 sentPosition)
+    {
+        Vector3 cut = so.CrossingCutOffset;
+        if (so.HeldForRiders || sentPosition.IsZero() || (cut.X == 0f && cut.Y == 0f) || !double.IsFinite(so.CrossingSampleAgeMs))
+        {
+            so.CrossingCutOffset = Vector3.Zero;
+            return sentPosition;
+        }
+
+        const float enterDistance = 0.2f;
+        Vector3 moved = sentPosition;
+        moved.X = Utils.Clamp(sentPosition.X + cut.X, enterDistance, RegionInfo.RegionSizeX - enterDistance);
+        moved.Y = Utils.Clamp(sentPosition.Y + cut.Y, enterDistance, RegionInfo.RegionSizeY - enterDistance);
+        if (!InSameParcel(sentPosition, moved)
+            && (so.CrossingCarriesAvatars || !Permissions.CanObjectEntry(so, true, moved)))
+            moved = sentPosition;
+        so.CrossingCutOffset = moved - sentPosition;
+        return moved;
+    }
+
+    private bool InSameParcel(Vector3 a, Vector3 b)
+    {
+        if (LandChannel is null)
+            return true;
+        return LandChannel.GetLandObject(a.X, a.Y)?.LandData.LocalID == LandChannel.GetLandObject(b.X, b.Y)?.LandData.LocalID;
     }
 
     /// <summary>Removes an incoming object whose arrival failed half way, if this region holds that very object.</summary>
@@ -3240,10 +3300,32 @@ public partial class Scene : SceneBase
                 return false;
             }
             // false when an object with this id is already here: the caller must not go on as if this one had been added
-            return AddRestoredSceneObject(sceneObject, true, false);
+            if (!AddRestoredSceneObject(sceneObject, true, false))
+                return false;
+            GiveArrivalAge(sceneObject);
+            return true;
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Tells the engine of an object that has just crossed in how old its position and velocity are, so that its next
+    /// step moves it only as far as the time that has really passed (PhysicsActor.CrossedIn). This is done as soon as
+    /// its physics actor exists, before its scripts are started, so that no step runs in between. An object held for its
+    /// riders is held still and is not told.
+    /// </summary>
+    private void GiveArrivalAge(SceneObjectGroup so)
+    {
+        double ageMs = so.CrossingSampleAgeMs;
+        double handedOverAtMs = so.CrossingHandedOverAtMs;
+        if (!double.IsFinite(ageMs) || !double.IsFinite(handedOverAtMs))
+            return;
+        Vector3 cutAdded = so.CrossingCutOffset;   // read before the age is cleared: it is zero without one
+        so.CrossingSampleAgeMs = double.NaN;
+        so.CrossingHandedOverAtMs = double.NaN;
+        if (!so.HeldForRiders && so.UsesPhysics && so.RootPart.PhysActor is PhysicsActor actor)
+            actor.CrossedIn((float)((ageMs + Math.Max(0.0, CrossingClock() - handedOverAtMs)) / 1000.0), cutAdded);
     }
 
     private int GetStateSource(SceneObjectGroup sog)

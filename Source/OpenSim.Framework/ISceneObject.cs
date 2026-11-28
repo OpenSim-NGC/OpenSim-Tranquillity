@@ -47,4 +47,29 @@ public interface ISceneObject
     string GetStateSnapshot();
     void SetState(string xmlstr, IScene s);
     bool HasGroupChanged { get; set; }
+
+    // The three crossing members have default bodies, so that an implementer written without them still compiles: it
+    // has no sample age, no cut and no avatars aboard, and what is set on it is ignored.
+
+    /// <summary>
+    /// For an object crossing to another region: how long ago (ms) the position and velocity it is sent with were taken.
+    /// While the sending region holds the object it is measured on that region's own clock; the region that takes it in
+    /// is given it as a duration, so no two clocks are ever compared. NaN when not known.
+    /// </summary>
+    double CrossingSampleAgeMs { get => double.NaN; set { } }
+
+    /// <summary>
+    /// For an object crossing to another region: how far (m) the position it is sent with was cut back from where its
+    /// engine's last step took it (PhysicsActor.CrossingCutOffset). A region that takes the object in with the sample's
+    /// age adds it, in x and y and kept inside the region, to the position it is given, unless it holds the object for
+    /// its riders. Zero when nothing was cut or the age is not known.
+    /// </summary>
+    Vector3 CrossingCutOffset { get => Vector3.Zero; set { } }
+
+    /// <summary>
+    /// For an object crossing to another region: whether it has avatars seated or standing on it. A region that takes
+    /// such an object in does not let the cut (<see cref="CrossingCutOffset"/>) move it into another parcel than the one
+    /// at the position it was sent to, which is the one the avatars' access was checked for.
+    /// </summary>
+    bool CrossingCarriesAvatars { get => false; set { } }
 }

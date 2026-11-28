@@ -320,6 +320,23 @@ public abstract class PhysicsActor
     /// </summary>
     public virtual void KeepInsideBorder(bool keep) { }
 
+    /// <summary>
+    /// Tells the actor of an object that has just crossed into the region that the position and velocity it was given
+    /// were taken <paramref name="sampleAgeSeconds"/> ago, by the region it came from. An engine whose next step would
+    /// move the object as if it had been in the region for the whole step can use this to move it only as far as the time
+    /// that has really passed. <paramref name="cutAdded"/> is how far the region moved the object on from the position it
+    /// was sent with, to where the sending engine had cut it back from; zero when it did not. The default does nothing:
+    /// the object moves as before.
+    /// </summary>
+    public virtual void CrossedIn(float sampleAgeSeconds, Vector3 cutAdded = default) { }
+
+    /// <summary>
+    /// For an object waiting past the region's edge to be crossed: how far the engine cut the position it reports back
+    /// from where its last step took the object (that place is <see cref="Position"/> plus this). The default, and the
+    /// value once the object no longer waits there, is zero.
+    /// </summary>
+    public virtual Vector3 CrossingCutOffset => Vector3.Zero;
+
     public abstract void link(PhysicsActor obj);
 
     public abstract void delink();
