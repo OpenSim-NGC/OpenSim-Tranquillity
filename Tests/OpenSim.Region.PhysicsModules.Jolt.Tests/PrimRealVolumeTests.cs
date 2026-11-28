@@ -12,7 +12,6 @@ using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using OpenSim.Region.PhysicsModules.Meshing;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Xunit;
-using Xunit.Abstractions;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.MeshShapesTodayTests;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.PrimHullProbeTests;
 using SVector3 = System.Numerics.Vector3;
@@ -57,8 +56,8 @@ public class PrimRealVolumeTests
         PrimitiveBaseShape pbs = spec.Build();
         IMesh mesh = mesher.CreateMesh(spec.Name, pbs, Vector3.One, Lod, true, false, false);
         Assert.NotNull(mesh);
-        float[] v = mesh.getVertexListAsFloat();
-        int[] i = mesh.getIndexListAsInt();
+        float[] v = mesh.getVertexListAsFloatLocked();
+        int[] i = mesh.getIndexListAsIntLocked();
         Assert.True(mesher.TryGetPrimProfileRings(spec.Name, pbs, Vector3.One, Lod, out PrimProfileRings rings), spec.Name);
         double meshVolume = PrimHullCells.MeshVolume(v, i);
         return (PrimHullCells.AssessMesh(v, i), meshVolume, PrimHullCells.Build(scene.Backend, rings, meshVolume));
@@ -226,7 +225,7 @@ public class PrimRealVolumeTests
                 var (assessment, _, _) = Measure(mesher, scene, spec);
                 Assert.True(assessment.Trusted, name);
                 IMesh mesh = mesher.CreateMesh(name, spec.Build(), Vector3.One, Lod, true, false, false);
-                var points = mesh.getVertexListAsFloat();
+                var points = mesh.getVertexListAsFloatLocked();
                 float side = 0f;                       // the longest side of the shape's box
                 foreach (int axis in new[] { 0, 1, 2 })
                 {
@@ -342,7 +341,7 @@ public class PrimRealVolumeTests
                     {
                         // which of the checks said no, read again from the mesh the way the engine did
                         IMesh mesh = mesher.CreateMesh(spec.Name, pbs, Vector3.One, Lod, true, false, false);
-                        var a = PrimHullCells.AssessMesh(mesh.getVertexListAsFloat(), mesh.getIndexListAsInt());
+                        var a = PrimHullCells.AssessMesh(mesh.getVertexListAsFloatLocked(), mesh.getIndexListAsIntLocked());
                         string reason = a.Reason ?? "over-cells";
                         fallbacks[reason] = fallbacks.GetValueOrDefault(reason) + 1;
                     }
@@ -379,8 +378,8 @@ public class PrimRealVolumeTests
             IMesh m = mesher.CreateMesh(spec.Name, spec.Build(), Vector3.One, Lod, true, false, false);
             IMesh mt = mesher.CreateMesh(twin.Name, twin.Build(), Vector3.One, Lod, true, false, false);
             if (m == null || mt == null) continue;
-            var a = PrimHullCells.AssessMesh(m.getVertexListAsFloat(), m.getIndexListAsInt());
-            var at = PrimHullCells.AssessMesh(mt.getVertexListAsFloat(), mt.getIndexListAsInt());
+            var a = PrimHullCells.AssessMesh(m.getVertexListAsFloatLocked(), m.getIndexListAsIntLocked());
+            var at = PrimHullCells.AssessMesh(mt.getVertexListAsFloatLocked(), mt.getIndexListAsIntLocked());
             if (!at.Trusted) continue;
             double d = (a.SignedVolume - at.SignedVolume) / at.SignedVolume;
             if (a.Trusted)

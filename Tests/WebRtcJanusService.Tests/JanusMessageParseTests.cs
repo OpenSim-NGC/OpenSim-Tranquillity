@@ -16,7 +16,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class JanusMessageParseTests
     {
         // A Janus "create session" success response whose id exceeds Int32.MaxValue.
@@ -26,34 +25,41 @@ namespace osWebRtcVoice.Tests
         private static OSD ParseId(long id) =>
             JanusMessageResp.FromJson("{\"janus\":\"success\",\"data\":{\"id\":" + id + "}}").dataSection["id"];
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void CreateSessionResp_ReturnedId_ReadsA64BitSessionId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var createResp = new CreateSessionResp(JanusMessageResp.FromJson(CreateSessionSuccess));
-            Assert.That(createResp.returnedId, Is.EqualTo("923631757106466"));
+            Assert.Equal("923631757106466", createResp.returnedId);
         }
 
-        [TestCase(923631757106466L)]
-        [TestCase(4294967296L)]        // 2^32
-        [TestCase(2147483648L)]        // Int32.MaxValue + 1
-        [TestCase(9007199254740991L)]  // 2^53 - 1
+        [InlineData(923631757106466L)]
+        [InlineData(4294967296L)]        // 2^32
+        [InlineData(2147483648L)]        // Int32.MaxValue + 1
+        [InlineData(9007199254740991L)]  // 2^53 - 1
+        [Theory(Timeout = 60000)]
         public void OSDToLong_ReadsValuesGreaterThanInt32(long id)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSD osd = ParseId(id);
-            Assert.That(osd.Type, Is.EqualTo(OSDType.Long),
-                "precondition: the parser returns OSDType.Long for a number above int32");
-            Assert.That(JanusMessage.OSDToLong(osd), Is.EqualTo(id));
+            {
+                var assertedValue = osd.Type;
+                TestAssert.WithMessage(() => Assert.Equal(OSDType.Long, assertedValue), "precondition: the parser returns OSDType.Long for a number above int32");
+            }
+            Assert.Equal(id, JanusMessage.OSDToLong(osd));
         }
 
-        [TestCase(0L)]
-        [TestCase(1L)]
-        [TestCase(12345L)]
-        [TestCase(2147483647L)]        // Int32.MaxValue
+        [InlineData(0L)]
+        [InlineData(1L)]
+        [InlineData(12345L)]
+        [InlineData(2147483647L)]        // Int32.MaxValue
+        [Theory(Timeout = 60000)]
         public void OSDToLong_StillReadsInt32RangeValues(long id)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSD osd = ParseId(id);
-            Assert.That(osd.Type, Is.EqualTo(OSDType.Integer));
-            Assert.That(JanusMessage.OSDToLong(osd), Is.EqualTo(id));
+            Assert.Equal(OSDType.Integer, osd.Type);
+            Assert.Equal(id, JanusMessage.OSDToLong(osd));
         }
     }
 }

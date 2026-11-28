@@ -12,7 +12,6 @@ using System.Threading;
 using OpenMetaverse;
 using Phlox.ScriptEngine;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 
@@ -92,7 +91,7 @@ public class StateSaveThreadingTests
         using var held = new ManualResetEventSlim(false);
         var holder = new Thread(() => { lock (writerLock) { held.Set(); Thread.Sleep(3000); } }) { IsBackground = true };
         holder.Start();
-        held.Wait();
+        held.Wait(TestContext.Current.CancellationToken);
 
         SavedStateRig.PostRemove(h, h.Prim, item);   // a derez-style unload: the item stays in the prim
         var sw = Stopwatch.StartNew();

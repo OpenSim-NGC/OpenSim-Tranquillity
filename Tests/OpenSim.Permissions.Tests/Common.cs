@@ -39,7 +39,7 @@ using PermissionMask = OpenSim.Framework.PermissionMask;
 // These tests exercise scenes that share process-wide static state (MainServer,
 // Util.FireAndForgetMethod, static caps registries), so they cannot run in parallel. The same
 // declaration, for the same reason, is in OpenSim.Region.CoreModules.Tests/AssemblyInfo.cs.
-[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
 
 namespace OpenSim.Tests.Permissions
 {
@@ -266,10 +266,8 @@ namespace OpenSim.Tests.Permissions
             InventoryFolderBase objsFolder = UserInventoryHelpers.GetInventoryFolder(m_Scene.InventoryService, userID, folderName);
             Assert.NotNull(objsFolder);
             List<InventoryItemBase> items = m_Scene.InventoryService.GetFolderItems(userID, objsFolder.ID);
-            InventoryItemBase item = items.Find(i => i.Name == itemName);
-            Assert.NotNull(item);
-
-            return item;
+            return items.Find(i => i.Name == itemName)
+                ?? throw new InvalidOperationException($"Could not find inventory item {itemName}.");
         }
 
         public InventoryItemBase CloneInventoryItem(InventoryItemBase item)
@@ -310,7 +308,7 @@ namespace OpenSim.Tests.Permissions
 
                 Common.TheScene.InventoryService.DeleteItems(Common.TheAvatars[i].UUID, ids);
                 items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[i].UUID, objsFolder.ID);
-                Assert.Equal(0, items.Count);
+                Assert.Empty(items);
             }
 
         }

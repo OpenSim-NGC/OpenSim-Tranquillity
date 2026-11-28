@@ -16,7 +16,6 @@ using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.Meshing;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 

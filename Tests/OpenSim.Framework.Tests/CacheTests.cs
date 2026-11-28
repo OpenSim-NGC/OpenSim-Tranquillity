@@ -37,11 +37,6 @@ namespace OpenSim.Framework.Tests
 
         public CacheTests()
         {
-            Setup();
-        }
-
-        public void Setup()
-        {
             cache = new Cache();
             cache = new Cache(CacheMedium.Memory,CacheStrategy.Aggressive,CacheFlags.AllowUpdate);
             cacheItemUUID = UUID.Random();

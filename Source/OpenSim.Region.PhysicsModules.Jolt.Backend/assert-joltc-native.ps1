@@ -40,15 +40,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# The stock files of JoltPhysics.Native 1.0.4, by SHA-256. Must equal the entries of JoltNative.Known in
+# The stock files of JoltPhysics.Native 1.3.0, by SHA-256. Must equal the entries of JoltNative.Known in
 # OpenSim.Region.PhysicsModules.Jolt.Backend/JoltNative.cs (a unit test checks both against the files).
-$stockVersion = "1.0.4"
+$stockVersion = "1.3.0"
 $stock = [ordered]@{
-    "67BECFC70CFBDA643AB9B75ABA895042900C3E339B001080BA4107E4929B0910" = @{ Folder = "win-x64"; File = "joltc.dll" }
-    "5FC051708BDD05031A816796612A2F87E17ED32CC198F195A43B2305B3D990FD" = @{ Folder = "linux-x64"; File = "libjoltc.so" }
-    "B0A7D05151A8E504765A39E23B2EC196B88B3BF2CE3E8B884161E6925E7578E4" = @{ Folder = "win-arm64"; File = "joltc.dll" }
-    "FDE70508C826370B5CF6BB54C6EA9CEEAB0C37C826BCD71579EBB9B4AC3E0D61" = @{ Folder = "linux-arm64"; File = "libjoltc.so" }
-    "39E4A8728307E48026D965D8AB661348A8808A9A2AFDDDE6CE58272B37D83E91" = @{ Folder = "osx"; File = "libjoltc.dylib" }
+    "2DF8E823A82FCBA0E5FCF33F0E162760CE88C1BDE481436A36A356C478F17844" = @{ Folder = "win-x64"; File = "joltc.dll" }
+    "1ACCF71DC32C4125C161C989AF26D1EDAC9C8361AD7B3DA0EF23B55EC5D43232" = @{ Folder = "linux-x64"; File = "libjoltc.so" }
+    "3B57E253211BAF1A0BDA773A997329AC5C1E9C48AE3B6630457DEDBBDFF94D37" = @{ Folder = "win-arm64"; File = "joltc.dll" }
+    "EE6BC8BD85B2FAAC0D74094D97443A35E73604D60A1FC203788A831CE9B78E6A" = @{ Folder = "linux-arm64"; File = "libjoltc.so" }
+    "AD00673D2597313468E6B7F521C90BE3084431BAB6DEFD13198A08FD94612739" = @{ Folder = "osx"; File = "libjoltc.dylib" }
 }
 # The runtimes/ folders the module loads from, and the file it loads in each.
 $folders = @{}

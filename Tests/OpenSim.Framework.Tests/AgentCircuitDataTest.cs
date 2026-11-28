@@ -48,11 +48,6 @@ namespace OpenSim.Framework.Tests
 
         public AgentCircuitDataTest()
         {
-            Setup();
-        }
-
-        public void Setup()
-        {
             AgentId = UUID.Random();
             BaseFolder = UUID.Random();
             CapsPath = "http://www.opensimulator.org/Caps/Foo";
