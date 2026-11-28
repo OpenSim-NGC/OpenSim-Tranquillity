@@ -20,7 +20,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class PositionProtocolLearningTests
     {
         private const int Room = 70001;
@@ -52,9 +51,10 @@ namespace osWebRtcVoice.Tests
             => "{\"janus\":\"success\",\"response\":{\"slvoice\":\"applied\",\"op\":\"replace\",\"room\":1,\"entries\":1,\"skipped\":0," +
                "\"vis_protocol\":" + protocol + "}}";
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheProtocolIsLearnedFromTheReplyToEveryPartOfASplitRequest()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var requests = new List<OSDMap>();
             // Only the last part's reply advertises protocol 3. A sink that read the first reply only would never learn it.
             int total = -1;
@@ -70,38 +70,43 @@ namespace osWebRtcVoice.Tests
             // First pass only to count the parts the room is cut into.
             await sink.SendAsync(VisOp.Replace, excl);
             total = requests.Count;
-            Assert.That(total, Is.GreaterThan(1), "the room really is sent in parts");
-            Assert.That(sink.MixerVisProtocol, Is.EqualTo(2));
+            Assert.True(total > 1, "the room really is sent in parts");
+            Assert.Equal(2, sink.MixerVisProtocol);
 
             requests.Clear();
             await sink.SendAsync(VisOp.Replace, excl);
 
-            Assert.That(requests.Count, Is.EqualTo(total));
-            Assert.That(sink.MixerVisProtocol, Is.EqualTo(3), "the last part's reply was read");
+            Assert.Equal(total, requests.Count);
+            {
+                var assertedValue = sink.MixerVisProtocol;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "the last part's reply was read");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheProtocolIsLearnedFromAHeartbeatReply()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const string heartbeat = "{\"janus\":\"success\",\"response\":{\"slvoice\":\"heartbeat\",\"vis_protocol\":3,\"rooms\":{}}}";
             using var sink = new JanusPeerCtlBatchSink("http://example.org/admin", "secret", TimeSpan.FromSeconds(5), Id(999), "Test Region", 4,
                 _ => Task.FromResult((AdminSendResult.Ok, heartbeat)));
 
-            Assert.That(sink.MixerVisProtocol, Is.EqualTo(0));
-            Assert.That(await sink.SendHeartbeatAsync(new OSDMap { ["request"] = OSD.FromString("peer_ctl_heartbeat") }), Is.True);
+            Assert.Equal(0, sink.MixerVisProtocol);
+            Assert.True(await sink.SendHeartbeatAsync(new OSDMap { ["request"] = OSD.FromString("peer_ctl_heartbeat") }));
 
-            Assert.That(sink.MixerVisProtocol, Is.EqualTo(3));
+            Assert.Equal(3, sink.MixerVisProtocol);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARequestCarriesFewerEntriesThanTheMixerAccepts()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The mixer refuses a peer_pos request of more than 128 entries or 65536 bytes (SLV_POS_MAX_ENTRIES and
             // SLV_POS_MAX_BYTES in the mixer's possync.h). The region's own limit is deliberately lower, and a room of
             // the mixer's largest size (110) fits in one request.
             const int mixerMaxEntries = 128;
-            Assert.That(PositionBatchSerializer.MaxEntries, Is.LessThanOrEqualTo(mixerMaxEntries));
-            Assert.That(PositionBatchSerializer.MaxEntries, Is.GreaterThanOrEqualTo(110));
+            Assert.True(PositionBatchSerializer.MaxEntries <= mixerMaxEntries);
+            Assert.True(PositionBatchSerializer.MaxEntries >= 110);
         }
     }
 }

@@ -313,13 +313,13 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
 
         // the capability's call, held inside its restart
         Task<ScriptEngineChoiceResult> first = Task.Run(() => rig.Scene.SetScriptEngine(rig.Owner, rig.Part.UUID, rig.Item.ItemID, "Phlox"));
-        Assert.True(inFirstCall.Wait(TimeSpan.FromSeconds(30)), "the first call never reached the restart");
+        Assert.True(inFirstCall.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the first call never reached the restart");
         // an OSSL call from another script on the same script while the first has not finished
         Task<ScriptEngineChoiceResult> second = Task.Run(() =>
             rig.Scene.SetScriptEngine(rig.Owner, rig.Part.UUID, rig.Item.ItemID, "engine:InWorldz.Phlox", callingScript));
 
         // a fixed window, to prove the second call does NOT run while the first holds the script
-        Assert.False(second.Wait(TimeSpan.FromMilliseconds(500)), "the second call ran while the first was still changing the script");
+        Assert.False(second.Wait(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken), "the second call ran while the first was still changing the script");
         releaseFirstCall.Set();
 
         Assert.True(Task.WaitAll(new Task[] { first, second }, TimeSpan.FromSeconds(30)), "the calls did not finish");

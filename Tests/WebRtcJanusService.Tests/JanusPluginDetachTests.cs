@@ -23,10 +23,8 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]
-    public class JanusPluginDetachTests
-    {
+    public class JanusPluginDetachTests : IAsyncLifetime
+        {
         private sealed class Capture : ILoggerProvider, ILogger
         {
             private readonly List<(LogLevel Level, string Text)> _lines = new();
@@ -90,16 +88,12 @@ namespace osWebRtcVoice.Tests
 
         private Capture _log;
         private LogCapture _logging;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             _logging.Dispose();
             _log.Dispose();
@@ -109,9 +103,9 @@ namespace osWebRtcVoice.Tests
         {
             var fake = new FakeJanus { DetachAnswer = detachAnswer };
             using var session = new JanusSession("http://janus.test/voice", "tok", "http://janus.test/admin", "tok", false, fake);
-            Assert.That(await session.CreateSession(), Is.True);
+            Assert.True(await session.CreateSession());
             var plugin = new JanusPlugin(session, "janus.plugin.slvoice");
-            Assert.That(await plugin.Activate(null), Is.True, "the handle attached");
+            Assert.True((await plugin.Activate(null)), "the handle attached");
 
             bool detached = await plugin.Detach();
 
@@ -119,50 +113,71 @@ namespace osWebRtcVoice.Tests
             return detached;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ADetachForASessionJanusNoLongerHasIsLoggedAtDebug()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             bool detached = await DetachAnswered(
                 "{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":458,\"reason\":\"No such session 4242\"}}");
 
-            Assert.That(detached, Is.False, "Janus did not confirm a detach");
+            Assert.False(detached, "Janus did not confirm a detach");
             var lines = _log.Detach();
-            Assert.That(lines.Where(l => l.Level >= LogLevel.Warning), Is.Empty, "a vanished session is not an error");
-            Assert.That(lines.Any(l => l.Level == LogLevel.Debug && l.Text.Contains("session")), Is.True,
-                "the case is still recorded, at Debug");
+            {
+                var assertedValue = lines.Where(l => l.Level >= LogLevel.Warning);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a vanished session is not an error");
+            }
+            Assert.True(lines.Any(l => l.Level == LogLevel.Debug && l.Text.Contains("session")), "the case is still recorded, at Debug");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ADetachForAHandleJanusAlreadyDroppedIsDebugNotAnError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             bool detached = await DetachAnswered(
                 "{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":459,\"reason\":\"No such handle 77\"}}");
 
-            Assert.That(detached, Is.False, "Janus did not confirm a detach");
+            Assert.False(detached, "Janus did not confirm a detach");
             var lines = _log.Detach();
-            Assert.That(lines.Where(l => l.Level >= LogLevel.Warning), Is.Empty, "a handle that is already gone is a race, not an error");
-            Assert.That(lines.Any(l => l.Level == LogLevel.Debug && l.Text.Contains("handle")), Is.True,
-                "the case is still recorded, at Debug");
+            {
+                var assertedValue = lines.Where(l => l.Level >= LogLevel.Warning);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a handle that is already gone is a race, not an error");
+            }
+            Assert.True(lines.Any(l => l.Level == LogLevel.Debug && l.Text.Contains("handle")), "the case is still recorded, at Debug");
         }
 
-        [TestCase("{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":403,\"reason\":\"Unauthorized request\"}}")]
-        [TestCase("{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":490,\"reason\":\"Something else\"}}")]
-        [TestCase(null)]
+        [InlineData("{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":403,\"reason\":\"Unauthorized request\"}}")]
+        [InlineData("{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":490,\"reason\":\"Something else\"}}")]
+        [InlineData(null)]
+        [Theory(Timeout = 60000)]
         public async Task AnyOtherFailedDetachStaysAnError(string answer)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             bool detached = await DetachAnswered(answer);
 
-            Assert.That(detached, Is.False);
-            Assert.That(_log.Detach().Any(l => l.Level == LogLevel.Error && l.Text.Contains("Detach: failed")), Is.True);
+            Assert.False(detached);
+            Assert.Contains(_log.Detach(), l => l.Level == LogLevel.Error && l.Text.Contains("Detach: failed"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ASuccessfulDetachLogsNoWarningOrError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             bool detached = await DetachAnswered("{\"janus\":\"success\",\"transaction\":\"TXN\"}");
 
-            Assert.That(detached, Is.True);
-            Assert.That(_log.Detach().Where(l => l.Level >= LogLevel.Warning), Is.Empty);
+            Assert.True(detached);
+            Assert.DoesNotContain(_log.Detach(), l => l.Level >= LogLevel.Warning);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

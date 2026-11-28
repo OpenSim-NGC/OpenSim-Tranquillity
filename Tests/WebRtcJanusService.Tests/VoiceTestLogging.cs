@@ -11,7 +11,7 @@
  * live factory. Its loggers send each line to the LogCapture that is current when the line is logged, or nowhere.
  *
  * Tests never swap LoggerProvider.LoggerFactory themselves. Swapping it per test broke when teardowns ran out of
- * order: a timed-out test's teardown runs late (NUnit's [Timeout] does not stop a test on .NET), and putting back
+ * order: an uncooperative timed-out test's teardown can run late, and putting back
  * "the factory found at setup" could put back one that was already disposed, after which every logger in the
  * process threw ObjectDisposedException.
  */
@@ -72,9 +72,18 @@ namespace osWebRtcVoice.Tests
 }
 
 /// <summary>Installs the voice tests' logger factory once for the whole assembly, before any fixture runs.</summary>
-[SetUpFixture]
-public sealed class VoiceTestLoggingSetUp
+public sealed class VoiceTestLoggingSetUp : IAsyncLifetime
 {
-    [OneTimeSetUp]
     public void InstallLogging() => osWebRtcVoice.Tests.VoiceTestLogging.Install();
+
+    public ValueTask InitializeAsync()
+    {
+        InstallLogging();
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        return ValueTask.CompletedTask;
+    }
 }

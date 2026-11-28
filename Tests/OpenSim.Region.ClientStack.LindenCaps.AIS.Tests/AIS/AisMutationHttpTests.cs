@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -26,7 +26,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// <c>_updated_category_versions</c> is discarded by the viewer, a version read before the write is stale, and a
 /// removal under the wrong key does nothing.
 /// </summary>
-[TestFixture]
 public class AisMutationHttpTests
 {
     private const string Cap = "/CAP/0a1b2c3d-0000-4000-8000-000000000000";
@@ -97,22 +96,21 @@ public class AisMutationHttpTests
         var handler = new AisHandler(Cap, Agent, backend, mode);
         var response = new TestOSHttpResponse();
         handler.Handle(new MutTestRequest(verb, Cap + path, body), response);
-        Assert.That(response.ContentType, Is.EqualTo("application/llsd+xml"), $"{verb} {path}");
+        Assert.Equal("application/llsd+xml", response.ContentType);
         var parsed = OSDParser.DeserializeLLSDXml(response.RawBuffer);
-        Assert.That(parsed, Is.InstanceOf<OSDMap>(), "the viewer forces 500 on a non-map body (llaisapi.cpp:882-885)");
+        Assert.True(parsed is OSDMap, "the viewer forces 500 on a non-map body (llaisapi.cpp:882-885)");
         return (response.StatusCode, (OSDMap)parsed);
     }
 
     private static OSDMap Versions(OSDMap body)
     {
-        Assert.That(body.ContainsKey("_updated_category_versions"), Is.True,
-            "without this key the viewer skips the folder entirely: 'Skipping version increment for non-updated category' (llaisapi.cpp:1625-1629)");
+        Assert.True(body.ContainsKey("_updated_category_versions"), "without this key the viewer skips the folder entirely: 'Skipping version increment for non-updated category' (llaisapi.cpp:1625-1629)");
         return (OSDMap)body["_updated_category_versions"];
     }
 
     // ------------------------------------------------------------------ PATCH /item
 
-    [Test]
+    [Fact]
     public void patching_an_item_name_returns_the_item_as_content_with_its_parents_new_version()
     {
         var b = Inventory();
@@ -120,21 +118,21 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Red Shirt" });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Red Shirt"), "the write actually happened");
+        Assert.Equal(200, status);
+        Assert.Equal("Red Shirt", b.Items[Shirt].Name);
 
         // there is no "updated" delta key: an updated item is top-level content (§1d-bis)
-        Assert.That(body["item_id"].AsUUID(), Is.EqualTo(Shirt));
-        Assert.That(body["parent_id"].AsUUID(), Is.EqualTo(Clothing));
-        Assert.That(body["name"].AsString(), Is.EqualTo("Red Shirt"));
-        Assert.That(body.ContainsKey("_updated_items"), Is.False, "no such key exists in the viewer");
+        Assert.Equal(Shirt, body["item_id"].AsUUID());
+        Assert.Equal(Clothing, body["parent_id"].AsUUID());
+        Assert.Equal("Red Shirt", body["name"].AsString());
+        Assert.False(body.ContainsKey("_updated_items"), "no such key exists in the viewer");
 
         var versions = Versions(body);
-        Assert.That(versions.ContainsKey(Clothing.ToString()), Is.True, "the parent must be listed or the update is discarded");
-        Assert.That(versions[Clothing.ToString()].AsInteger(), Is.EqualTo(before + 1), "and it must be the post-write version");
+        Assert.True(versions.ContainsKey(Clothing.ToString()), "the parent must be listed or the update is discarded");
+        Assert.Equal(before + 1, versions[Clothing.ToString()].AsInteger());
     }
 
-    [Test]
+    [Fact]
     public void the_reported_version_is_read_after_the_write_not_before()
     {
         // a backend that bumps again underneath the handler proves the version is not cached from before the write
@@ -143,8 +141,7 @@ public class AisMutationHttpTests
 
         var (_, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Green Shirt" });
 
-        Assert.That(Versions(body)[Clothing.ToString()].AsInteger(), Is.EqualTo(b.Folders[Clothing].Version),
-            "the version reported is whatever GetFolder returns after the write, read fresh (tree state T4)");
+        Assert.Equal(b.Folders[Clothing].Version, Versions(body)[Clothing.ToString()].AsInteger());
     }
 
     /// <summary>
@@ -157,7 +154,7 @@ public class AisMutationHttpTests
     /// client-settable field. A <c>thumbnail</c> or <c>favorite</c> that asks for a value is a change this
     /// tree cannot store, and is refused (see the PATCH field-refusal tests below); absent, as here, it is fine.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_patch_carrying_fields_this_tree_cannot_store_is_ignored_not_refused()
     {
         var b = Inventory();
@@ -175,13 +172,13 @@ public class AisMutationHttpTests
 
         var (status, response) = Send(b, "PATCH", $"/item/{Shirt}", body);
 
-        Assert.That(status, Is.EqualTo(200), "an unstorable field must not fail an ordinary rename");
-        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Renamed"));
-        Assert.That(b.Items[Shirt].CurrentPermissions, Is.EqualTo(0x7fffffffu), "owner_mask is never taken from a body");
-        Assert.That(response["item_id"].AsUUID(), Is.EqualTo(Shirt));
+        Assert.Equal(200, status);
+        Assert.Equal("Renamed", b.Items[Shirt].Name);
+        Assert.Equal(0x7fffffffu, b.Items[Shirt].CurrentPermissions);
+        Assert.Equal(Shirt, response["item_id"].AsUUID());
     }
 
-    [Test]
+    [Fact]
     public void patching_sale_info_and_flags_is_applied()
     {
         var b = Inventory();
@@ -190,10 +187,10 @@ public class AisMutationHttpTests
             ["sale_info"] = new OSDMap { ["sale_price"] = 250, ["sale_type"] = 2 },
             ["flags"] = 4,
         });
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items[Shirt].SalePrice, Is.EqualTo(250));
-        Assert.That(b.Items[Shirt].SaleType, Is.EqualTo(2));
-        Assert.That(b.Items[Shirt].Flags, Is.EqualTo(4u));
+        Assert.Equal(200, status);
+        Assert.Equal(250, b.Items[Shirt].SalePrice);
+        Assert.Equal(2, b.Items[Shirt].SaleType);
+        Assert.Equal(4u, b.Items[Shirt].Flags);
     }
 
     // ------------------------------------------------------------------ A16: the asset id
@@ -202,7 +199,7 @@ public class AisMutationHttpTests
     /// An asset named directly in <c>asset_id</c> must be the resident's own upload of the item's type; any other
     /// is refused whole, and the item keeps its asset. (A viewer sends <c>hash_id</c>, never a changed asset_id.)
     /// </summary>
-    [Test]
+    [Fact]
     public void patching_asset_id_to_an_asset_that_is_not_the_residents_is_refused()
     {
         var b = Inventory();
@@ -213,12 +210,12 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Mine now", ["asset_id"] = others });
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-        Assert.That(body.ContainsKey("_updated_category_versions"), Is.False, "a refusal reports no folder version");
-        Assert.That(b.Items[Shirt].AssetID, Is.EqualTo(before), "the item keeps its asset");
-        Assert.That(b.Items[Shirt].Name, Is.Not.EqualTo("Mine now"), "nothing in a refused body is applied");
-        Assert.That(b.Writes, Is.Empty);
-        Assert.That(b.Folders[Clothing].Version, Is.EqualTo(versionBefore));
+        Assert.Equal((int)HttpStatusCode.Forbidden, status);
+        Assert.False(body.ContainsKey("_updated_category_versions"), "a refusal reports no folder version");
+        Assert.Equal(before, b.Items[Shirt].AssetID);
+        Assert.NotEqual("Mine now", b.Items[Shirt].Name);
+        Assert.Empty(b.Writes);
+        Assert.Equal(versionBefore, b.Folders[Clothing].Version);
     }
 
     /// <summary>
@@ -228,7 +225,7 @@ public class AisMutationHttpTests
     /// the row still read 637022fb. The legacy UDP path did persist it, which is what made the bug look
     /// intermittent.
     /// </summary>
-    [Test]
+    [Fact]
     public void patching_asset_id_persists_it()
     {
         var b = Inventory();
@@ -238,12 +235,11 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["asset_id"] = uploaded });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items[Shirt].AssetID, Is.Not.EqualTo(before), "the item still carries the asset it had before the save");
-        Assert.That(b.Items[Shirt].AssetID, Is.EqualTo(uploaded));
-        Assert.That(body["asset_id"].AsUUID(), Is.EqualTo(uploaded), "and the response says so");
-        Assert.That(Versions(body)[Clothing.ToString()].AsInteger(), Is.EqualTo(versionBefore + 1),
-            "an asset change is a change: the parent's version must move or the viewer never re-reads the item");
+        Assert.Equal(200, status);
+        Assert.NotEqual(before, b.Items[Shirt].AssetID);
+        Assert.Equal(uploaded, b.Items[Shirt].AssetID);
+        Assert.Equal(uploaded, body["asset_id"].AsUUID());
+        Assert.Equal(versionBefore + 1, Versions(body)[Clothing.ToString()].AsInteger());
     }
 
     /// <summary>
@@ -252,7 +248,7 @@ public class AisMutationHttpTests
     /// (<c>llviewerinventory.cpp:445-452</c>), so the server never sees an asset id at all and must ask the
     /// asset-transaction module which asset that transaction produced.
     /// </summary>
-    [Test]
+    [Fact]
     public void patching_hash_id_resolves_the_transaction_to_the_uploaded_asset()
     {
         var b = Inventory();
@@ -263,13 +259,13 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["hash_id"] = transaction });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items[Shirt].AssetID, Is.EqualTo(uploaded));
-        Assert.That(body["asset_id"].AsUUID(), Is.EqualTo(uploaded), "the response carries the resolved asset, not the transaction");
-        Assert.That(Versions(body)[Clothing.ToString()].AsInteger(), Is.EqualTo(versionBefore + 1));
+        Assert.Equal(200, status);
+        Assert.Equal(uploaded, b.Items[Shirt].AssetID);
+        Assert.Equal(uploaded, body["asset_id"].AsUUID());
+        Assert.Equal(versionBefore + 1, Versions(body)[Clothing.ToString()].AsInteger());
     }
 
-    [Test]
+    [Fact]
     public void the_map_fields_are_stored_before_the_transaction_is_handed_over()
     {
         // the legacy route's order: InventoryService.UpdateItem (Scene.Inventory.cs:576), then
@@ -281,12 +277,12 @@ public class AisMutationHttpTests
         Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Saved Shirt", ["hash_id"] = transaction });
 
         var order = b.Calls.Where(c => c.StartsWith("UpdateItem(") || c.StartsWith("ApplyAssetTransaction(")).ToList();
-        Assert.That(order.First(), Does.StartWith("UpdateItem("), "the body's own fields are stored first");
-        Assert.That(order, Does.Contain($"ApplyAssetTransaction({transaction})"));
-        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Saved Shirt"));
+        Assert.StartsWith("UpdateItem(", order.First());
+        Assert.Contains($"ApplyAssetTransaction({transaction})", order);
+        Assert.Equal("Saved Shirt", b.Items[Shirt].Name);
     }
 
-    [Test]
+    [Fact]
     public void an_unresolvable_transaction_leaves_the_asset_alone_and_still_answers_200()
     {
         // a region with no transaction module, or the library: the item keeps what it had
@@ -296,13 +292,13 @@ public class AisMutationHttpTests
 
         var (status, _) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["hash_id"] = UUID.Random() });
 
-        Assert.That(status, Is.EqualTo(200), "an unresolvable hash must not fail the rest of the patch");
-        Assert.That(b.Items[Shirt].AssetID, Is.EqualTo(before));
+        Assert.Equal(200, status);
+        Assert.Equal(before, b.Items[Shirt].AssetID);
     }
 
     // ------------------------------------------------------------------ A19: a refused save is not a 200
 
-    [Test]
+    [Fact]
     public void a_refused_transaction_answers_403_and_does_not_bump_the_category_version()
     {
         // 2026-09-06 09:52:55: a wearable referencing a library texture was refused by the uploader
@@ -317,15 +313,14 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["hash_id"] = transaction });
 
-        Assert.That(status, Is.EqualTo(403), "a refused save must not be reported as a success");
-        Assert.That(b.Items[Shirt].AssetID, Is.EqualTo(assetBefore), "the item still points at its previous asset");
-        Assert.That(body.ContainsKey("_updated_category_versions"), Is.False,
-            "a failed save must not advance the folder version the viewer holds, or its next fetch skips the folder "
+        Assert.Equal(403, status);
+        Assert.Equal(assetBefore, b.Items[Shirt].AssetID);
+        Assert.False(body.ContainsKey("_updated_category_versions"), "a failed save must not advance the folder version the viewer holds, or its next fetch skips the folder "
             + "and it never sees the true state (llaisapi.cpp:1625-1629)");
-        Assert.That(b.Folders[Clothing].Version, Is.EqualTo(versionBefore));
+        Assert.Equal(versionBefore, b.Folders[Clothing].Version);
     }
 
-    [Test]
+    [Fact]
     public void a_refused_transaction_does_not_fire_the_worn_wearable_rebake()
     {
         // The worn-asset hook is keyed on the asset actually changing, so a refusal must leave it silent - it did before this
@@ -336,10 +331,10 @@ public class AisMutationHttpTests
 
         Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["hash_id"] = transaction });
 
-        Assert.That(b.AssetChanges, Is.Empty, "nothing changed, so nothing may queue an appearance save");
+        Assert.Empty(b.AssetChanges);
     }
 
-    [Test]
+    [Fact]
     public void a_refused_transaction_still_leaves_the_body_fields_it_already_stored()
     {
         // The map fields are applied and stored before the transaction is handed over (the legacy route's order),
@@ -355,11 +350,11 @@ public class AisMutationHttpTests
             ["hash_id"] = transaction,
         });
 
-        Assert.That(status, Is.EqualTo(403));
-        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Renamed Shirt"));
+        Assert.Equal(403, status);
+        Assert.Equal("Renamed Shirt", b.Items[Shirt].Name);
     }
 
-    [Test]
+    [Fact]
     public void patching_permissions_applies_next_everyone_and_group_masked_by_base()
     {
         // set_default_permissions changes exactly these three and calls updateServer (llagentwearables.cpp:62-78)
@@ -379,13 +374,13 @@ public class AisMutationHttpTests
             },
         });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items[Shirt].NextPermissions, Is.EqualTo(0x0000000eu), "masked by base (Scene.Inventory.cs:539)");
-        Assert.That(b.Items[Shirt].EveryOnePermissions, Is.EqualTo(0x0000000eu));
-        Assert.That(b.Items[Shirt].GroupPermissions, Is.EqualTo(0x00000008u));
+        Assert.Equal(200, status);
+        Assert.Equal(0x0000000eu, b.Items[Shirt].NextPermissions);
+        Assert.Equal(0x0000000eu, b.Items[Shirt].EveryOnePermissions);
+        Assert.Equal(0x00000008u, b.Items[Shirt].GroupPermissions);
     }
 
-    [Test]
+    [Fact]
     public void patching_permissions_never_takes_base_or_current_from_the_body()
     {
         var b = Inventory();
@@ -393,12 +388,12 @@ public class AisMutationHttpTests
         {
             ["permissions"] = new OSDMap { ["base_mask"] = 0, ["owner_mask"] = 0, ["next_owner_mask"] = 8 },
         });
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items[Shirt].BasePermissions, Is.EqualTo(0x7fffffffu), "base is not a client-settable field");
-        Assert.That(b.Items[Shirt].CurrentPermissions, Is.EqualTo(0x7fffffffu), "nor is current");
+        Assert.Equal(200, status);
+        Assert.Equal(0x7fffffffu, b.Items[Shirt].BasePermissions);
+        Assert.Equal(0x7fffffffu, b.Items[Shirt].CurrentPermissions);
     }
 
-    [Test]
+    [Fact]
     public void patching_permissions_leaves_the_export_bit_as_it_stands()
     {
         var b = Inventory();
@@ -410,11 +405,10 @@ public class AisMutationHttpTests
             ["permissions"] = new OSDMap { ["everyone_mask"] = (int)OpenSim.Framework.PermissionMask.Export },
         });
 
-        Assert.That(b.Items[Shirt].EveryOnePermissions & (uint)OpenSim.Framework.PermissionMask.Export, Is.EqualTo(0u),
-            "export is not granted through this route; the legacy path guards it with a creator check we do not reproduce here");
+        Assert.Equal(0u, b.Items[Shirt].EveryOnePermissions & (uint)OpenSim.Framework.PermissionMask.Export);
     }
 
-    [Test]
+    [Fact]
     public void a_patch_that_changes_nothing_writes_nothing()
     {
         var b = Inventory();
@@ -427,48 +421,47 @@ public class AisMutationHttpTests
             ["asset_id"] = asset,
         });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Calls, Does.Not.Contain($"UpdateItem({Shirt})"), "an unchanged body must not bump the folder");
-        Assert.That(b.Folders[Clothing].Version, Is.EqualTo(version));
+        Assert.Equal(200, status);
+        Assert.DoesNotContain($"UpdateItem({Shirt})", b.Calls);
+        Assert.Equal(version, b.Folders[Clothing].Version);
     }
 
-    [Test]
+    [Fact]
     public void patching_an_unknown_item_is_404()
     {
         var (status, body) = Send(Inventory(), "PATCH", $"/item/{UUID.Random()}", new OSDMap { ["name"] = "x" });
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
         AssertErrorBody(body, 404);
     }
 
     // ------------------------------------------------------------------ PATCH /category
 
-    [Test]
+    [Fact]
     public void patching_a_category_lists_both_the_category_and_its_parent()
     {
         var b = Inventory();
         var (status, body) = Send(b, "PATCH", $"/category/{Outfits}", new OSDMap { ["name"] = "My Outfits" });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Folders[Outfits].Name, Is.EqualTo("My Outfits"));
-        Assert.That(body["category_id"].AsUUID(), Is.EqualTo(Outfits));
-        Assert.That(body["name"].AsString(), Is.EqualTo("My Outfits"));
+        Assert.Equal(200, status);
+        Assert.Equal("My Outfits", b.Folders[Outfits].Name);
+        Assert.Equal(Outfits, body["category_id"].AsUUID());
+        Assert.Equal("My Outfits", body["name"].AsString());
 
         var versions = Versions(body);
-        Assert.That(versions.Keys, Is.EquivalentTo(new[] { Outfits.ToString(), Clothing.ToString() }),
-            "parseCategory creates zero-delta entries for the category AND its parent (llaisapi.cpp:1419-1428), so both must be listed");
+        Assert.Equivalent(new[] { Outfits.ToString(), Clothing.ToString() }, versions.Keys, true);
     }
 
-    [Test]
+    [Fact]
     public void patching_an_unknown_category_is_404()
     {
         var (status, body) = Send(Inventory(), "PATCH", $"/category/{UUID.Random()}", new OSDMap { ["name"] = "x" });
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
         AssertErrorBody(body, 404);
     }
 
     // ------------------------------------------------------------------ DELETE /item
 
-    [Test]
+    [Fact]
     public void deleting_an_item_reports_removed_items_and_the_parents_new_version()
     {
         var b = Inventory();
@@ -476,25 +469,25 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "DELETE", $"/item/{Shirt}");
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items.ContainsKey(Shirt), Is.False, "the item is gone");
-        Assert.That(body.ContainsKey("_removed_items"), Is.True);
-        Assert.That(((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), Is.EquivalentTo(new[] { Shirt }));
-        Assert.That(body.ContainsKey("item_id"), Is.False, "a delete returns no content, only deltas");
-        Assert.That(Versions(body)[Clothing.ToString()].AsInteger(), Is.EqualTo(before + 1));
+        Assert.Equal(200, status);
+        Assert.False(b.Items.ContainsKey(Shirt), "the item is gone");
+        Assert.True(body.ContainsKey("_removed_items"));
+        Assert.Equivalent(new[] { Shirt }, ((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), true);
+        Assert.False(body.ContainsKey("item_id"), "a delete returns no content, only deltas");
+        Assert.Equal(before + 1, Versions(body)[Clothing.ToString()].AsInteger());
     }
 
-    [Test]
+    [Fact]
     public void deleting_an_unknown_item_is_404()
     {
         var (status, body) = Send(Inventory(), "DELETE", $"/item/{UUID.Random()}");
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
         AssertErrorBody(body, 404);
     }
 
     // ------------------------------------------------------------------ DELETE /category
 
-    [Test]
+    [Fact]
     public void deleting_a_category_names_only_the_folder_and_lets_the_viewer_purge_its_descendents()
     {
         var b = Inventory();
@@ -502,18 +495,16 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "DELETE", $"/category/{Outfits}");
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Folders.ContainsKey(Outfits), Is.False);
-        Assert.That(b.Folders.ContainsKey(Party), Is.False, "descendents are gone on the server");
-        Assert.That(b.Items.ContainsKey(PartyHat), Is.False);
+        Assert.Equal(200, status);
+        Assert.False(b.Folders.ContainsKey(Outfits));
+        Assert.False(b.Folders.ContainsKey(Party), "descendents are gone on the server");
+        Assert.False(b.Items.ContainsKey(PartyHat));
 
         var removed = ((OSDArray)body["_categories_removed"]).Select(o => o.AsUUID()).ToList();
-        Assert.That(removed, Is.EquivalentTo(new[] { Outfits }),
-            "only the folder is named: onObjectDeletedFromServer purges descendents locally (llinventorymodel.cpp:2019-2023), so they are implied");
-        Assert.That(body.ContainsKey("_removed_items"), Is.False, "the descendent item is not enumerated either");
-        Assert.That(Versions(body)[Clothing.ToString()].AsInteger(), Is.EqualTo(before + 1), "the deleted folder's PARENT is the one that changed");
-        Assert.That(Versions(body).ContainsKey(Outfits.ToString()), Is.False,
-            "the deleted folder must not be listed: the viewer would dereference a category it has just removed (Ledger A-R6)");
+        Assert.Equivalent(new[] { Outfits }, removed, true);
+        Assert.False(body.ContainsKey("_removed_items"), "the descendent item is not enumerated either");
+        Assert.Equal(before + 1, Versions(body)[Clothing.ToString()].AsInteger());
+        Assert.False(Versions(body).ContainsKey(Outfits.ToString()), "the deleted folder must not be listed: the viewer would dereference a category it has just removed (Ledger A-R6)");
     }
 
     /// <summary>
@@ -521,7 +512,7 @@ public class AisMutationHttpTests
     /// added in A2b, so a folder outside Trash is deleted rather than silently skipped. The trash gate is armed
     /// on the backend here, so this fails if the handler ever stops passing the flag.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_folder_outside_trash_is_deleted_because_the_handler_passes_only_if_trash_false()
     {
         var b = Inventory();
@@ -530,12 +521,11 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "DELETE", $"/category/{Outfits}");
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Folders.ContainsKey(Outfits), Is.False, "the folder is gone even though it was never in Trash");
-        Assert.That(b.Calls, Does.Contain("DeleteFolders[1, onlyIfTrash=False]"),
-            "the AIS route must ask for the unrestricted delete (Ledger A-Q9)");
-        Assert.That(((OSDArray)body["_categories_removed"]).Select(o => o.AsUUID()), Is.EquivalentTo(new[] { Outfits }));
-        Assert.That(Versions(body)[Clothing.ToString()].AsInteger(), Is.EqualTo(before + 1));
+        Assert.Equal(200, status);
+        Assert.False(b.Folders.ContainsKey(Outfits), "the folder is gone even though it was never in Trash");
+        Assert.Contains("DeleteFolders[1, onlyIfTrash=False]", b.Calls);
+        Assert.Equivalent(new[] { Outfits }, ((OSDArray)body["_categories_removed"]).Select(o => o.AsUUID()), true);
+        Assert.Equal(before + 1, Versions(body)[Clothing.ToString()].AsInteger());
     }
 
     /// <summary>
@@ -544,26 +534,26 @@ public class AisMutationHttpTests
     /// the exact membership of that predicate is UNVERIFIED (llfoldertype.cpp is not a permitted read), so the
     /// server rule is "the root, or any system type except Outfit".
     /// </summary>
-    [Test]
+    [Fact]
     public void a_protected_folder_is_refused_with_403_and_nothing_is_deleted()
     {
         var b = Inventory();
 
         // a system-typed folder
         var (status, body) = Send(b, "DELETE", $"/category/{Clothing}");
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
+        Assert.Equal((int)HttpStatusCode.Forbidden, status);
         AssertErrorBody(body, 403);
-        Assert.That(b.Folders.ContainsKey(Clothing), Is.True);
-        Assert.That(b.Calls.Any(c => c.StartsWith("DeleteFolders")), Is.False, "the backend is never asked");
+        Assert.True(b.Folders.ContainsKey(Clothing));
+        Assert.False(b.Calls.Any(c => c.StartsWith("DeleteFolders")), "the backend is never asked");
 
         // the inventory root
         var (rootStatus, _) = Send(b, "DELETE", $"/category/{Root}");
-        Assert.That(rootStatus, Is.EqualTo((int)HttpStatusCode.Forbidden));
-        Assert.That(b.Folders.ContainsKey(Root), Is.True);
+        Assert.Equal((int)HttpStatusCode.Forbidden, rootStatus);
+        Assert.True(b.Folders.ContainsKey(Root));
     }
 
     /// <summary>A saved outfit is ordinary user data and must stay deletable.</summary>
-    [Test]
+    [Fact]
     public void a_saved_outfit_folder_is_not_protected()
     {
         var b = Inventory();
@@ -572,9 +562,9 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "DELETE", $"/category/{outfit}");
 
-        Assert.That(status, Is.EqualTo(200), "FolderType.Outfit is a user folder, not a protected system one");
-        Assert.That(b.Folders.ContainsKey(outfit), Is.False);
-        Assert.That(((OSDArray)body["_categories_removed"]).Select(o => o.AsUUID()), Is.EquivalentTo(new[] { outfit }));
+        Assert.Equal(200, status);
+        Assert.False(b.Folders.ContainsKey(outfit));
+        Assert.Equivalent(new[] { outfit }, ((OSDArray)body["_categories_removed"]).Select(o => o.AsUUID()), true);
     }
 
     /// <summary>
@@ -583,18 +573,19 @@ public class AisMutationHttpTests
     /// one the viewer's table has never heard of, which lookupIsProtectedType defaults to protected (:154-162) -
     /// must be refused.
     /// </summary>
-    [TestCase((short)FolderType.None, false, TestName = "protected_set: FT_NONE is deletable")]
-    [TestCase((short)FolderType.Outfit, false, TestName = "protected_set: FT_OUTFIT is deletable")]
-    [TestCase((short)FolderType.MarketplaceListings, false, TestName = "protected_set: FT_MARKETPLACE_LISTINGS is deletable")]
-    [TestCase((short)FolderType.MarkplaceStock, false, TestName = "protected_set: FT_MARKETPLACE_STOCK is deletable")]
-    [TestCase((short)30, false, TestName = "protected_set: an ensemble type is deletable")]
-    [TestCase((short)FolderType.Clothing, true, TestName = "protected_set: FT_CLOTHING is protected")]
-    [TestCase((short)FolderType.Trash, true, TestName = "protected_set: FT_TRASH is protected")]
-    [TestCase((short)FolderType.CurrentOutfit, true, TestName = "protected_set: FT_CURRENT_OUTFIT is protected")]
-    [TestCase((short)FolderType.MyOutfits, true, TestName = "protected_set: FT_MY_OUTFITS is protected")]
-    [TestCase((short)FolderType.Favorites, true, TestName = "protected_set: FT_FAVORITE is protected")]
-    [TestCase((short)FolderType.Settings, true, TestName = "protected_set: FT_SETTINGS is protected")]
-    [TestCase((short)FolderType.Suitcase, true, TestName = "protected_set: a type the viewer's table lacks defaults to protected")]
+    [Theory]
+    [InlineData((short)FolderType.None, false)]
+    [InlineData((short)FolderType.Outfit, false)]
+    [InlineData((short)FolderType.MarketplaceListings, false)]
+    [InlineData((short)FolderType.MarkplaceStock, false)]
+    [InlineData((short)30, false)]
+    [InlineData((short)FolderType.Clothing, true)]
+    [InlineData((short)FolderType.Trash, true)]
+    [InlineData((short)FolderType.CurrentOutfit, true)]
+    [InlineData((short)FolderType.MyOutfits, true)]
+    [InlineData((short)FolderType.Favorites, true)]
+    [InlineData((short)FolderType.Settings, true)]
+    [InlineData((short)FolderType.Suitcase, true)]
     public void the_protected_set_is_the_viewers_table(short folderType, bool expectRefused)
     {
         var b = Inventory();
@@ -605,18 +596,18 @@ public class AisMutationHttpTests
 
         if (expectRefused)
         {
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden), $"type {folderType} must be protected");
-            Assert.That(b.Folders.ContainsKey(id), Is.True);
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            Assert.True(b.Folders.ContainsKey(id));
         }
         else
         {
-            Assert.That(status, Is.EqualTo(200), $"type {folderType} must be deletable");
-            Assert.That(b.Folders.ContainsKey(id), Is.False);
+            Assert.Equal(200, status);
+            Assert.False(b.Folders.ContainsKey(id));
         }
     }
 
     /// <summary>The verification survives: a service that really does nothing is a 500, not a false 200.</summary>
-    [Test]
+    [Fact]
     public void a_delete_the_service_did_not_perform_is_reported_as_a_failure()
     {
         var b = Inventory();
@@ -624,30 +615,30 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "DELETE", $"/category/{Outfits}");
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.InternalServerError));
+        Assert.Equal((int)HttpStatusCode.InternalServerError, status);
         AssertErrorBody(body, 500);
-        Assert.That(b.Folders.ContainsKey(Outfits), Is.True);
+        Assert.True(b.Folders.ContainsKey(Outfits));
     }
 
-    [Test]
+    [Fact]
     public void deleting_an_unknown_category_is_404()
     {
         var (status, body) = Send(Inventory(), "DELETE", $"/category/{UUID.Random()}");
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
         AssertErrorBody(body, 404);
     }
 
     // ------------------------------------------------------------------ cross-cutting
 
-    [Test]
+    [Fact]
     public void tid_is_echoed_on_a_mutation()
     {
         var tid = UUID.Random();
         var (_, body) = Send(Inventory(), "DELETE", $"/item/{Shirt}?tid={tid}");
-        Assert.That(body["tid"].AsUUID(), Is.EqualTo(tid));
+        Assert.Equal(tid, body["tid"].AsUUID());
     }
 
-    [Test]
+    [Fact]
     public void every_mutation_through_the_library_cap_is_405_and_changes_nothing()
     {
         foreach (var (verb, path) in new (string, string)[]
@@ -658,22 +649,21 @@ public class AisMutationHttpTests
         {
             var b = Inventory();
             var (status, body) = Send(b, verb, path, new OSDMap { ["name"] = "hacked" }, AisMode.Library);
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.MethodNotAllowed), $"{verb} {path}");
+            Assert.Equal((int)HttpStatusCode.MethodNotAllowed, status);
             AssertErrorBody(body, 405);
-            Assert.That(b.Items[Shirt].Name, Is.EqualTo("Blue Shirt"), "nothing was written");
-            Assert.That(b.Folders[Outfits].Name, Is.EqualTo("Outfits"));
-            Assert.That(b.Calls.Any(c => c.StartsWith("Update") || c.StartsWith("Delete")), Is.False,
-                "the backend is never even asked");
+            Assert.Equal("Blue Shirt", b.Items[Shirt].Name);
+            Assert.Equal("Outfits", b.Folders[Outfits].Name);
+            Assert.False(b.Calls.Any(c => c.StartsWith("Update") || c.StartsWith("Delete")), "the backend is never even asked");
         }
     }
 
-    [Test]
+    [Fact]
     public void a_service_that_refuses_the_write_is_a_500_not_a_silent_success()
     {
         var b = Inventory();
         b.AllowWrite = false;
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Nope" });
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.InternalServerError));
+        Assert.Equal((int)HttpStatusCode.InternalServerError, status);
         AssertErrorBody(body, 500);
     }
 
@@ -681,7 +671,7 @@ public class AisMutationHttpTests
     /// After A4 nothing in the spec answers 501 on the inventory cap except COPY, which belongs to the library
     /// cap. Purge, slam and create all landed in A3/A4.
     /// </summary>
-    [Test]
+    [Fact]
     public void the_previously_unimplemented_mutations_now_answer_properly()
     {
         var b = Inventory();
@@ -699,7 +689,7 @@ public class AisMutationHttpTests
             // into null, i.e. no body at all — see the remarks on MutTestRequest.
             var body = verb == "PUT" ? (OSD)new OSDArray() : new OSDMap();
             handler.Handle(new MutTestRequest(verb, Cap + path, body), response);
-            Assert.That(response.StatusCode, Is.EqualTo(expected), $"{verb} {path}");
+            Assert.Equal(expected, response.StatusCode);
         }
     }
     // ------------------------------------------------------------------ PATCH fields that are refused, not ignored
@@ -714,13 +704,13 @@ public class AisMutationHttpTests
     /// <summary>A refusal: 400, the field named, no delta envelope (so no folder version moves on the client).</summary>
     private static void AssertRefusedNaming(int status, OSDMap body, string field)
     {
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest), $"a PATCH asking to change {field} must not be answered 200");
+        Assert.Equal((int)HttpStatusCode.BadRequest, status);
         AssertErrorBody(body, 400);
-        Assert.That(body["message"].AsString(), Does.Contain(field), "the error names the field it refused");
-        Assert.That(body.ContainsKey("_updated_category_versions"), Is.False, "a refusal reports no folder version");
+        Assert.Contains(field, body["message"].AsString());
+        Assert.False(body.ContainsKey("_updated_category_versions"), "a refusal reports no folder version");
     }
 
-    [Test]
+    [Fact]
     public void patching_an_item_with_a_new_parent_id_is_400_and_the_item_stays_where_it_was()
     {
         var b = Inventory();
@@ -730,13 +720,13 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["parent_id"] = Party });
 
         AssertRefusedNaming(status, body, "parent_id");
-        Assert.That(b.Items[Shirt].Folder, Is.EqualTo(Clothing), "the item did not move");
-        Assert.That(b.Folders[Clothing].Version, Is.EqualTo(clothingVersion));
-        Assert.That(b.Folders[Party].Version, Is.EqualTo(partyVersion));
-        Assert.That(b.Writes, Is.Empty, "nothing was written");
+        Assert.Equal(Clothing, b.Items[Shirt].Folder);
+        Assert.Equal(clothingVersion, b.Folders[Clothing].Version);
+        Assert.Equal(partyVersion, b.Folders[Party].Version);
+        Assert.Empty(b.Writes);
     }
 
-    [Test]
+    [Fact]
     public void a_new_parent_id_alongside_a_rename_refuses_the_whole_patch()
     {
         var b = Inventory();
@@ -744,12 +734,12 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Moved Shirt", ["parent_id"] = Party });
 
         AssertRefusedNaming(status, body, "parent_id");
-        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Blue Shirt"), "the rename in the same body is not applied either");
-        Assert.That(b.Items[Shirt].Folder, Is.EqualTo(Clothing));
-        Assert.That(b.Writes, Is.Empty);
+        Assert.Equal("Blue Shirt", b.Items[Shirt].Name);
+        Assert.Equal(Clothing, b.Items[Shirt].Folder);
+        Assert.Empty(b.Writes);
     }
 
-    [Test]
+    [Fact]
     public void patching_an_item_with_a_null_parent_id_is_400()
     {
         var b = Inventory();
@@ -757,10 +747,10 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["parent_id"] = UUID.Zero });
 
         AssertRefusedNaming(status, body, "parent_id");
-        Assert.That(b.Items[Shirt].Folder, Is.EqualTo(Clothing));
+        Assert.Equal(Clothing, b.Items[Shirt].Folder);
     }
 
-    [Test]
+    [Fact]
     public void patching_an_item_with_its_own_parent_id_is_an_ordinary_update()
     {
         // The viewer's body is the item's whole asLLSD (llinventory.cpp:936-939), so parent_id is in every rename.
@@ -769,14 +759,14 @@ public class AisMutationHttpTests
 
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Red Shirt", ["parent_id"] = Clothing, ["item_id"] = Shirt });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Red Shirt"));
-        Assert.That(b.Items[Shirt].Folder, Is.EqualTo(Clothing));
-        Assert.That(body["parent_id"].AsUUID(), Is.EqualTo(Clothing));
-        Assert.That(Versions(body)[Clothing.ToString()].AsInteger(), Is.EqualTo(before + 1));
+        Assert.Equal(200, status);
+        Assert.Equal("Red Shirt", b.Items[Shirt].Name);
+        Assert.Equal(Clothing, b.Items[Shirt].Folder);
+        Assert.Equal(Clothing, body["parent_id"].AsUUID());
+        Assert.Equal(before + 1, Versions(body)[Clothing.ToString()].AsInteger());
     }
 
-    [Test]
+    [Fact]
     public void patching_an_item_whose_body_names_another_item_id_is_400()
     {
         var b = Inventory();
@@ -784,11 +774,11 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "x", ["item_id"] = PartyHat });
 
         AssertRefusedNaming(status, body, "item_id");
-        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Blue Shirt"));
-        Assert.That(b.Items[PartyHat].Name, Is.EqualTo("Party Hat"));
+        Assert.Equal("Blue Shirt", b.Items[Shirt].Name);
+        Assert.Equal("Party Hat", b.Items[PartyHat].Name);
     }
 
-    [Test]
+    [Fact]
     public void patching_an_item_thumbnail_is_400_because_this_tree_cannot_store_it()
     {
         var b = Inventory();
@@ -796,10 +786,10 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["thumbnail"] = new OSDMap { ["asset_id"] = UUID.Random() } });
 
         AssertRefusedNaming(status, body, "thumbnail");
-        Assert.That(b.Writes, Is.Empty);
+        Assert.Empty(b.Writes);
     }
 
-    [Test]
+    [Fact]
     public void marking_an_item_favorite_is_400_because_this_tree_cannot_store_it()
     {
         var b = Inventory();
@@ -807,10 +797,10 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["favorite"] = new OSDMap { ["toggled"] = true } });
 
         AssertRefusedNaming(status, body, "favorite");
-        Assert.That(b.Writes, Is.Empty);
+        Assert.Empty(b.Writes);
     }
 
-    [Test]
+    [Fact]
     public void clearing_favorite_or_thumbnail_on_an_item_that_has_neither_is_not_a_change()
     {
         // favorite_send sends an undefined value to clear (llinventoryfunctions.cpp:2516-2527); this tree stores
@@ -824,11 +814,11 @@ public class AisMutationHttpTests
             ["thumbnail"] = new OSDMap { ["asset_id"] = UUID.Zero },
         });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Red Shirt"));
+        Assert.Equal(200, status);
+        Assert.Equal("Red Shirt", b.Items[Shirt].Name);
     }
 
-    [Test]
+    [Fact]
     public void patching_a_category_with_a_new_parent_id_is_400_and_the_folder_stays_where_it_was()
     {
         var b = Inventory();
@@ -838,13 +828,13 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["parent_id"] = Root });
 
         AssertRefusedNaming(status, body, "parent_id");
-        Assert.That(b.Folders[Party].ParentID, Is.EqualTo(Outfits), "the folder did not move");
-        Assert.That(b.Folders[Root].Version, Is.EqualTo(rootVersion));
-        Assert.That(b.Folders[Clothing].Version, Is.EqualTo(clothingVersion));
-        Assert.That(b.Writes, Is.Empty);
+        Assert.Equal(Outfits, b.Folders[Party].ParentID);
+        Assert.Equal(rootVersion, b.Folders[Root].Version);
+        Assert.Equal(clothingVersion, b.Folders[Clothing].Version);
+        Assert.Empty(b.Writes);
     }
 
-    [Test]
+    [Fact]
     public void a_new_category_parent_id_alongside_a_rename_refuses_the_whole_patch()
     {
         var b = Inventory();
@@ -852,11 +842,11 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["name"] = "Moved", ["parent_id"] = Root });
 
         AssertRefusedNaming(status, body, "parent_id");
-        Assert.That(b.Folders[Party].Name, Is.EqualTo("Party"));
-        Assert.That(b.Folders[Party].ParentID, Is.EqualTo(Outfits));
+        Assert.Equal("Party", b.Folders[Party].Name);
+        Assert.Equal(Outfits, b.Folders[Party].ParentID);
     }
 
-    [Test]
+    [Fact]
     public void patching_a_category_with_its_own_parent_id_and_type_is_an_ordinary_rename()
     {
         // LLInventoryCategory::asLLSD (llinventory.cpp:1236-1256) sends item_id, parent_id, type and name.
@@ -870,13 +860,13 @@ public class AisMutationHttpTests
             ["type"] = (int)b.Folders[Party].Type,
         });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Folders[Party].Name, Is.EqualTo("Party Clothes"));
-        Assert.That(b.Folders[Party].ParentID, Is.EqualTo(Outfits));
-        Assert.That(Versions(body).Keys, Is.EquivalentTo(new[] { Party.ToString(), Outfits.ToString() }));
+        Assert.Equal(200, status);
+        Assert.Equal("Party Clothes", b.Folders[Party].Name);
+        Assert.Equal(Outfits, b.Folders[Party].ParentID);
+        Assert.Equivalent(new[] { Party.ToString(), Outfits.ToString() }, Versions(body).Keys, true);
     }
 
-    [Test]
+    [Fact]
     public void moving_a_system_folder_by_patch_is_400_and_it_stays_put()
     {
         var b = Inventory();
@@ -884,11 +874,11 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/category/{Clothing}", new OSDMap { ["parent_id"] = Party });
 
         AssertRefusedNaming(status, body, "parent_id");
-        Assert.That(b.Folders[Clothing].ParentID, Is.EqualTo(Root));
-        Assert.That(b.Writes, Is.Empty);
+        Assert.Equal(Root, b.Folders[Clothing].ParentID);
+        Assert.Empty(b.Writes);
     }
 
-    [Test]
+    [Fact]
     public void changing_a_category_type_by_patch_is_400_and_the_type_stays()
     {
         // LLViewerInventoryCategory::changeType sends the whole asLLSD with a new "type" (llviewerinventory.cpp:866-881).
@@ -898,11 +888,11 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["type"] = (int)FolderType.Outfit });
 
         AssertRefusedNaming(status, body, "type");
-        Assert.That(b.Folders[Party].Type, Is.EqualTo(type));
-        Assert.That(b.Writes, Is.Empty);
+        Assert.Equal(type, b.Folders[Party].Type);
+        Assert.Empty(b.Writes);
     }
 
-    [Test]
+    [Fact]
     public void changing_a_category_type_default_by_patch_is_400()
     {
         var b = Inventory();
@@ -910,10 +900,10 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["type_default"] = (int)FolderType.Outfit });
 
         AssertRefusedNaming(status, body, "type_default");
-        Assert.That(b.Writes, Is.Empty);
+        Assert.Empty(b.Writes);
     }
 
-    [Test]
+    [Fact]
     public void patching_a_category_whose_body_names_another_id_is_400()
     {
         var b = Inventory();
@@ -921,11 +911,11 @@ public class AisMutationHttpTests
         var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["name"] = "x", ["category_id"] = Outfits });
 
         AssertRefusedNaming(status, body, "category_id");
-        Assert.That(b.Folders[Party].Name, Is.EqualTo("Party"));
-        Assert.That(b.Folders[Outfits].Name, Is.EqualTo("Outfits"));
+        Assert.Equal("Party", b.Folders[Party].Name);
+        Assert.Equal("Outfits", b.Folders[Outfits].Name);
     }
 
-    [Test]
+    [Fact]
     public void a_category_thumbnail_or_favorite_is_400_because_this_tree_cannot_store_it()
     {
         // The one PATCH the viewer sends for a protected folder (update_inventory_category, llviewerinventory.cpp:1436-1457).
@@ -936,16 +926,16 @@ public class AisMutationHttpTests
 
         AssertRefusedNaming(tStatus, tBody, "thumbnail");
         AssertRefusedNaming(fStatus, fBody, "favorite");
-        Assert.That(b.Writes, Is.Empty);
+        Assert.Empty(b.Writes);
     }
 
     private static void AssertErrorBody(OSDMap body, int code)
     {
-        Assert.That(body["error_code"].AsInteger(), Is.EqualTo(code));
-        Assert.That(body.ContainsKey("message"), Is.True);
-        Assert.That(body.ContainsKey("parent_id"), Is.False);
-        Assert.That(body.ContainsKey("item_id"), Is.False);
-        Assert.That(body.ContainsKey("category_id"), Is.False);
-        Assert.That(body.ContainsKey("_embedded"), Is.False);
+        Assert.Equal(code, body["error_code"].AsInteger());
+        Assert.True(body.ContainsKey("message"));
+        Assert.False(body.ContainsKey("parent_id"));
+        Assert.False(body.ContainsKey("item_id"));
+        Assert.False(body.ContainsKey("category_id"));
+        Assert.False(body.ContainsKey("_embedded"));
     }
 }

@@ -10,7 +10,6 @@ using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Region.CoreModules.World.Estate;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

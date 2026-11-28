@@ -60,7 +60,8 @@ public class XmlRpcScriptMarkerTests : IDisposable
             lock (m_callers)
             {
                 m_callers.Add(caller);
-                m_callers.Add((IPEndPoint)request.Params[1]);
+                m_callers.Add(request.Params[1] as IPEndPoint
+                    ?? throw new InvalidOperationException("The XML-RPC caller was not an IPEndPoint."));
             }
             return new XmlRpcResponse { Value = new Hashtable { ["result"] = "ok" } };
         });

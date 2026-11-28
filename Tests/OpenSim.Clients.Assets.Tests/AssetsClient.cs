@@ -36,7 +36,7 @@ namespace OpenSim.Tests.Clients.AssetsClient
 {
     public class AssetsClient
     {
-        private static ILogger m_logger;
+        private static ILogger<AssetsClient> m_logger;
 
         private static int m_MaxThreadID = 0;
         private static readonly int NREQS = 150;
@@ -52,7 +52,7 @@ namespace OpenSim.Tests.Clients.AssetsClient
                 serverURI = args[1];
             int max1, max2;
             ThreadPool.GetMaxThreads(out max1, out max2);
-            m_logger.LogInformation("[ASSET CLIENT]: Connecting to {0} max threads = {1} - {2}", serverURI, max1, max2);
+            m_logger.LogInformation($"[ASSET CLIENT]: Connecting to {serverURI} max threads = {max1} - {max2}");
             ThreadPool.GetMinThreads(out max1, out max2);
             m_logger.LogInformation("[ASSET CLIENT]: Connecting to {0} min threads = {1} - {2}", serverURI, max1, max2);
 

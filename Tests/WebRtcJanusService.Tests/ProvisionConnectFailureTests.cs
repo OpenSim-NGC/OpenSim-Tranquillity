@@ -20,7 +20,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ProvisionConnectFailureTests
     {
         private static readonly UUID Region = new UUID("bbbbbbbb-0000-0000-0000-0000000a0053");
@@ -41,24 +40,39 @@ namespace osWebRtcVoice.Tests
             ["jsep"] = new OSDMap { ["type"] = OSD.FromString("offer"), ["sdp"] = OSD.FromString("v=0") },
         };
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ConnectFailure_ReturnsJanusUnavailableFailureMap_WithoutThrowing_AndLeavesNothingOnTheSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var service = new WebRtcJanusService(NoJanusConfig());
             var session = (JanusViewerSession)service.CreateViewerSession(LocalOffer(), Alice, Region);
 
             OSDMap resp = null;
-            Assert.DoesNotThrow(() => resp = service.ProvisionVoiceAccountRequest(session, LocalOffer(), Alice, Region),
-                "pre-fix: NullReferenceException from SelectRoom on the null AudioBridge");
+            {
+                var assertedValue = () => resp = service.ProvisionVoiceAccountRequest(session, LocalOffer(), Alice, Region);
+                TestAssert.WithMessage(() => Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                })), "pre-fix: NullReferenceException from SelectRoom on the null AudioBridge");
+            }
 
-            Assert.That(resp, Is.Not.Null, "a failure map, not null");
-            Assert.That(resp["response"].AsString(), Is.EqualTo("failed"), "the same shape the room-full arm returns");
-            Assert.That(resp["error"].AsString(), Is.EqualTo("janus unavailable"));
-            Assert.That(resp.ContainsKey("error_code"), Is.False, "not a capacity rejection: no error_code, no 409");
-            Assert.That(resp.ContainsKey("viewer_session"), Is.False, "failure signature: no viewer_session");
-            Assert.That(session.Session, Is.Null, "no half-built JanusSession left on the viewer session");
-            Assert.That(session.AudioBridge, Is.Null);
-            Assert.That(session.Room, Is.Null);
+            {
+                var assertedValue = resp;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "a failure map, not null");
+            }
+            {
+                var assertedValue = resp["response"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal("failed", assertedValue), "the same shape the room-full arm returns");
+            }
+            Assert.Equal("janus unavailable", resp["error"].AsString());
+            Assert.False(resp.ContainsKey("error_code"), "not a capacity rejection: no error_code, no 409");
+            Assert.False(resp.ContainsKey("viewer_session"), "failure signature: no viewer_session");
+            {
+                var assertedValue = session.Session;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no half-built JanusSession left on the viewer session");
+            }
+            Assert.Null(session.AudioBridge);
+            Assert.Null(session.Room);
         }
     }
 }

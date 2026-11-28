@@ -34,7 +34,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class RoomAddressingTests
     {
         private static UUID Id(int n)
@@ -172,26 +171,31 @@ namespace osWebRtcVoice.Tests
         /// <summary>An avatar that joined a room of its parcel's own voice channel. That is where it is armed and
         /// where the heartbeat names it. The estate number is not addressed at all - and, the sharper half, no
         /// generation is ever ALLOCATED for it.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AnAvatarThatJoinedAnOwnChannelRoom_IsAddressedAtThatRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Place(A, ParcelOwn);
             rig.Join(A, OwnChannelRoom);
 
             await rig.Tick();
 
-            Assert.That(rig.Rooms(), Is.EqualTo(new[] { OwnChannelRoom }), "armed at the joined room");
-            Assert.That(rig.Rooms(), Does.Not.Contain(EstateRoom));
-            Assert.That(rig.Auth.IsArmed(OwnChannelRoom, A), Is.True);
-            Assert.That(rig.Auth.IsArmed(EstateRoom, A), Is.False);
-            Assert.That(rig.Auth.CurrentGeneration(EstateRoom), Is.Zero,
-                "no generation is ever allocated for the estate number in this region");
+            {
+                var assertedValue = rig.Rooms();
+                TestAssert.WithMessage(() => Assert.Equal(new[] { OwnChannelRoom }, assertedValue), "armed at the joined room");
+            }
+            Assert.DoesNotContain(EstateRoom, rig.Rooms());
+            Assert.True(rig.Auth.IsArmed(OwnChannelRoom, A));
+            Assert.False(rig.Auth.IsArmed(EstateRoom, A));
+            {
+                var assertedValue = rig.Auth.CurrentGeneration(EstateRoom);
+                TestAssert.WithMessage(() => Assert.Equal(0u, assertedValue), "no generation is ever allocated for the estate number in this region");
+            }
 
             OSDMap hb = rig.Heartbeat();
-            Assert.That(ListenersOf(hb, OwnChannelRoom), Is.EquivalentTo(new[] { A.ToString() }));
-            Assert.That(((OSDMap)hb["rooms"]).ContainsKey(EstateRoom.ToString()), Is.False,
-                "the heartbeat claims authority over the joined room only");
+            Assert.Equivalent(new[] { A.ToString() }, ListenersOf(hb, OwnChannelRoom), strict: true);
+            Assert.False(((OSDMap)hb["rooms"]).ContainsKey(EstateRoom.ToString()), "the heartbeat claims authority over the joined room only");
         }
 
         // ---- an avatar that joined the estate room is addressed there ----------------------
@@ -199,10 +203,12 @@ namespace osWebRtcVoice.Tests
         /// <summary>An avatar on an estate-channel parcel that joined the estate room is addressed at it, with arming
         /// on; with the knob off nothing is sent at all, as the knob-off goldens pin. The goldens cover the off case
         /// against a file captured before; this covers the on case, which no golden file pins.</summary>
-        [TestCase(true)]
-        [TestCase(false)]
+        [InlineData(true)]
+        [InlineData(false)]
+        [Theory(Timeout = 60000)]
         public async Task AnAvatarThatJoinedTheEstateRoom_IsAddressedAtIt(bool arming)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig(arming);
             rig.Place(A, ParcelEstate);
             rig.Place(B, ParcelEstate);
@@ -212,9 +218,15 @@ namespace osWebRtcVoice.Tests
             await rig.Tick();
 
             if (arming)
-                Assert.That(rig.Rooms(), Is.EqualTo(new[] { EstateRoom }), "the room those bytes name is the estate-channel number");
+                {
+                    var assertedValue = rig.Rooms();
+                    TestAssert.WithMessage(() => Assert.Equal(new[] { EstateRoom }, assertedValue), "the room those bytes name is the estate-channel number");
+                }
             else
-                Assert.That(rig.Sent, Is.Empty, "with the knob off nothing is sent at all, as the goldens pin");
+                {
+                    var assertedValue = rig.Sent;
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), "with the knob off nothing is sent at all, as the goldens pin");
+                }
         }
 
         // ---- a record arrives ------------------------------------------------------------------
@@ -222,23 +234,30 @@ namespace osWebRtcVoice.Tests
         /// <summary>The agent has no record, so it is armed nowhere, whatever parcel it stands on. A record then
         /// arrives - the viewer provisioned it - and from the next pass it is armed at that room and the heartbeat names it
         /// there and nowhere else.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task WhenARecordArrives_TheAgentIsArmedAtItAndNowhereElse()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Place(A, ParcelOwn);
             await rig.Tick();
-            Assert.That(rig.Rooms(), Is.Empty, "no record, so no room is addressed");
+            {
+                var assertedValue = rig.Rooms();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no record, so no room is addressed");
+            }
 
             rig.Join(A, RecordedRoom);   // the viewer's provision lands
             await rig.Tick();
 
-            Assert.That(rig.Auth.IsArmed(RecordedRoom, A), Is.True, "armed at the recorded room");
-            Assert.That(rig.Rooms(), Is.EqualTo(new[] { RecordedRoom }));
+            Assert.True(rig.Auth.IsArmed(RecordedRoom, A), "armed at the recorded room");
+            Assert.Equal(new[] { RecordedRoom }, rig.Rooms());
 
             OSDMap hb = rig.Heartbeat();
-            Assert.That(ListenersOf(hb, RecordedRoom), Is.EquivalentTo(new[] { A.ToString() }));
-            Assert.That(ListenersOf(hb, OwnChannelRoom), Is.Empty, "and named nowhere at its parcel's room");
+            Assert.Equivalent(new[] { A.ToString() }, ListenersOf(hb, RecordedRoom), strict: true);
+            {
+                var assertedValue = ListenersOf(hb, OwnChannelRoom);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "and named nowhere at its parcel's room");
+            }
         }
 
         // ---- nowhere to put it ---------------------------------------------------------------
@@ -246,26 +265,36 @@ namespace osWebRtcVoice.Tests
         /// <summary>No record - the sim has no evidence of a room this agent is in. It is left out of the batch and
         /// the heartbeat, counted on the sender, and nothing is allocated for any room on its behalf. It is never turned
         /// into an estate-room write.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AnAgentWithNoRecord_IsOmittedAndCounted_AndAllocatesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Place(A, ParcelOwn);
 
             await rig.Tick();
 
-            Assert.That(rig.Batches(), Is.Empty, "nothing addressed, so nothing on the wire");
-            Assert.That(rig.Sender.Unplaced, Is.EqualTo(1), "the sender counts what it could not place");
-            Assert.That(rig.Auth.CurrentGeneration(EstateRoom), Is.Zero);
-            Assert.That(rig.Auth.CurrentGeneration(OwnChannelRoom), Is.Zero);
-            Assert.That(rig.Auth.IsArmed(EstateRoom, A), Is.False);
-            Assert.That(((OSDMap)rig.Heartbeat()["rooms"]).Count, Is.Zero, "and named in no room's entry");
+            {
+                var assertedValue = rig.Batches();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "nothing addressed, so nothing on the wire");
+            }
+            {
+                var assertedValue = rig.Sender.Unplaced;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the sender counts what it could not place");
+            }
+            Assert.Equal(0u, rig.Auth.CurrentGeneration(EstateRoom));
+            Assert.Equal(0u, rig.Auth.CurrentGeneration(OwnChannelRoom));
+            Assert.False(rig.Auth.IsArmed(EstateRoom, A));
+            {
+                var assertedValue = ((OSDMap)rig.Heartbeat()["rooms"]).Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "and named in no room's entry");
+            }
 
             // It is picked up the moment a provision for it is recorded - nothing latches.
             rig.Join(A, OwnChannelRoom);
             await rig.Tick();
-            Assert.That(rig.Auth.IsArmed(OwnChannelRoom, A), Is.True);
-            Assert.That(rig.Sender.Unplaced, Is.Zero);
+            Assert.True(rig.Auth.IsArmed(OwnChannelRoom, A));
+            Assert.Equal(0, rig.Sender.Unplaced);
         }
 
         // ---- what the operator reads ---------------------------------------------------------
@@ -273,9 +302,10 @@ namespace osWebRtcVoice.Tests
         /// <summary>"show voice visibility" must report the rooms the last send RESOLVED and how many agents it
         /// could not place. A line that printed "fallback room N" first would read as an address, which is exactly
         /// what makes a wrong room look like a working fallback.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheConsoleReader_NamesTheResolvedRooms_AndCountsTheUnplaced()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Place(A, ParcelOwn);
             rig.Join(A, OwnChannelRoom);
@@ -285,19 +315,32 @@ namespace osWebRtcVoice.Tests
             IReadOnlyList<string> lines = VoiceVisibilityCommands.Format("Example Region", rig.Sink, rig.Sender.Unplaced);
             string all = string.Join("\n", lines);
 
-            Assert.That(lines[0], Does.Contain("addressed 1 room(s): " + OwnChannelRoom),
-                "the rooms it actually addressed, by number");
-            Assert.That(lines[0], Does.Contain("estate room " + rig.Sink.FallbackRoom),
-                "the estate number is reported as the region's own, not as anybody's address");
-            Assert.That(lines[0].IndexOf("addressed", StringComparison.Ordinal),
-                Is.LessThan(lines[0].IndexOf("estate room", StringComparison.Ordinal)),
-                "and it reads after the resolved rooms, not before them");
-            Assert.That(lines[0], Does.Contain("1 agent(s) unplaced and omitted"),
-                "B has no record, and the count of that is the headline, not a room number");
-            Assert.That(all, Does.Contain("unplaced in the send"), "the counters are named for what they count");
-            Assert.That(all, Does.Contain("held back (unknown room)"), "and the rooms held back after unknown_room are named");
-            Assert.That(all, Does.Not.Contain("fallback"), "nothing here calls an omission a fallback any more");
-            Assert.That(rig.Sink.LastSendRoomNumbers, Is.EqualTo(new[] { OwnChannelRoom }));
+            {
+                var assertedValue = lines[0];
+                TestAssert.WithMessage(() => Assert.Contains("addressed 1 room(s): " + OwnChannelRoom, assertedValue), "the rooms it actually addressed, by number");
+            }
+            {
+                var assertedValue = lines[0];
+                TestAssert.WithMessage(() => Assert.Contains("estate room " + rig.Sink.FallbackRoom, assertedValue), "the estate number is reported as the region's own, not as anybody's address");
+            }
+            Assert.True(lines[0].IndexOf("addressed", StringComparison.Ordinal) < lines[0].IndexOf("estate room", StringComparison.Ordinal), "and it reads after the resolved rooms, not before them");
+            {
+                var assertedValue = lines[0];
+                TestAssert.WithMessage(() => Assert.Contains("1 agent(s) unplaced and omitted", assertedValue), "B has no record, and the count of that is the headline, not a room number");
+            }
+            {
+                var assertedValue = all;
+                TestAssert.WithMessage(() => Assert.Contains("unplaced in the send", assertedValue), "the counters are named for what they count");
+            }
+            {
+                var assertedValue = all;
+                TestAssert.WithMessage(() => Assert.Contains("held back (unknown room)", assertedValue), "and the rooms held back after unknown_room are named");
+            }
+            {
+                var assertedValue = all;
+                TestAssert.WithMessage(() => Assert.DoesNotContain("fallback", assertedValue), "nothing here calls an omission a fallback any more");
+            }
+            Assert.Equal(new[] { OwnChannelRoom }, rig.Sink.LastSendRoomNumbers);
         }
 
         // ---- the mixer is not sent batches for a room it does not hold ------------------------------
@@ -305,10 +348,12 @@ namespace osWebRtcVoice.Tests
         /// <summary>An avatar that is only in a group or avatar-to-avatar call stands on a parcel but never joined its
         /// room, so the mixer does not hold that room. Nothing is sent for it - not at the arming pass, not at later
         /// passes - and so the mixer never has to refuse it.</summary>
-        [TestCase(1)]
-        [TestCase(8)]
+        [InlineData(1)]
+        [InlineData(8)]
+        [Theory(Timeout = 60000)]
         public async Task F1_AnAgentOnlyInAGroupCall_CausesNoBatchForItsParcelsRoom(int passes)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Held = new HashSet<int>();   // the mixer holds no room
             rig.Place(A, ParcelOwn);
@@ -317,17 +362,30 @@ namespace osWebRtcVoice.Tests
             for (int i = 0; i < passes; i++)
                 await rig.Tick(advanceMs: 2000);
 
-            Assert.That(rig.Batches(), Is.Empty, "no peer_ctl_batch for any room");
-            Assert.That(rig.UnknownRoomReplies, Is.Zero, "so the mixer refused nothing");
-            Assert.That(rig.Sender.Unplaced, Is.EqualTo(2), "both agents are counted as left out");
-            Assert.That(rig.Refusals.Count, Is.Zero);
-            Assert.That(((OSDMap)rig.Heartbeat()["rooms"]).Count, Is.Zero, "and named in no heartbeat entry");
+            {
+                var assertedValue = rig.Batches();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no peer_ctl_batch for any room");
+            }
+            {
+                var assertedValue = rig.UnknownRoomReplies;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "so the mixer refused nothing");
+            }
+            {
+                var assertedValue = rig.Sender.Unplaced;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "both agents are counted as left out");
+            }
+            Assert.Equal(0, rig.Refusals.Count);
+            {
+                var assertedValue = ((OSDMap)rig.Heartbeat()["rooms"]).Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "and named in no heartbeat entry");
+            }
         }
 
         /// <summary>The same agents, joined to their room as the viewer does, are addressed at it as before.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task F2_AnAgentInTheRoom_IsAddressedExactlyAsBefore()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Held = new HashSet<int>();
             rig.Place(A, ParcelOwn);
@@ -338,32 +396,36 @@ namespace osWebRtcVoice.Tests
             await rig.Tick();
             await rig.Tick();
 
-            Assert.That(rig.Rooms(), Is.EqualTo(new[] { OwnChannelRoom }));
-            Assert.That(rig.Auth.IsArmed(OwnChannelRoom, A) && rig.Auth.IsArmed(OwnChannelRoom, B), Is.True);
-            Assert.That(rig.UnknownRoomReplies, Is.Zero);
-            Assert.That(rig.Refusals.Count, Is.Zero);
-            Assert.That(rig.Sender.Unplaced, Is.Zero);
-            Assert.That(rig.Sink.RoomsHeldBack, Is.Zero);
+            Assert.Equal(new[] { OwnChannelRoom }, rig.Rooms());
+            Assert.True(rig.Auth.IsArmed(OwnChannelRoom, A) && rig.Auth.IsArmed(OwnChannelRoom, B));
+            Assert.Equal(0, rig.UnknownRoomReplies);
+            Assert.Equal(0, rig.Refusals.Count);
+            Assert.Equal(0, rig.Sender.Unplaced);
+            Assert.Equal(0, rig.Sink.RoomsHeldBack);
         }
 
         /// <summary>The mixer drops a room (its last listener left, or it restarted). The next request to it is answered
         /// unknown_room; after that nothing more is sent to the room, however long the sim waits and however often the
         /// authority would have retried, until the region records a join into it again.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task F3_AfterUnknownRoom_NothingMoreIsSent_UntilAJoin()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Held = new HashSet<int>();
             rig.Place(A, ParcelOwn);
             rig.Join(A, OwnChannelRoom);
             await rig.Tick();
-            Assert.That(rig.Auth.IsArmed(OwnChannelRoom, A), Is.True, "armed while the mixer held the room");
+            Assert.True(rig.Auth.IsArmed(OwnChannelRoom, A), "armed while the mixer held the room");
 
             rig.Held.Remove(OwnChannelRoom);   // the mixer lost the room
             rig.Auth.RequestArm(A);
             await rig.Tick();
-            Assert.That(rig.UnknownRoomReplies, Is.EqualTo(1), "the first request is refused");
-            Assert.That(rig.Refusals.IsRefused(OwnChannelRoom), Is.True);
+            {
+                var assertedValue = rig.UnknownRoomReplies;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the first request is refused");
+            }
+            Assert.True(rig.Refusals.IsRefused(OwnChannelRoom));
 
             rig.Sent.Clear();
             for (int i = 0; i < 20; i++)
@@ -371,21 +433,31 @@ namespace osWebRtcVoice.Tests
                 rig.Auth.RequestArm(A);
                 await rig.Tick(advanceMs: 20_000);   // far past the authority's own retry delay
             }
-            Assert.That(rig.Batches(), Is.Empty, "nothing more is sent to the room");
-            Assert.That(rig.UnknownRoomReplies, Is.EqualTo(1), "and the mixer is not asked again");
+            {
+                var assertedValue = rig.Batches();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "nothing more is sent to the room");
+            }
+            {
+                var assertedValue = rig.UnknownRoomReplies;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "and the mixer is not asked again");
+            }
 
             rig.Join(A, OwnChannelRoom);   // a viewer is provisioned into it again: the mixer holds it
             await rig.Tick();
-            Assert.That(rig.Refusals.IsRefused(OwnChannelRoom), Is.False);
-            Assert.That(rig.Rooms(), Is.EqualTo(new[] { OwnChannelRoom }), "sent to again");
-            Assert.That(rig.Auth.IsArmed(OwnChannelRoom, A), Is.True);
-            Assert.That(rig.UnknownRoomReplies, Is.EqualTo(1));
+            Assert.False(rig.Refusals.IsRefused(OwnChannelRoom));
+            {
+                var assertedValue = rig.Rooms();
+                TestAssert.WithMessage(() => Assert.Equal(new[] { OwnChannelRoom }, assertedValue), "sent to again");
+            }
+            Assert.True(rig.Auth.IsArmed(OwnChannelRoom, A));
+            Assert.Equal(1, rig.UnknownRoomReplies);
         }
 
         /// <summary>One room being refused does not hold back another: the back-off is per room.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task F4_ARefusedRoom_DoesNotHoldBackAnotherRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Held = new HashSet<int>();
             rig.Place(A, ParcelOwn);
@@ -395,16 +467,17 @@ namespace osWebRtcVoice.Tests
             rig.Held.Remove(OwnChannelRoom);   // only A's room is gone
             await rig.Tick();
 
-            Assert.That(rig.Refusals.IsRefused(OwnChannelRoom), Is.True);
-            Assert.That(rig.Refusals.IsRefused(EstateRoom), Is.False);
-            Assert.That(rig.Auth.IsArmed(EstateRoom, B), Is.True, "B is armed in the room the mixer holds");
+            Assert.True(rig.Refusals.IsRefused(OwnChannelRoom));
+            Assert.False(rig.Refusals.IsRefused(EstateRoom));
+            Assert.True(rig.Auth.IsArmed(EstateRoom, B), "B is armed in the room the mixer holds");
         }
 
         /// <summary>The sink holds back a refused room whatever the sender does: a send that names the room goes out
         /// empty, and says so in the counters. This is the guard of the path that does not arm.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task F5_TheSink_LeavesARefusedRoomOut_AndCountsIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig(arming: false);
             rig.Held = new HashSet<int>();
             rig.Table.Record(A, OwnChannelRoom);
@@ -412,39 +485,49 @@ namespace osWebRtcVoice.Tests
             var excl = new Dictionary<UUID, IReadOnlyCollection<UUID>> { [A] = new[] { B } };
 
             await rig.Sink.SendAsync(VisOp.Replace, excl);
-            Assert.That(rig.UnknownRoomReplies, Is.EqualTo(1), "the first send is refused");
+            {
+                var assertedValue = rig.UnknownRoomReplies;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the first send is refused");
+            }
 
             rig.Sent.Clear();
             await rig.Sink.SendAsync(VisOp.Replace, excl);
             await rig.Sink.SendAsync(VisOp.Replace, excl);
-            Assert.That(rig.Sent, Is.Empty, "later sends name the room and go nowhere");
-            Assert.That(rig.Sink.LastSendHeldBackRooms, Is.EqualTo(1));
-            Assert.That(rig.Sink.RoomsHeldBack, Is.EqualTo(2));
-            Assert.That(rig.Sink.LastSendRooms, Is.Zero);
+            {
+                var assertedValue = rig.Sent;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "later sends name the room and go nowhere");
+            }
+            Assert.Equal(1, rig.Sink.LastSendHeldBackRooms);
+            Assert.Equal(2, rig.Sink.RoomsHeldBack);
+            Assert.Equal(0, rig.Sink.LastSendRooms);
 
             rig.Held.Add(OwnChannelRoom);
             rig.Refusals.Joined(OwnChannelRoom);
             await rig.Sink.SendAsync(VisOp.Replace, excl);
-            Assert.That(rig.Batches(), Has.Count.EqualTo(1), "after a join the room is sent to again");
-            Assert.That(rig.Sink.LastSendHeldBackRooms, Is.Zero);
+            {
+                var assertedValue = rig.Batches();
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "after a join the room is sent to again");
+            }
+            Assert.Equal(0, rig.Sink.LastSendHeldBackRooms);
         }
 
         // ---- RoomRefusals ------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void R1_ARefusalFromBeforeAJoin_IsIgnored_AndOneFromAfterIsKept()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = new RoomRefusals();
             long sentBeforeJoin = r.Stamp();
             r.Joined(OwnChannelRoom);                    // a viewer joins while the request is in flight
             r.Refused(OwnChannelRoom, sentBeforeJoin);   // the answer to the earlier request arrives late
-            Assert.That(r.IsRefused(OwnChannelRoom), Is.False, "that answer describes the room before the join");
+            Assert.False(r.IsRefused(OwnChannelRoom), "that answer describes the room before the join");
 
             r.Refused(OwnChannelRoom, r.Stamp());        // a request sent after the join
-            Assert.That(r.IsRefused(OwnChannelRoom), Is.True);
+            Assert.True(r.IsRefused(OwnChannelRoom));
             r.Joined(OwnChannelRoom);
-            Assert.That(r.IsRefused(OwnChannelRoom), Is.False, "a join clears it");
-            Assert.That(r.Count, Is.Zero);
+            Assert.False(r.IsRefused(OwnChannelRoom), "a join clears it");
+            Assert.Equal(0, r.Count);
         }
     }
 }
