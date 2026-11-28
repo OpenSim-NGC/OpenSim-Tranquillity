@@ -55,13 +55,26 @@ public class OfflineIMRegionModule : ISharedRegionModule, IOfflineIMService
         if (cnf != null && cnf.GetString("OfflineMessageModule", string.Empty) != Name)
             return;
 
-        m_Enabled = true;
-
         string serviceLocation = cnf.GetString("OfflineMessageURL", string.Empty);
         if (serviceLocation.Length == 0)
-            m_OfflineIMService = new OfflineIMService(config);
+        {
+            // A local store that cannot be loaded (no StorageProvider, or one without an offline IM store) turns
+            // offline messages off; it does not stop the region.
+            try
+            {
+                m_OfflineIMService = new OfflineIMService(config);
+            }
+            catch (Exception e)
+            {
+                m_log.LogError("[OfflineIM.V2]: Offline messages are disabled: the local offline IM store could not be loaded: {0}",
+                    e.Message);
+                return;
+            }
+        }
         else
             m_OfflineIMService = new OfflineIMServiceRemoteConnector(config);
+
+        m_Enabled = true;
 
         m_ForwardOfflineGroupMessages = cnf.GetBoolean("ForwardOfflineGroupMessages", m_ForwardOfflineGroupMessages);
         m_log.LogDebug("[OfflineIM.V2]: Offline messages enabled by {0}", Name);
