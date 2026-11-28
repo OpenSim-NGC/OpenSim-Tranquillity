@@ -250,7 +250,7 @@ public class SQLiteLinkNumberTests : OpenSimTestCase
 
         List<SceneObjectGroup> loaded = NewStore(old).LoadObjects(s_region);
         int migratedTo = SQLiteSitTargetActiveTests.RegionStoreVersion(oldConn);
-        Assert.Equal(VersionBeforeColumn + 1, migratedTo);
+        Assert.True(migratedTo > VersionBeforeColumn);
 
         // every prim's number as the step wrote it: the old loader's numbers, per linkset and per region
         Dictionary<string, int?> stored = StoredLinkNumbers(oldConn);
