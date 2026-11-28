@@ -112,52 +112,20 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
             int mapHeight = m_scene.Heightmap.Height;
 
             var mapbmp = new SKBitmap(mapWidth, mapHeight);
-            
-            // Create terrain renderer based on scene settings
-            terrainRenderer = new TexturedMapTileRenderer();
 
-            // Get terrain height data and render it directly
-            float[] heightData = m_scene.Heightmap.GetFloatsSerialised();
-            using (var surface = SKSurface.Create(new SKImageInfo(mapWidth, mapHeight)))
-            using (var canvas = surface.Canvas)
-            {
-                // Draw terrain heights
-                float maxHeight = float.MinValue;
-                float minHeight = float.MaxValue;
-                
-                // Find height range
-                foreach (var height in heightData)
-                {
-                    maxHeight = Math.Max(maxHeight, height);
-                    minHeight = Math.Min(minHeight, height);
-                }
+            // As in OpenSimulator's MapImageModule.CreateMapTile: the terrain is drawn by the
+            // textured renderer, or by the shaded one when TextureOnMapTile is false. The textured
+            // one colours land from the terrain textures, the shaded one in green by height; both
+            // paint the water colour where the terrain is below the region's water height.
+            bool textureTerrain = Util.GetConfigVarFromSections<bool>(
+                m_config, "TextureOnMapTile", new string[] { "Map", "Startup" }, false);
+            if (textureTerrain)
+                terrainRenderer = new TexturedMapTileRenderer();
+            else
+                terrainRenderer = new ShadedMapTileRenderer();
 
-                float heightRange = maxHeight - minHeight;
-                
-                // Render terrain
-                int index = 0;
-                // Traversal order (y outer, x inner, index++) is preserved exactly as
-                // found rather than "corrected" against GetFloatsSerialised's ordering.
-                // Every region on this grid is square, so the two are indistinguishable
-                // here; on a non-square varregion they would not be. That is a separate
-                // question from the size bug and is deliberately not answered by this patch.
-                for (int y = 0; y < mapHeight; y++)
-                {
-                    for (int x = 0; x < mapWidth; x++)
-                    {
-                        float height = heightData[index++];
-                        // Normalize height to 0-255 range
-                        byte gray = (byte)(((height - minHeight) / heightRange) * 255);
-                        
-                        // Apply some lighting to create terrain shading
-                        byte shaded = (byte)(gray * 0.8f); // Darken slightly
-                        var color = new SKColor(shaded, shaded, shaded);
-                        
-                        // Set pixel directly
-                        mapbmp.SetPixel(x, y, color);
-                    }
-                }
-            }
+            terrainRenderer.Initialise(m_scene, m_config);
+            terrainRenderer.TerrainToBitmap(mapbmp);
 
             if (m_scene?.Entities != null && m_scene.Entities.Count > 0)
             {
