@@ -50,7 +50,7 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
         {
             m_CmdManager = CmdManager;
             maximumRange = CmdManager.m_ScriptEngine.Config.GetDouble("SensorMaxRange", 96.0d);
-            maximumToReturn = CmdManager.m_ScriptEngine.Config.GetInt("SensorMaxResults", 16);
+            maximumToReturn = CmdManager.m_ScriptEngine.Config.GetInt("SensorMaxResults", 32);
         }
 
         private readonly object SenseLock = new object();
@@ -61,7 +61,7 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
         private const int SCRIPTED = 8;
 
         private double maximumRange    = 96.0;
-        private int    maximumToReturn = 16;
+        private int    maximumToReturn = 32;
 
         private class SenseRepeatClass
         {
