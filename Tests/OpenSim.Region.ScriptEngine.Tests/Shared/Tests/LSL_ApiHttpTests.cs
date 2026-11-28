@@ -42,7 +42,7 @@ using OpenSim.Tests.Common;
 // These tests exercise scenes that share process-wide static state (MainServer,
 // Util.FireAndForgetMethod, static caps registries), so they cannot run in parallel. The same
 // declaration, for the same reason, is in OpenSim.Region.CoreModules.Tests/AssemblyInfo.cs.
-[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
 
 namespace OpenSim.Region.ScriptEngine.Shared.Tests
 {
@@ -51,6 +51,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// </summary>
     public class LSL_ApiHttpTests : OpenSimTestCase
     {
+        private static string Parameter(EventParams eventParams, int index)
+            => eventParams.Params[index].ToString()
+                ?? throw new InvalidOperationException($"Event parameter {index} was null.");
+
         private Scene m_scene;
         private MockScriptEngine m_engine;
         private UrlModule m_urlModule;
@@ -139,7 +143,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             TestHelpers.InMethod();
 
             m_lslApi.llRequestURL();
-            string returnedUri = m_engine.PostedEvents[m_scriptItem.ItemID][0].Params[2].ToString();
+            string returnedUri = Parameter(m_engine.PostedEvents[m_scriptItem.ItemID][0], 2);
 
             {
                 // Check that the initial number of URLs is correct
@@ -210,9 +214,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Assert.Equal("http_request", eventParams.EventName);
 
                 UUID returnKey;
-                string rawReturnKey = eventParams.Params[0].ToString();
-                string method = eventParams.Params[1].ToString();
-                returnedUri = eventParams.Params[2].ToString();
+                string rawReturnKey = Parameter(eventParams, 0);
+                string method = Parameter(eventParams, 1);
+                returnedUri = Parameter(eventParams, 2);
 
                 Assert.True(UUID.TryParse(rawReturnKey, out returnKey));
                 Assert.Equal(ScriptBaseClass.URL_REQUEST_GRANTED, method);
@@ -239,9 +243,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Assert.Equal("http_request", eventParams.EventName);
 
                 UUID returnKey;
-                string rawReturnKey = eventParams.Params[0].ToString();
-                string method = eventParams.Params[1].ToString();
-                string body = eventParams.Params[2].ToString();
+                string rawReturnKey = Parameter(eventParams, 0);
+                string method = Parameter(eventParams, 1);
+                string body = Parameter(eventParams, 2);
 
                 Assert.True(UUID.TryParse(rawReturnKey, out returnKey));
                 Assert.Equal("GET", method);

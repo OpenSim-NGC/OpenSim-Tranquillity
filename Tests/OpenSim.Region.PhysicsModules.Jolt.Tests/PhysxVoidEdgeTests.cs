@@ -8,7 +8,6 @@
 using System.Reflection;
 using OpenSim.Region.PhysicsModules.Jolt.Vehicles;
 using Xunit;
-using Xunit.Abstractions;
 using Omv = OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;

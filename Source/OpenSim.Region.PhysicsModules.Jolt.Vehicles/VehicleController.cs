@@ -357,6 +357,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Vehicles
         // =====================================================================
         private bool _linearMotorStalled;
         private bool _linearMotorStallChecked;
+        // Set when a vehicle takes up the motors it crossed a region border with; the next stall check starts its rate from there.
+        private bool _seedStallRate;
 
         // =====================================================================
         // Torque accumulator (Halcyon pattern: accumulate per-frame, apply once)
@@ -998,6 +1000,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Vehicles
                 d.TargetAngularDelta = Vector3.Zero;
             }
             d.LastAccessTOD = Clock();
+            // This controller is new, in a region whose coordinates the vehicle has just been put down in: the stall check's
+            // rate of change of position must start from here and from the speed the vehicle arrived with.
+            _seedStallRate = true;
             _hostBody.KeepAwake();
         }
 
@@ -1720,6 +1725,21 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Vehicles
 
             if (!_linearMotorStallChecked)
             {
+                // A vehicle that arrived over a region border takes up its motors with a decay clock that is already well past
+                // the "starting fresh" guard below, and a new controller has no earlier position: the last position is the
+                // origin and the smoothed rate nothing. The first step would read the whole distance from the origin as a
+                // rate, which the smoothing then swings through zero when the vehicle is heading back toward the origin, and
+                // reads as a stall (the rate under half the speed), which puts the motor's clock far past its decay and ends the
+                // motor. The check starts instead from the arrival position and the speed the vehicle came with, as a vehicle
+                // that has been running all along has them.
+                if (_seedStallRate)
+                {
+                    _seedStallRate = false;
+                    _sp.Dynamics.LastPosition = currpos;
+                    _sp.Dynamics.ShortTermPositionDelta = _worldLinearVel;
+                    posdelta = _worldLinearVel * timeStep;
+                }
+
                 // The position's rate of change, smoothed with a time constant (StallSmoothing): the same smoothing
                 // over a span of time whatever the step. (It was 0.8 / 0.2 per step, which is this time constant at
                 // the 64 Hz step the code was tuned at.)

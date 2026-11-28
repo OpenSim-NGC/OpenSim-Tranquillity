@@ -11,7 +11,6 @@ using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Tests.Common;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 
@@ -97,7 +96,7 @@ public class EditorErrorsWithYEngineTests
         var item = TaskInventoryHelpers.AddScript(h.Scene.AssetService, h.Prim, UUID.Random(), UUID.Random(), "yscript",
             "default { state_entry() { llSay(0, \"x\") } }").ItemID;
         var save = Task.Run(() => h.Prim.Inventory.CreateScriptInstanceEr(item, 0, false, h.YEngine.ScriptEngineName, 1));
-        Assert.True(await Task.WhenAny(save, Task.Delay(TimeSpan.FromSeconds(60))) == save, "a YEngine save did not return");
+        Assert.True(await Task.WhenAny(save, Task.Delay(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken)) == save, "a YEngine save did not return");
         var errors = await save;
         _out.WriteLine($"[{string.Join(" | ", errors.Cast<object>())}]");
         Assert.NotEmpty(errors);

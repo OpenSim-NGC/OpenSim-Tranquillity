@@ -9,7 +9,6 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Xunit;
-using Xunit.Abstractions;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;

@@ -13,7 +13,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 using osWebRtcVoice.NonSpatial;
@@ -22,7 +22,6 @@ using static osWebRtcVoice.Tests.CallRemovalModuleTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class CallModerationRecheckCostTests
     {
         // The third agent the module test region already has a presence and the group powers for.
@@ -54,33 +53,44 @@ namespace osWebRtcVoice.Tests
             lock (FakeGroups.Calls) return FakeGroups.Calls.GetValueOrDefault(method);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnePass_ReadsTheSessionOnce_NotOncePerMember()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = ACallOfThree();
             CountingSessions counting = Count(r);
 
             Tick(r);
 
-            Assert.That(counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.Get)), Is.EqualTo(1),
-                        "three members of one call: one read of the call");
+            {
+                var assertedValue = counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.Get));
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "three members of one call: one read of the call");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnePass_AsksTheGroupsServiceOnceForEachMember_NotOncePerQuestion()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = ACallOfThree();
             lock (FakeGroups.Calls) FakeGroups.Calls.Clear();
 
             Tick(r);
 
-            Assert.That(Groups(nameof(IGroupsModule.GetMembershipData)), Is.EqualTo(3), "membership: one lookup for each of the three");
-            Assert.That(Groups(nameof(IGroupsModule.GetFullGroupPowers)), Is.EqualTo(3), "powers: one lookup for each of the three");
+            {
+                var assertedValue = Groups(nameof(IGroupsModule.GetMembershipData));
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "membership: one lookup for each of the three");
+            }
+            {
+                var assertedValue = Groups(nameof(IGroupsModule.GetFullGroupPowers));
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "powers: one lookup for each of the three");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ThePassStillDoesWhatItDid_ALostModeratorFlagIsWithdrawn_AndAMemberWhoLeftTheGroupIsLetGo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = ACallOfThree();
             r.Events.Lists.Clear();
             FakeGroups.Powers[Officer] = GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice;   // no longer a moderator
@@ -89,10 +99,10 @@ namespace osWebRtcVoice.Tests
             Tick(r);
 
             var flags = r.Events.Lists.SelectMany(l => l.Updates.Select(u => (l.To, u))).Where(x => x.u.agentID == Officer && x.To == Officer).ToList();
-            Assert.That(flags.Count, Is.EqualTo(1));
-            Assert.That(flags[0].u.isModerator, Is.False);
-            Assert.That(r.Sessions.Get(GroupId).Find(Third).HoldsSeat, Is.False, "let go, as before");
-            Assert.That(r.Sessions.Get(GroupId).Find(Member).HoldsSeat, Is.True);
+            Assert.Single(flags);
+            Assert.False(flags[0].u.isModerator);
+            Assert.False(r.Sessions.Get(GroupId).Find(Third).HoldsSeat, "let go, as before");
+            Assert.True(r.Sessions.Get(GroupId).Find(Member).HoldsSeat);
         }
     }
 }

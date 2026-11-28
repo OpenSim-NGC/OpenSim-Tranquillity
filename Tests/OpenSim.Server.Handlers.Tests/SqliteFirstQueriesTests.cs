@@ -73,7 +73,7 @@ public class SqliteFirstQueriesTests
                         wrong.Add(d is null ? "no row" : string.Join(",", d.Data.Keys));
                 }
             }, TaskCreationOptions.LongRunning)).ToArray();
-            Task.WaitAll(tasks);
+            Task.WaitAll(tasks, Xunit.TestContext.Current.CancellationToken);
         }
 
         Assert.Empty(wrong);

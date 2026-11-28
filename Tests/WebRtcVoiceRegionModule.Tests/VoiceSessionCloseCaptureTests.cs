@@ -19,7 +19,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VoiceSessionCloseCaptureTests
     {
         private static VoiceViewerSession NewSession(UUID region, UUID agent, UUID generation)
@@ -35,9 +34,10 @@ namespace osWebRtcVoice.Tests
         // The review's core hazard: after a relog, an orphan (old login) and a live session (new
         // login) coexist for the same agent in the same region. The old login's close must capture
         // ONLY its own generation and never the successor's.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Capture_SelectsOnlyMatchingGeneration()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random();
             UUID oldLogin = UUID.Random(), newLogin = UUID.Random();
             VoiceViewerSession orphan = NewSession(region, agent, oldLogin);
@@ -46,20 +46,19 @@ namespace osWebRtcVoice.Tests
             List<IVoiceViewerSession> captured =
                 VoiceViewerSession.CaptureSessionsForClose(region, agent, oldLogin);
 
-            Assert.That(captured, Has.Count.EqualTo(1));
-            Assert.That(captured[0], Is.SameAs(orphan));
-            Assert.That(VoiceViewerSession.IsAgentInRegion(region, agent), Is.True,
-                "the successor login's session must keep the agent a member");
-            Assert.That(VoiceViewerSession.TryGetViewerSession(live.ViewerSessionID, out _), Is.True,
-                "the live session must remain in the registry");
+            Assert.Single(captured);
+            Assert.Same(orphan, captured[0]);
+            Assert.True(VoiceViewerSession.IsAgentInRegion(region, agent), "the successor login's session must keep the agent a member");
+            Assert.True(VoiceViewerSession.TryGetViewerSession(live.ViewerSessionID, out _), "the live session must remain in the registry");
             VoiceViewerSession.CloseCompleted(orphan);   // static-state hygiene
         }
 
         // Two sessions of the SAME login (intra-login reconnect overlap) are both dying at close:
         // both are captured.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Capture_TakesEverySessionOfTheDyingLogin()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random(), login = UUID.Random();
             VoiceViewerSession s1 = NewSession(region, agent, login);
             VoiceViewerSession s2 = NewSession(region, agent, login);
@@ -67,52 +66,52 @@ namespace osWebRtcVoice.Tests
             List<IVoiceViewerSession> captured =
                 VoiceViewerSession.CaptureSessionsForClose(region, agent, login);
 
-            Assert.That(captured, Has.Count.EqualTo(2));
-            Assert.That(VoiceViewerSession.IsAgentInRegion(region, agent), Is.False,
-                "capturing the last sessions clears membership");
+            Assert.Equal(2, captured.Count());
+            Assert.False(VoiceViewerSession.IsAgentInRegion(region, agent), "capturing the last sessions clears membership");
             VoiceViewerSession.CloseCompleted(s1);
             VoiceViewerSession.CloseCompleted(s2);
         }
 
         // A UUID.Zero token means the capture failed at provision; such a voice session can only belong
         // to an already-dead or now-dying login, so any close for its agent sweeps it.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Capture_SweepsZeroTokenSessions()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random();
             VoiceViewerSession untagged = NewSession(region, agent, UUID.Zero);
 
             List<IVoiceViewerSession> captured =
                 VoiceViewerSession.CaptureSessionsForClose(region, agent, UUID.Random());
 
-            Assert.That(captured, Has.Count.EqualTo(1));
-            Assert.That(captured[0], Is.SameAs(untagged));
+            Assert.Single(captured);
+            Assert.Same(untagged, captured[0]);
             VoiceViewerSession.CloseCompleted(untagged);
         }
 
         // Atomic unavailability: a captured session is gone from BOTH the registry and the
         // membership index the moment capture returns — no provision, hangup, or matrix read can
         // find it while its Janus cleanup is in flight.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Capture_RemovesFromRegistryAndMembership()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random(), login = UUID.Random();
             VoiceViewerSession s = NewSession(region, agent, login);
 
             VoiceViewerSession.CaptureSessionsForClose(region, agent, login);
 
-            Assert.That(VoiceViewerSession.TryGetViewerSession(s.ViewerSessionID, out _), Is.False,
-                "captured session must not be findable in the registry");
-            Assert.That(VoiceViewerSession.IsAgentInRegion(region, agent), Is.False,
-                "captured session must not keep the agent a matrix member");
+            Assert.False(VoiceViewerSession.TryGetViewerSession(s.ViewerSessionID, out _), "captured session must not be findable in the registry");
+            Assert.False(VoiceViewerSession.IsAgentInRegion(region, agent), "captured session must not keep the agent a matrix member");
             VoiceViewerSession.CloseCompleted(s);
         }
 
         // The remove-and-forget guard: captured sessions are parked (discoverable, with an age)
         // until CloseCompleted; a failed teardown therefore stays visible for the retry hooks.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Capture_ParksInClosingSet_UntilCloseCompleted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random(), login = UUID.Random();
             VoiceViewerSession s = NewSession(region, agent, login);
 
@@ -120,29 +119,31 @@ namespace osWebRtcVoice.Tests
 
             List<(IVoiceViewerSession Session, long AgeMs)> parked =
                 VoiceViewerSession.GetClosingSessions(agent);
-            Assert.That(parked, Has.Count.EqualTo(1));
-            Assert.That(parked[0].Session, Is.SameAs(s));
-            Assert.That(parked[0].AgeMs, Is.GreaterThanOrEqualTo(0));
+            Assert.Single(parked);
+            Assert.Same(s, parked[0].Session);
+            Assert.True(parked[0].AgeMs >= 0);
 
             VoiceViewerSession.CloseCompleted(s);
-            Assert.That(VoiceViewerSession.GetClosingSessions(agent), Is.Empty,
-                "a successful teardown must clear the parked entry");
+            {
+                var assertedValue = VoiceViewerSession.GetClosingSessions(agent);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a successful teardown must clear the parked entry");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Capture_UnknownAgent_ReturnsEmpty()
         {
-            Assert.That(
-                VoiceViewerSession.CaptureSessionsForClose(UUID.Random(), UUID.Random(), UUID.Random()),
-                Is.Empty);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Empty(VoiceViewerSession.CaptureSessionsForClose(UUID.Random(), UUID.Random(), UUID.Random()));
         }
 
         // The console snapshot ("show voice closing") records WHY a parked teardown failed.
         // RecordCloseFailure on a parked session surfaces in GetClosingSnapshot with the reason;
         // after CloseCompleted it is a silent no-op (a racing retry may complete first).
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RecordCloseFailure_SurfacesInSnapshot()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random(), login = UUID.Random();
             VoiceViewerSession s = NewSession(region, agent, login);
             VoiceViewerSession.CaptureSessionsForClose(region, agent, login);
@@ -151,29 +152,43 @@ namespace osWebRtcVoice.Tests
 
             List<(UUID AgentId, string SessionId, long AgeMs, string LastFailure)> snap =
                 VoiceViewerSession.GetClosingSnapshot().Where(e => e.AgentId == agent).ToList();
-            Assert.That(snap, Has.Count.EqualTo(1));
-            Assert.That(snap[0].SessionId, Is.EqualTo(s.ViewerSessionID));
-            Assert.That(snap[0].LastFailure, Is.EqualTo("TestException: boom"));
+            Assert.Single(snap);
+            Assert.Equal(s.ViewerSessionID, snap[0].SessionId);
+            Assert.Equal("TestException: boom", snap[0].LastFailure);
 
             VoiceViewerSession.CloseCompleted(s);
-            Assert.DoesNotThrow(() => VoiceViewerSession.RecordCloseFailure(s, "late"),
-                "recording a failure for an already-completed session must be a no-op");
-            Assert.That(VoiceViewerSession.GetClosingSnapshot().Where(e => e.AgentId == agent), Is.Empty);
+            {
+                var assertedValue = () => VoiceViewerSession.RecordCloseFailure(s, "late");
+                TestAssert.WithMessage(() => Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                })), "recording a failure for an already-completed session must be a no-op");
+            }
+            Assert.DoesNotContain(VoiceViewerSession.GetClosingSnapshot(), e => e.AgentId == agent);
         }
 
         // A hangup arriving after a close-time capture (the two teardown paths racing) must be a
         // silent no-op: the capture already removed the voice session, and RemoveViewerSession tolerates
         // a missing id.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void HangupAfterCapture_IsNoOp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID region = UUID.Random(), agent = UUID.Random(), login = UUID.Random();
             VoiceViewerSession s = NewSession(region, agent, login);
             VoiceViewerSession.CaptureSessionsForClose(region, agent, login);
 
-            Assert.DoesNotThrow(() => VoiceViewerSession.RemoveViewerSession(s.ViewerSessionID));
-            Assert.That(VoiceViewerSession.GetClosingSessions(agent), Has.Count.EqualTo(1),
-                "the racing hangup must not disturb the parked closing entry");
+            {
+                var assertedValue = () => VoiceViewerSession.RemoveViewerSession(s.ViewerSessionID);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
+            {
+                var assertedValue = VoiceViewerSession.GetClosingSessions(agent);
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "the racing hangup must not disturb the parked closing entry");
+            }
             VoiceViewerSession.CloseCompleted(s);
         }
     }
