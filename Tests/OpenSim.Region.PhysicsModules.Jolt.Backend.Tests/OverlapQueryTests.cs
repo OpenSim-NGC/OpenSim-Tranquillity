@@ -55,6 +55,20 @@ public class OverlapQueryTests
     }
 
     [Fact]
+    public void ShapeCast_OfAMovingBodyAlreadyJustInsideABox_HitsItAndNotItself()
+    {
+        using var t = new JoltTestBackend();
+        BodyId moving = Box(t, Away);
+        BodyId ahead = Box(t, Away + new Vector3(0.98f, 0f, 0f));   // 2 cm into the moving box's front
+        ShapeId shape = t.B.CreateBoxShape(new Vector3(0.5f));
+
+        bool struck = t.B.ShapeCast(shape, Away, Quaternion.Identity, Vector3.UnitX, 3f, QueryFilter.All, out RayHit hit, moving);
+
+        Assert.True(struck, "the cast hit nothing");
+        Assert.Equal(ahead, hit.Body);
+    }
+
+    [Fact]
     public void ShapeCast_RotatedAndAwayFromTheOrigin_HitsTheBoxUnderItsTurnedEnd()
     {
         using var t = new JoltTestBackend();

@@ -324,9 +324,11 @@ public abstract class PhysicsActor
     /// Tells the actor of an object that has just crossed into the region that the position and velocity it was given
     /// were taken <paramref name="sampleAgeSeconds"/> ago, by the region it came from. An engine whose next step would
     /// move the object as if it had been in the region for the whole step can use this to move it only as far as the time
-    /// that has really passed. The default does nothing: the object moves as before.
+    /// that has really passed. <paramref name="cutAdded"/> is how far the region moved the object on from the position it
+    /// was sent with, to where the sending engine had cut it back from; zero when it did not. The default does nothing:
+    /// the object moves as before.
     /// </summary>
-    public virtual void CrossedIn(float sampleAgeSeconds) { }
+    public virtual void CrossedIn(float sampleAgeSeconds, Vector3 cutAdded = default) { }
 
     /// <summary>
     /// For an object waiting past the region's edge to be crossed: how far the engine cut the position it reports back

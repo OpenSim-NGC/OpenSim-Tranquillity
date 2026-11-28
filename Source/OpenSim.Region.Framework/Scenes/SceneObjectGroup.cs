@@ -893,6 +893,9 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
         set => m_crossCutOffset = value;
     }
 
+    /// <summary>For a crossing: whether avatars cross seated or standing on the object (ISceneObject).</summary>
+    public bool CrossingCarriesAvatars { get; set; }
+
     /// <summary>
     /// Set on the frozen original of an object this region sent to another region, from the moment that region took it
     /// until it reports the crossing complete (the object is then deleted) or gives it back (see <see cref="ShowToViewers"/>):
@@ -945,6 +948,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                     // the position and velocity the object crosses with are the ones its engine reports now
                     m_crossSampleAtMs = Scene.CrossingClock();
                     m_crossCutOffset = RootPart.PhysActor?.CrossingCutOffset ?? Vector3.Zero;
+                    CrossingCarriesAvatars = false;   // set when the crossing finds avatars aboard
                     StartCrossing(val, null, "ObjCross-" + UUID.ToString());
                 }
                 return;
@@ -1322,6 +1326,9 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             }
             return sog;
         }
+
+        // said to the region that takes the object in (ISceneObject.CrossingCarriesAvatars)
+        sog.CrossingCarriesAvatars = true;
 
         foreach (ScenePresence av in sog.m_sittingAvatars)
         {
@@ -2004,6 +2011,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
         };
 
         m_crossSampleAtMs = double.NaN;   // an object teleport is not sent with a crossing's sample age
+        CrossingCarriesAvatars = false;
         StartCrossing(targetPosition, tdata, "ObjTeleport-" + UUID.ToString());
         return 0;
     }
@@ -3407,6 +3415,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         dupe.m_crossSampleAtMs = double.NaN;
         dupe.m_crossSampleAgeMs = double.NaN;
         dupe.m_crossCutOffset = Vector3.Zero;
+        dupe.CrossingCarriesAvatars = false;
         dupe.CrossingHandedOverAtMs = double.NaN;
 
         // a copy is not being dragged: the drag belongs to the original's actor and to the subscriptions it made

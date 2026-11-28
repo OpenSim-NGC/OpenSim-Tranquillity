@@ -531,7 +531,7 @@ public class SimulationServiceConnector : ISimulationService
     /// Adds how old the position and velocity the object is sent with are, as a duration (ms) measured by this region:
     /// the receiving region adds its own handling time and never compares this region's clock with its own. Left out when
     /// it is not known, so the message is then the one an older region sends. With it goes how far the position was cut
-    /// back by the engine, when it was; "new_position" itself stays the cut-back one.
+    /// back by the engine, when it was, and then whether avatars are aboard; "new_position" itself stays the cut-back one.
     /// </summary>
     private static void AddSampleAge(OSDMap args, ISceneObject sog)
     {
@@ -541,7 +541,11 @@ public class SimulationServiceConnector : ISimulationService
         args["sample_age_ms"] = OSD.FromReal(sampleAgeMs);
         Vector3 cut = sog.CrossingCutOffset;
         if (cut != Vector3.Zero)
+        {
             args["sample_cut_offset"] = OSD.FromVector3(cut);
+            if (sog.CrossingCarriesAvatars)
+                args["sample_avatars_aboard"] = OSD.FromBoolean(true);
+        }
     }
 
     /// <summary>Sends one object message to a region's object handler. A test replaces it to take the place of the network.</summary>

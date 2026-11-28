@@ -44,7 +44,9 @@ public class CrossingArrivalPositionTests
         public double Now = 100.0;
         public readonly JoltPrim Prim;
 
-        public Arrival(float x, Vector3 velocity, float sampleAgeSeconds, float rate = 45f, bool crossIn = true)
+        public Arrival(float x, Vector3 velocity, float sampleAgeSeconds, float rate = 45f, bool crossIn = true,
+            float y = Y, int size = StepRateRig.Size, Vector3 cutAdded = default, float? wallAtX = null,
+            bool onGround = false, float? childBesideWallAtX = null)
         {
             var config = new IniConfigSource();
             IConfig startup = config.AddConfig("Startup");
@@ -55,19 +57,34 @@ public class CrossingArrivalPositionTests
             MaterialPins.Apply(jolt);
             Scene = new JoltScene();
             Scene.Initialise(config);
-            var heights = new float[StepRateRig.Size * StepRateRig.Size];
+            var heights = new float[size * size];
             Array.Fill(heights, StepRateRig.Ground);
-            Scene.InitialiseWithoutScene("Test Region", StepRateRig.Size, StepRateRig.Size, heights, 0f, CrossingArrivalPositionTests.Heartbeat);
+            Scene.InitialiseWithoutScene("Test Region", (uint)size, (uint)size, heights, 0f, CrossingArrivalPositionTests.Heartbeat);
             Scene.Simulate(CrossingArrivalPositionTests.Heartbeat);
             Scene.ArrivalClock = () => Now;
 
-            Prim = Assert.IsType<JoltPrim>(Scene.AddPrimShape("box", PrimitiveBaseShape.CreateBox(), new Vector3(x, Y, Height),
+            if (wallAtX is float wall)   // a 10 cm thick wall across the way
+                Scene.AddPrimShape("wall", PrimitiveBaseShape.CreateBox(), new Vector3(wall, y, Height),
+                    new Vector3(0.1f, 10f, 4f), Quaternion.Identity, false, 901u);
+
+            // on the ground, the box starts with its underside on it
+            Prim = Assert.IsType<JoltPrim>(Scene.AddPrimShape("box", PrimitiveBaseShape.CreateBox(),
+                new Vector3(x, y, onGround ? StepRateRig.Ground + 0.25f : Height),
                 new Vector3(2f, 1f, 0.5f), Quaternion.Identity, true, 900u));
             Prim.Density = 1000f;
-            Prim.Buoyancy = 1f;   // weightless: it keeps its height and speed
+            Prim.Buoyancy = onGround ? 0f : 1f;   // weightless: it keeps its height and speed
             Prim.Velocity = velocity;
+            if (childBesideWallAtX is float besideWall)
+            {
+                // a linked part 2 m ahead and 3 m to the side, and a wall only that part meets
+                Scene.AddPrimShape("wall", PrimitiveBaseShape.CreateBox(), new Vector3(besideWall, y + 3f, Height),
+                    new Vector3(0.1f, 1f, 4f), Quaternion.Identity, false, 902u);
+                var child = (JoltPrim)Scene.AddPrimShape("part", PrimitiveBaseShape.CreateBox(), new Vector3(x + 2f, y + 3f, Height),
+                    new Vector3(2f, 1f, 0.5f), Quaternion.Identity, true, 903u);
+                child.link(Prim);
+            }
             if (crossIn)
-                Prim.CrossedIn(sampleAgeSeconds);
+                Prim.CrossedIn(sampleAgeSeconds, cutAdded);
         }
 
         public void Heartbeat()
@@ -197,6 +214,134 @@ public class CrossingArrivalPositionTests
         float x = arriving.Prim.Position.X;
         _out.WriteLine($"sample {sampleAge * 1000:0} ms old: sent {sent:0.000}, cut {cut:0.000}, x {x:0.000}, true position {expected:0.000}, error {x - expected:+0.000;-0.000} m");
         Assert.InRange(x, expected - 0.05f, expected + 0.05f);
+    }
+
+    // ---- the way a correction adds is checked for what is in it ----------------------------------------------------
+
+    [Fact]
+    public void A_correction_that_would_carry_a_fast_body_past_a_thin_wall_keeps_the_engines_own_step()
+    {
+        // 60 m/s with a 150 ms old sample: the engine's step ends at x 5.94 (front 6.94), short of the wall at 8; the
+        // correction would put the centre at 9.73, beyond it.
+        const float arrivedAt = 0.61f, speed = 60f, wall = 8f;
+        using var a = new Arrival(arrivedAt, new Vector3(speed, 0f, 0f), 0.150f, wallAtX: wall);
+
+        a.Heartbeat();
+
+        float engine = arrivedAt + speed * 4f / 45f;
+        _out.WriteLine($"x {a.Prim.Position.X:0.000}, engine's step {engine:0.000}, wall at {wall}");
+        Assert.InRange(a.Prim.Position.X, engine - 0.05f, engine + 0.05f);
+        for (int i = 0; i < 10; i++)
+        {
+            a.Heartbeat();
+            Assert.True(a.Prim.Position.X < wall, $"heartbeat {i + 2}: x {a.Prim.Position.X:0.000} is past the wall");
+        }
+    }
+
+    [Theory]
+    [InlineData(45f)]
+    [InlineData(0f)]   // one physics step per heartbeat
+    public void A_cut_that_put_a_body_past_a_thin_wall_is_taken_back_before_it_is_stepped(float rate)
+    {
+        // Sent to x 2 and moved on 5 m by the cut, to 7: the wall at 4.5 lies between. The engine steps it from 2.
+        const float sentTo = 2f, cut = 5f, wall = 4.5f;
+        using var a = new Arrival(sentTo + cut, new Vector3(60f, 0f, 0f), 0.028f, rate: rate, wallAtX: wall,
+            cutAdded: new Vector3(cut, 0f, 0f));
+
+        for (int i = 0; i < 10; i++)
+        {
+            a.Heartbeat();
+            _out.WriteLine($"heartbeat {i + 1}: x {a.Prim.Position.X:0.000}, wall at {wall}");
+            Assert.True(a.Prim.Position.X < wall, $"heartbeat {i + 1}: x {a.Prim.Position.X:0.000} is past the wall");
+        }
+    }
+
+    [Fact]
+    public void A_wall_in_the_way_of_a_linked_part_only_stops_the_correction()
+    {
+        // The root passes beside the wall at 10. The part's centre ends the engine's step at 7.94 (front 8.94) and the
+        // correction would put it at 11.73.
+        const float arrivedAt = 0.61f, speed = 60f;
+        using var a = new Arrival(arrivedAt, new Vector3(speed, 0f, 0f), 0.150f, childBesideWallAtX: 10f);
+
+        a.Heartbeat();
+
+        float engine = arrivedAt + speed * 4f / 45f;
+        _out.WriteLine($"x {a.Prim.Position.X:0.000}, engine's step {engine:0.000}");
+        Assert.InRange(a.Prim.Position.X, engine - 0.1f, engine + 0.1f);
+    }
+
+    [Fact]
+    public void A_cut_with_nothing_in_its_way_stands()
+    {
+        const float sentTo = 2f, cut = 3.25f, speed = 60f, sampleAge = 0.028f;
+        using var a = new Arrival(sentTo + cut, new Vector3(speed, 0f, 0f), sampleAge, cutAdded: new Vector3(cut, 0f, 0f));
+
+        a.Heartbeat();
+
+        float expected = sentTo + cut + speed * (float)(sampleAge + TakenInAfter);
+        Assert.InRange(a.Prim.Position.X, expected - 0.05f, expected + 0.05f);
+    }
+
+    [Fact]
+    public void The_ground_a_body_slides_on_does_not_stop_its_correction()
+    {
+        const float arrivedAt = 3f, speed = 30f, sampleAge = 0.150f;
+        using var a = new Arrival(arrivedAt, new Vector3(speed, 0f, 0f), sampleAge, onGround: true,
+            cutAdded: new Vector3(1f, 0f, 0f));
+
+        a.Heartbeat();
+
+        float engineAtMost = arrivedAt + speed * 4f / 45f;
+        _out.WriteLine($"on the ground: x {a.Prim.Position.X:0.000}, the engine's step is at most {engineAtMost:0.000}");
+        Assert.True(a.Prim.Position.X > engineAtMost + 1f, $"x {a.Prim.Position.X:0.000}: the correction was not made");
+    }
+
+    // ---- along y, and in a 1024 m region --------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(256, false, 0.61f, 30f)]      // along +y
+    [InlineData(256, false, 255.39f, -30f)]   // along -y
+    [InlineData(1024, true, 0.61f, 30f)]      // into a 1024 m region from the west
+    [InlineData(1024, true, 1023.39f, -30f)]  // from the east: far past where a 256 m region ends
+    [InlineData(1024, false, 0.61f, 30f)]
+    [InlineData(1024, false, 1023.39f, -30f)]
+    public void An_arrival_along_either_axis_and_in_a_large_region_is_placed_by_the_time_elapsed(int size, bool alongX, float from, float speed)
+    {
+        const float sampleAge = 0.028f;
+        float other = size == 256 ? 128f : 600f;
+        using var a = new Arrival(alongX ? from : other, alongX ? new Vector3(speed, 0f, 0f) : new Vector3(0f, speed, 0f),
+            sampleAge, y: alongX ? other : from, size: size);
+
+        a.Heartbeat();
+
+        float expected = from + speed * (float)(sampleAge + TakenInAfter);
+        Vector3 at = a.Prim.Position;
+        Assert.InRange(alongX ? at.X : at.Y, expected - 0.05f, expected + 0.05f);
+        Assert.InRange(alongX ? at.Y : at.X, other - 0.05f, other + 0.05f);
+        Assert.False(a.Prim.HasLeftRegion);
+    }
+
+    [Theory]
+    [InlineData(256, false, 255.9f, 60f, 258f)]     // out to the north
+    [InlineData(256, false, 0.1f, -60f, -2f)]       // out to the south
+    [InlineData(1024, true, 1023.9f, 60f, 1026f)]   // out of a 1024 m region
+    [InlineData(1024, true, 0.1f, -60f, -2f)]
+    [InlineData(1024, false, 1023.9f, 60f, 1026f)]
+    public void A_fast_object_leaving_along_either_axis_and_a_large_region_is_cut_back_the_same_way(int size, bool alongX, float from, float speed, float waits)
+    {
+        float other = size == 256 ? 128f : 600f;
+        using var a = new Arrival(alongX ? from : other, alongX ? new Vector3(speed, 0f, 0f) : new Vector3(0f, speed, 0f), 0f,
+            crossIn: false, y: alongX ? other : from, size: size);
+
+        a.Heartbeat();
+
+        float reached = from + speed * 4f / 45f;
+        Vector3 at = a.Prim.Position, cut = a.Prim.CrossingCutOffset;
+        Assert.True(a.Prim.HasLeftRegion);
+        Assert.InRange(alongX ? at.X : at.Y, waits - 0.001f, waits + 0.001f);
+        Assert.InRange(alongX ? cut.X : cut.Y, reached - waits - 0.05f, reached - waits + 0.05f);
+        Assert.Equal(0f, alongX ? cut.Y : cut.X);
     }
 
     [Fact]

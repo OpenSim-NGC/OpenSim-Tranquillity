@@ -186,17 +186,34 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             }
         }
 
+        // The arrivals this heartbeat handles, taken before the linkset drain: an object is linked before its engine is told
+        // it crossed in, so the drain that follows has welded each of these. One that comes in later waits for the next.
+        private JoltPrim[] ArrivalsSoFar()
+        {
+            lock (_arrivals)
+                return _arrivals.Count == 0 ? Array.Empty<JoltPrim>() : _arrivals.ToArray();
+        }
+
+        // Before a heartbeat's steps: the cut added to an arriving prim's position is swept (JoltPrim.CheckArrivalCut)
+        private void CheckArrivalCuts(JoltPrim[] pending)
+        {
+            foreach (JoltPrim prim in pending)
+            {
+                try
+                {
+                    prim.CheckArrivalCut();
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(e, $"{LogHeader} checking the way of the arrived prim {prim.LocalID} failed: {e.Message}");
+                }
+            }
+        }
+
         // At the end of a heartbeat, after all of its steps: each arrival that has been stepped is moved back (or on) to
         // where the time that has really passed since its sample puts it.
-        private void FinishArrivals()
+        private void FinishArrivals(JoltPrim[] pending)
         {
-            JoltPrim[] pending;
-            lock (_arrivals)
-            {
-                if (_arrivals.Count == 0)
-                    return;
-                pending = _arrivals.ToArray();
-            }
             foreach (JoltPrim prim in pending)
             {
                 bool done;
@@ -2315,6 +2332,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // testing Jolt's real cooked shapes rather than falling back to OpenSim's own geometry intersection.
         public override bool SupportsRaycastWorldFiltered() => true;
 
+        // an arriving body's first heartbeat is scaled to its sample's age (JoltPrim.CrossedIn)
+        public override bool AppliesCrossingSampleAge => true;
+
         // TWO llCastRay entry points route here, and BOTH must be overridden or llCastRay returns 0:
         //  - the 5-arg (RayFilterFlags) overload is what OpenSim's XEngine/YEngine LSL_Api.llCastRay calls
         //    (it maps RC_* -> RayFilterFlags, then we -> QueryFilter);
@@ -2863,15 +2883,14 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             backend.BeginRayCastBudget();   // [Jolt] RayCastBudgetMs and RayCastSimulatorBudgetMs are per heartbeat, at every PhysicsStepRate
             if (_substeps != null)
             {
-                float result = SimulateSubsteps(timeStep);
-                FinishArrivals();
-                return result;
+                return SimulateSubsteps(timeStep);
             }
 
             // (Re)build changed linkset compounds ONCE per frame, here on the step thread before
             // the step. link()/unlink() only mark the root dirty (they do not rebuild inline); this
             // coalesces a whole linkset's worth of child-links into a single rebuild - rebuilding on every
             // child's link() churns the root and can hang the region load of a persisted physical linkset.
+            JoltPrim[] arrivals = ArrivalsSoFar();
             DrainDirtyLinksets();
             DrainCameraRays();
 
@@ -2882,6 +2901,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // just below, before StepOnce), so it can NEVER free-fall during load or the reload stall. Mirrors
             // BulletSim draining ALL taints before PE.PhysicsStep().
             DrainPendingActivation();
+            CheckArrivalCuts(arrivals);
 
             // Keyframed prims take the pose their object was last given, over the time this step covers.
             StepKinematics(timeStep);
@@ -2902,7 +2922,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // dropped prim integrates in solver sub-slices and rests, while the avatar stays at 1 step/frame.
             DrainCoversSeconds = timeStep;
             StepOnce(timeStep, backend);
-            FinishArrivals();
+            FinishArrivals(arrivals);
 
             TraceCharFrame(backend);
             return 1f;
@@ -3181,9 +3201,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // DispatchContacts). Each step takes and releases the job pool's gate and _simLock itself, as one step does.
         private float SimulateSubsteps(float timeStep)
         {
+            JoltPrim[] arrivals = ArrivalsSoFar();
             DrainDirtyLinksets();
             DrainCameraRays();
             DrainPendingActivation();
+            CheckArrivalCuts(arrivals);
 
             int n = _substeps.Advance(timeStep);
             float dt = _substeps.StepSeconds;
@@ -3228,6 +3250,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             }
             DrainCoversSeconds = n * (double)dt;
             ReportStep(backend, in r, timeStep, contactCount, contactsOverflowed, physicsMs, mergeSubsteps: true, in timing);
+            FinishArrivals(arrivals);
             TraceCharFrame(backend);
             return 1f;
         }

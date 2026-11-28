@@ -12,6 +12,7 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Framework.EntityTransfer;
 using OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation;
+using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.PhysicsModules.BasicPhysics;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Services.Interfaces;
@@ -46,6 +47,7 @@ public class CrossingSampleAgeTests : OpenSimTestCase
     private sealed class RecordingPrim : BasicPhysicsPrim
     {
         public readonly List<float> CrossedInAges = new();
+        public readonly List<Vector3> CutsAdded = new();
         public Vector3 Cut;
 
         public override Vector3 CrossingCutOffset => Cut;
@@ -53,13 +55,20 @@ public class CrossingSampleAgeTests : OpenSimTestCase
         public RecordingPrim(string name, uint id, Vector3 pos, Vector3 size, Quaternion rot, PrimitiveBaseShape shape)
             : base(name, id, pos, size, rot, shape) { }
 
-        public override void CrossedIn(float sampleAgeSeconds) => CrossedInAges.Add(sampleAgeSeconds);
+        public override void CrossedIn(float sampleAgeSeconds, Vector3 cutAdded = default)
+        {
+            CrossedInAges.Add(sampleAgeSeconds);
+            CutsAdded.Add(cutAdded);
+        }
     }
 
     private sealed class RecordingEngine : BasicScene
     {
         public readonly List<RecordingPrim> Prims = new();
         public Vector3 Cut;
+        public bool Applies = true;
+
+        public override bool AppliesCrossingSampleAge => Applies;
 
         public override PhysicsActor AddPrimShape(string primName, PrimitiveBaseShape pbs, Vector3 position, Vector3 size,
             Quaternion rotation, bool isPhysical, uint localid)
@@ -93,12 +102,122 @@ public class CrossingSampleAgeTests : OpenSimTestCase
         var (arrived, _) = CrossInOneProcess(new Vector3(3.25f, 0f, 0f));
 
         Assert.Equal(1f + 3.25f, arrived.AbsolutePosition.X, 3);
-        Assert.Single(Assert.IsType<RecordingPrim>(arrived.RootPart.PhysActor).CrossedInAges);
+        RecordingPrim actor = Assert.IsType<RecordingPrim>(arrived.RootPart.PhysActor);
+        Assert.Single(actor.CrossedInAges);
+        Assert.Equal(new Vector3(3.25f, 0f, 0f), Assert.Single(actor.CutsAdded));   // the engine is told how far it was moved on
         Assert.Equal(Vector3.Zero, arrived.CrossingCutOffset);   // used once, on arrival
     }
 
+    [Fact]
+    public void A_region_whose_engine_does_not_apply_the_age_places_the_object_at_the_sent_position()
+    {
+        TestHelpers.InMethod();
+
+        var (arrived, _) = CrossInOneProcess(new Vector3(3.25f, 0f, 0f), receiverApplies: false);
+
+        Assert.Equal(1f, arrived.AbsolutePosition.X, 3);
+        Assert.Empty(Assert.IsType<RecordingPrim>(arrived.RootPart.PhysActor).CrossedInAges);
+        Assert.True(double.IsNaN(arrived.CrossingSampleAgeMs));
+        Assert.Equal(Vector3.Zero, arrived.CrossingCutOffset);
+    }
+
+    [Fact]
+    public void Between_simulators_an_engine_that_does_not_apply_the_age_leaves_the_object_at_the_sent_position()
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e60);
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(3.25f, 0f, 0f);
+
+        Assert.Equal(2f, TakeIn(MessageFor(so), engineApplies: false).AbsolutePosition.X, 3);
+    }
+
+    // Two parcels in the receiving region, split at x or y = line; the object is sent to 2 m in and cut back by 3.25 m.
+    [Theory]
+    [InlineData(true, false, 4f, 2f)]       // avatars aboard and the cut would cross the parcel line: the sent position
+    [InlineData(true, false, 20f, 5.25f)]   // avatars aboard, both places in one parcel: the cut is added
+    [InlineData(false, false, 4f, 5.25f)]   // nobody aboard: the cut is added
+    [InlineData(true, true, 4f, 2f)]        // the same along y
+    [InlineData(true, true, 20f, 5.25f)]
+    public void With_avatars_aboard_the_cut_does_not_move_the_object_into_another_parcel(bool aboard, bool alongY, float line, float expected)
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e70);
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = alongY ? new Vector3(0f, 3.25f, 0f) : new Vector3(3.25f, 0f, 0f);
+        so.CrossingCarriesAvatars = aboard;
+        Vector3 sentTo = alongY ? new Vector3(128f, 2f, 30) : new Vector3(2f, 128, 30);
+
+        SceneObjectGroup arrived = TakeIn(MessageFor(so, sentTo), parcelLine: (alongY, line));
+
+        Assert.Equal(expected, alongY ? arrived.AbsolutePosition.Y : arrived.AbsolutePosition.X, 3);
+    }
+
+    [Fact]
+    public void The_cut_does_not_move_an_empty_object_into_a_parcel_that_would_refuse_it()
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7eb0);
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(3.25f, 0f, 0f);
+
+        // the parcel at the sent position takes the object, the one the cut leads into does not
+        SceneObjectGroup arrived = TakeIn(MessageFor(so), parcelLine: (false, 4f), farParcelRefuses: true);
+
+        Assert.Equal(2f, arrived.AbsolutePosition.X, 3);
+    }
+
+    [Theory]
+    [InlineData(true, 3.25f, true)]
+    [InlineData(false, 3.25f, false)]   // nobody aboard
+    [InlineData(true, 0f, false)]       // nothing cut: nothing for the avatars to matter to
+    public void The_message_says_that_avatars_are_aboard_only_along_with_a_cut(bool aboard, float cut, bool said)
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e80);
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(cut, 0f, 0f);
+        so.CrossingCarriesAvatars = aboard;
+
+        Assert.Equal(said, MessageFor(so).ContainsKey("sample_avatars_aboard"));
+    }
+
+    [Theory]
+    [InlineData(0f, 3.25f, 128f, 2f, 128f, 5.25f)]        // along +y
+    [InlineData(0f, -3.25f, 128f, 254f, 128f, 250.75f)]   // along -y
+    [InlineData(0f, 30f, 128f, 250f, 128f, 255.8f)]       // kept inside along y
+    public void A_cut_along_y_is_added_the_same_way(float cutX, float cutY, float sentX, float sentY, float x, float y)
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e90);
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(cutX, cutY, 0f);
+
+        Vector3 at = TakeIn(MessageFor(so, new Vector3(sentX, sentY, 30))).AbsolutePosition;
+
+        Assert.Equal(x, at.X, 3);
+        Assert.Equal(y, at.Y, 3);
+    }
+
+    [Theory]
+    [InlineData(1022f, 600f, -3.25f, 0f, 1018.75f, 600f)]   // in from the east: past 256 m, not clamped to a 256 m region
+    [InlineData(600f, 1022f, 0f, -3.25f, 600f, 1018.75f)]   // in from the north
+    [InlineData(1022f, 1022f, 30f, 30f, 1023.8f, 1023.8f)]  // kept inside the 1024 m region
+    public void A_cut_in_a_1024_m_region_is_kept_inside_that_region(float sentX, float sentY, float cutX, float cutY, float x, float y)
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7ea0);
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(cutX, cutY, 0f);
+
+        Vector3 at = TakeIn(MessageFor(so, new Vector3(sentX, sentY, 30)), regionSize: 1024).AbsolutePosition;
+
+        Assert.Equal(x, at.X, 3);
+        Assert.Equal(y, at.Y, 3);
+    }
+
     // An object of sceneA, whose engine reports the given cut, crosses 1 m past the east border into sceneB.
-    private static (SceneObjectGroup arrived, List<double> reads) CrossInOneProcess(Vector3 cut)
+    private static (SceneObjectGroup arrived, List<double> reads) CrossInOneProcess(Vector3 cut, bool receiverApplies = true)
     {
         EntityTransferModule etmA = new(), etmB = new();
         LocalSimulationConnectorModule lscm = new();
@@ -115,7 +234,7 @@ public class CrossingSampleAgeTests : OpenSimTestCase
         SceneHelpers.SetupSceneModules(sceneB, config, etmB);
 
         sceneA.PhysicsScene = new RecordingEngine { Cut = cut };
-        RecordingEngine engineB = new();
+        RecordingEngine engineB = new() { Applies = receiverApplies };
         sceneB.PhysicsScene = engineB;
         sceneB.CrossingClock = () => 1000;   // the receiving region's own clock: its handling time is then 0
 
@@ -286,11 +405,12 @@ public class CrossingSampleAgeTests : OpenSimTestCase
     private static readonly GridRegion ExampleDestination =
         new() { RegionID = UUID.Random(), RegionName = "Example", ServerURI = "http://example.org:9000/" };
 
-    // The object message a sending region builds for an object, with the position (2, 128, 30) in the destination.
-    private static OSDMap MessageFor(SceneObjectGroup so)
+    // The object message a sending region builds for an object, with the position (2, 128, 30) in the destination
+    // unless another is given.
+    private static OSDMap MessageFor(SceneObjectGroup so, Vector3? sentTo = null)
     {
         var client = new RemoteHeldCrossingTests.RecordingClient();
-        Assert.True(client.CreateObject(ExampleDestination, new Vector3(2f, 128, 30), so, false));
+        Assert.True(client.CreateObject(ExampleDestination, sentTo ?? new Vector3(2f, 128, 30), so, false));
         return Assert.Single(client.Posts);
     }
 
@@ -301,13 +421,20 @@ public class CrossingSampleAgeTests : OpenSimTestCase
     }
 
     // The message goes through the object handler into a real region, which takes the object in, held or not.
-    private static SceneObjectGroup TakeIn(OSDMap message, bool held = false)
+    private static SceneObjectGroup TakeIn(OSDMap message, bool held = false, bool engineApplies = true,
+        (bool alongY, float at)? parcelLine = null, uint regionSize = 256, bool farParcelRefuses = false)
     {
         EntityTransferModule etm = new();
         IConfigSource config = new IniConfigSource();
         config.AddConfig("Modules").Set("EntityTransferModule", etm.Name);
-        TestScene scene = new SceneHelpers().SetupScene("sceneD", TestHelpers.ParseTail(0x7c00), 7600, 7600);
+        TestScene scene = new SceneHelpers().SetupScene("sceneD", TestHelpers.ParseTail(0x7c00), 7600, 7600,
+            regionSize, regionSize, new IniConfigSource());
         SceneHelpers.SetupSceneModules(scene, config, etm);
+        scene.PhysicsScene = new RecordingEngine { Applies = engineApplies };
+        if (parcelLine is { } line)
+            scene.LandChannel = TwoParcels.Over(scene, line.alongY, line.at);
+        if (farParcelRefuses)
+            scene.Permissions.OnObjectEntry += (_, _, point) => (parcelLine.Value.alongY ? point.Y : point.X) < parcelLine.Value.at;
         scene.CrossingClock = () => 1000;
 
         ISimulationService service = DispatchProxy.Create<ISimulationService, CapturingService>();
@@ -335,6 +462,39 @@ public class CrossingSampleAgeTests : OpenSimTestCase
             Assert.True(scene.IncomingCreateObject(capture.Position, received));
         }
         return Assert.IsType<SceneObjectGroup>(scene.GetSceneObjectGroup(received.UUID));
+    }
+
+    /// <summary>A land channel with two parcels, split at x or y = a line; everything else is the test land channel's.</summary>
+    public class TwoParcels : DispatchProxy
+    {
+        private ILandChannel m_inner;
+        private ILandObject m_near, m_far;
+        private bool m_alongY;
+        private float m_line;
+
+        public static ILandChannel Over(Scene scene, bool alongY, float line)
+        {
+            ILandChannel channel = DispatchProxy.Create<ILandChannel, TwoParcels>();
+            TwoParcels parcels = (TwoParcels)(object)channel;
+            parcels.m_inner = scene.LandChannel;
+            parcels.m_near = new OpenSim.Region.CoreModules.World.Land.LandObject(UUID.Zero, false, scene);
+            parcels.m_near.LandData.LocalID = 1;
+            parcels.m_far = new OpenSim.Region.CoreModules.World.Land.LandObject(UUID.Zero, false, scene);
+            parcels.m_far.LandData.LocalID = 2;
+            parcels.m_alongY = alongY;
+            parcels.m_line = line;
+            return channel;
+        }
+
+        protected override object Invoke(MethodInfo method, object[] args)
+        {
+            if (method.Name == nameof(ILandChannel.GetLandObject) && args.Length == 2)
+            {
+                float along = Convert.ToSingle(args[m_alongY ? 1 : 0]);
+                return along < m_line ? m_near : m_far;
+            }
+            return method.Invoke(m_inner, args);
+        }
     }
 
     [Fact]

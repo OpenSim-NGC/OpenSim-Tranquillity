@@ -66,6 +66,25 @@ public class SeatedCrossingDestinationFailureTests : HeldCrossingFixture
     }
 
     [Fact]
+    public void A_vehicle_with_a_seated_avatar_is_handed_over_as_carrying_avatars()
+    {
+        TestHelpers.InMethod();
+        Setup(5460);
+        ScenePresence sitter = AddSeatedRider(0x11);
+        bool? carries = null;
+        m_sceneB.CrossingStepHook = (sog, label) =>
+        {
+            if (label == "destination-add")
+                carries = sog.CrossingCarriesAvatars;
+        };
+
+        Cross(sitter);
+
+        Assert.True(carries.HasValue, "the step was never reached");
+        Assert.True(carries.Value, "the vehicle was handed over as carrying no avatars");
+    }
+
+    [Fact]
     public void When_the_destination_fails_after_adding_the_vehicle_the_driver_stays_seated_on_the_one_copy_here()
     {
         TestHelpers.InMethod();

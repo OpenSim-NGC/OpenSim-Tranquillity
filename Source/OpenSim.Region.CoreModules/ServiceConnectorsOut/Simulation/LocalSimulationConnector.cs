@@ -332,6 +332,7 @@ public class LocalSimulationConnectorModule : ISharedRegionModule, ISimulationSe
                 // the age of the position and velocity it crosses with, on this process's own clock, and what was cut off
                 sogClone.CrossingSampleAgeMs = sog.CrossingSampleAgeMs;
                 sogClone.CrossingCutOffset = sog.CrossingCutOffset;
+                sogClone.CrossingCarriesAvatars = sog.CrossingCarriesAvatars;
                 return s.IncomingCreateObject(newPosition, sogClone);
             }
             else
@@ -365,6 +366,7 @@ public class LocalSimulationConnectorModule : ISharedRegionModule, ISimulationSe
             sogClone.SetState(sog.GetStateSnapshot(), s);
             sogClone.CrossingSampleAgeMs = sog.CrossingSampleAgeMs;
             sogClone.CrossingCutOffset = sog.CrossingCutOffset;
+            sogClone.CrossingCarriesAvatars = sog.CrossingCarriesAvatars;
             return s.IncomingCreateObject(newPosition, sogClone, hold);
         }
 

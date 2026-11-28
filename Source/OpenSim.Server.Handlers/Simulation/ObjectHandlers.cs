@@ -208,6 +208,9 @@ public class ObjectSimpleHandler : SimpleStreamHandler
                     if (Math.Abs(cut.X) <= MaxCutOffset && Math.Abs(cut.Y) <= MaxCutOffset && Math.Abs(cut.Z) <= MaxCutOffset)
                         sog.CrossingCutOffset = cut;
                 }
+                // avatars sit or stand on the object: the cut may not move it into another parcel
+                if (args.ContainsKey("sample_avatars_aboard") && args["sample_avatars_aboard"] is OSD aboard)
+                    sog.CrossingCarriesAvatars = aboard.AsBoolean();
             }
         }
 

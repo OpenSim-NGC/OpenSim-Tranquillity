@@ -62,4 +62,11 @@ public interface ISceneObject
     /// its riders. Zero when nothing was cut or the age is not known.
     /// </summary>
     Vector3 CrossingCutOffset { get; set; }
+
+    /// <summary>
+    /// For an object crossing to another region: whether it has avatars seated or standing on it. A region that takes
+    /// such an object in does not let the cut (<see cref="CrossingCutOffset"/>) move it into another parcel than the one
+    /// at the position it was sent to, which is the one the avatars' access was checked for.
+    /// </summary>
+    bool CrossingCarriesAvatars { get; set; }
 }

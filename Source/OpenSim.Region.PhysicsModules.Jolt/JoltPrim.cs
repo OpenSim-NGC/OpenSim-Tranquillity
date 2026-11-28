@@ -787,7 +787,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // not made (the engine's own step stands), so it can never cross back because of it. Nor is one made for a body
         // whose first heartbeat comes more than MaxArrivalAgeSeconds after it was taken in, or that is no longer physical.
         // A hand-over longer than the heartbeat moves the body on by at most MaxArrivalShare times its own step, along the
-        // way it went, so that it is never carried far past what the engine checked for collisions.
+        // way it went. What the correction adds beyond the engine's own step is swept with the body's shape first: if
+        // something is in that way, the engine's own step stands. The cut the region added to the position the object was
+        // sent with (CrossedIn's cutAdded) is swept the same way before the body's first step; if something is in that way,
+        // the body goes back to the position it was sent with.
         // ---------------------------------------------------------------------
         internal const double MaxArrivalAgeSeconds = 1.0;   // the most time an arrival is placed by
         internal const float MaxArrivalShare = 3f;          // the most an arrival's first heartbeat is stretched
@@ -796,8 +799,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private Vector3 _arrivalFrom;                       // where the body was placed
         private double _arrivalStepped;                     // seconds of steps the body has had since
         private bool _drained;                              // the engine has reported this body at least once
+        private Vector3 _arrivalCut;                        // added to the sent position, and not yet swept
 
-        public override void CrossedIn(float sampleAgeSeconds)
+        public override void CrossedIn(float sampleAgeSeconds, Vector3 cutAdded = default)
         {
             if (!(sampleAgeSeconds >= 0f) || float.IsInfinity(sampleAgeSeconds))
                 return;
@@ -814,8 +818,58 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 _arrivalAt = _module.ArrivalClock();
                 _arrivalFrom = _position;
                 _arrivalStepped = 0;
+                _arrivalCut = cutAdded;
             }
             _module.NoteArrival(this);
+        }
+
+        // Before a heartbeat's steps (JoltScene.CheckArrivalCuts), when a linkset's parts have been welded into the one
+        // shape that is swept and none has a body of its own left in the way.
+        internal void CheckArrivalCut()
+        {
+            lock (_awayLock)
+            {
+                if (double.IsNaN(_arrivalAge) || _away != Away.None || !_body.IsValid || _drained)
+                    return;   // a body stepped before this could run is checked at the end of the heartbeat
+                if (!TakeBackBlockedCut(_position))
+                    return;
+            }
+            RequestPhysicsterseUpdate();
+        }
+
+        // Under _awayLock. Sweeps from the sent position to 'to'; when something is in the way of a cut that was added,
+        // the body is put back at the position it was sent with. The cut is looked at once.
+        private bool TakeBackBlockedCut(Vector3 to)
+        {
+            Vector3 cut = _arrivalCut;
+            _arrivalCut = Vector3.Zero;
+            if (cut.IsZero())
+                return false;
+            Vector3 sentTo = _arrivalFrom - cut;
+            if (!SomethingInTheWay(sentTo, to))
+                return false;
+            if (JoltScene.m_log.IsEnabled(LogLevel.Debug))
+                JoltScene.m_log.LogDebug($"{JoltScene.LogHeader} [crossing] arrival of {LocalID}: something between {sentTo} and {to}, put back at {sentTo}");
+            // a vehicle's stall check moves with the body, as for a correction at the end of the heartbeat
+            _vehicle?.BodyMovedBy(sentTo - _position);
+            _arrivalFrom = sentTo;
+            _position = sentTo;
+            _backend.SetBodyTransform(_body, ToS(_position), BodyOrientationOf(_orientation), activate: true);
+            return true;
+        }
+
+        // Whether the body's shape, moved from 'from' to 'to', meets anything the body collides with
+        private bool SomethingInTheWay(Vector3 from, Vector3 to)
+        {
+            Vector3 way = to - from;
+            float length = way.Length();
+            if (_isVolumeDetect || !(length > 1e-3f))
+                return false;
+            ShapeId shape = _compoundShape.IsValid ? _compoundShape : _shape;
+            SQuaternion orientation = BodyOrientationOf(_orientation);
+            SVector3 centre = ToS(from) + SVector3.Transform(_backend.GetShapeCenterOfMass(shape), orientation);
+            QueryFilter filter = _isPhantom ? QueryFilter.Terrain : QueryFilter.Default;
+            return _backend.ShapeCast(shape, centre, orientation, ToS(way), length, filter, out _, _body);
         }
 
         // At the end of the heartbeat (JoltScene.FinishArrivals). True when nothing more is to be done for the arrival.
@@ -845,17 +899,21 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 float share = Math.Min((float)(elapsed / _arrivalStepped), MaxArrivalShare);
                 _arrivalAge = double.NaN;
 
-                Vector3 engine = _position;
-                Vector3 target = _arrivalFrom + (engine - _arrivalFrom) * share;
-                bool inside = InRegion(target);
-                if (JoltScene.m_log.IsEnabled(LogLevel.Debug))
-                    JoltScene.m_log.LogDebug($"{JoltScene.LogHeader} [crossing] arrival of {LocalID}: placed at {_arrivalFrom}, sample {elapsed * 1000:0.0} ms old after {_arrivalStepped * 1000:0.0} ms of steps, engine {engine}, {(inside ? "moved to " + target : "left: the time elapsed is past the edge")}");
-                if (!inside)
-                    return true;
-                _position = target;
-                _backend.SetBodyTransform(_body, ToS(_position), BodyOrientationOf(_orientation), activate: true);
-                // a vehicle's stall check must not read the move as the vehicle's own motion (VehicleController.BodyMovedBy)
-                _vehicle?.BodyMovedBy(target - engine);
+                // a cut not swept before the first step: when something was in its way, nothing more is added
+                if (!TakeBackBlockedCut(_position))
+                {
+                    Vector3 engine = _position;
+                    Vector3 target = _arrivalFrom + (engine - _arrivalFrom) * share;
+                    bool inside = InRegion(target);
+                    if (JoltScene.m_log.IsEnabled(LogLevel.Debug))
+                        JoltScene.m_log.LogDebug($"{JoltScene.LogHeader} [crossing] arrival of {LocalID}: placed at {_arrivalFrom}, sample {elapsed * 1000:0.0} ms old after {_arrivalStepped * 1000:0.0} ms of steps, engine {engine}, {(inside ? "moved to " + target : "left: the time elapsed is past the edge")}");
+                    if (!inside || (share > 1f && SomethingInTheWay(engine, target)))
+                        return true;
+                    _position = target;
+                    _backend.SetBodyTransform(_body, ToS(_position), BodyOrientationOf(_orientation), activate: true);
+                    // a vehicle's stall check must not read the move as the vehicle's own motion (VehicleController.BodyMovedBy)
+                    _vehicle?.BodyMovedBy(target - engine);
+                }
             }
             RequestPhysicsterseUpdate();
             return true;

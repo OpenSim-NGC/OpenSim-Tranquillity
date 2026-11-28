@@ -275,6 +275,13 @@ public abstract class PhysicsScene
     public abstract Dictionary<uint, float> GetTopColliders();
 
     /// <summary>
+    /// True if the actors of this scene use the age of a crossing object's position and velocity
+    /// (<see cref="PhysicsActor.CrossedIn"/>). Only then does the region take that age, and the cut that goes with it,
+    /// from the region the object came from; otherwise the object is placed where it was sent to.
+    /// </summary>
+    public virtual bool AppliesCrossingSampleAge => false;
+
+    /// <summary>
     /// True if the physics plugin supports raycasting against the physics scene
     /// </summary>
     public virtual bool SupportsRayCast()

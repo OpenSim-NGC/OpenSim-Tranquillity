@@ -4792,7 +4792,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             return false;
         }
 
-        public bool ShapeCast(ShapeId shape, Vector3 origin, Quaternion orientation, Vector3 direction, float maxDistance, QueryFilter filter, out RayHit hit)
+        public bool ShapeCast(ShapeId shape, Vector3 origin, Quaternion orientation, Vector3 direction, float maxDistance, QueryFilter filter, out RayHit hit, BodyId movingBody = default)
         {
             hit = default;
             if (_system == null)
@@ -4810,17 +4810,44 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             com.Translation = origin;
             var results = new List<ShapeCastResult>();
             var scs = DefaultCastSettings();
+            bool ownWay = movingBody.IsValid;
+            if (ownWay)
+            {
+                scs.ActiveEdgeMode = ActiveEdgeMode.CollideOnlyWithActive;   // not the seams of a surface it slides along
+                scs.ReturnDeepestPoint = true;   // what it already overlaps at the start has a direction to be judged by
+            }
+            uint self = 0;
             lock (_simLock)
             {
                 if (_disposed) return false;   // backend torn down (shutdown race) - no native call
+                if (ownWay)
+                {
+                    if (!TryResolve(movingBody, out _, out BodyID jid))
+                        return false;
+                    self = jid.ID;
+                }
                 _system.NarrowPhaseQuery.CastShape(
                     shapeRec.NativeShape, com, castVec, scs, Vector3.Zero,
-                    CollisionCollectorType.ClosestHit, results, null, FilterFor(filter), null, null);
+                    ownWay ? CollisionCollectorType.AllHit : CollisionCollectorType.ClosestHit, results, null, FilterFor(filter), null, null);
             }
-            if (results.Count == 0)
+            int nearest = -1;
+            for (int i = 0; i < results.Count; i++)
+            {
+                if (ownWay)
+                {
+                    if (results[i].BodyID2.ID == self)
+                        continue;
+                    float depth = results[i].PenetrationAxis.Length();
+                    if (!(depth > 1e-6f) || !(Vector3.Dot(results[i].PenetrationAxis / depth, direction / len) > 0.1f))
+                        continue;   // what the body rests on or slides along
+                }
+                if (nearest < 0 || results[i].Fraction < results[nearest].Fraction)
+                    nearest = i;
+            }
+            if (nearest < 0)
                 return false;
 
-            ShapeCastResult r = results[0];
+            ShapeCastResult r = results[nearest];
             _joltToRecord.TryGetValue(r.BodyID2.ID, out JoltBodyRecord? rec);
             // PenetrationAxis points from the cast shape into the hit body; the surface normal the caller
             // wants (pointing back out of the struck surface) is its negation, normalised.
