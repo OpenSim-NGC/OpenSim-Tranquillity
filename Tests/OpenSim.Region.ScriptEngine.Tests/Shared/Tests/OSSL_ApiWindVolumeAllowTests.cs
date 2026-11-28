@@ -25,7 +25,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     /// </summary>
     // OSSL_Api keeps its settings (threat level, Allow_ entries) in statics read once; each test resets them before and
     // after, as OSSL_ApiSetScriptEngineTests does. The assembly runs its tests one at a time (LSL_ApiHttpTests.cs:
-    // DisableTestParallelization), so the reset cannot race another class.
+    // ParallelMode.None), so the reset cannot race another class.
     public class OSSL_ApiWindVolumeAllowTests : OpenSimTestCase
     {
         private class StoreWind : DispatchProxy
@@ -130,7 +130,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Setup(manager: false, god: true);
 
             int handle = 0;
-            Exception thrown = Record.Exception(() => handle = m_api.osWindVolumeCreate(Rules()));
+            Exception? thrown = Record.Exception(() => handle = m_api.osWindVolumeCreate(Rules()));
 
             Assert.Null(thrown);
             Assert.True(handle >= 1, $"got {handle}");
@@ -149,7 +149,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             });
 
             int result = -100;
-            Exception thrown = Record.Exception(() => result = m_api.osWindVolumeRemove(handle));
+            Exception? thrown = Record.Exception(() => result = m_api.osWindVolumeRemove(handle));
 
             Assert.Null(thrown);
             Assert.Equal(WindVolumeError.Ok, result);

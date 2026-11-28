@@ -20,7 +20,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class PositionRoomHoldBackTests
     {
         private static readonly UUID A = new UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
@@ -96,80 +95,109 @@ namespace osWebRtcVoice.Tests
             public void Dispose() => Sink.Dispose();
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AnAgentOnlyInAGroupCall_CausesNoPeerPosForItsParcelsRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();   // the agent stands on a parcel but has joined no room
 
             await rig.Ticks(8);
 
-            Assert.That(rig.PosRequests, Is.Empty, "nothing is sent for an agent with no record");
-            Assert.That(rig.Sink.Replies.Counts.UnknownRoom, Is.Zero, "so the mixer refuses nothing");
-            Assert.That(rig.Pump.MessagesSent, Is.Zero);
+            {
+                var assertedValue = rig.PosRequests;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "nothing is sent for an agent with no record");
+            }
+            {
+                var assertedValue = rig.Sink.Replies.Counts.UnknownRoom;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "so the mixer refuses nothing");
+            }
+            Assert.Equal(0, rig.Pump.MessagesSent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AnAgentInTheRoom_IsSentAsBefore()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Join(A, Room);
 
             await rig.Ticks(2);   // the first learns the mixer's version, the second sends
-            Assert.That(rig.PosRequests, Has.Count.EqualTo(1), "the first request is the whole snapshot");
-            Assert.That(rig.PosRequests[0]["room"].AsInteger(), Is.EqualTo(Room));
-            Assert.That(rig.PosRequests[0]["full"].AsBoolean(), Is.True);
+            {
+                var assertedValue = rig.PosRequests;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "the first request is the whole snapshot");
+            }
+            Assert.Equal(Room, rig.PosRequests[0]["room"].AsInteger());
+            Assert.True(rig.PosRequests[0]["full"].AsBoolean());
 
             rig.World.Views = new List<PositionView> { new PositionView(A, false, 100000, 200, 300, 0) };
             await rig.Ticks(1);
-            Assert.That(rig.PosRequests, Has.Count.EqualTo(2), "and a move follows as a change");
-            Assert.That(rig.PosRequests[1]["full"].AsBoolean(), Is.False);
+            {
+                var assertedValue = rig.PosRequests;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue.Count()), "and a move follows as a change");
+            }
+            Assert.False(rig.PosRequests[1]["full"].AsBoolean());
 
-            Assert.That(rig.Sink.Replies.Counts.Applied, Is.EqualTo(2));
-            Assert.That(rig.Sink.Replies.Counts.UnknownRoom, Is.Zero);
-            Assert.That(rig.Refusals.Count, Is.Zero);
-            Assert.That(rig.Pump.MessagesHeldBack, Is.Zero);
+            Assert.Equal(2, rig.Sink.Replies.Counts.Applied);
+            Assert.Equal(0, rig.Sink.Replies.Counts.UnknownRoom);
+            Assert.Equal(0, rig.Refusals.Count);
+            Assert.Equal(0, rig.Pump.MessagesHeldBack);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AfterUnknownRoom_NothingMoreIsSent_UntilAJoin_AndThenAWholeSnapshot()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Table.Record(A, Room);   // a record from a join the mixer has since lost (its last listener left)
 
             await rig.Ticks(2);
-            Assert.That(rig.PosRequests, Has.Count.EqualTo(1));
-            Assert.That(rig.Sink.Replies.Counts.UnknownRoom, Is.EqualTo(1), "the first request is refused");
-            Assert.That(rig.Refusals.IsRefused(Room), Is.True);
+            Assert.Single(rig.PosRequests);
+            {
+                var assertedValue = rig.Sink.Replies.Counts.UnknownRoom;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the first request is refused");
+            }
+            Assert.True(rig.Refusals.IsRefused(Room));
 
             await rig.Ticks(20);
-            Assert.That(rig.PosRequests, Has.Count.EqualTo(1), "nothing more is sent to the room");
-            Assert.That(rig.Sink.Replies.Counts.UnknownRoom, Is.EqualTo(1), "and the mixer is not asked again");
-            Assert.That(rig.Pump.MessagesHeldBack, Is.GreaterThan(0), "what was left out is counted");
+            {
+                var assertedValue = rig.PosRequests;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "nothing more is sent to the room");
+            }
+            {
+                var assertedValue = rig.Sink.Replies.Counts.UnknownRoom;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "and the mixer is not asked again");
+            }
+            Assert.True(rig.Pump.MessagesHeldBack > 0, "what was left out is counted");
 
             rig.Join(A, Room);   // a viewer is provisioned into the room again
             await rig.Ticks(1);
-            Assert.That(rig.PosRequests, Has.Count.EqualTo(2), "sent to again");
-            Assert.That(rig.PosRequests[1]["full"].AsBoolean(), Is.True, "as a whole snapshot");
-            Assert.That(rig.Sink.Replies.Counts.Applied, Is.EqualTo(1));
-            Assert.That(rig.Sink.Replies.Counts.UnknownRoom, Is.EqualTo(1));
+            {
+                var assertedValue = rig.PosRequests;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue.Count()), "sent to again");
+            }
+            Assert.True(rig.PosRequests[1]["full"].AsBoolean(), "as a whole snapshot");
+            Assert.Equal(1, rig.Sink.Replies.Counts.Applied);
+            Assert.Equal(1, rig.Sink.Replies.Counts.UnknownRoom);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ARefusalOfAnotherRoom_DoesNotHoldBackThisOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Join(A, Room);
             rig.Refusals.Refused(OtherRoom, rig.Refusals.Stamp());
 
             await rig.Ticks(2);
 
-            Assert.That(rig.PosRequests, Has.Count.EqualTo(1));
-            Assert.That(rig.Sink.Replies.Counts.Applied, Is.EqualTo(1));
+            Assert.Single(rig.PosRequests);
+            Assert.Equal(1, rig.Sink.Replies.Counts.Applied);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ARefusalToARequestSentBeforeAJoin_DoesNotHoldTheRoomBack()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var rig = new Rig();
             rig.Table.Record(A, Room);
             rig.DuringRequest = () =>
@@ -179,14 +207,17 @@ namespace osWebRtcVoice.Tests
             };
 
             await rig.Ticks(2);
-            Assert.That(rig.Sink.Replies.Counts.UnknownRoom, Is.EqualTo(1));
-            Assert.That(rig.Refusals.IsRefused(Room), Is.False, "the answer describes the room before the join");
+            Assert.Equal(1, rig.Sink.Replies.Counts.UnknownRoom);
+            Assert.False(rig.Refusals.IsRefused(Room), "the answer describes the room before the join");
 
             rig.DuringRequest = null;
             rig.Held.Add(Room);
             await rig.Ticks(1);
-            Assert.That(rig.PosRequests, Has.Count.EqualTo(2), "so the next tick sends again");
-            Assert.That(rig.Sink.Replies.Counts.Applied, Is.EqualTo(1));
+            {
+                var assertedValue = rig.PosRequests;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue.Count()), "so the next tick sends again");
+            }
+            Assert.Equal(1, rig.Sink.Replies.Counts.Applied);
         }
     }
 }

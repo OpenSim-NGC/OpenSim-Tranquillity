@@ -37,7 +37,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice.NonSpatial;
@@ -64,14 +64,15 @@ namespace osWebRtcVoice.Tests
 
         // ---- the seat cap is counted once for every region ------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheSeatCapHoldsAcrossTwoRegions()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             GridNonSpatialSessions a = NewRegion(), b = NewRegion();
             UUID regionA = UUID.Random(), regionB = UUID.Random(), group = UUID.Random();
 
             SessionOutcome started = a.Start(NonSpatialSessionType.Group, UUID.Random(), group, group, regionA);
-            Assert.That(started.Ok, Is.True, started.Decision);
+            Assert.True(started.Ok, started.Decision);
 
             int accepted = 0, refused = 0;
             UUID[] members = Agents(60);
@@ -82,17 +83,27 @@ namespace osWebRtcVoice.Tests
                 else if (o.Decision == SessionOutcome.Capacity) refused++;
             }
 
-            Assert.That(accepted, Is.EqualTo(NonSpatialCaps.DefaultConferenceCap - 1), "49 more seats after the creator");
-            Assert.That(refused, Is.EqualTo(members.Length - accepted), "everyone else is told the room is full");
-            Assert.That(a.Get(group).SeatsHeld, Is.EqualTo(NonSpatialCaps.DefaultConferenceCap));
-            Assert.That(b.Get(group).SeatsHeld, Is.EqualTo(NonSpatialCaps.DefaultConferenceCap), "both regions see the one count");
+            {
+                var assertedValue = accepted;
+                TestAssert.WithMessage(() => Assert.Equal(NonSpatialCaps.DefaultConferenceCap - 1, assertedValue), "49 more seats after the creator");
+            }
+            {
+                var assertedValue = refused;
+                TestAssert.WithMessage(() => Assert.Equal(members.Length - accepted, assertedValue), "everyone else is told the room is full");
+            }
+            Assert.Equal(NonSpatialCaps.DefaultConferenceCap, a.Get(group).SeatsHeld);
+            {
+                var assertedValue = b.Get(group).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(NonSpatialCaps.DefaultConferenceCap, assertedValue), "both regions see the one count");
+            }
         }
 
         // ---- a group is rung once ---------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupRingsOnce_WhoeverJoinsFromWhichRegion()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             GridNonSpatialSessions a = NewRegion(), b = NewRegion();
             UUID regionA = UUID.Random(), regionB = UUID.Random(), group = UUID.Random();
 
@@ -100,17 +111,18 @@ namespace osWebRtcVoice.Tests
             SessionOutcome joined = b.Accept(group, UUID.Random(), regionB);
             SessionOutcome joinedAgain = b.Start(NonSpatialSessionType.Group, UUID.Random(), group, group, regionB);
 
-            Assert.That(opened.StartedRinging, Is.True, "the opener's region rings the group");
-            Assert.That(joined.Ok, Is.True, joined.Decision);
-            Assert.That(joined.StartedRinging, Is.False, "a join from another region does not ring it again");
-            Assert.That(joinedAgain.StartedRinging, Is.False);
+            Assert.True(opened.StartedRinging, "the opener's region rings the group");
+            Assert.True(joined.Ok, joined.Decision);
+            Assert.False(joined.StartedRinging, "a join from another region does not ring it again");
+            Assert.False(joinedAgain.StartedRinging);
         }
 
         // ---- two regions racing -----------------------------------------------------------------------
 
-        [Test]
-        public void TwoRegionsRacingToStartOneGroupCallGetOneSession()
+        [Fact(Timeout = 60000)]
+        public async Task TwoRegionsRacingToStartOneGroupCallGetOneSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             GridNonSpatialSessions[] regions = { NewRegion(), NewRegion() };
             UUID[] origin = { UUID.Random(), UUID.Random() };
             UUID group = UUID.Random();
@@ -119,20 +131,30 @@ namespace osWebRtcVoice.Tests
             UUID[] callers = Agents(attempts);
             Task<SessionOutcome>[] tasks = Enumerable.Range(0, attempts).Select(i => Task.Factory.StartNew(() =>
             {
-                gate.SignalAndWait();
+                gate.SignalAndWait(TestContext.Current.CancellationToken);
                 return regions[i % 2].Start(NonSpatialSessionType.Group, callers[i], group, group, origin[i % 2]);
             }, TaskCreationOptions.LongRunning)).ToArray();
-            Task.WaitAll(tasks);
+            SessionOutcome[] results = await Task.WhenAll(tasks);
 
-            Assert.That(tasks.All(t => t.Result.Ok), Is.True, string.Join(",", tasks.Select(t => t.Result.Decision).Distinct()));
-            Assert.That(tasks.Count(t => t.Result.Created), Is.EqualTo(1), "one start made the session");
-            Assert.That(tasks.Count(t => t.Result.StartedRinging), Is.EqualTo(1), "one start rang the group");
-            Assert.That(regions[0].Get(group).SeatsHeld, Is.EqualTo(1), "a start seats only the one that made the session");
+            Assert.True(results.All(t => t.Ok), string.Join(",", results.Select(t => t.Decision).Distinct()));
+            {
+                var assertedValue = results.Count(t => t.Created);
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one start made the session");
+            }
+            {
+                var assertedValue = results.Count(t => t.StartedRinging);
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one start rang the group");
+            }
+            {
+                var assertedValue = regions[0].Get(group).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "a start seats only the one that made the session");
+            }
         }
 
-        [Test]
-        public void TwoRegionsRetryingOneConferenceStartGetOneSession()
+        [Fact(Timeout = 60000)]
+        public async Task TwoRegionsRetryingOneConferenceStartGetOneSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             GridNonSpatialSessions[] regions = { NewRegion(), NewRegion() };
             UUID[] origin = { UUID.Random(), UUID.Random() };
             UUID creator = UUID.Random(), temp = UUID.Random();
@@ -140,21 +162,22 @@ namespace osWebRtcVoice.Tests
             using Barrier gate = new Barrier(attempts);
             Task<SessionOutcome>[] tasks = Enumerable.Range(0, attempts).Select(i => Task.Factory.StartNew(() =>
             {
-                gate.SignalAndWait();
+                gate.SignalAndWait(TestContext.Current.CancellationToken);
                 return regions[i % 2].StartAdhoc(creator, temp, origin[i % 2]);
             }, TaskCreationOptions.LongRunning)).ToArray();
-            Task.WaitAll(tasks);
+            SessionOutcome[] results = await Task.WhenAll(tasks);
 
-            Assert.That(tasks.All(t => t.Result.Ok), Is.True, string.Join(",", tasks.Select(t => t.Result.Decision).Distinct()));
-            Assert.That(tasks.Select(t => t.Result.Session.SessionId).Distinct().Count(), Is.EqualTo(1));
-            Assert.That(tasks.Count(t => t.Result.Created), Is.EqualTo(1));
+            Assert.True(results.All(t => t.Ok), string.Join(",", results.Select(t => t.Decision).Distinct()));
+            Assert.Single(results.Select(t => t.Session.SessionId).Distinct());
+            Assert.Single(results, t => t.Created);
         }
 
         // ---- a region restarting, and a seat nobody renews ----------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARestartedRegionReleasesItsSeatsAndNoOthers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             GridNonSpatialSessions a = NewRegion(), b = NewRegion();
             UUID regionA = UUID.Random(), regionB = UUID.Random(), group = UUID.Random();
             UUID alice = UUID.Random(), bob = UUID.Random(), onB = UUID.Random();
@@ -164,17 +187,24 @@ namespace osWebRtcVoice.Tests
 
             int released = a.DepartRegion(regionA);
 
-            Assert.That(released, Is.EqualTo(2), "the creator's seat and Bob's, both taken from region A");
+            {
+                var assertedValue = released;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the creator's seat and Bob's, both taken from region A");
+            }
             NonSpatialVoiceSession s = b.Get(group);
-            Assert.That(s.SeatsHeld, Is.EqualTo(1));
-            Assert.That(s.Find(onB).HoldsSeat, Is.True, "region B's seat is untouched");
-            Assert.That(s.Find(bob).Departure, Is.EqualTo(DepartureReason.PresenceLost));
-            Assert.That(b.DepartRegion(regionA), Is.EqualTo(0), "a second release finds nothing left");
+            Assert.Equal(1, s.SeatsHeld);
+            Assert.True(s.Find(onB).HoldsSeat, "region B's seat is untouched");
+            Assert.Equal(DepartureReason.PresenceLost, s.Find(bob).Departure);
+            {
+                var assertedValue = b.DepartRegion(regionA);
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "a second release finds nothing left");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASeatNobodyRenews_IsReleasedWhenItsLeaseRunsOut_AndARenewedSeatIsKept()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Require("lease");
             GridNonSpatialSessions a = NewRegion();
             UUID regionA = UUID.Random(), group = UUID.Random(), alice = UUID.Random(), bob = UUID.Random();
@@ -186,9 +216,9 @@ namespace osWebRtcVoice.Tests
                 () => !a.Get(group).Find(bob).HoldsSeat);
 
             NonSpatialVoiceSession s = a.Get(group);
-            Assert.That(s.Find(alice).HoldsSeat, Is.True, "renewed, so kept");
-            Assert.That(s.Find(bob).HoldsSeat, Is.False, "never renewed, so released");
-            Assert.That(s.Find(bob).Departure, Is.EqualTo(DepartureReason.PresenceLost));
+            Assert.True(s.Find(alice).HoldsSeat, "renewed, so kept");
+            Assert.False(s.Find(bob).HoldsSeat, "never renewed, so released");
+            Assert.Equal(DepartureReason.PresenceLost, s.Find(bob).Departure);
         }
 
         // ---- a ring is judged by the service ------------------------------------------------------------
@@ -210,7 +240,7 @@ namespace osWebRtcVoice.Tests
                 SenderRegion = UUID.Random(), ReceiverRegion = UUID.Random(),
             };
             SessionOutcome started = c.Sender.StartAdhoc(c.Alice, UUID.Random(), c.SenderRegion, new List<UUID> { c.Bob, c.Carol });
-            Assert.That(started.Ok, Is.True, started.Decision);
+            Assert.True(started.Ok, started.Decision);
             c.SessionId = started.Session.SessionId;
             c.RoomKey = started.Session.RoomKey;
             c.Token = c.Sender.IssueToken(c.SessionId, c.Alice);
@@ -218,77 +248,106 @@ namespace osWebRtcVoice.Tests
             return c;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingVerifiesOnceAndOnlyForWhatWasSent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Conference c = NewConference(markInvited: true);
             const NonSpatialSessionType adhoc = NonSpatialSessionType.Adhoc;
 
             SessionOutcome genuine = c.Receiver.VerifyRing(c.SessionId, c.Bob, c.Alice, adhoc);
-            Assert.That(genuine.Ok, Is.True, genuine.Decision);
-            Assert.That(genuine.Session.Token, Is.EqualTo(c.Token), "an invited target is given the credential");
+            Assert.True(genuine.Ok, genuine.Decision);
+            {
+                var assertedValue = genuine.Session.Token;
+                TestAssert.WithMessage(() => Assert.Equal(c.Token, assertedValue), "an invited target is given the credential");
+            }
 
             SessionOutcome replay = c.Receiver.VerifyRing(c.SessionId, c.Bob, c.Alice, adhoc);
-            Assert.That(replay.Ok, Is.False);
-            Assert.That(replay.Decision, Is.EqualTo("refused-ring-used"));
+            Assert.False(replay.Ok);
+            Assert.Equal("refused-ring-used", replay.Decision);
 
-            Assert.That(c.Receiver.VerifyRing(c.SessionId, c.Dave, c.Alice, adhoc).Decision, Is.EqualTo("refused-target-not-invited"));
-            Assert.That(c.Receiver.VerifyRing(c.SessionId, c.Carol, c.Dave, adhoc).Decision, Is.EqualTo("refused-caller-not-seated"));
-            Assert.That(c.Receiver.VerifyRing(c.SessionId, c.Carol, c.Alice, NonSpatialSessionType.Group).Decision, Is.EqualTo("refused-session-type-mismatch"));
-            Assert.That(c.Receiver.VerifyRing(c.SessionId, c.Carol, c.Alice, adhoc).Ok, Is.True, "the refusals did not use Carol's ring up");
+            Assert.Equal("refused-target-not-invited", c.Receiver.VerifyRing(c.SessionId, c.Dave, c.Alice, adhoc).Decision);
+            Assert.Equal("refused-caller-not-seated", c.Receiver.VerifyRing(c.SessionId, c.Carol, c.Dave, adhoc).Decision);
+            Assert.Equal("refused-session-type-mismatch", c.Receiver.VerifyRing(c.SessionId, c.Carol, c.Alice, NonSpatialSessionType.Group).Decision);
+            Assert.True(c.Receiver.VerifyRing(c.SessionId, c.Carol, c.Alice, adhoc).Ok, "the refusals did not use Carol's ring up");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingForASessionThatDoesNotExist_IsRefused_AndNothingIsCreated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Conference c = NewConference(markInvited: true);
             UUID nothing = UUID.Random();
 
             SessionOutcome o = c.Receiver.VerifyRing(nothing, c.Bob, c.Alice, NonSpatialSessionType.Adhoc);
 
-            Assert.That(o.Ok, Is.False);
-            Assert.That(o.Decision, Is.EqualTo(SessionOutcome.NoSuchSession));
-            Assert.That(c.Receiver.Get(nothing), Is.Null, "the forged ring made no session");
+            Assert.False(o.Ok);
+            Assert.Equal(SessionOutcome.NoSuchSession, o.Decision);
+            {
+                var assertedValue = c.Receiver.Get(nothing);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the forged ring made no session");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingBeforeTheSenderMarkedTheTarget_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Conference c = NewConference(markInvited: false);
 
-            Assert.That(c.Receiver.VerifyRing(c.SessionId, c.Bob, c.Alice, NonSpatialSessionType.Adhoc).Decision, Is.EqualTo("refused-target-not-invited"));
+            Assert.Equal("refused-target-not-invited", c.Receiver.VerifyRing(c.SessionId, c.Bob, c.Alice, NonSpatialSessionType.Adhoc).Decision);
         }
 
         // ---- the conference text key goes only to seated members ----------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheConferenceTextKeyGoesOnlyToSeatedMembers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Conference c = NewConference(markInvited: true);
-            Assert.That(c.Receiver.Accept(c.SessionId, c.Bob, c.ReceiverRegion).Ok, Is.True);
+            Assert.True(c.Receiver.Accept(c.SessionId, c.Bob, c.ReceiverRegion).Ok);
 
             string first = c.Sender.CarrierKey(c.SessionId, c.Alice);
             string second = c.Receiver.CarrierKey(c.SessionId, c.Bob);
 
-            Assert.That(first, Has.Length.GreaterThanOrEqualTo(CarrierAuth.MinSecretLength));
-            Assert.That(second, Is.EqualTo(first), "every seated member has the same key, from whichever region");
-            Assert.That(c.Receiver.CarrierKey(c.SessionId, c.Carol), Is.Null, "invited, not seated");
-            Assert.That(c.Receiver.CarrierKey(c.SessionId, c.Dave), Is.Null, "not in the conference");
-            Assert.That(c.Receiver.CarrierKey(UUID.Random(), c.Alice), Is.Null, "no such conference");
+            Assert.True(first.Length >= CarrierAuth.MinSecretLength);
+            {
+                var assertedValue = second;
+                TestAssert.WithMessage(() => Assert.Equal(first, assertedValue), "every seated member has the same key, from whichever region");
+            }
+            {
+                var assertedValue = c.Receiver.CarrierKey(c.SessionId, c.Carol);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "invited, not seated");
+            }
+            {
+                var assertedValue = c.Receiver.CarrierKey(c.SessionId, c.Dave);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "not in the conference");
+            }
+            {
+                var assertedValue = c.Receiver.CarrierKey(UUID.Random(), c.Alice);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no such conference");
+            }
 
             SessionOutcome other = c.Sender.StartAdhoc(c.Alice, UUID.Random(), c.SenderRegion);
-            Assert.That(c.Sender.CarrierKey(other.Session.SessionId, c.Alice), Is.Not.EqualTo(first), "each conference has its own key");
+            {
+                var assertedValue = c.Sender.CarrierKey(other.Session.SessionId, c.Alice);
+                TestAssert.WithMessage(() => Assert.NotEqual(first, assertedValue), "each conference has its own key");
+            }
 
             c.Receiver.Depart(c.SessionId, c.Bob, DepartureReason.VoiceTeardown);
-            Assert.That(NewRegion().CarrierKey(c.SessionId, c.Bob), Is.Null, "a member who left no longer has it (asked of a region that has not kept it)");
+            {
+                var assertedValue = NewRegion().CarrierKey(c.SessionId, c.Bob);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "a member who left no longer has it (asked of a region that has not kept it)");
+            }
         }
 
         // ---- the time one provision step takes ----------------------------------------------------------
 
         /// <summary>The numbers are reported, not held to a tight bound: where the service runs changes them.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheTimeOfAJoinAndAReadIsReported()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             GridNonSpatialSessions region = NewRegion();
             UUID origin = UUID.Random();
             const int groups = 6, perGroup = 40;
@@ -296,24 +355,24 @@ namespace osWebRtcVoice.Tests
             for (int g = 0; g < groups; g++)
             {
                 UUID group = UUID.Random();
-                Assert.That(region.Start(NonSpatialSessionType.Group, UUID.Random(), group, group, origin).Ok, Is.True);
+                Assert.True(region.Start(NonSpatialSessionType.Group, UUID.Random(), group, group, origin).Ok);
                 for (int i = 0; i < perGroup; i++)
                 {
                     UUID agent = UUID.Random();
                     Stopwatch w = Stopwatch.StartNew();
                     SessionOutcome o = region.Accept(group, agent, origin);
                     joins.Add(w.Elapsed.TotalMilliseconds);
-                    Assert.That(o.Ok, Is.True, o.Decision);
+                    Assert.True(o.Ok, o.Decision);
                     w.Restart();
-                    Assert.That(region.Get(group, agent), Is.Not.Null);
+                    Assert.NotNull(region.Get(group, agent));
                     reads.Add(w.Elapsed.TotalMilliseconds);
                 }
             }
 
             string joinLine = Describe("join", joins), readLine = Describe("read", reads);
-            TestContext.Progress.WriteLine(joinLine);
-            TestContext.Progress.WriteLine(readLine);
-            Assert.That(Percentile(joins, 0.95), Is.LessThan(2000), "a sanity bound only: " + joinLine);
+            TestContext.Current.TestOutputHelper.WriteLine(joinLine);
+            TestContext.Current.TestOutputHelper.WriteLine(readLine);
+            Assert.True(Percentile(joins, 0.95) < 2000, "a sanity bound only: " + joinLine);
         }
 
         private static double Percentile(List<double> values, double p)
@@ -327,14 +386,11 @@ namespace osWebRtcVoice.Tests
     }
 
     /// <summary>The scenarios with every region sharing one service object in this process.</summary>
-    [TestFixture]
-    public class InProcessStoreScenarios : StoreScenarios
-    {
+    public class InProcessStoreScenarios : StoreScenarios, IAsyncLifetime
+        {
         private readonly NonSpatialIdentityTests.FakeClock _clock = new NonSpatialIdentityTests.FakeClock();
         private const int LeaseSeconds = 10;
         private VoiceSessionService _service;
-
-        [SetUp]
         public void NewStore()
             => _service = new VoiceSessionService("example-grid", clock: _clock.Get, seatLease: TimeSpan.FromSeconds(LeaseSeconds));
 
@@ -346,17 +402,25 @@ namespace osWebRtcVoice.Tests
             renewKept();
             _clock.Now += TimeSpan.FromSeconds(LeaseSeconds / 2 + 1);
             _service.Sweep();
-            Assert.That(gone(), Is.True);
+            Assert.True(gone());
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            NewStore();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 
     /// <summary>The scenarios against a call session service in another process, over HTTP. Opt-in; see the file header.</summary>
     // The assembly-wide 10 s backstop is too short for a seat lease that has to run out in real time.
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-    [TestFixture, NUnit.Framework.Timeout(240000)]
-#pragma warning restore CS0618
-    public class GridStoreProcessTests : StoreScenarios
-    {
+    public class GridStoreProcessTests : StoreScenarios, IAsyncLifetime
+        {
         public const string UrlVariable = "WEBRTC_VOICE_STORE_TEST_URL";
         public const string UserVariable = "WEBRTC_VOICE_STORE_TEST_USER";
         public const string PasswordVariable = "WEBRTC_VOICE_STORE_TEST_PASSWORD";
@@ -368,18 +432,16 @@ namespace osWebRtcVoice.Tests
 
         /// <summary>True when the variables that name the service are set.</summary>
         public static bool Configured => !string.IsNullOrEmpty(Url) && !string.IsNullOrEmpty(Password);
-
-        [SetUp]
         public void RequireService()
         {
             if (!Configured)
-                Assert.Ignore($"{UrlVariable} and {PasswordVariable} are not both set: the tests against a call session service process are opt-in");
+                Assert.Skip($"{UrlVariable} and {PasswordVariable} are not both set: the tests against a call session service process are opt-in");
         }
 
         protected override void Require(string need)
         {
             if (need == "lease" && !int.TryParse(Environment.GetEnvironmentVariable(LeaseVariable), out _))
-                Assert.Ignore($"{LeaseVariable} is not set: the seat lease test needs the service's SeatLeaseSeconds");
+                Assert.Skip($"{LeaseVariable} is not set: the seat lease test needs the service's SeatLeaseSeconds");
         }
 
         protected override IVoiceSessionService NewRegionClient()
@@ -407,14 +469,22 @@ namespace osWebRtcVoice.Tests
             }
             Assert.Fail($"the unrenewed seat was still held {limit.TotalSeconds:F0} s after it was taken");
         }
+
+        public ValueTask InitializeAsync()
+        {
+            RequireService();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     /// <summary>What a region does while the service is stopped, and after it is started again. Opt-in; see the file header.</summary>
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-    [TestFixture, NUnit.Framework.Timeout(120000)]
-#pragma warning restore CS0618
-    public class GridStoreRestartProof
-    {
+    public class GridStoreRestartProof : IAsyncLifetime
+        {
         private const string PhaseVariable = "WEBRTC_VOICE_STORE_TEST_PHASE";
         private const string StateVariable = "WEBRTC_VOICE_STORE_TEST_STATE";
 
@@ -429,12 +499,10 @@ namespace osWebRtcVoice.Tests
         private IVoiceSessionService _client;
         private GridNonSpatialSessions _region;
         private A2ACalls _calls;
-
-        [SetUp]
-        public void Connect()
+        private void Connect()
         {
             if (!GridStoreProcessTests.Configured || string.IsNullOrEmpty(Phase) || string.IsNullOrEmpty(StateFile))
-                Assert.Ignore($"{PhaseVariable} and {StateVariable} are not set (with the service address and password): the restart proof is opt-in");
+                Assert.Skip($"{PhaseVariable} and {StateVariable} are not set (with the service address and password): the restart proof is opt-in");
             IniConfigSource config = new IniConfigSource();
             IConfig c = config.AddConfig("WebRtcVoice");
             c.Set("AuthType", "BasicHttpAuthentication");
@@ -461,9 +529,10 @@ namespace osWebRtcVoice.Tests
             return m;
         }
 
-        [Test]
+        [Fact(Timeout = 120000)]
         public void Run()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             switch (Phase)
             {
                 case "seed": Seed(); break;
@@ -476,11 +545,14 @@ namespace osWebRtcVoice.Tests
         private void Seed()
         {
             Ids i = new Ids { Group = UUID.Random(), Alice = UUID.Random(), Bob = UUID.Random(), Carol = UUID.Random(), Dave = UUID.Random(), Origin = UUID.Random() };
-            Assert.That(_region.Start(NonSpatialSessionType.Group, i.Alice, i.Group, i.Group, i.Origin).Ok, Is.True);
-            Assert.That(_region.Accept(i.Group, i.Bob, i.Origin).Ok, Is.True);
-            Assert.That(_region.Accept(i.Group, i.Carol, i.Origin).Ok, Is.True);
-            Assert.That(_region.Get(i.Group).SeatsHeld, Is.EqualTo(3));
-            Assert.That(_calls.Record(i.Alice, i.Dave, i.Origin, out _), Is.Not.Null, "the avatar-to-avatar call is taken");
+            Assert.True(_region.Start(NonSpatialSessionType.Group, i.Alice, i.Group, i.Group, i.Origin).Ok);
+            Assert.True(_region.Accept(i.Group, i.Bob, i.Origin).Ok);
+            Assert.True(_region.Accept(i.Group, i.Carol, i.Origin).Ok);
+            Assert.Equal(3, _region.Get(i.Group).SeatsHeld);
+            {
+                var assertedValue = _calls.Record(i.Alice, i.Dave, i.Origin, out _);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the avatar-to-avatar call is taken");
+            }
             File.WriteAllLines(StateFile, new[] { i.Group, i.Alice, i.Bob, i.Carol, i.Dave, i.Origin }.Select(u => u.ToString()));
         }
 
@@ -488,39 +560,89 @@ namespace osWebRtcVoice.Tests
         {
             Ids i = Load();
             SessionOutcome start = default;
-            Assert.DoesNotThrow(() => start = _region.Start(NonSpatialSessionType.Group, UUID.Random(), i.Group, i.Group, i.Origin));
-            Assert.That(start.Ok, Is.False);
-            Assert.That(start.Decision, Is.EqualTo(SessionOutcome.StoreUnavailable));
+            {
+                var assertedValue = () => start = _region.Start(NonSpatialSessionType.Group, UUID.Random(), i.Group, i.Group, i.Origin);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
+            Assert.False(start.Ok);
+            Assert.Equal(SessionOutcome.StoreUnavailable, start.Decision);
 
             SessionOutcome join = default;
-            Assert.DoesNotThrow(() => join = _region.Accept(i.Group, UUID.Random(), i.Origin));
-            Assert.That(join.Decision, Is.EqualTo(SessionOutcome.StoreUnavailable), "a new join is refused");
+            {
+                var assertedValue = () => join = _region.Accept(i.Group, UUID.Random(), i.Origin);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
+            {
+                var assertedValue = join.Decision;
+                TestAssert.WithMessage(() => Assert.Equal(SessionOutcome.StoreUnavailable, assertedValue), "a new join is refused");
+            }
 
             ChatSessionOutcome p2p = default;
-            Assert.DoesNotThrow(() => p2p = ChatSessionRequestLogic.Decide(Request(ChatSessionRequestLogic.MethodStartP2PVoice, UUID.Random(), UUID.Random()), UUID.Random(), _calls));
-            Assert.That(p2p.Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable), "starting an avatar-to-avatar call is answered 503");
+            {
+                var assertedValue = () => p2p = ChatSessionRequestLogic.Decide(Request(ChatSessionRequestLogic.MethodStartP2PVoice, UUID.Random(), UUID.Random()), UUID.Random(), _calls);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
+            {
+                var assertedValue = p2p.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.ServiceUnavailable, assertedValue), "starting an avatar-to-avatar call is answered 503");
+            }
 
             ChatSessionOutcome call = default;
-            Assert.DoesNotThrow(() => call = ChatSessionRequestLogic.Decide(Request(ChatSessionRequestLogic.MethodCall, A2ACalls.ComputeSessionId(i.Alice, i.Dave)), i.Alice, _calls));
-            Assert.That(call.Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable), "joining one is answered 503, not 404: the store has not said the call is gone");
+            {
+                var assertedValue = () => call = ChatSessionRequestLogic.Decide(Request(ChatSessionRequestLogic.MethodCall, A2ACalls.ComputeSessionId(i.Alice, i.Dave)), i.Alice, _calls);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
+            {
+                var assertedValue = call.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.ServiceUnavailable, assertedValue), "joining one is answered 503, not 404: the store has not said the call is gone");
+            }
         }
 
         private void After()
         {
             Ids i = Load();
-            Assert.That(_region.Get(i.Group), Is.Null, "the restarted service starts empty: the group call from before is gone");
+            {
+                var assertedValue = _region.Get(i.Group);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the restarted service starts empty: the group call from before is gone");
+            }
             ChatSessionOutcome gone = ChatSessionRequestLogic.Decide(Request(ChatSessionRequestLogic.MethodCall, A2ACalls.ComputeSessionId(i.Alice, i.Dave)), i.Alice, _calls);
-            Assert.That(gone.Status, Is.EqualTo(HttpStatusCode.NotFound), "and now the store answers that the call is gone");
+            {
+                var assertedValue = gone.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.NotFound, assertedValue), "and now the store answers that the call is gone");
+            }
 
             SessionOutcome start = _region.Start(NonSpatialSessionType.Group, i.Alice, i.Group, i.Group, i.Origin);
-            Assert.That(start.Ok, Is.True, start.Decision);
-            Assert.That(start.Created, Is.True, "a region starts the call again, as a new session");
-            Assert.That(start.StartedRinging, Is.True);
-            Assert.That(_region.Accept(i.Group, i.Bob, i.Origin).Ok, Is.True, "and its members take their seats again");
-            Assert.That(_region.Get(i.Group).SeatsHeld, Is.EqualTo(2));
-            Assert.That(_calls.Record(i.Alice, i.Dave, i.Origin, out bool created), Is.Not.Null);
-            Assert.That(created, Is.True, "the avatar-to-avatar call is taken again");
-            Assert.That(_region.DepartRegion(i.Origin), Is.GreaterThanOrEqualTo(3), "the region's seats are released again");
+            Assert.True(start.Ok, start.Decision);
+            Assert.True(start.Created, "a region starts the call again, as a new session");
+            Assert.True(start.StartedRinging);
+            Assert.True(_region.Accept(i.Group, i.Bob, i.Origin).Ok, "and its members take their seats again");
+            Assert.Equal(2, _region.Get(i.Group).SeatsHeld);
+            Assert.NotNull(_calls.Record(i.Alice, i.Dave, i.Origin, out bool created));
+            Assert.True(created, "the avatar-to-avatar call is taken again");
+            Assert.True(_region.DepartRegion(i.Origin) >= 3, "the region's seats are released again");
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            Connect();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

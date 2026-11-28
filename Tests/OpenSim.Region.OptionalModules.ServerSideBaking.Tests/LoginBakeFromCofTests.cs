@@ -6,6 +6,7 @@
  */
 
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -307,10 +308,10 @@ public class LoginBakeFromCofTests
             using (var log = new LogCapture())
             {
                 bake = Task.Run(() => rig.Module.LoginBakeAsync(rig.Presence, CancellationToken.None));
-                Assert.True(gated.Entered.Wait(TimeSpan.FromSeconds(30)), "the login bake never read the Current Outfit");
+                Assert.True(gated.Entered.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the login bake never read the Current Outfit");
 
                 // generous: the limit is 300 ms, so a bake held by the read is what keeps this from finishing
-                finished = await Task.WhenAny(bake, Task.Delay(TimeSpan.FromSeconds(30))) == bake;
+                finished = await Task.WhenAny(bake, Task.Delay(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken)) == bake;
                 warnings = log.Messages.Where(m => m.Contains("could not read the Current Outfit", StringComparison.Ordinal) && m.Contains(Agent.ToString(), StringComparison.Ordinal)).ToList();
             }
         }
@@ -325,8 +326,84 @@ public class LoginBakeFromCofTests
         Assert.Single(warnings);
 
         // the late read must not rewrite the worn set behind the bake that was sent
-        Assert.True(gated.Left.Wait(TimeSpan.FromSeconds(30)), "the stalled read never finished");
-        await Task.Delay(TimeSpan.FromMilliseconds(500));   // a NOT-happened window: the late read's result has nowhere to go
+        Assert.True(gated.Left.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the stalled read never finished");
+        await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);   // a NOT-happened window: the late read's result has nowhere to go
         Assert.Equal(1, rig.Presence.Appearance.Wearables[Alpha].Count);
+    }
+
+    /// <summary>Wait for <paramref name="condition"/>, polling, for up to <paramref name="timeout"/>.</summary>
+    private static async Task<bool> Eventually(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline) return false;
+            await Task.Delay(20);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// The login bake is queued when the agent is made root (<c>ScenePresence.MakeRootAgent</c> raises
+    /// <c>OnMakeRootAgent</c>), and runs on the thread pool. Under load it can run after the agent has teleported or
+    /// crossed on, when the presence here is a child agent. That bake ends quietly: nothing is baked, recorded or sent
+    /// here, and nothing is logged above Debug. The region the agent arrived in raised its own make-root and bakes it.
+    /// </summary>
+    [Fact]
+    public async Task AQueuedLoginBakeForAnAgentThatHasLeftEndsQuietly()
+    {
+        var rig = Setup(recordTypes: new[] { Shape, Skin }, cofTypes: new[] { Shape, Skin });
+        var region = rig.Module.RegionOf(rig.Scene);
+        var name = rig.Presence.Name;
+        var gated = new GatedInventory(rig.Scene.InventoryService);
+        UseInventory(rig.Scene, gated);
+        gated.Open.Reset();
+
+        var threw = $"login bake for {name} threw";
+        var quiet = $"({Agent}) reason=Login not run";
+        bool ended;
+        LogLevel? threwLevel, quietLevel;
+        try
+        {
+            using var log = new LogCapture();
+
+            // the module's own trigger; raised off the test thread in case the fire-and-forget method runs it inline
+            _ = Task.Run(() => rig.Scene.EventManager.TriggerOnMakeRootAgent(rig.Presence), TestContext.Current.CancellationToken);
+            Assert.True(gated.Entered.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "no login bake was queued");
+
+            // the queued bake is held at its Current Outfit read while the agent leaves for another region
+            rig.Presence.MakeChildAgent(rig.Scene.RegionInfo.RegionHandle + 1);
+            Assert.True(rig.Presence.IsChildAgent);
+            gated.Open.Set();
+
+            ended = await Eventually(() => log.Contains(threw) || log.Contains(quiet), TimeSpan.FromSeconds(30));
+            threwLevel = log.LevelOf(threw);
+            quietLevel = log.LevelOf(quiet);
+        }
+        finally
+        {
+            gated.Open.Set();
+        }
+
+        Assert.True(ended, "the queued login bake never finished");
+        Assert.Null(threwLevel);
+        Assert.Equal(LogLevel.Debug, quietLevel);
+        Assert.Equal(-1, region.BakedCofVersion(Agent));
+        lock (rig.Client.Sent) Assert.Empty(rig.Client.Sent);
+    }
+
+    /// <summary>The control: queued the same way, the login bake for an agent that stays bakes it and sends the appearance.</summary>
+    [Fact]
+    public async Task AQueuedLoginBakeForAnAgentThatStaysBakesIt()
+    {
+        var rig = Setup(recordTypes: new[] { Shape, Skin }, cofTypes: new[] { Shape, Skin });
+        var region = rig.Module.RegionOf(rig.Scene);
+
+        _ = Task.Run(() => rig.Scene.EventManager.TriggerOnMakeRootAgent(rig.Presence), TestContext.Current.CancellationToken);
+
+        Assert.True(await Eventually(() => { lock (rig.Client.Sent) return rig.Client.Sent.Count > 0; }, TimeSpan.FromSeconds(60)),
+            "the queued login bake sent no appearance");
+        Assert.NotEqual(-1, region.BakedCofVersion(Agent));
+        Assert.False(rig.Presence.IsChildAgent);
     }
 }

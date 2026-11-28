@@ -23,7 +23,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ConnectorRoomTests
     {
         private static UUID Id(int n)
@@ -82,9 +81,10 @@ namespace osWebRtcVoice.Tests
 
         /// A room the mixer never knows must not be retried at tick rate. The REAL sender and authority, 120
         /// simulated seconds at a tick every 250 ms, every batch answered unknown_room: at most 10 attempts.
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task T4_ARoomThatStaysUnknown_DrawsAtMostTenAttemptsInTwoMinutes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             long clock = 10_000;
             int attempts = 0;
             Task<(AdminSendResult, string)> Send(OSDMap request)
@@ -111,16 +111,16 @@ namespace osWebRtcVoice.Tests
                 await sender.PumpAsync(feed.Tick());
             }
 
-            TestContext.Out.WriteLine($"attempts in 120 s: {attempts}");
-            Assert.That(attempts, Is.LessThanOrEqualTo(10),
-                "a room that stays unknown for 120 s draws at most 10 attempts (1 s doubling; capped at 300 s)");
-            Assert.That(attempts, Is.GreaterThanOrEqualTo(5), "and it does keep trying");
+            TestContext.Current.TestOutputHelper.WriteLine($"attempts in 120 s: {attempts}");
+            Assert.True(attempts <= 10, "a room that stays unknown for 120 s draws at most 10 attempts (1 s doubling; capped at 300 s)");
+            Assert.True(attempts >= 5, "and it does keep trying");
         }
 
         /// The backoff resets once the room answers: the next failure starts at 1 s again, not at the cap.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void T4b_TheBackoffResetsOnSuccess()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             long clock = 10_000;
             var auth = new VisAuthority(0x0000018f00000001UL, "backoff", () => clock);
             var named = new List<UUID> { L };
@@ -132,35 +132,35 @@ namespace osWebRtcVoice.Tests
             }
             auth.OnBatchOutcome(Room, VisOp.Replace, auth.NextGeneration(Room), named, true,
                 new JanusPeerCtlBatchSink.SlvoiceReply { Present = true, Status = "applied" });
-            Assert.That(auth.IsArmed(Room, L), Is.True, "the room answered: armed");
+            Assert.True(auth.IsArmed(Room, L), "the room answered: armed");
 
             auth.OnBatchOutcome(Room, VisOp.Replace, auth.NextGeneration(Room), named, true,
                 new JanusPeerCtlBatchSink.SlvoiceReply { Present = true, Status = "error", Reason = "unknown_room" });
-            Assert.That(auth.CanArmNow(L), Is.False, "backing off again");
+            Assert.False(auth.CanArmNow(L), "backing off again");
             clock += 1_100;
-            Assert.That(auth.CanArmNow(L), Is.True, "from 1 s again, not from the cap it had climbed to");
+            Assert.True(auth.CanArmNow(L), "from 1 s again, not from the cap it had climbed to");
         }
 
         /// Pinned: a standing re-arm request must not bypass the backoff. Otherwise the mixer logs
         /// unknown_room several times a second for one connector: the NPC never leaves the population, so its request
         /// never expires, and the arming pass would short-circuit on it every tick.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void T4c_AStandingRearmRequest_DoesNotBypassTheBackoff()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             long clock = 10_000;
             var auth = new VisAuthority(0x0000018f00000001UL, "backoff", () => clock);
             auth.RequestArm(L);
             auth.OnBatchOutcome(Room, VisOp.Replace, auth.NextGeneration(Room), new List<UUID> { L }, true,
                 new JanusPeerCtlBatchSink.SlvoiceReply { Present = true, Status = "error", Reason = "unknown_room" });
 
-            Assert.That(auth.IsRearmRequested(L), Is.True, "the request is still outstanding");
-            Assert.That(auth.CanArmNow(L), Is.False, "the authority's own backoff was always right");
+            Assert.True(auth.IsRearmRequested(L), "the request is still outstanding");
+            Assert.False(auth.CanArmNow(L), "the authority's own backoff was always right");
             // The sender's arming condition is what bypassed it. This is that condition, as VisibilityBatchSender
             // evaluates it: with the fix nothing arms while the backoff holds, standing request or not.
             bool snapshot = false;
             bool wouldArm = (snapshot || auth.IsRearmRequested(L) || !auth.IsArmed(Room, L)) && auth.CanArmNow(L);
-            Assert.That(wouldArm, Is.False,
-                "and the sender does not arm through it: a re-arm request is not a licence to retry every tick");
+            Assert.False(wouldArm, "and the sender does not arm through it: a re-arm request is not a licence to retry every tick");
         }
 
         // ---- proof that the room exists releases the backoff -------------
@@ -174,10 +174,12 @@ namespace osWebRtcVoice.Tests
         /// tick, not minutes later. TWO listeners are in the room deliberately: RequestArm has always cleared the retry
         /// for the agent it names, so a one-listener provision case would pass without the release at all. What is tested
         /// here is that the room existing releases the OTHERS - the listener nobody provisioned.</summary>
-        [TestCase(false, TestName = "C1_EnsureSucceeded_ArmsOnTheVeryNextTick")]
-        [TestCase(true, TestName = "C1_ViewerProvisioned_ArmsOnTheVeryNextTick")]
+        [InlineData(false,TestDisplayName="C1_EnsureSucceeded_ArmsOnTheVeryNextTick")]
+        [InlineData(true,TestDisplayName="C1_ViewerProvisioned_ArmsOnTheVeryNextTick")]
+        [Theory(Timeout = 60000)]
         public async Task C1_ProofThatTheRoomExists_ReleasesTheBackoff_AndArmsOnTheVeryNextTick(bool viaProvision)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             long clock = 10_000;
             int attempts = 0;
             bool unknown = true;
@@ -209,10 +211,9 @@ namespace osWebRtcVoice.Tests
             clock += 31_000;                         // let the capped delay expire, so the next pump really tries
             await sender.PumpAsync(feed.Tick());
             int attemptsAtCap = attempts;
-            Assert.That(auth.CanArmNow(L), Is.False, "that attempt failed too, so it is waiting again");
+            Assert.False(auth.CanArmNow(L), "that attempt failed too, so it is waiting again");
             clock += 25_000;
-            Assert.That(auth.CanArmNow(L), Is.False,
-                "and still waiting 25 s later: the delay has climbed far past the 1 s it started at");
+            Assert.False(auth.CanArmNow(L), "and still waiting 25 s later: the delay has climbed far past the 1 s it started at");
 
             // The room now exists, and the sim learns it the way the two live paths learn it.
             unknown = false;
@@ -220,25 +221,27 @@ namespace osWebRtcVoice.Tests
             if (viaProvision)
                 sender.OnListenerProvisioned(L);   // what VoiceVisibilityService does after RoomExists
 
-            Assert.That(auth.CanArmNow(L), Is.True, "the proof released the backoff there and then (ruling C)");
-            Assert.That(auth.CanArmNow(L2), Is.True,
-                "including for the listener nobody named: it is the ROOM that was proved to exist, not one agent's "
-                + "place in it");
+            Assert.True(auth.CanArmNow(L), "the proof released the backoff there and then (ruling C)");
+            Assert.True(auth.CanArmNow(L2), "including for the listener nobody named: it is the ROOM that was proved to exist, not one agent's " + "place in it");
 
             clock += 250;                          // ONE tick later, not minutes
             await sender.PumpAsync(feed.Tick());
 
-            Assert.That(attempts, Is.EqualTo(attemptsAtCap + 1), "it armed on the very next tick");
-            Assert.That(auth.IsArmed(Room, L) && auth.IsArmed(Room, L2), Is.True, "and the room took them both");
+            {
+                var assertedValue = attempts;
+                TestAssert.WithMessage(() => Assert.Equal(attemptsAtCap + 1, assertedValue), "it armed on the very next tick");
+            }
+            Assert.True((auth.IsArmed(Room, L) && auth.IsArmed(Room, L2)), "and the room took them both");
         }
 
         /// <summary>The heartbeat half of connector room resolution: the connector's parcel changes its voice channel, so the
         /// resolver answers with a new room. The next heartbeat must name the NPC at the NEW room and stop naming it
         /// at the old one. A heartbeat that kept listing it at the old room would be claiming authority over a room
         /// the sim no longer places it in - the mixer reconciles against that list, so the claim is not cosmetic.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public void C2_WhenTheConnectorsParcelChannelChanges_TheHeartbeatFollowsIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             long clock = 10_000;
             const int NewRoom = 1966197062;
             int current = Room;
@@ -248,18 +251,22 @@ namespace osWebRtcVoice.Tests
 
             auth.OnBatchOutcome(Room, VisOp.Replace, auth.NextGeneration(Room), population, true,
                 new JanusPeerCtlBatchSink.SlvoiceReply { Present = true, Status = "applied" });
-            Assert.That(auth.IsArmed(Room, L), Is.True);
-            Assert.That(Listeners(auth.BuildHeartbeat(population, resolve, false), Room),
-                Is.EquivalentTo(new[] { L.ToString() }), "named at the room it was armed in");
+            Assert.True(auth.IsArmed(Room, L));
+            {
+                var assertedValue = Listeners(auth.BuildHeartbeat(population, resolve, false), Room);
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { L.ToString() }, assertedValue, strict: true), "named at the room it was armed in");
+            }
 
             current = NewRoom;   // the parcel now runs its own channel
             auth.PruneTo(population, resolve);
             OSDMap hb = auth.BuildHeartbeat(population, resolve, false);
 
-            Assert.That(Listeners(hb, NewRoom), Is.EquivalentTo(new[] { L.ToString() }), "named at the new room");
-            Assert.That(((OSDMap)hb["rooms"]).ContainsKey(Room.ToString()), Is.False,
-                "and the old room is not in the heartbeat at all");
-            Assert.That(auth.IsArmed(Room, L), Is.False, "the claim on the old room is dropped, not left standing");
+            {
+                var assertedValue = Listeners(hb, NewRoom);
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { L.ToString() }, assertedValue, strict: true), "named at the new room");
+            }
+            Assert.False(((OSDMap)hb["rooms"]).ContainsKey(Room.ToString()), "and the old room is not in the heartbeat at all");
+            Assert.False(auth.IsArmed(Room, L), "the claim on the old room is dropped, not left standing");
         }
 
         // ---- a 300 s cap, and proof still releases it at once --------------------------
@@ -314,25 +321,27 @@ namespace osWebRtcVoice.Tests
         /// <summary>A room the mixer never has, for a simulated HOUR, draws at most 20 attempts: 1 s doubling to a
         /// 300 s cap is attempts at 0, 1, 3, 7 ... 511 s, then one every 300 s. A shorter 30 s cap would draw one
         /// attempt per room every 30 s, flooding the log overnight.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task H7_ARoomUnknownForAnHour_DrawsAtMostTwentyAttempts()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = await RunUnknownRoom(3_600_000);
-            TestContext.Out.WriteLine($"attempts in one simulated hour: {r.Attempts}");
-            Assert.That(r.Attempts, Is.LessThanOrEqualTo(20), "at most 20 in an hour (300 s cap)");
-            Assert.That(r.Attempts, Is.GreaterThanOrEqualTo(15), "and it does keep trying");
+            TestContext.Current.TestOutputHelper.WriteLine($"attempts in one simulated hour: {r.Attempts}");
+            Assert.True(r.Attempts <= 20, "at most 20 in an hour (300 s cap)");
+            Assert.True(r.Attempts >= 15, "and it does keep trying");
         }
 
         /// <summary>H7, second half: however far the backoff has climbed, a RoomExists arms on the very next tick - so a
         /// longer cap costs a proven room no latency.</summary>
-        [TestCase(10_000L, TestName = "H7_RoomExistsAfter10s_ArmsOnTheNextTick")]
-        [TestCase(700_000L, TestName = "H7_RoomExistsAfter700s_ArmsOnTheNextTick")]
-        [TestCase(3_500_000L, TestName = "H7_RoomExistsAfterAnHour_ArmsOnTheNextTick")]
+        [InlineData(10_000L,TestDisplayName="H7_RoomExistsAfter10s_ArmsOnTheNextTick")]
+        [InlineData(700_000L,TestDisplayName="H7_RoomExistsAfter700s_ArmsOnTheNextTick")]
+        [InlineData(3_500_000L,TestDisplayName="H7_RoomExistsAfterAnHour_ArmsOnTheNextTick")]
+        [Theory(Timeout = 60000)]
         public async Task H7_RoomExistsAtAnyPoint_ArmsOnTheNextTick(long proveAtMs)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = await RunUnknownRoom(3_600_000, proveAtMs);
-            Assert.That(r.ArmedNextTick, Is.True, $"armed on the tick after RoomExists at {proveAtMs / 1000} s " +
-                $"({r.AttemptsAtProof} attempts before it)");
+            Assert.True(r.ArmedNextTick, $"armed on the tick after RoomExists at {proveAtMs / 1000} s " + $"({r.AttemptsAtProof} attempts before it)");
         }
 
         private static HashSet<string> Listeners(OSDMap heartbeat, int room)
