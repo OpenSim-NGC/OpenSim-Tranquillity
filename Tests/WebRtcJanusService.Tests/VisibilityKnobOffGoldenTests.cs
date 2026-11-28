@@ -39,7 +39,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VisibilityKnobOffGoldenTests
     {
         private const int RoomAB = 1001;
@@ -185,20 +184,24 @@ namespace osWebRtcVoice.Tests
             return sb.ToString();
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task KnobOff_PayloadsAndRoomCreate_AreByteIdenticalToTheGoldenFile()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string actual = await RunScenarioAsync();
             string path = GoldenPath();
             if (Environment.GetEnvironmentVariable("VIS_GOLDEN_UPDATE") == "1")
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 File.WriteAllText(path, actual, new UTF8Encoding(false));
-                Assert.Pass("golden written: " + path);
+                {
+                    TestContext.Current.TestOutputHelper.WriteLine("golden written: " + path);
+                    return;
+                }
             }
-            Assert.That(File.Exists(path), Is.True, "golden file missing: " + path);
+            Assert.True(File.Exists(path), "golden file missing: " + path);
             string golden = File.ReadAllText(path).Replace("\r\n", "\n");   // a CRLF checkout changes line ends only
-            Assert.That(actual, Is.EqualTo(golden));
+            Assert.Equal(golden, actual);
         }
     }
 }

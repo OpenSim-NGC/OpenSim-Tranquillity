@@ -13,7 +13,7 @@
  */
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -24,7 +24,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class AdhocRingRootOnlyTests
     {
         private const string Grid = "example-grid";
@@ -56,52 +55,56 @@ namespace osWebRtcVoice.Tests
         private static void Ring(WebRtcVoiceRegionModule mod, NonSpatialVoiceSession session)
             => Invoke(mod, "RingAdhocMembers", session, Alice, "Test User", null);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void InviteeWithOnlyAChildPresenceHere_IsNotRungLocally_AndIsRungThroughTheCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session) = Starting(x => x.AddChild(Bob));
 
             Ring(mod, session);
 
-            Assert.That(p.Queue.Enqueued, Does.Not.Contain(Bob));
+            Assert.DoesNotContain(Bob, p.Queue.Enqueued);
             GridInstantMessage sent = p.Transfer.Sent.SingleOrDefault();
-            Assert.That(sent, Is.Not.Null);
-            Assert.That(GroupVoiceRingTransport.TryParse(sent, out UUID target, out UUID id, out _), Is.True);
-            Assert.That(target, Is.EqualTo(Bob));
-            Assert.That(id, Is.EqualTo(session.SessionId));
+            Assert.NotNull(sent);
+            Assert.True(GroupVoiceRingTransport.TryParse(sent, out UUID target, out UUID id, out _));
+            Assert.Equal(Bob, target);
+            Assert.Equal(session.SessionId, id);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCarrierRing_IsSentToRootOnly_SoAChildPresenceHereIsNotHandedTheCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session) = Starting(x => x.AddChild(Bob));
 
             Ring(mod, session);
 
-            Assert.That(p.Transfer.Sent, Has.Count.EqualTo(1));
-            Assert.That(p.Transfer.SentRootOnly, Is.EqualTo(new[] { true }));
+            Assert.Single(p.Transfer.Sent);
+            Assert.Equal(new[] { true }, p.Transfer.SentRootOnly);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void InviteeWithARootPresenceHere_IsRungLocally_AndNothingIsCarried()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session) = Starting(x => x.AddRoot(Bob));
 
             Ring(mod, session);
 
-            Assert.That(p.Queue.Enqueued, Is.EqualTo(new[] { Bob }));
-            Assert.That(p.Transfer.Sent, Is.Empty);
+            Assert.Equal(new[] { Bob }, p.Queue.Enqueued);
+            Assert.Empty(p.Transfer.Sent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void InviteeWithNoPresenceHere_IsRungThroughTheCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session) = Starting(_ => { });
 
             Ring(mod, session);
 
-            Assert.That(p.Queue.Enqueued, Is.Empty);
-            Assert.That(p.Transfer.Sent, Has.Count.EqualTo(1));
+            Assert.Empty(p.Queue.Enqueued);
+            Assert.Single(p.Transfer.Sent);
         }
     }
 }

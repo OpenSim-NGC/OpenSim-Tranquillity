@@ -21,7 +21,6 @@ using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Tests.Common;
 using Phlox.ScriptEngine;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 
@@ -464,7 +463,7 @@ public class ScriptCleanupTests
             }
         }) { IsBackground = true };
         sweep.Start();
-        Assert.True(sweeping.Wait(TimeSpan.FromSeconds(30)), "the stand-in sweep never started");
+        Assert.True(sweeping.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the stand-in sweep never started");
 
         r.Say(7, "state");
         Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the new state never ran: " + r.H.Diagnose(id));
@@ -542,7 +541,7 @@ public class ScriptCleanupTests
         var delivery = new System.Threading.Thread(() => listens.DeliverChat(8, "tester", UUID.Random(), "late"))
             { IsBackground = true };
         delivery.Start();
-        Assert.True(matched.Wait(TimeSpan.FromSeconds(30)), "the delivery never matched the listen");
+        Assert.True(matched.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the delivery never matched the listen");
 
         r.Say(7, "state");
         Assert.True(r.PumpUntil(() => r.Count("other") == 1), "the new state never ran: " + r.H.Diagnose(id));
@@ -664,7 +663,7 @@ public class ScriptCleanupTests
             }
         }) { IsBackground = true };
         sweep.Start();
-        Assert.True(sweeping.Wait(TimeSpan.FromSeconds(30)), "the stand-in sweep never started");
+        Assert.True(sweeping.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the stand-in sweep never started");
 
         r.H.Engine.ResetScript(id);
         Assert.True(r.PumpUntil(() => r.Count("entry") == 2), "the fresh script never ran its state_entry: " + r.H.Diagnose(id));
