@@ -26,7 +26,6 @@ using OpenSim.Tests.Common;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ProvisionAnswerTests
     {
         private static readonly UUID Owner = new UUID("a11ce000-0000-4000-8000-000000000001");
@@ -102,40 +101,53 @@ namespace osWebRtcVoice.Tests
             return resp.StatusCode;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACapacityRejection_IsAnswered409()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig();
             rig.Service.Answer = new OSDMap { { "response", "failed" }, { "error", "room is full" }, { "error_code", WebRtcJanusService.JANUS_ROOM_FULL_ERROR_CODE } };
 
-            Assert.That(Send(rig, LocalBody()), Is.EqualTo((int)HttpStatusCode.Conflict));
+            Assert.Equal((int)HttpStatusCode.Conflict, Send(rig, LocalBody()));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnyOtherFailure_KeepsItsOkStatus()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig();
             rig.Service.Answer = new OSDMap { { "response", "failed" }, { "error", "JoinRoom failed" } };
 
-            Assert.That(Send(rig, LocalBody()), Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, Send(rig, LocalBody()));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusal_IsAnsweredAgainFromTheCache_WithoutRepeatingTheChecks()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig();
             rig.Scene.RegionInfo.EstateSettings.AllowVoice = false;
-            Assert.That(Send(rig, LocalBody()), Is.EqualTo((int)HttpStatusCode.NotImplemented), "refused: voice is off for the estate");
+            {
+                var assertedValue = Send(rig, LocalBody());
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.NotImplemented, assertedValue), "refused: voice is off for the estate");
+            }
 
             rig.Scene.RegionInfo.EstateSettings.AllowVoice = true;   // the checks would now pass
 
-            Assert.That(Send(rig, LocalBody()), Is.EqualTo((int)HttpStatusCode.NotImplemented), "the retry gets the cached refusal");
-            Assert.That(rig.Service.Requests, Is.Empty, "the voice service was not called");
+            {
+                var assertedValue = Send(rig, LocalBody());
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.NotImplemented, assertedValue), "the retry gets the cached refusal");
+            }
+            {
+                var assertedValue = rig.Service.Requests;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the voice service was not called");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALogout_ClearsTheCachedRefusal()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig();
             rig.Scene.RegionInfo.EstateSettings.AllowVoice = false;
             Send(rig, LocalBody());
@@ -143,20 +155,24 @@ namespace osWebRtcVoice.Tests
 
             Send(rig, LogoutBody());
 
-            Assert.That(Send(rig, LocalBody()), Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(rig.Service.Requests, Has.Count.GreaterThanOrEqualTo(1), "the provision reached the voice service");
+            Assert.Equal((int)HttpStatusCode.OK, Send(rig, LocalBody()));
+            Assert.True(rig.Service.Requests.Count() >= 1, "the provision reached the voice service");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AZeroWindow_TurnsTheCacheOff()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(refusalCacheSeconds: "0");
             rig.Scene.RegionInfo.EstateSettings.AllowVoice = false;
-            Assert.That(Send(rig, LocalBody()), Is.EqualTo((int)HttpStatusCode.NotImplemented));
+            Assert.Equal((int)HttpStatusCode.NotImplemented, Send(rig, LocalBody()));
 
             rig.Scene.RegionInfo.EstateSettings.AllowVoice = true;
 
-            Assert.That(Send(rig, LocalBody()), Is.EqualTo((int)HttpStatusCode.OK), "the checks ran again");
+            {
+                var assertedValue = Send(rig, LocalBody());
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "the checks ran again");
+            }
         }
     }
 }

@@ -14,14 +14,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class GridStoreResilienceTests
     {
         private static readonly UUID GroupId = NonSpatialIdentityTests.Group;
@@ -99,44 +98,50 @@ namespace osWebRtcVoice.Tests
 
         // ---- the circuit breaker ---------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheBreakerOpensAfterRepeatedFailures_AndNotBefore()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             SessionCircuitBreaker breaker = NewBreaker(clock);
 
             for (int i = 0; i < 4; i++)
             {
-                Assert.That(breaker.TryEnter(), Is.True);
+                Assert.True(breaker.TryEnter());
                 breaker.RecordFailure();
                 clock.Now += TimeSpan.FromSeconds(1);
             }
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.Closed), "four failures are not enough");
-            Assert.That(breaker.TryEnter(), Is.True);
+            {
+                var assertedValue = breaker.State;
+                TestAssert.WithMessage(() => Assert.Equal(BreakerState.Closed, assertedValue), "four failures are not enough");
+            }
+            Assert.True(breaker.TryEnter());
 
             breaker.RecordFailure();
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.Open));
-            Assert.That(breaker.TryEnter(), Is.False);
+            Assert.Equal(BreakerState.Open, breaker.State);
+            Assert.False(breaker.TryEnter());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void FailuresSpreadOutOverTimeNeverOpenTheBreaker()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             SessionCircuitBreaker breaker = NewBreaker(clock);
 
             for (int i = 0; i < 40; i++)
             {
-                Assert.That(breaker.TryEnter(), Is.True, "failure " + i);
+                Assert.True(breaker.TryEnter(), "failure " + i);
                 breaker.RecordFailure();
                 clock.Now += TimeSpan.FromSeconds(3);   // five inside ten seconds is never reached
             }
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.Closed));
+            Assert.Equal(BreakerState.Closed, breaker.State);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnAnswerClearsTheCountOfFailures()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             SessionCircuitBreaker breaker = NewBreaker(clock);
 
@@ -145,35 +150,46 @@ namespace osWebRtcVoice.Tests
                 for (int i = 0; i < 4; i++) breaker.RecordFailure();
                 breaker.RecordSuccess();
             }
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.Closed), "failures separated by an answer are not repeated failures");
+            {
+                var assertedValue = breaker.State;
+                TestAssert.WithMessage(() => Assert.Equal(BreakerState.Closed, assertedValue), "failures separated by an answer are not repeated failures");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhileOpenTheServiceIsNotCalledAtAll_AndTheRegionIsToldAtOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             FlakyService flaky = new FlakyService(NewReal(clock)) { Up = false };
             SessionCircuitBreaker breaker = NewBreaker(clock);
             GridNonSpatialSessions region = NewRegion(new GuardedVoiceSessionService(flaky, breaker));
 
             for (int i = 0; i < 5; i++)
-                Assert.That(region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA).Decision, Is.EqualTo(SessionOutcome.StoreUnavailable));
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.Open));
-            Assert.That(flaky.Calls, Is.EqualTo(5), "each failure waited on the service");
+                Assert.Equal(SessionOutcome.StoreUnavailable, region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA).Decision);
+            Assert.Equal(BreakerState.Open, breaker.State);
+            {
+                var assertedValue = flaky.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(5, assertedValue), "each failure waited on the service");
+            }
 
             for (int i = 0; i < 50; i++)
             {
                 SessionOutcome refused = region.Accept(GroupId, Bob, RegionA);
-                Assert.That(refused.Ok, Is.False);
-                Assert.That(refused.Decision, Is.EqualTo(SessionOutcome.StoreUnavailable));
-                Assert.That(region.Get(GroupId), Is.Null);
+                Assert.False(refused.Ok);
+                Assert.Equal(SessionOutcome.StoreUnavailable, refused.Decision);
+                Assert.Null(region.Get(GroupId));
             }
-            Assert.That(flaky.Calls, Is.EqualTo(5), "fifty more requests, none of them reached the service");
+            {
+                var assertedValue = flaky.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(5, assertedValue), "fifty more requests, none of them reached the service");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AfterTheOpenPeriodOneRequestIsLetThrough_AndAnAnswerClosesTheBreaker()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             FlakyService flaky = new FlakyService(NewReal(clock)) { Up = false };
             SessionCircuitBreaker breaker = NewBreaker(clock);
@@ -181,48 +197,59 @@ namespace osWebRtcVoice.Tests
             breaker.Changed += seen.Add;
             GridNonSpatialSessions region = NewRegion(new GuardedVoiceSessionService(flaky, breaker));
             for (int i = 0; i < 5; i++) region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA);
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.Open));
+            Assert.Equal(BreakerState.Open, breaker.State);
 
             clock.Now += TimeSpan.FromSeconds(4);
-            Assert.That(region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA).Decision, Is.EqualTo(SessionOutcome.StoreUnavailable));
-            Assert.That(flaky.Calls, Is.EqualTo(5), "still inside the open period");
+            Assert.Equal(SessionOutcome.StoreUnavailable, region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA).Decision);
+            {
+                var assertedValue = flaky.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(5, assertedValue), "still inside the open period");
+            }
 
             clock.Now += TimeSpan.FromSeconds(1);
             flaky.Up = true;
             SessionOutcome probe = region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA);
 
-            Assert.That(probe.Ok, Is.True, probe.Decision);
-            Assert.That(flaky.Calls, Is.EqualTo(6), "exactly one request was let through");
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.Closed), "the service answered");
-            Assert.That(region.Accept(GroupId, Bob, RegionA).Ok, Is.True, "and traffic flows again");
-            Assert.That(seen, Is.EqualTo(new[] { BreakerState.Open, BreakerState.HalfOpen, BreakerState.Closed }));
+            Assert.True(probe.Ok, probe.Decision);
+            {
+                var assertedValue = flaky.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(6, assertedValue), "exactly one request was let through");
+            }
+            {
+                var assertedValue = breaker.State;
+                TestAssert.WithMessage(() => Assert.Equal(BreakerState.Closed, assertedValue), "the service answered");
+            }
+            Assert.True(region.Accept(GroupId, Bob, RegionA).Ok, "and traffic flows again");
+            Assert.Equal(new[] { BreakerState.Open, BreakerState.HalfOpen, BreakerState.Closed }, seen);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlyOneProbeRunsWhileHalfOpen_AndAFailedProbeOpensItAgainForTheFullPeriod()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             SessionCircuitBreaker breaker = NewBreaker(clock);
             for (int i = 0; i < 5; i++) breaker.RecordFailure();
             clock.Now += TimeSpan.FromSeconds(5);
 
-            Assert.That(breaker.TryEnter(), Is.True, "the probe");
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.HalfOpen));
-            Assert.That(breaker.TryEnter(), Is.False, "the others wait for the probe");
+            Assert.True(breaker.TryEnter(), "the probe");
+            Assert.Equal(BreakerState.HalfOpen, breaker.State);
+            Assert.False(breaker.TryEnter(), "the others wait for the probe");
 
             breaker.RecordFailure();
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.Open));
+            Assert.Equal(BreakerState.Open, breaker.State);
             clock.Now += TimeSpan.FromSeconds(4);
-            Assert.That(breaker.TryEnter(), Is.False, "the period starts over from the failed probe");
+            Assert.False(breaker.TryEnter(), "the period starts over from the failed probe");
             clock.Now += TimeSpan.FromSeconds(1);
-            Assert.That(breaker.TryEnter(), Is.True);
+            Assert.True(breaker.TryEnter());
         }
 
         // ---- the retry queue for departs -------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void DepartsThatFailWhileTheServiceIsDownAreRetriedAndArriveWhenItIsBack()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             VoiceSessionService real = NewReal(clock);
             FlakyService flaky = new FlakyService(real);
@@ -236,30 +263,42 @@ namespace osWebRtcVoice.Tests
             region.Accept(GroupId, erin, RegionA, "viewer-erin");
 
             flaky.Up = false;
-            Assert.That(region.Depart(GroupId, Bob, DepartureReason.VoiceTeardown).Decision, Is.EqualTo(SessionOutcome.StoreUnavailable), "the caller is told as before");
+            {
+                var assertedValue = region.Depart(GroupId, Bob, DepartureReason.VoiceTeardown).Decision;
+                TestAssert.WithMessage(() => Assert.Equal(SessionOutcome.StoreUnavailable, assertedValue), "the caller is told as before");
+            }
             region.LeaveChat(GroupId, Carol);
             region.DepartByViewerSession(dave, "viewer-dave", DepartureReason.VoiceTeardown);
             region.DepartAll(erin, DepartureReason.PresenceLost);
-            Assert.That(outbox.Count, Is.EqualTo(4));
-            Assert.That(Holds(real, GroupId, Bob), Is.True, "nothing has arrived yet");
+            Assert.Equal(4, outbox.Count);
+            Assert.True(Holds(real, GroupId, Bob), "nothing has arrived yet");
 
-            Assert.That(outbox.RunOnce(), Is.EqualTo(0), "still down: nothing delivered");
-            Assert.That(outbox.Count, Is.EqualTo(4), "and nothing lost");
+            {
+                var assertedValue = outbox.RunOnce();
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "still down: nothing delivered");
+            }
+            {
+                var assertedValue = outbox.Count;
+                TestAssert.WithMessage(() => Assert.Equal(4, assertedValue), "and nothing lost");
+            }
 
             flaky.Up = true;
             flaky.Delivered.Clear();
-            Assert.That(outbox.RunOnce(), Is.EqualTo(4));
-            Assert.That(outbox.Count, Is.EqualTo(0));
-            Assert.That(flaky.Delivered, Is.EqualTo(new[] { "depart:" + Bob, "leavechat:" + Carol, "departbyviewer:" + dave, "departall:" + erin }),
-                        "each delivered once, oldest first");
-            Assert.That(Holds(real, GroupId, Bob), Is.False, "the depart arrived");
-            Assert.That(Holds(real, GroupId, dave), Is.False);
-            Assert.That(Holds(real, GroupId, erin), Is.False);
+            Assert.Equal(4, outbox.RunOnce());
+            Assert.Equal(0, outbox.Count);
+            {
+                var assertedValue = flaky.Delivered;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { "depart:" + Bob, "leavechat:" + Carol, "departbyviewer:" + dave, "departall:" + erin }, assertedValue), "each delivered once, oldest first");
+            }
+            Assert.False(Holds(real, GroupId, Bob), "the depart arrived");
+            Assert.False(Holds(real, GroupId, dave));
+            Assert.False(Holds(real, GroupId, erin));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARetryWhileTheServiceIsStillDownTriesOnceAndStops()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             FlakyService flaky = new FlakyService(NewReal(clock)) { Up = false };
             DepartOutbox outbox = NewOutbox(flaky, clock);
@@ -267,13 +306,17 @@ namespace osWebRtcVoice.Tests
 
             outbox.RunOnce();
 
-            Assert.That(flaky.Calls, Is.EqualTo(1), "one attempt to find out, not twenty");
-            Assert.That(outbox.Count, Is.EqualTo(20));
+            {
+                var assertedValue = flaky.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one attempt to find out, not twenty");
+            }
+            Assert.Equal(20, outbox.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheQueueIsBounded_AndKeepsTheNewest()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             FlakyService flaky = new FlakyService(NewReal(clock));
             DepartOutbox outbox = NewOutbox(flaky, clock, max: 3);
@@ -281,15 +324,19 @@ namespace osWebRtcVoice.Tests
 
             foreach (UUID a in agents) outbox.EnqueueDepart(GroupId, a, (int)DepartureReason.VoiceTeardown);
 
-            Assert.That(outbox.Count, Is.EqualTo(3));
-            Assert.That(outbox.Dropped, Is.EqualTo(2));
+            Assert.Equal(3, outbox.Count);
+            Assert.Equal(2, outbox.Dropped);
             outbox.RunOnce();
-            Assert.That(flaky.Delivered, Is.EqualTo(agents.Skip(2).Select(a => "depart:" + a)), "the two oldest were the ones given up, in order");
+            {
+                var assertedValue = flaky.Delivered;
+                TestAssert.WithMessage(() => Assert.Equal(agents.Skip(2).Select(a => "depart:" + a), assertedValue), "the two oldest were the ones given up, in order");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADepartOlderThanTheLimitIsDroppedNotDelivered()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             FlakyService flaky = new FlakyService(NewReal(clock));
             DepartOutbox outbox = NewOutbox(flaky, clock);
@@ -299,14 +346,18 @@ namespace osWebRtcVoice.Tests
 
             outbox.RunOnce();
 
-            Assert.That(flaky.Delivered, Is.EqualTo(new[] { "depart:" + Carol }), "the seat lease covers the one that aged out");
-            Assert.That(outbox.Dropped, Is.EqualTo(1));
-            Assert.That(outbox.Count, Is.EqualTo(0));
+            {
+                var assertedValue = flaky.Delivered;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { "depart:" + Carol }, assertedValue), "the seat lease covers the one that aged out");
+            }
+            Assert.Equal(1, outbox.Dropped);
+            Assert.Equal(0, outbox.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void JoiningAgainDropsTheQueuedDepartForThatSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             VoiceSessionService real = NewReal(clock);
             FlakyService flaky = new FlakyService(real);
@@ -319,19 +370,23 @@ namespace osWebRtcVoice.Tests
             flaky.Up = false;
             region.Depart(GroupId, Bob, DepartureReason.VoiceTeardown);
             outbox.EnqueueDepart(GroupId, other, (int)DepartureReason.VoiceTeardown);
-            Assert.That(outbox.Count, Is.EqualTo(2));
+            Assert.Equal(2, outbox.Count);
 
             flaky.Up = true;
-            Assert.That(region.Accept(GroupId, Bob, RegionA, "viewer-bob").Ok, Is.True, "Bob comes back before the queue is worked");
-            Assert.That(outbox.Count, Is.EqualTo(1), "his old depart is gone, the other agent's stays");
+            Assert.True(region.Accept(GroupId, Bob, RegionA, "viewer-bob").Ok, "Bob comes back before the queue is worked");
+            {
+                var assertedValue = outbox.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "his old depart is gone, the other agent's stays");
+            }
 
             outbox.RunOnce();
-            Assert.That(Holds(real, GroupId, Bob), Is.True, "the late depart did not remove the seat he took again");
+            Assert.True(Holds(real, GroupId, Bob), "the late depart did not remove the seat he took again");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlyDepartsAreQueued()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             FlakyService flaky = new FlakyService(NewReal(clock)) { Up = false };
             DepartOutbox outbox = NewOutbox(flaky, clock);
@@ -344,12 +399,16 @@ namespace osWebRtcVoice.Tests
             region.Decline(GroupId, Bob);
             region.Invite(GroupId, Alice, Bob);
 
-            Assert.That(outbox.Count, Is.EqualTo(0), "a call that could not start or join is refused, not replayed later");
+            {
+                var assertedValue = outbox.Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "a call that could not start or join is refused, not replayed later");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheQueueEmptiesThroughTheBreakerOnceItClosesAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             VoiceSessionService real = NewReal(clock);
             FlakyService flaky = new FlakyService(real);
@@ -363,28 +422,40 @@ namespace osWebRtcVoice.Tests
 
             flaky.Up = false;
             foreach (UUID a in agents) region.Depart(GroupId, a, DepartureReason.VoiceTeardown);
-            Assert.That(breaker.State, Is.EqualTo(BreakerState.Open), "five failures in a row");
-            Assert.That(outbox.Count, Is.EqualTo(6), "all six kept, the sixth refused by the open breaker");
+            {
+                var assertedValue = breaker.State;
+                TestAssert.WithMessage(() => Assert.Equal(BreakerState.Open, assertedValue), "five failures in a row");
+            }
+            {
+                var assertedValue = outbox.Count;
+                TestAssert.WithMessage(() => Assert.Equal(6, assertedValue), "all six kept, the sixth refused by the open breaker");
+            }
 
             int calls = flaky.Calls;
-            Assert.That(outbox.RunOnce(), Is.EqualTo(0));
-            Assert.That(flaky.Calls, Is.EqualTo(calls), "an open breaker keeps the retry off the service too");
+            Assert.Equal(0, outbox.RunOnce());
+            {
+                var assertedValue = flaky.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(calls, assertedValue), "an open breaker keeps the retry off the service too");
+            }
 
             clock.Now += TimeSpan.FromSeconds(5);
             flaky.Up = true;
-            Assert.That(outbox.RunOnce(), Is.EqualTo(6), "the first retry is the probe, and it answers");
-            foreach (UUID a in agents) Assert.That(Holds(real, GroupId, a), Is.False);
+            {
+                var assertedValue = outbox.RunOnce();
+                TestAssert.WithMessage(() => Assert.Equal(6, assertedValue), "the first retry is the probe, and it answers");
+            }
+            foreach (UUID a in agents) Assert.False(Holds(real, GroupId, a));
         }
 
         // ---- the settings ----------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheNewKeysHaveTheDesignsDefaults_AndUnusableValuesFallBackToThem()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfig voice = new IniConfigSource().AddConfig("WebRtcVoice");
             SessionStoreSettings d = SessionStoreSettings.Read(voice);
-            Assert.That(new[] { d.OutboxMax, d.OutboxSeconds, d.BreakerFailures, d.BreakerWindowSeconds, d.BreakerOpenSeconds },
-                        Is.EqualTo(new[] { 256, 60, 5, 10, 5 }));
+            Assert.Equal(new[] { 256, 60, 5, 10, 5 }, new[] { d.OutboxMax, d.OutboxSeconds, d.BreakerFailures, d.BreakerWindowSeconds, d.BreakerOpenSeconds });
 
             voice.Set("SessionStoreOutboxMax", "32");
             voice.Set("SessionStoreOutboxSeconds", "20");
@@ -392,15 +463,23 @@ namespace osWebRtcVoice.Tests
             voice.Set("SessionStoreBreakerWindowSeconds", "30");
             voice.Set("SessionStoreBreakerOpenSeconds", "15");
             SessionStoreSettings set = SessionStoreSettings.Read(voice);
-            Assert.That(new[] { set.OutboxMax, set.OutboxSeconds, set.BreakerFailures, set.BreakerWindowSeconds, set.BreakerOpenSeconds },
-                        Is.EqualTo(new[] { 32, 20, 3, 30, 15 }));
+            Assert.Equal(new[] { 32, 20, 3, 30, 15 }, new[] { set.OutboxMax, set.OutboxSeconds, set.BreakerFailures, set.BreakerWindowSeconds, set.BreakerOpenSeconds });
 
             foreach (string key in new[] { "SessionStoreOutboxMax", "SessionStoreOutboxSeconds", "SessionStoreBreakerFailures",
                                            "SessionStoreBreakerWindowSeconds", "SessionStoreBreakerOpenSeconds" })
                 voice.Set(key, "0");
             SessionStoreSettings zero = SessionStoreSettings.Read(voice);
-            Assert.That(new[] { zero.OutboxMax, zero.OutboxSeconds, zero.BreakerFailures, zero.BreakerWindowSeconds, zero.BreakerOpenSeconds },
-                        Is.EqualTo(new[] { 256, 60, 5, 10, 5 }), "zero or less is not a usable value");
+            {
+                var assertedValue = new[]
+                {
+                    zero.OutboxMax,
+                    zero.OutboxSeconds,
+                    zero.BreakerFailures,
+                    zero.BreakerWindowSeconds,
+                    zero.BreakerOpenSeconds
+                };
+                TestAssert.WithMessage(() => Assert.Equal(new[] { 256, 60, 5, 10, 5 }, assertedValue), "zero or less is not a usable value");
+            }
         }
     }
 }

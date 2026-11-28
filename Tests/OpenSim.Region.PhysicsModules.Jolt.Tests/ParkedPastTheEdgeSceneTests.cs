@@ -15,7 +15,6 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 using Xunit;
-using Xunit.Abstractions;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.MeshShapesTodayTests;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
@@ -372,7 +371,9 @@ public class ParkedPastTheEdgeSceneTests
 
     private static float Angle(Quaternion a, Quaternion b)
     {
-        float d = MathF.Min(1f, MathF.Abs(Quaternion.Dot(Quaternion.Normalize(a), Quaternion.Normalize(b))));
+        Quaternion normalizedA = Quaternion.Normalize(in a);
+        Quaternion normalizedB = Quaternion.Normalize(in b);
+        float d = MathF.Min(1f, MathF.Abs(Quaternion.Dot(normalizedA, normalizedB)));
         return 2f * MathF.Acos(d) * 180f / MathF.PI;
     }
 

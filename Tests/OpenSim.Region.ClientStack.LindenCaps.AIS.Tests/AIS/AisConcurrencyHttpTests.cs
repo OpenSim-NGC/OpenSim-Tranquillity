@@ -11,7 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -42,7 +42,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// the same folder. The requirement is <b>serialisability</b>: the end state must be one that some serial order
 /// of the two requests could have produced, and no response may describe a state that never existed.</para>
 /// </summary>
-[TestFixture]
 public class AisConcurrencyHttpTests
 {
     private const string Cap = "/CAP/5ec3ec30-0000-4000-8000-000000000000";
@@ -166,7 +165,7 @@ public class AisConcurrencyHttpTests
         t1.Start();
         try
         {
-            Assert.That(parked.Wait(TimeSpan.FromSeconds(10)), Is.True, $"the first request never reached {parkAt}");
+            Assert.True(parked.Wait(TimeSpan.FromSeconds(10)), $"the first request never reached {parkAt}");
             t2.Start();
             secondDone.Wait(TimeSpan.FromMilliseconds(750));   // finishes at once when nothing serialises
         }
@@ -174,8 +173,8 @@ public class AisConcurrencyHttpTests
         {
             release.Set();   // a parked thread holds the folder lock; leaking it would poison later tests
         }
-        Assert.That(t1.Join(TimeSpan.FromSeconds(30)), Is.True, "the first request did not finish");
-        Assert.That(t2.Join(TimeSpan.FromSeconds(30)), Is.True, "the second request did not finish");
+        Assert.True(t1.Join(TimeSpan.FromSeconds(30)), "the first request did not finish");
+        Assert.True(t2.Join(TimeSpan.FromSeconds(30)), "the second request did not finish");
         b.BeforeCall = null;
         if (firstError is not null) throw firstError;
         if (secondError is not null) throw secondError;
@@ -192,7 +191,7 @@ public class AisConcurrencyHttpTests
     ///
     /// <para>Correct behaviour is exactly one of the two outfits, whichever the lock ordered second. Never both.</para>
     /// </summary>
-    [Test]
+    [Fact]
     public void two_slams_on_one_folder_never_leave_the_union()
     {
         var b = World(Alice);
@@ -207,12 +206,10 @@ public class AisConcurrencyHttpTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(final, Is.Not.EqualTo(new HashSet<UUID> { TargetX, TargetY, TargetZ }),
-                "the folder holds the UNION of both outfits - this is the AIS-SEC-3 defect");
-            Assert.That(final.SetEquals(setA) || final.SetEquals(setB), Is.True,
-                $"final outfit must be exactly one of the two requested sets, was [{string.Join(",", final)}]");
-            Assert.That(a.Status is 200 or 503, Is.True, $"slam A answered {a.Status}");
-            Assert.That(second.Status is 200 or 503, Is.True, $"slam B answered {second.Status}");
+            Assert.NotEqual(new HashSet<UUID> { TargetX, TargetY, TargetZ }, final);
+            Assert.True(final.SetEquals(setA) || final.SetEquals(setB), $"final outfit must be exactly one of the two requested sets, was [{string.Join(",", final)}]");
+            Assert.True(a.Status is 200 or 503, $"slam A answered {a.Status}");
+            Assert.True(second.Status is 200 or 503, $"slam B answered {second.Status}");
         });
     }
 
@@ -232,7 +229,7 @@ public class AisConcurrencyHttpTests
     /// and names links it never saw and was never asked to remove. Serialised, a purge of this folder always
     /// succeeds, whichever order it runs in.</para>
     /// </summary>
-    [Test]
+    [Fact]
     public void a_purge_racing_a_slam_does_not_blame_the_slams_new_links()
     {
         var b = World(Alice);
@@ -246,16 +243,13 @@ public class AisConcurrencyHttpTests
         var final = Outfit(b, Cof);
         Assert.Multiple(() =>
         {
-            Assert.That(purge.Status, Is.Not.EqualTo(500),
-                "the purge blamed children a concurrent slam created - this is the AIS-SEC-3 defect");
-            Assert.That(purge.Status is 200 or 503, Is.True, $"purge answered {purge.Status}");
-            Assert.That(final.Count == 0 || final.SetEquals(new HashSet<UUID> { TargetX, TargetY }), Is.True,
-                $"final state must be empty or exactly the slam's set, was [{string.Join(",", final)}]");
+            Assert.NotEqual(500, purge.Status);
+            Assert.True(purge.Status is 200 or 503, $"purge answered {purge.Status}");
+            Assert.True(final.Count == 0 || final.SetEquals(new HashSet<UUID> { TargetX, TargetY }), $"final state must be empty or exactly the slam's set, was [{string.Join(",", final)}]");
             // whatever the purge claims to have removed, it may not name a link the slam created
             var created = Ids(slam.Body, "_created_items").ToHashSet();
             var removed = Ids(purge.Body, "_removed_items");
-            Assert.That(removed.Where(created.Contains), Is.Empty,
-                "the purge reported removing a link the concurrent slam had just created");
+            Assert.DoesNotContain(removed, created.Contains);
         });
     }
 
@@ -266,7 +260,7 @@ public class AisConcurrencyHttpTests
     /// be reported as created and then silently vanish, and the end state must be a legal serial outcome: the
     /// slam's set alone (create first, slam replaced it) or the slam's set plus the new link (slam first).
     /// </summary>
-    [Test]
+    [Fact]
     public void a_create_racing_a_slam_is_either_kept_or_never_claimed()
     {
         var b = World(Alice);
@@ -285,13 +279,12 @@ public class AisConcurrencyHttpTests
         var createdIds = Ids(create.Body, "_created_items");
         Assert.Multiple(() =>
         {
-            Assert.That(create.Status is 200 or 503, Is.True, $"create answered {create.Status}");
-            Assert.That(slam.Status is 200 or 503, Is.True, $"slam answered {slam.Status}");
+            Assert.True(create.Status is 200 or 503, $"create answered {create.Status}");
+            Assert.True(slam.Status is 200 or 503, $"slam answered {slam.Status}");
 
             var slamSet = new HashSet<UUID> { TargetX, TargetY };
             var slamPlusCreate = new HashSet<UUID> { TargetX, TargetY, TargetZ };
-            Assert.That(final.SetEquals(slamSet) || final.SetEquals(slamPlusCreate), Is.True,
-                $"final state is not a legal serial outcome, was [{string.Join(",", final)}]");
+            Assert.True(final.SetEquals(slamSet) || final.SetEquals(slamPlusCreate), $"final state is not a legal serial outcome, was [{string.Join(",", final)}]");
 
             // if the create answered 200 naming a created link, that link must still exist unless the slam,
             // ordered after it, legitimately replaced the folder - which it can only have done by seeing it
@@ -299,8 +292,7 @@ public class AisConcurrencyHttpTests
             {
                 var stillThere = createdIds.All(id => b.Items.ContainsKey(id));
                 var slamSawIt = Ids(slam.Body, "_removed_items").Intersect(createdIds).Any();
-                Assert.That(stillThere || slamSawIt, Is.True,
-                    "the create reported a link as created, and it is gone without the slam ever having seen it");
+                Assert.True(stillThere || slamSawIt, "the create reported a link as created, and it is gone without the slam ever having seen it");
             }
         });
     }
@@ -313,7 +305,7 @@ public class AisConcurrencyHttpTests
     /// that serialised the whole agent, or the whole handler, would break outfit changes and saved-outfit edits
     /// happening together.
     /// </summary>
-    [Test]
+    [Fact]
     public void different_folders_do_not_block_each_other()
     {
         var b = World(Alice);
@@ -337,16 +329,14 @@ public class AisConcurrencyHttpTests
         // The stripe array means two unrelated keys CAN share a lock; that is only ever slower, never wrong,
         // but it would make this test fail for a reason that has nothing to do with the property under test.
         // Assert it up front so a future UUID change says so instead of timing out mysteriously.
-        Assert.That(AisFolderLocks.StripeOf(Alice, Cof), Is.Not.EqualTo(AisFolderLocks.StripeOf(Alice, Other)),
-            "these two folder keys share a lock stripe; pick different test UUIDs");
+        Assert.NotEqual(AisFolderLocks.StripeOf(Alice, Other), AisFolderLocks.StripeOf(Alice, Cof));
 
         t1.Start();
         try
         {
-            Assert.That(parked.Wait(TimeSpan.FromSeconds(10)), Is.True, "the first slam never reached its creates");
+            Assert.True(parked.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), "the first slam never reached its creates");
             t2.Start();
-            Assert.That(secondDone.Wait(TimeSpan.FromSeconds(5)), Is.True,
-                "a slam on a DIFFERENT folder waited on the parked one - the lock is too coarse");
+            Assert.True(secondDone.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken), "a slam on a DIFFERENT folder waited on the parked one - the lock is too coarse");
         }
         finally
         {
@@ -360,15 +350,15 @@ public class AisConcurrencyHttpTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(otherResult.Status, Is.EqualTo(200));
-            Assert.That(cofResult.Status, Is.EqualTo(200));
-            Assert.That(Outfit(b, Other), Is.EquivalentTo(new[] { TargetZ }));
-            Assert.That(Outfit(b, Cof), Is.EquivalentTo(new[] { TargetX }));
+            Assert.Equal(200, otherResult.Status);
+            Assert.Equal(200, cofResult.Status);
+            Assert.Equivalent(new[] { TargetZ }, Outfit(b, Other), true);
+            Assert.Equivalent(new[] { TargetX }, Outfit(b, Cof), true);
         });
     }
 
     /// <summary>Two different agents slamming their own Current Outfit must not block each other either.</summary>
-    [Test]
+    [Fact]
     public void different_agents_do_not_block_each_other()
     {
         var alice = World(Alice);
@@ -390,16 +380,14 @@ public class AisConcurrencyHttpTests
         var t1 = new Thread(() => { Role.Value = "first"; aliceResult = Send(alice, Alice, "PUT", $"/category/{Cof}/links", Slam(TargetX)); });
         var t2 = new Thread(() => { Role.Value = "second"; bobResult = Send(bob, Bob, "PUT", $"/category/{Cof}/links", Slam(TargetZ)); secondDone.Set(); });
 
-        Assert.That(AisFolderLocks.StripeOf(Alice, Cof), Is.Not.EqualTo(AisFolderLocks.StripeOf(Bob, Cof)),
-            "Alice's and Bob's COF keys share a lock stripe; pick different test agent UUIDs");
+        Assert.NotEqual(AisFolderLocks.StripeOf(Bob, Cof), AisFolderLocks.StripeOf(Alice, Cof));
 
         t1.Start();
         try
         {
-            Assert.That(parked.Wait(TimeSpan.FromSeconds(10)), Is.True, "Alice's slam never reached its creates");
+            Assert.True(parked.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), "Alice's slam never reached its creates");
             t2.Start();
-            Assert.That(secondDone.Wait(TimeSpan.FromSeconds(5)), Is.True,
-                "Bob waited on Alice - the lock key is missing the agent, so two residents whose COF ids collide would serialise");
+            Assert.True(secondDone.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken), "Bob waited on Alice - the lock key is missing the agent, so two residents whose COF ids collide would serialise");
         }
         finally
         {
@@ -411,10 +399,10 @@ public class AisConcurrencyHttpTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(aliceResult.Status, Is.EqualTo(200));
-            Assert.That(bobResult.Status, Is.EqualTo(200));
-            Assert.That(Outfit(alice, Cof), Is.EquivalentTo(new[] { TargetX }));
-            Assert.That(Outfit(bob, Cof), Is.EquivalentTo(new[] { TargetZ }));
+            Assert.Equal(200, aliceResult.Status);
+            Assert.Equal(200, bobResult.Status);
+            Assert.Equivalent(new[] { TargetX }, Outfit(alice, Cof), true);
+            Assert.Equivalent(new[] { TargetZ }, Outfit(bob, Cof), true);
         });
     }
 }

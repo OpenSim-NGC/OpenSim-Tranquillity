@@ -34,8 +34,8 @@ using OpenMetaverse;
 using OpenSim.Data;
 using OpenSim.Framework;
 using OpenSim.Groups;
+using System.Runtime.CompilerServices;
 using Xunit;
-using Xunit.Abstractions;
 using V2Import = OpenSim.Groups.FlotsamGroupsImport;
 using Assert = Xunit.Assert;
 
@@ -64,12 +64,16 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     private sealed record Backend(string Name, GroupsService Service, IGroupsData Groups, IGridUserData GridUsers);
 
     private static readonly FieldInfo s_groupsField =
-        typeof(GroupsServiceBase).GetField("m_Database", BindingFlags.Instance | BindingFlags.NonPublic);
+        typeof(GroupsServiceBase).GetField("m_Database", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new MissingFieldException(typeof(GroupsServiceBase).FullName, "m_Database");
     private static readonly FieldInfo s_gridUsersField =
-        typeof(GroupsServiceBase).GetField("m_GridUserService", BindingFlags.Instance | BindingFlags.NonPublic);
+        typeof(GroupsServiceBase).GetField("m_GridUserService", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new MissingFieldException(typeof(GroupsServiceBase).FullName, "m_GridUserService");
 
     private static Backend Of(string name, GroupsService service)
-        => new(name, service, (IGroupsData)s_groupsField.GetValue(service), (IGridUserData)s_gridUsersField.GetValue(service));
+        => new(name, service,
+            s_groupsField.GetValue(service) as IGroupsData ?? throw new InvalidOperationException("Groups data store was not initialized."),
+            s_gridUsersField.GetValue(service) as IGridUserData ?? throw new InvalidOperationException("Grid user data store was not initialized."));
 
     private static GroupsService ServiceOn(string dll, string conn)
     {
@@ -88,7 +92,8 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
 
     private Backend MySQL()
     {
-        string server = Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar);
+        string server = Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar)
+            ?? throw new InvalidOperationException($"Set {MySQLServerFactAttribute.EnvVar} to run the MySQL test.");
         string name = "groupsbq_" + Guid.NewGuid().ToString("N");
         string admin = new MySqlConnectionStringBuilder(server) { Database = "", Pooling = false }.ConnectionString;
         string conn = new MySqlConnectionStringBuilder(server) { Database = name }.ConnectionString;
@@ -105,7 +110,8 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
 
     private Backend PGSQL()
     {
-        string server = Environment.GetEnvironmentVariable(PGSQLServerFactAttribute.EnvVar);
+        string server = Environment.GetEnvironmentVariable(PGSQLServerFactAttribute.EnvVar)
+            ?? throw new InvalidOperationException($"Set {PGSQLServerFactAttribute.EnvVar} to run the PostgreSQL test.");
         string name = "groupsbq_" + Guid.NewGuid().ToString("N");
         string admin = new NpgsqlConnectionStringBuilder(server) { Database = "postgres", Pooling = false }.ConnectionString;
         string conn = new NpgsqlConnectionStringBuilder(server) { Database = name }.ConnectionString;
@@ -120,7 +126,7 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
         return Of("PostgreSQL", ServiceOn("OpenSim.Data.PGSQL.dll", conn));
     }
 
-    private string m_mysql, m_pgsql;
+    private string? m_mysql, m_pgsql;
 
     private static void Admin(Func<System.Data.Common.DbConnection> open, string sql)
     {
@@ -137,7 +143,7 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
         c.Open();
         using var cmd = c.CreateCommand();
         cmd.CommandText = sql;
-        return cmd.ExecuteScalar();
+        return cmd.ExecuteScalar() ?? throw new InvalidOperationException("Scalar query returned no result.");
     }
     #endregion
 
@@ -145,15 +151,18 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     /// <summary>Counts the calls made through an interface, then passes them on.</summary>
     public class Counting<T> : DispatchProxy where T : class
     {
-        public T Inner;
+        public T? Inner;
         public readonly Dictionary<string, int> Calls = new();
         public int Total => Calls.Values.Sum();
 
-        protected override object Invoke(MethodInfo method, object[] args)
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
+            ArgumentNullException.ThrowIfNull(method);
+            ArgumentNullException.ThrowIfNull(args);
+            T inner = Inner ?? throw new InvalidOperationException("Counting proxy has no wrapped store.");
             Calls[method.Name] = Calls.GetValueOrDefault(method.Name) + 1;
-            try { return method.Invoke(Inner, args); }
-            catch (TargetInvocationException e) { throw e.InnerException; }
+            try { return method.Invoke(inner, args); }
+            catch (TargetInvocationException e) { throw e.InnerException ?? e; }
         }
 
         public static (T Proxy, Counting<T> Counter) Around(T inner)
@@ -230,7 +239,7 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
         }).ToList();
 
         // the member list, as the founder asks for it
-        List<ExtendedGroupMembersData> members = null;
+        List<ExtendedGroupMembersData> members = [];
         var listed = Count(b, () => members = s.GetGroupMembers(founder, group));
         Assert.Equal(joiners.Count + 1, members.Count);
         Assert.True(members.Single(m => m.AgentID == founder).IsOwner);
@@ -250,7 +259,7 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
         Assert.Equal(1, listed.GridUsers);
 
         // the builder's memberships: three groups, with the right title and powers in each
-        List<GroupMembershipData> mine = null;
+        List<GroupMembershipData> mine = [];
         var arrival = Count(b, () => mine = s.GetAgentGroupMemberships(builder, builder));
         Assert.Equal(3, mine.Count);
         GroupMembershipData inGroup = mine.Single(m => m.GroupID == group);
@@ -282,7 +291,13 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     };
 
     private static ulong GroupsServiceAllPowers()
-        => (ulong)typeof(GroupsService).GetField("AllPowers", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).GetValue(null);
+    {
+        FieldInfo field = typeof(GroupsService).GetField(
+            "AllPowers", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)
+            ?? throw new MissingFieldException(typeof(GroupsService).FullName, "AllPowers");
+        return (ulong)(field.GetValue(null)
+            ?? throw new InvalidOperationException("GroupsService.AllPowers has no value."));
+    }
     #endregion
 
     [Fact]
@@ -293,7 +308,7 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     {
         TheMemberListAndMembershipsAreRight(MySQL());
         // the index's two columns
-        Assert.Equal(2L, Convert.ToInt64(Scalar(() => new MySqlConnection(m_mysql),
+        Assert.Equal(2L, Convert.ToInt64(Scalar(() => new MySqlConnection(m_mysql ?? throw new InvalidOperationException("MySQL test connection was not initialized.")),
             "select count(*) from information_schema.statistics where table_schema = database() " +
             "and table_name = 'os_groups_rolemembership' and index_name = 'GroupPrincipal'")));
     }
@@ -302,7 +317,7 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     public void PGSQLListsMembersAndMembershipsInAFewStatements()
     {
         TheMemberListAndMembershipsAreRight(PGSQL());
-        Assert.Equal(5L, Convert.ToInt64(Scalar(() => new NpgsqlConnection(m_pgsql),
+        Assert.Equal(5L, Convert.ToInt64(Scalar(() => new NpgsqlConnection(m_pgsql ?? throw new InvalidOperationException("PostgreSQL test connection was not initialized.")),
             "select count(*) from pg_indexes where indexname in ('os_groups_rolemembership_member', " +
             "'os_groups_rolemembership_principal', 'os_groups_membership_principal', 'os_groups_notices_group', " +
             "'os_groups_notices_stamp')")));
@@ -498,7 +513,8 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     /// <summary>A scratch database on the MySQL server with the Flotsam tables, filled by <paramref name="fill"/>.</summary>
     private string FlotsamDatabase(Action<Action<string>> fill)
     {
-        string server = Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar);
+        string server = Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar)
+            ?? throw new InvalidOperationException($"Set {MySQLServerFactAttribute.EnvVar} to run the MySQL test.");
         string name = "flotsam_" + Guid.NewGuid().ToString("N");
         string admin = new MySqlConnectionStringBuilder(server) { Database = "", Pooling = false }.ConnectionString;
         string conn = new MySqlConnectionStringBuilder(server) { Database = name, Pooling = false }.ConnectionString;
@@ -611,7 +627,10 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
     /// <summary>Runs only with both OPENSIM_TEST_MYSQL (the Flotsam tables) and OPENSIM_TEST_PGSQL set.</summary>
     public sealed class MySQLAndPGSQLServerFactAttribute : FactAttribute
     {
-        public MySQLAndPGSQLServerFactAttribute()
+        public MySQLAndPGSQLServerFactAttribute(
+            [CallerFilePath] string sourceFilePath = "",
+            [CallerLineNumber] int sourceLineNumber = -1)
+            : base(sourceFilePath, sourceLineNumber)
         {
             if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar))
                 || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(PGSQLServerFactAttribute.EnvVar)))
@@ -649,7 +668,7 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
             Assert.True(group.IsNotZero(), reason);
 
             var seed = Stopwatch.StartNew();
-            string busy = null;
+            string? busy = null;
             for (int i = 0; i < n; i++)
             {
                 string p = UUID.Random().ToString();
@@ -663,12 +682,15 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
                 if (i % 2 == 0)
                     b.GridUsers.Store(new GridUserData { UserID = p, Data = GridUser(i % 4 == 0, 1700000000 + i) });
             }
+            string busyPrincipal = busy
+                ?? throw new InvalidOperationException("The batched-query test requires at least one member.");
+
             // the busy avatar is in 25 more groups
             for (int g = 0; g < 25; g++)
             {
                 UUID other = b.Service.CreateGroup(founder, $"Scale {tag} {g}", "", true, UUID.Zero, 0, true, true,
                     false, new UUID(founder), out reason);
-                Assert.True(b.Service.AddAgentToGroup(busy, busy, other, UUID.Zero, string.Empty, out reason), reason);
+                Assert.True(b.Service.AddAgentToGroup(busyPrincipal, busyPrincipal, other, UUID.Zero, string.Empty, out reason), reason);
             }
             m_out.WriteLine($"{b.Name}: seeded {n} members in {seed.Elapsed.TotalSeconds:0.0} s");
 
@@ -678,7 +700,7 @@ public sealed class GroupsBatchedQueriesTests : IDisposable
                 int count = b.Service.GetGroupMembers(founder, group).Count;
                 double list = t.Elapsed.TotalMilliseconds;
                 t.Restart();
-                int groups = b.Service.GetAgentGroupMemberships(busy, busy).Count;
+                int groups = b.Service.GetAgentGroupMemberships(busyPrincipal, busyPrincipal).Count;
                 double arrive = t.Elapsed.TotalMilliseconds;
                 m_out.WriteLine($"{b.Name} run {run}: member list of {count} in {list:0} ms; memberships of {groups} groups in {arrive:0.0} ms");
             }

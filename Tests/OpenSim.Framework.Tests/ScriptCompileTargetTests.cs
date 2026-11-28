@@ -26,7 +26,7 @@ public class ScriptCompileTargetTests
     [InlineData("lsl-lua", ScriptCompileTarget.Unspecified)]
     [InlineData("lua", ScriptCompileTarget.Unspecified)]
     [InlineData("slua", ScriptCompileTarget.Unspecified)]
-    public void TheViewersValueIsReadAsTheTargetItNames(string value, ScriptCompileTarget expected)
+    public void TheViewersValueIsReadAsTheTargetItNames(string? value, ScriptCompileTarget expected)
     {
         Assert.Equal(expected, ScriptCompileTargets.Parse(value));
     }

@@ -69,7 +69,7 @@ public class ShutdownCaptureTests
         pump.Start();
         try
         {
-            Assert.True(entered.Wait(TimeSpan.FromSeconds(30)), "the script never reached its call");
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken), "the script never reached its call");
             // The held script was saved-marked by its llSleep slice with g = 2, and is inside llSay now.
             typeof(PhloxEngine).GetMethod("SaveStateAtStop", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .Invoke(h.Engine, new object[] { false });

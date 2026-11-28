@@ -9,7 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -34,7 +34,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// <para>The AIS <c>UpdateItem</c> that carries the new asset is the one moment the region reliably learns of
 /// the change, so that is where the save is queued.</para>
 /// </summary>
-[TestFixture]
 public class WornWearableRebakeTests
 {
     private const string Cap = "/CAP/0a1b2c3d-0000-4000-8000-000000000000";
@@ -95,21 +94,20 @@ public class WornWearableRebakeTests
 
     // ------------------------------------------------------------------ the handler reports the change
 
-    [Test]
+    [Fact]
     public void a_patch_that_changes_an_items_asset_reports_it()
     {
         var b = Inventory();
         var uploaded = UUID.Random();
 
-        Assert.That(Send(b, $"/item/{Shirt}", new OSDMap { ["asset_id"] = uploaded }), Is.EqualTo(200));
+        Assert.Equal(200, Send(b, $"/item/{Shirt}", new OSDMap { ["asset_id"] = uploaded }));
 
-        Assert.That(b.AssetChanges, Has.Count.EqualTo(1),
-            "the AIS UpdateItem is the only reliable moment the region learns a worn wearable was edited");
-        Assert.That(b.AssetChanges[0].Item, Is.EqualTo(Shirt));
-        Assert.That(b.AssetChanges[0].Asset, Is.EqualTo(uploaded));
+        Assert.Single(b.AssetChanges);
+        Assert.Equal(Shirt, b.AssetChanges[0].Item);
+        Assert.Equal(uploaded, b.AssetChanges[0].Asset);
     }
 
-    [Test]
+    [Fact]
     public void a_transaction_resolved_asset_is_reported_too()
     {
         // the path a real wearable save takes: hash_id, not asset_id (llviewerinventory.cpp:445-452)
@@ -118,13 +116,13 @@ public class WornWearableRebakeTests
         var uploaded = UUID.Random();
         b.Transactions[transaction] = uploaded;
 
-        Assert.That(Send(b, $"/item/{Shirt}", new OSDMap { ["hash_id"] = transaction }), Is.EqualTo(200));
+        Assert.Equal(200, Send(b, $"/item/{Shirt}", new OSDMap { ["hash_id"] = transaction }));
 
-        Assert.That(b.AssetChanges, Has.Count.EqualTo(1));
-        Assert.That(b.AssetChanges[0].Asset, Is.EqualTo(uploaded));
+        Assert.Single(b.AssetChanges);
+        Assert.Equal(uploaded, b.AssetChanges[0].Asset);
     }
 
-    [Test]
+    [Fact]
     public void a_patch_that_does_not_change_the_asset_reports_nothing()
     {
         var b = Inventory();
@@ -132,15 +130,15 @@ public class WornWearableRebakeTests
 
         Send(b, $"/item/{Shirt}", new OSDMap { ["name"] = "Red Shirt", ["asset_id"] = unchanged });
 
-        Assert.That(b.AssetChanges, Is.Empty, "a rename must not cost an appearance save");
+        Assert.Empty(b.AssetChanges);
     }
 
-    [Test]
+    [Fact]
     public void an_unresolvable_transaction_reports_nothing()
     {
         var b = Inventory();
         Send(b, $"/item/{Shirt}", new OSDMap { ["hash_id"] = UUID.Random() });
-        Assert.That(b.AssetChanges, Is.Empty, "no asset landed, so there is nothing to rebake from");
+        Assert.Empty(b.AssetChanges);
     }
 
     // ------------------------------------------------------------------ the rule the module applies
@@ -154,53 +152,52 @@ public class WornWearableRebakeTests
         return a;
     }
 
-    [Test]
+    [Fact]
     public void editing_a_worn_wearable_points_it_at_the_new_asset()
     {
         var oldAsset = UUID.Random();
         var newAsset = UUID.Random();
         var appearance = Wearing(WearableType.Shirt, Shirt, oldAsset);
 
-        Assert.That(AisWornAssets.ApplyTo(appearance, Shirt, newAsset), Is.True);
-        Assert.That(appearance.Wearables[(int)WearableType.Shirt].GetAsset(Shirt), Is.EqualTo(newAsset));
-        Assert.That(appearance.Wearables[(int)WearableType.Shirt].Count, Is.EqualTo(1),
-            "the slot is updated in place, not appended to");
+        Assert.True(AisWornAssets.ApplyTo(appearance, Shirt, newAsset));
+        Assert.Equal(newAsset, appearance.Wearables[(int)WearableType.Shirt].GetAsset(Shirt));
+        Assert.Equal(1, appearance.Wearables[(int)WearableType.Shirt].Count);
     }
 
-    [Test]
+    [Fact]
     public void editing_an_item_that_is_not_worn_changes_nothing()
     {
         // the case that would otherwise make every drawer edit cost an appearance save
         var appearance = Wearing(WearableType.Shirt, Shirt, UUID.Random());
-        Assert.That(AisWornAssets.ApplyTo(appearance, UUID.Random(), UUID.Random()), Is.False);
+        Assert.False(AisWornAssets.ApplyTo(appearance, UUID.Random(), UUID.Random()));
     }
 
-    [Test]
+    [Fact]
     public void a_worn_item_already_carrying_the_asset_changes_nothing()
     {
         var asset = UUID.Random();
         var appearance = Wearing(WearableType.Shirt, Shirt, asset);
-        Assert.That(AisWornAssets.ApplyTo(appearance, Shirt, asset), Is.False, "a replayed PATCH must be free");
+        Assert.False(AisWornAssets.ApplyTo(appearance, Shirt, asset), "a replayed PATCH must be free");
     }
 
-    [Test]
+    [Fact]
     public void a_zero_item_or_asset_changes_nothing()
     {
         var appearance = Wearing(WearableType.Shirt, Shirt, UUID.Random());
-        Assert.That(AisWornAssets.ApplyTo(appearance, UUID.Zero, UUID.Random()), Is.False);
-        Assert.That(AisWornAssets.ApplyTo(appearance, Shirt, UUID.Zero), Is.False);
-        Assert.That(AisWornAssets.ApplyTo(null, Shirt, UUID.Random()), Is.False);
+        Assert.False(AisWornAssets.ApplyTo(appearance, UUID.Zero, UUID.Random()));
+        Assert.False(AisWornAssets.ApplyTo(appearance, Shirt, UUID.Zero));
+        Assert.False(AisWornAssets.ApplyTo(null, Shirt, UUID.Random()));
     }
 
-    [Test]
+    [Fact]
     public void the_right_slot_is_found_whichever_one_it_is()
     {
         foreach (var slot in new[] { WearableType.Skin, WearableType.Gloves, WearableType.Socks, WearableType.Skirt })
         {
             var newAsset = UUID.Random();
             var appearance = Wearing(slot, Shirt, UUID.Random());
-            Assert.That(AisWornAssets.ApplyTo(appearance, Shirt, newAsset), Is.True, slot.ToString());
-            Assert.That(appearance.Wearables[(int)slot].GetAsset(Shirt), Is.EqualTo(newAsset), slot.ToString());
+            Assert.True(AisWornAssets.ApplyTo(appearance, Shirt, newAsset), slot.ToString());
+            Assert.Equal(newAsset, appearance.Wearables[(int)slot].GetAsset(Shirt));
         }
     }
 }

@@ -62,6 +62,7 @@ each text.
 | Prototype JavaScript framework | MIT | `Prototype.txt` |
 | Second Life viewer source | LGPL 2.1 | `SecondLifeViewer-LICENSE-source.txt`, `SecondLifeViewer-LGPL-2.1.txt` |
 | SmartThreadPool | Microsoft Public License | `SmartThreadPool.txt` |
+| xUnit.net v3 | Apache 2.0; copyright .NET Foundation | `Phlox.txt` (shared Apache 2.0 licence text) |
 | XML-RPC.NET | MIT | `XML-RPC.NET.txt` |
 | zlib | zlib | `zlib.txt` |
 

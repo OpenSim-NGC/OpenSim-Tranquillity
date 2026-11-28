@@ -27,7 +27,7 @@ public class BakeOrchestratorTests
     private static string FixtureDir([CallerFilePath] string here = "")
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "Source", "OpenSimNGC.Appearance.Baking.Tests", "Golden", "truly-stock", "fixtures"));
 
-    // xunit 2.9 has no dynamic skip: absent fixtures make tests 1 and 3 vacuous passes that say so on the console.
+    // Existing fixture gating is unchanged: absent fixtures make tests 1 and 3 vacuous passes that say so on the console.
     private const string SkipNote = "SKIPPED: golden fixtures not fetched (Source/OpenSimNGC.Appearance.Baking.Tests/Golden/truly-stock/fixtures)";
 
     private static bool FixturesPresent => File.Exists(Path.Combine(FixtureDir(), "avatar.json"));
