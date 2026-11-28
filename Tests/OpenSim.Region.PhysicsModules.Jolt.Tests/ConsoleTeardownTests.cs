@@ -87,7 +87,7 @@ public class ConsoleTeardownTests
                     catch (Exception e) { failure = e; }
                 });
                 console.Start();
-                started.Wait();
+                started.Wait(TestContext.Current.CancellationToken);
                 Thread.Sleep(cycle % 5);
                 s.Dispose();
                 Assert.True(console.Join(TimeSpan.FromSeconds(30)), "the console commands did not finish after teardown");

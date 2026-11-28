@@ -17,14 +17,13 @@
  */
 using System;
 using System.Linq;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialMembershipTests
     {
         private static (NonSpatialVoiceSessionEngine, UUID) SeatedAdhoc(FakeClock clock, params UUID[] others)
@@ -41,66 +40,74 @@ namespace osWebRtcVoice.Tests
 
         // ---- states ---------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Creator_IsSeatedAtStart_AndNeedsNoInvitation()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock);
             NonSpatialMember me = e.Store.Get(id).Find(Alice);
-            Assert.That(me, Is.Not.Null);
-            Assert.That(me.State, Is.EqualTo(MemberState.Accepted));
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1));
+            Assert.NotNull(me);
+            Assert.Equal(MemberState.Accepted, me.State);
+            Assert.Equal(1, e.Store.Get(id).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnInvitationHoldsNoSeat_SoAnInviteStormCannotReserveTheRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock);
             for (int i = 0; i < 40; i++)
                 e.Invite(id, Alice, UUID.Random());
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1), "only the creator holds a seat");
+            {
+                var assertedValue = e.Store.Get(id).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "only the creator holds a seat");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MarkPresent_PromotesAcceptedWithoutTakingASecondSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock, Bob);
             int before = e.Store.Get(id).SeatsHeld;
 
             SessionOutcome o = e.MarkPresent(id, Bob, RegionA, "vs-bob");
 
-            Assert.That(o.Ok, Is.True, o.Decision);
-            Assert.That(e.Store.Get(id).Find(Bob).State, Is.EqualTo(MemberState.Present));
-            Assert.That(e.Store.Get(id).Find(Bob).ViewerSession, Is.EqualTo("vs-bob"));
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(before));
+            Assert.True(o.Ok, o.Decision);
+            Assert.Equal(MemberState.Present, e.Store.Get(id).Find(Bob).State);
+            Assert.Equal("vs-bob", e.Store.Get(id).Find(Bob).ViewerSession);
+            Assert.Equal(before, e.Store.Get(id).SeatsHeld);
         }
 
         // ---- lifecycle 1: chat leave (UDP IM_SESSION_LEAVE) ------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChatLeave_ReleasesTheSeat_WithNoCapPostAndNoVoiceTeardown()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock, Bob);
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(2));
+            Assert.Equal(2, e.Store.Get(id).SeatsHeld);
 
             SessionOutcome o = e.Depart(id, Bob, DepartureReason.ChatLeave);
 
-            Assert.That(o.Ok, Is.True, o.Decision);
-            Assert.That(o.Decision, Is.EqualTo("departed"));
+            Assert.True(o.Ok, o.Decision);
+            Assert.Equal("departed", o.Decision);
             NonSpatialMember m = e.Store.Get(id).Find(Bob);
-            Assert.That(m.State, Is.EqualTo(MemberState.Departed));
-            Assert.That(m.Departure, Is.EqualTo(DepartureReason.ChatLeave));
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1));
+            Assert.Equal(MemberState.Departed, m.State);
+            Assert.Equal(DepartureReason.ChatLeave, m.Departure);
+            Assert.Equal(1, e.Store.Get(id).SeatsHeld);
         }
 
         // ---- lifecycle 2: invitation decline ---------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void InvitationDecline_IsTerminalForTheInvitation_AndNeverTouchedASeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(clock);
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
@@ -109,63 +116,73 @@ namespace osWebRtcVoice.Tests
 
             SessionOutcome o = e.Decline(id, Bob);
 
-            Assert.That(o.Ok, Is.True, o.Decision);
-            Assert.That(o.Decision, Is.EqualTo("declined"));
+            Assert.True(o.Ok, o.Decision);
+            Assert.Equal("declined", o.Decision);
             NonSpatialMember m = e.Store.Get(id).Find(Bob);
-            Assert.That(m.State, Is.EqualTo(MemberState.Declined));
-            Assert.That(m.Departure, Is.EqualTo(DepartureReason.InvitationDeclined));
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(seats), "an invitation held no seat to release");
+            Assert.Equal(MemberState.Declined, m.State);
+            Assert.Equal(DepartureReason.InvitationDeclined, m.Departure);
+            {
+                var assertedValue = e.Store.Get(id).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(seats, assertedValue), "an invitation held no seat to release");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AFreshInviteReopensADeclinedInvitation()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(clock);
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
             e.Decline(id, Bob);
 
-            Assert.That(e.Invite(id, Alice, Bob).Ok, Is.True);
-            Assert.That(e.Store.Get(id).Find(Bob).State, Is.EqualTo(MemberState.Invited));
-            Assert.That(e.Accept(id, Bob, RegionA).Ok, Is.True);
+            Assert.True(e.Invite(id, Alice, Bob).Ok);
+            Assert.Equal(MemberState.Invited, e.Store.Get(id).Find(Bob).State);
+            Assert.True(e.Accept(id, Bob, RegionA).Ok);
         }
 
         // ---- lifecycle 3: voice teardown -------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VoiceTeardown_ReleasesTheSeat_AndClearsTheViewerSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock, Bob);
             e.MarkPresent(id, Bob, RegionA, "vs-bob");
 
             SessionOutcome o = e.Depart(id, Bob, DepartureReason.VoiceTeardown);
 
-            Assert.That(o.Ok, Is.True, o.Decision);
+            Assert.True(o.Ok, o.Decision);
             NonSpatialMember m = e.Store.Get(id).Find(Bob);
-            Assert.That(m.Departure, Is.EqualTo(DepartureReason.VoiceTeardown));
-            Assert.That(m.ViewerSession, Is.Null);
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1));
+            Assert.Equal(DepartureReason.VoiceTeardown, m.Departure);
+            Assert.Null(m.ViewerSession);
+            Assert.Equal(1, e.Store.Get(id).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheThreeLifecyclesAreIndependent_EachAloneIsEnoughToRelease()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             foreach (DepartureReason r in new[] { DepartureReason.ChatLeave, DepartureReason.InvitationDeclined, DepartureReason.VoiceTeardown })
             {
                 FakeClock clock = new FakeClock();
                 (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock, Bob);
-                Assert.That(e.Depart(id, Bob, r).Ok, Is.True, "reason " + r);
-                Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1), "reason " + r + " did not release the seat");
+                Assert.True(e.Depart(id, Bob, r).Ok, "reason " + r);
+                {
+                    var assertedValue = e.Store.Get(id).SeatsHeld;
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "reason " + r + " did not release the seat");
+                }
             }
         }
 
         // ---- backstops: departure never waits on a POST that does not come ---------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void PresenceLost_RemovesTheAgentFromEverySessionAtOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(clock);
             UUID one = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
@@ -178,17 +195,18 @@ namespace osWebRtcVoice.Tests
 
             var touched = e.DepartAll(Bob, DepartureReason.PresenceLost);
 
-            Assert.That(touched.Count, Is.EqualTo(2));
+            Assert.Equal(2, touched.Count);
             foreach (UUID id in new[] { one, two })
             {
-                Assert.That(e.Store.Get(id).Find(Bob).Departure, Is.EqualTo(DepartureReason.PresenceLost));
-                Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1));
+                Assert.Equal(DepartureReason.PresenceLost, e.Store.Get(id).Find(Bob).Departure);
+                Assert.Equal(1, e.Store.Get(id).SeatsHeld);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnUnansweredInvitationExpires_WithNoPostFromAnyone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(clock, inviteTtl: TimeSpan.FromMinutes(2));
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
@@ -198,13 +216,14 @@ namespace osWebRtcVoice.Tests
             e.Sweep();
 
             NonSpatialMember m = e.Store.Get(id).Find(Bob);
-            Assert.That(m.State, Is.EqualTo(MemberState.Departed));
-            Assert.That(m.Departure, Is.EqualTo(DepartureReason.Expired));
+            Assert.Equal(MemberState.Departed, m.State);
+            Assert.Equal(DepartureReason.Expired, m.Departure);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASessionWithNoSeatsNoInvitationsAndNobodyInTheChatIsCollected()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock, Bob);
             e.Depart(id, Alice, DepartureReason.ChatLeave);
@@ -212,8 +231,8 @@ namespace osWebRtcVoice.Tests
 
             var removed = e.Sweep();
 
-            Assert.That(removed, Does.Contain(id));
-            Assert.That(e.Store.Get(id), Is.Null);
+            Assert.Contains(id, removed);
+            Assert.Null(e.Store.Get(id));
         }
 
         /// <summary>
@@ -221,35 +240,44 @@ namespace osWebRtcVoice.Tests
         /// counted, everyone hanging up voice would make the voice session collectable -- which would
         /// sweep a conference out from under members who were still typing in it.
         /// </summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASessionWhoseMembersHungUpVoiceButAreStillTypingIsNOTCollected()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock, Bob);
             e.Depart(id, Alice, DepartureReason.VoiceTeardown);
             e.Depart(id, Bob, DepartureReason.VoiceTeardown);
 
             NonSpatialVoiceSession s = e.Store.Get(id);
-            Assert.That(s.SeatsHeld, Is.EqualTo(0), "no voice seats left");
-            Assert.That(s.ChatMembers(), Is.Not.Empty, "but the conversation is still open");
-            Assert.That(s.IsDead, Is.False);
-            Assert.That(e.Sweep(), Does.Not.Contain(id));
-            Assert.That(e.Store.Get(id), Is.Not.Null);
+            {
+                var assertedValue = s.SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no voice seats left");
+            }
+            {
+                var assertedValue = s.ChatMembers();
+                TestAssert.WithMessage(() => Assert.NotEmpty(assertedValue), "but the conversation is still open");
+            }
+            Assert.False(s.IsDead);
+            Assert.DoesNotContain(id, e.Sweep());
+            Assert.NotNull(e.Store.Get(id));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALiveSessionSurvivesTheSweep()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock, Bob);
             clock.Now = clock.Now.AddMinutes(30);
-            Assert.That(e.Sweep(), Does.Not.Contain(id));
-            Assert.That(e.Store.Get(id), Is.Not.Null);
+            Assert.DoesNotContain(id, e.Sweep());
+            Assert.NotNull(e.Store.Get(id));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnIdleSessionIsCollectedByTheBackstop()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
@@ -257,16 +285,17 @@ namespace osWebRtcVoice.Tests
             e.Accept(id, Bob, RegionA);
 
             clock.Now = clock.Now.AddHours(9);
-            Assert.That(e.Sweep(), Does.Contain(id));
+            Assert.Contains(id, e.Sweep());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void DepartingAnUnknownAgentOrSessionIsRefused_NotThrown()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             (NonSpatialVoiceSessionEngine e, UUID id) = SeatedAdhoc(clock);
-            Assert.That(e.Depart(id, Carol, DepartureReason.ChatLeave).Decision, Is.EqualTo(SessionOutcome.NoSuchSession));
-            Assert.That(e.Depart(UUID.Random(), Alice, DepartureReason.ChatLeave).Decision, Is.EqualTo(SessionOutcome.NoSuchSession));
+            Assert.Equal(SessionOutcome.NoSuchSession, e.Depart(id, Carol, DepartureReason.ChatLeave).Decision);
+            Assert.Equal(SessionOutcome.NoSuchSession, e.Depart(UUID.Random(), Alice, DepartureReason.ChatLeave).Decision);
         }
     }
 }

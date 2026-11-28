@@ -64,9 +64,10 @@ public class RemoteAdminRestartTests
         request.Params.Add(parameters);
         XmlRpcResponse response = new() { Value = new Hashtable() };
         MethodInfo method = typeof(RemoteAdminPlugin)
-            .GetMethod("XmlRpcRestartMethod", BindingFlags.Instance | BindingFlags.NonPublic);
+            .GetMethod("XmlRpcRestartMethod", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(RemoteAdminPlugin).FullName, "XmlRpcRestartMethod");
         method.Invoke(plugin, new object[] { request, response, new IPEndPoint(IPAddress.Loopback, 9000) });
-        return (Hashtable)response.Value;
+        return response.Value as Hashtable ?? throw new InvalidOperationException("Restart response was not a Hashtable.");
     }
 
     [Xunit.Fact]

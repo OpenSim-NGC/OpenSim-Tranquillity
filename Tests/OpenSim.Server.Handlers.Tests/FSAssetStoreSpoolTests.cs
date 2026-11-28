@@ -138,7 +138,10 @@ public sealed class SmallFileSystemFactAttribute : FactAttribute
     public const string EnvVar = "OPENSIM_TEST_SMALL_FS";
     public const long MaxSize = 256L * 1024 * 1024;
 
-    public SmallFileSystemFactAttribute()
+    public SmallFileSystemFactAttribute(
+        [CallerFilePath] string sourceFilePath = "",
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(EnvVar)))
             Skip = $"Requires a small filesystem to fill; set {EnvVar} to run.";
