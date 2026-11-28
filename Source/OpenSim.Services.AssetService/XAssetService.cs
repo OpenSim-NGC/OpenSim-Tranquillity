@@ -222,6 +222,16 @@ public class XAssetService : XAssetServiceBase, IAssetService
     private void MigrateFromChainedService(AssetBase asset)
     {
         Store(asset);
+
+        // A store that fails is logged and rolled back without an error, so the chained copy is removed only once
+        // the asset reads back from this service.
+        if (m_Database.GetAsset(asset.FullID) == null)
+        {
+            m_log.LogWarning(
+                "[XASSET SERVICE]: Asset {0} was not stored, so it is kept in the chained asset service", asset.ID);
+            return;
+        }
+
         m_ChainedAssetService.Delete(asset.ID);
     }
 

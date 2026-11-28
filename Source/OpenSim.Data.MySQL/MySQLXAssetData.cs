@@ -207,7 +207,9 @@ public class MySQLXAssetData : IXAssetDataPlugin
         {
             dbcon.Open();
 
-            using (MySqlTransaction transaction = dbcon.BeginTransaction())
+            // Begun after the data lookup below.
+            MySqlTransaction transaction = null;
+            try
             {
                 string assetName = asset.Name;
                 if (asset.Name.Length > AssetBase.MAX_ASSET_NAME)
@@ -241,6 +243,25 @@ public class MySQLXAssetData : IXAssetDataPlugin
                     data = asset.Data;
 
                 byte[] hash = SHA256.HashData(data);
+
+                // Look the data up before the transaction begins. Inside it, this plain read would fix the
+                // transaction's snapshot, and where the server checks writes against that snapshot (MariaDB 11.6.2 and
+                // later, innodb_snapshot_isolation) the insert below would fail with error 1020 once another store of
+                // the same bytes commits, and this store would roll back.
+                bool dataExists;
+                try
+                {
+                    dataExists = ExistsData(dbcon, hash);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError("[XASSET DB]: MySQL failure looking up the data of asset {0} with name \"{1}\". Error: {2}",
+                        asset.FullID, asset.Name, e.Message);
+
+                    return;
+                }
+
+                transaction = dbcon.BeginTransaction();
 
                 try
                 {
@@ -276,7 +297,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                     return;
                 }
 
-                if (!ExistsData(dbcon, transaction, hash))
+                if (!dataExists)
                 {
                     try
                     {
@@ -290,6 +311,12 @@ public class MySQLXAssetData : IXAssetDataPlugin
                             cmd.ExecuteNonQuery();
                         }
                     }
+                    catch (MySqlException e) when (e.ErrorCode == MySqlErrorCode.DuplicateKeyEntry)
+                    {
+                        // Another store of the same bytes inserted this hash after the lookup. Hash is the only key, so
+                        // that row holds these bytes. InnoDB undoes only the failed statement: this asset's metadata
+                        // stays in the transaction and commits.
+                    }
                     catch (Exception e)
                     {
                         m_log.LogError("[XASSET DB]: MySQL failure creating asset data {0} with name \"{1}\". Error: {2}",
@@ -302,6 +329,10 @@ public class MySQLXAssetData : IXAssetDataPlugin
                 }
 
                 transaction.Commit();
+            }
+            finally
+            {
+                transaction?.Dispose();
             }
             dbcon.Close();
         }
@@ -350,39 +381,29 @@ public class MySQLXAssetData : IXAssetDataPlugin
     }
 
     /// <summary>
-    /// Whether the data for <paramref name="hash"/> is stored, read on <paramref name="transaction"/>: MySqlConnector
-    /// refuses a command that is not on the connection's active transaction.
+    /// Whether the data for <paramref name="hash"/> is stored. Called with no transaction active on
+    /// <paramref name="dbcon"/>. A failed lookup throws: it does not say that the data is missing.
     /// </summary>
     /// <param name="dbcon"></param>
-    /// <param name="transaction"></param>
     /// <param name="hash"></param>
     /// <returns></returns>
-    private bool ExistsData(MySqlConnection dbcon, MySqlTransaction transaction, byte[] hash)
+    private bool ExistsData(MySqlConnection dbcon, byte[] hash)
     {
 //            m_log.LogDebug("[ASSETS DB]: Checking for asset {0}", uuid);
 
         bool exists = false;
 
-        using (MySqlCommand cmd = new MySqlCommand("SELECT Hash FROM XAssetsData WHERE Hash=?Hash", dbcon, transaction))
+        using (MySqlCommand cmd = new MySqlCommand("SELECT Hash FROM XAssetsData WHERE Hash=?Hash", dbcon))
         {
             cmd.Parameters.AddWithValue("?Hash", hash);
 
-            try
+            using (MySqlDataReader dbReader = cmd.ExecuteReader(CommandBehavior.SingleRow))
             {
-                using (MySqlDataReader dbReader = cmd.ExecuteReader(CommandBehavior.SingleRow))
+                if (dbReader.Read())
                 {
-                    if (dbReader.Read())
-                    {
-//                                    m_log.LogDebug("[ASSETS DB]: Found asset {0}", uuid);
-                        exists = true;
-                    }
+//                                m_log.LogDebug("[ASSETS DB]: Found asset {0}", uuid);
+                    exists = true;
                 }
-            }
-            catch (Exception e)
-            {
-                m_log.LogError(
-                    "[XASSETS DB]: MySql failure in ExistsData fetching hash {0}.  Exception {1}{2}",
-                    hash, e.Message, e.StackTrace);
             }
         }
 
