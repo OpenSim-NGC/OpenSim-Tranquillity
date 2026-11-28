@@ -31,7 +31,11 @@ public sealed class GoldenFactAttribute : FactAttribute
     private static string GoldenDir([CallerFilePath] string here = "") => Path.GetDirectoryName(here)!;
 
     /// <param name="set">The reference set's directory name, e.g. <c>truly-stock</c>.</param>
-    public GoldenFactAttribute(string set)
+    public GoldenFactAttribute(
+        string set,
+        [CallerFilePath] string sourceFilePath = "",
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         Set = set;
         var fixtures = Path.Combine(GoldenDir(), set, "fixtures");

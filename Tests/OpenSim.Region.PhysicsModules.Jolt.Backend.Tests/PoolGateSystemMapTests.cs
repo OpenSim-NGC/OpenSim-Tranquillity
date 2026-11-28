@@ -9,7 +9,6 @@ using System.Diagnostics;
 using System.Numerics;
 using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -138,8 +137,8 @@ public class PoolGateSystemMapTests
         try
         {
             // Not finishing while the gate is held is the thing to show, so this is a real wait.
-            Assert.False(disposed.Wait(500), "Dispose destroyed the physics system while a pool gate was held (an Update in flight)");
-            Assert.False(opened.Wait(10), "Initialize created a physics system while a pool gate was held");
+            Assert.False(disposed.Wait(500, TestContext.Current.CancellationToken), "Dispose destroyed the physics system while a pool gate was held (an Update in flight)");
+            Assert.False(opened.Wait(10, TestContext.Current.CancellationToken), "Initialize created a physics system while a pool gate was held");
 
             // Dispose is waiting for the gate, and has not taken B's _simLock: B's own scene-thread calls still return.
             bool bodyOpReturned = false;
@@ -153,8 +152,8 @@ public class PoolGateSystemMapTests
             hold.Dispose();   // the thread that took it (Monitor)
         }
 
-        Assert.True(disposed.Wait(Limit), "Dispose did not complete after the gate was released");
-        Assert.True(opened.Wait(Limit), "Initialize did not complete after the gate was released");
+        Assert.True(disposed.Wait(Limit, TestContext.Current.CancellationToken), "Dispose did not complete after the gate was released");
+        Assert.True(opened.Wait(Limit, TestContext.Current.CancellationToken), "Initialize did not complete after the gate was released");
         Assert.True(disposer.Join(Limit) && opener.Join(Limit));
         c.Dispose();
     }

@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -56,7 +56,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// <para>Every cross-user case asserts <b>both</b> halves: the status, and that Bob's rows are byte-for-byte where
 /// they were. A 404 that had already written is not a fix.</para>
 /// </summary>
-[TestFixture]
 public class AisCrossUserHttpTests
 {
     private const string Cap = "/CAP/5ec0de00-0000-4000-8000-000000000000";
@@ -141,7 +140,7 @@ public class AisCrossUserHttpTests
         var response = new TestOSHttpResponse();
         handler.Handle(new CrossUserRequest(verb, Cap + path, body), response);
         var parsed = OSDParser.DeserializeLLSDXml(response.RawBuffer);
-        Assert.That(parsed, Is.InstanceOf<OSDMap>());
+        Assert.IsAssignableFrom<OSDMap>(parsed);
         return (response.StatusCode, (OSDMap)parsed);
     }
 
@@ -153,57 +152,57 @@ public class AisCrossUserHttpTests
 
     // ------------------------------------------------------------------ reads
 
-    [Test]
+    [Fact]
     public void GET_item_of_another_resident_is_404()
     {
         var svc = World();
         var (status, body) = AsAlice(svc, "GET", $"/item/{Bob.Wearable}");
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(body.ContainsKey("item_id"), Is.False, "no part of Bob's item may travel");
-        Assert.That(svc.Items[Bob.Wearable].Name, Is.EqualTo("a shirt"));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.False(body.ContainsKey("item_id"), "no part of Bob's item may travel");
+        Assert.Equal("a shirt", svc.Items[Bob.Wearable].Name);
     }
 
-    [Test]
+    [Fact]
     public void GET_category_children_of_another_resident_is_404()
     {
         var svc = World();
         var (status, body) = AsAlice(svc, "GET", $"/category/{Bob.Outfit}/children");
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(body.ContainsKey("_embedded"), Is.False, "Bob's children may not be enumerated");
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.False(body.ContainsKey("_embedded"), "Bob's children may not be enumerated");
     }
 
-    [Test]
+    [Fact]
     public void GET_category_links_of_another_resident_is_404()
     {
         var svc = World();
         var (status, body) = AsAlice(svc, "GET", $"/category/{Bob.Cof}/links");
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(body.ContainsKey("_embedded"), Is.False, "Bob's outfit may not be enumerated");
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.False(body.ContainsKey("_embedded"), "Bob's outfit may not be enumerated");
     }
 
     // ------------------------------------------------------------------ updates
 
-    [Test]
+    [Fact]
     public void PATCH_item_of_another_resident_is_refused_and_changes_nothing()
     {
         var svc = World();
         var (status, _) = AsAlice(svc, "PATCH", $"/item/{Bob.Wearable}", new OSDMap { ["name"] = "stolen" });
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(svc.Items[Bob.Wearable].Name, Is.EqualTo("a shirt"));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.Equal("a shirt", svc.Items[Bob.Wearable].Name);
     }
 
-    [Test]
+    [Fact]
     public void PATCH_category_of_another_resident_is_refused_and_changes_nothing()
     {
         var svc = World();
         var (status, _) = AsAlice(svc, "PATCH", $"/category/{Bob.Outfit}", new OSDMap { ["name"] = "stolen" });
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(svc.Folders[Bob.Outfit].Name, Is.EqualTo("Beach Outfit"));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.Equal("Beach Outfit", svc.Folders[Bob.Outfit].Name);
     }
 
     // ------------------------------------------------------------------ PATCH naming a parent outside the agent's inventory
@@ -220,7 +219,7 @@ public class AisCrossUserHttpTests
     private static (int Status, OSDMap Body) PatchAlicesWearableInto(PrincipalIgnoringInventoryService svc, UUID target)
         => AsAlice(svc, "PATCH", $"/item/{Alice.Wearable}", new OSDMap { ["name"] = "a shirt", ["parent_id"] = target });
 
-    [Test]
+    [Fact]
     public void PATCH_own_item_into_another_residents_folder_is_400_like_a_missing_folder_and_moves_nothing()
     {
         var svc = World();
@@ -229,15 +228,15 @@ public class AisCrossUserHttpTests
         var (status, body) = PatchAlicesWearableInto(svc, Bob.Clothing);
         var (missingStatus, missingBody) = PatchAlicesWearableInto(svc, UUID.Random());
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest));
-        Assert.That(body["message"].AsString(), Does.Contain("parent_id"));
-        Assert.That(missingStatus, Is.EqualTo(status), "a foreign folder and a missing one get the same answer");
-        Assert.That(body["message"].AsString(), Is.EqualTo(missingBody["message"].AsString()), "and the same words");
-        Assert.That(svc.Items[Alice.Wearable].Folder, Is.EqualTo(Alice.Clothing), "Alice's item did not move");
-        Assert.That(ChildItems(svc, Bob.Clothing), Is.EqualTo(bobsChildren), "nothing arrived in Bob's folder");
+        Assert.Equal((int)HttpStatusCode.BadRequest, status);
+        Assert.Contains("parent_id", body["message"].AsString());
+        Assert.Equal(status, missingStatus);
+        Assert.Equal(missingBody["message"].AsString(), body["message"].AsString());
+        Assert.Equal(Alice.Clothing, svc.Items[Alice.Wearable].Folder);
+        Assert.Equal(bobsChildren, ChildItems(svc, Bob.Clothing));
     }
 
-    [Test]
+    [Fact]
     public void PATCH_own_item_into_a_library_folder_is_400_and_moves_nothing()
     {
         var svc = World();
@@ -245,26 +244,26 @@ public class AisCrossUserHttpTests
 
         var (status, body) = PatchAlicesWearableInto(svc, LibraryFolder);
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest));
-        Assert.That(body["message"].AsString(), Does.Contain("parent_id"));
-        Assert.That(svc.Items[Alice.Wearable].Folder, Is.EqualTo(Alice.Clothing));
-        Assert.That(ChildItems(svc, LibraryFolder), Is.Empty);
+        Assert.Equal((int)HttpStatusCode.BadRequest, status);
+        Assert.Contains("parent_id", body["message"].AsString());
+        Assert.Equal(Alice.Clothing, svc.Items[Alice.Wearable].Folder);
+        Assert.Empty(ChildItems(svc, LibraryFolder));
     }
 
-    [Test]
+    [Fact]
     public void PATCH_own_category_into_another_residents_folder_is_400_and_moves_nothing()
     {
         var svc = World();
 
         var (status, body) = AsAlice(svc, "PATCH", $"/category/{Alice.Outfit}", new OSDMap { ["parent_id"] = Bob.Clothing });
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest));
-        Assert.That(body["message"].AsString(), Does.Contain("parent_id"));
-        Assert.That(svc.Folders[Alice.Outfit].ParentID, Is.EqualTo(Alice.Clothing));
-        Assert.That(ChildFolders(svc, Bob.Clothing), Is.EqualTo(new[] { Bob.Outfit }));
+        Assert.Equal((int)HttpStatusCode.BadRequest, status);
+        Assert.Contains("parent_id", body["message"].AsString());
+        Assert.Equal(Alice.Clothing, svc.Folders[Alice.Outfit].ParentID);
+        Assert.Equal(new[] { Bob.Outfit }, ChildFolders(svc, Bob.Clothing));
     }
 
-    [Test]
+    [Fact]
     public void PATCH_another_residents_item_with_a_parent_id_is_still_404()
     {
         // The owner check comes first: a body that would be refused must not turn "not yours" into a 400 oracle.
@@ -272,46 +271,46 @@ public class AisCrossUserHttpTests
 
         var (status, _) = AsAlice(svc, "PATCH", $"/item/{Bob.Wearable}", new OSDMap { ["parent_id"] = Alice.Clothing });
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(svc.Items[Bob.Wearable].Folder, Is.EqualTo(Bob.Clothing));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.Equal(Bob.Clothing, svc.Items[Bob.Wearable].Folder);
     }
 
     // ------------------------------------------------------------------ deletes
 
-    [Test]
+    [Fact]
     public void DELETE_item_of_another_resident_is_refused_and_the_row_survives()
     {
         var svc = World();
         var (status, _) = AsAlice(svc, "DELETE", $"/item/{Bob.Wearable}");
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(svc.Items.ContainsKey(Bob.Wearable), Is.True);
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.True(svc.Items.ContainsKey(Bob.Wearable));
     }
 
-    [Test]
+    [Fact]
     public void DELETE_category_of_another_resident_is_refused_and_the_row_survives()
     {
         var svc = World();
         var (status, _) = AsAlice(svc, "DELETE", $"/category/{Bob.Outfit}");
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(svc.Folders.ContainsKey(Bob.Outfit), Is.True);
-        Assert.That(svc.Items.ContainsKey(Bob.OutfitItem), Is.True, "nor may its contents be purged as a side effect");
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.True(svc.Folders.ContainsKey(Bob.Outfit));
+        Assert.True(svc.Items.ContainsKey(Bob.OutfitItem), "nor may its contents be purged as a side effect");
     }
 
-    [Test]
+    [Fact]
     public void DELETE_category_children_of_another_resident_is_refused_and_the_children_survive()
     {
         var svc = World();
         var (status, _) = AsAlice(svc, "DELETE", $"/category/{Bob.Outfit}/children");
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(ChildItems(svc, Bob.Outfit), Is.EqualTo(new[] { Bob.OutfitItem }));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.Equal(new[] { Bob.OutfitItem }, ChildItems(svc, Bob.Outfit));
     }
 
     // ------------------------------------------------------------------ slam and create
 
-    [Test]
+    [Fact]
     public void PUT_links_into_another_residents_COF_is_refused_and_their_outfit_is_unchanged()
     {
         var svc = World();
@@ -329,12 +328,12 @@ public class AisCrossUserHttpTests
         };
         var (status, _) = AsAlice(svc, "PUT", $"/category/{Bob.Cof}/links", slam);
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(ChildItems(svc, Bob.Cof), Is.EqualTo(before), "Bob's COF links must be exactly what they were");
-        Assert.That(svc.Items[Bob.CofLink].AssetID, Is.EqualTo(Bob.Wearable));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.Equal(before, ChildItems(svc, Bob.Cof));
+        Assert.Equal(Bob.Wearable, svc.Items[Bob.CofLink].AssetID);
     }
 
-    [Test]
+    [Fact]
     public void POST_category_under_another_resident_is_refused_and_creates_nothing()
     {
         var svc = World();
@@ -343,8 +342,8 @@ public class AisCrossUserHttpTests
         var (status, _) = AsAlice(svc, "POST", $"/category/{Bob.Outfit}",
             new OSDMap { ["categories"] = new OSDArray { new OSDMap { ["name"] = "planted" } } });
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(ChildFolders(svc, Bob.Outfit), Is.EqualTo(before));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.Equal(before, ChildFolders(svc, Bob.Outfit));
     }
 
     /// <summary>
@@ -352,7 +351,7 @@ public class AisCrossUserHttpTests
     /// is the authority; the mismatch is a malformed request and answers 400 before anything is written. The
     /// backend's own parent check would refuse the write in any case - this makes the refusal say why.
     /// </summary>
-    [Test]
+    [Fact]
     public void POST_category_whose_body_parent_points_at_another_resident_is_400_and_creates_nothing()
     {
         var svc = World();
@@ -373,10 +372,10 @@ public class AisCrossUserHttpTests
             },
         });
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest));
-        Assert.That(body["error_code"].AsInteger(), Is.EqualTo(400));
-        Assert.That(ChildFolders(svc, Bob.Outfit), Is.EqualTo(beforeBob), "nothing may be created under Bob");
-        Assert.That(ChildFolders(svc, Alice.Outfit), Is.EqualTo(beforeAlice), "and nothing under Alice either");
+        Assert.Equal((int)HttpStatusCode.BadRequest, status);
+        Assert.Equal(400, body["error_code"].AsInteger());
+        Assert.Equal(beforeBob, ChildFolders(svc, Bob.Outfit));
+        Assert.Equal(beforeAlice, ChildFolders(svc, Alice.Outfit));
     }
 
     // ------------------------------------------------------------------ the positive control
@@ -385,37 +384,35 @@ public class AisCrossUserHttpTests
     /// The same eleven routes against Alice's own objects. Without this the fixture could be satisfied by a
     /// backend that refuses everything, which is not a fix but an outage.
     /// </summary>
-    [Test]
+    [Fact]
     public void every_route_still_works_against_the_callers_own_objects()
     {
         Assert.Multiple(() =>
         {
             var svc = World();
-            Assert.That(AsAlice(svc, "GET", $"/item/{Alice.Wearable}").Status, Is.EqualTo(200), "GET /item");
-            Assert.That(AsAlice(svc, "GET", $"/category/{Alice.Outfit}/children").Status, Is.EqualTo(200), "GET /children");
-            Assert.That(AsAlice(svc, "GET", $"/category/{Alice.Cof}/links").Status, Is.EqualTo(200), "GET /links");
+            Assert.Equal(200, AsAlice(svc, "GET", $"/item/{Alice.Wearable}").Status);
+            Assert.Equal(200, AsAlice(svc, "GET", $"/category/{Alice.Outfit}/children").Status);
+            Assert.Equal(200, AsAlice(svc, "GET", $"/category/{Alice.Cof}/links").Status);
 
             svc = World();
-            Assert.That(AsAlice(svc, "PATCH", $"/item/{Alice.Wearable}", new OSDMap { ["name"] = "renamed" }).Status,
-                Is.EqualTo(200), "PATCH /item");
-            Assert.That(svc.Items[Alice.Wearable].Name, Is.EqualTo("renamed"));
+            Assert.Equal(200, AsAlice(svc, "PATCH", $"/item/{Alice.Wearable}", new OSDMap { ["name"] = "renamed" }).Status);
+            Assert.Equal("renamed", svc.Items[Alice.Wearable].Name);
 
             svc = World();
-            Assert.That(AsAlice(svc, "PATCH", $"/category/{Alice.Outfit}", new OSDMap { ["name"] = "renamed" }).Status,
-                Is.EqualTo(200), "PATCH /category");
-            Assert.That(svc.Folders[Alice.Outfit].Name, Is.EqualTo("renamed"));
+            Assert.Equal(200, AsAlice(svc, "PATCH", $"/category/{Alice.Outfit}", new OSDMap { ["name"] = "renamed" }).Status);
+            Assert.Equal("renamed", svc.Folders[Alice.Outfit].Name);
 
             svc = World();
-            Assert.That(AsAlice(svc, "DELETE", $"/item/{Alice.Wearable}").Status, Is.EqualTo(200), "DELETE /item");
-            Assert.That(svc.Items.ContainsKey(Alice.Wearable), Is.False);
+            Assert.Equal(200, AsAlice(svc, "DELETE", $"/item/{Alice.Wearable}").Status);
+            Assert.False(svc.Items.ContainsKey(Alice.Wearable));
 
             svc = World();
-            Assert.That(AsAlice(svc, "DELETE", $"/category/{Alice.Outfit}").Status, Is.EqualTo(200), "DELETE /category");
-            Assert.That(svc.Folders.ContainsKey(Alice.Outfit), Is.False);
+            Assert.Equal(200, AsAlice(svc, "DELETE", $"/category/{Alice.Outfit}").Status);
+            Assert.False(svc.Folders.ContainsKey(Alice.Outfit));
 
             svc = World();
-            Assert.That(AsAlice(svc, "DELETE", $"/category/{Alice.Outfit}/children").Status, Is.EqualTo(200), "DELETE /children");
-            Assert.That(ChildItems(svc, Alice.Outfit), Is.Empty);
+            Assert.Equal(200, AsAlice(svc, "DELETE", $"/category/{Alice.Outfit}/children").Status);
+            Assert.Empty(ChildItems(svc, Alice.Outfit));
 
             svc = World();
             var slam = new OSDArray
@@ -428,16 +425,16 @@ public class AisCrossUserHttpTests
                     ["type"] = (int)AssetType.Link,
                 },
             };
-            Assert.That(AsAlice(svc, "PUT", $"/category/{Alice.Cof}/links", slam).Status, Is.EqualTo(200), "PUT /links");
-            Assert.That(svc.Items.ContainsKey(Alice.CofLink), Is.False, "the old link went");
-            Assert.That(ChildItems(svc, Alice.Cof), Has.Count.EqualTo(1), "and exactly one new one is there");
+            Assert.Equal(200, AsAlice(svc, "PUT", $"/category/{Alice.Cof}/links", slam).Status);
+            Assert.False(svc.Items.ContainsKey(Alice.CofLink), "the old link went");
+            Assert.Single(ChildItems(svc, Alice.Cof));
 
             svc = World();
             var (createStatus, createBody) = AsAlice(svc, "POST", $"/category/{Alice.Outfit}",
                 new OSDMap { ["categories"] = new OSDArray { new OSDMap { ["name"] = "Sub Outfit" } } });
-            Assert.That(createStatus, Is.EqualTo(200), "POST /category");
+            Assert.Equal(200, createStatus);
             var created = ((OSDArray)createBody["_created_categories"]).Single().AsUUID();
-            Assert.That(svc.Folders[created].ParentID, Is.EqualTo(Alice.Outfit));
+            Assert.Equal(Alice.Outfit, svc.Folders[created].ParentID);
 
             // and the create whose body repeats the URL parent, which is what the viewer actually sends
             svc = World();
@@ -454,8 +451,8 @@ public class AisCrossUserHttpTests
                     },
                 },
             });
-            Assert.That(echoStatus, Is.EqualTo(200), "POST /category with the body repeating the URL parent");
-            Assert.That(ChildFolders(svc, Alice.Outfit), Has.Count.EqualTo(1));
+            Assert.Equal(200, echoStatus);
+            Assert.Single(ChildFolders(svc, Alice.Outfit));
         });
     }
 }

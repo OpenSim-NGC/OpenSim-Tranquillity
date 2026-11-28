@@ -61,7 +61,7 @@ public class LandOwnershipTests : OpenSimTestCase
         /// (or the no-money module, for which every price is paid). Its OnLandBuy handler is added after the land
         /// module's, so it runs after it.
         /// </param>
-        public Fixture(Func<EventManager.LandBuyArgs, int> charge = null)
+        public Fixture(Func<EventManager.LandBuyArgs, int>? charge = null)
         {
             Scene.RegisterModuleInterface(FakeGroups.Create(Powers));
             Scene.RegionInfo.EstateSettings.EstateOwner = EstateOwner;
@@ -305,7 +305,7 @@ public class LandOwnershipTests : OpenSimTestCase
     /// <summary>An IGroupsModule that knows each (group, member)'s powers (GetMembershipData).</summary>
     private class FakeGroups : DispatchProxy
     {
-        private Dictionary<(UUID, UUID), ulong> m_powers;
+        private Dictionary<(UUID, UUID), ulong> m_powers = new();
 
         public static IGroupsModule Create(Dictionary<(UUID, UUID), ulong> powers)
         {
@@ -314,11 +314,16 @@ public class LandOwnershipTests : OpenSimTestCase
             return proxy;
         }
 
-        protected override object Invoke(MethodInfo targetMethod, object[] args)
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
-            if (targetMethod.Name == "GetMembershipData" && args.Length == 2)
+            ArgumentNullException.ThrowIfNull(targetMethod);
+            ArgumentNullException.ThrowIfNull(args);
+            if (targetMethod.Name == "GetMembershipData"
+                && args.Length == 2
+                && args[0] is UUID groupID
+                && args[1] is UUID agentID)
             {
-                var key = ((UUID)args[0], (UUID)args[1]);
+                var key = (groupID, agentID);
                 return m_powers.TryGetValue(key, out ulong p) ? new GroupMembershipData { GroupID = key.Item1, GroupPowers = p } : null;
             }
             var rt = targetMethod.ReturnType;

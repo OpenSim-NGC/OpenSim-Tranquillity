@@ -13,7 +13,6 @@ using System.Threading;
 using OpenMetaverse;
 using Phlox.ScriptEngine;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

@@ -35,7 +35,6 @@ using osWebRtcVoice.NonSpatial;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VoiceFeatureSwitchTests
     {
         private static readonly UUID Alice = new UUID("3b8f2c71-5d04-4e96-a1b7-60c9e48d2f13");
@@ -99,83 +98,93 @@ namespace osWebRtcVoice.Tests
             return resp.StatusCode;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EverySwitchIsOffUnlessSet()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfig cfg = EmptyVoiceSection();
-            Assert.That(WebRtcVoiceRegionModule.ReadA2AVoiceEnabled(cfg), Is.False, "A2AVoiceEnabled");
-            Assert.That(WebRtcVoiceRegionModule.ReadGroupVoiceEnabled(cfg), Is.False, "GroupVoiceEnabled");
-            Assert.That(WebRtcVoiceRegionModule.ReadAdhocVoiceEnabled(cfg), Is.False, "AdhocVoiceEnabled");
-            Assert.That(WebRtcVoiceRegionModule.ReadVoiceModerationEnabled(cfg), Is.False, "VoiceModerationEnabled");
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityArmingEnabled(cfg), Is.False, "VisibilityArmingEnabled");
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityFeederEnabled(cfg), Is.False, "VisibilityFeederEnabled");
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityEmitEnabled(cfg), Is.False, "VisibilityEmitEnabled");
-            Assert.That(cfg.GetBoolean("JoinCapabilityEnabled", false), Is.False, "JoinCapabilityEnabled");
-            Assert.That(cfg.GetBoolean("ConnectorsEnabled", false), Is.False, "ConnectorsEnabled");
+            Assert.False(WebRtcVoiceRegionModule.ReadA2AVoiceEnabled(cfg), "A2AVoiceEnabled");
+            Assert.False(WebRtcVoiceRegionModule.ReadGroupVoiceEnabled(cfg), "GroupVoiceEnabled");
+            Assert.False(WebRtcVoiceRegionModule.ReadAdhocVoiceEnabled(cfg), "AdhocVoiceEnabled");
+            Assert.False(WebRtcVoiceRegionModule.ReadVoiceModerationEnabled(cfg), "VoiceModerationEnabled");
+            Assert.False(WebRtcVoiceRegionModule.ReadVisibilityArmingEnabled(cfg), "VisibilityArmingEnabled");
+            Assert.False(WebRtcVoiceRegionModule.ReadVisibilityFeederEnabled(cfg), "VisibilityFeederEnabled");
+            Assert.False(WebRtcVoiceRegionModule.ReadVisibilityEmitEnabled(cfg), "VisibilityEmitEnabled");
+            Assert.False(cfg.GetBoolean("JoinCapabilityEnabled", false), "JoinCapabilityEnabled");
+            Assert.False(cfg.GetBoolean("ConnectorsEnabled", false), "ConnectorsEnabled");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EverySwitchIsHonouredWhenSet()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfig cfg = EmptyVoiceSection();
             foreach (string key in new[] { "A2AVoiceEnabled", "GroupVoiceEnabled", "AdhocVoiceEnabled", "VoiceModerationEnabled" })
                 cfg.Set(key, "true");
-            Assert.That(WebRtcVoiceRegionModule.ReadA2AVoiceEnabled(cfg), Is.True);
-            Assert.That(WebRtcVoiceRegionModule.ReadGroupVoiceEnabled(cfg), Is.True);
-            Assert.That(WebRtcVoiceRegionModule.ReadAdhocVoiceEnabled(cfg), Is.True);
-            Assert.That(WebRtcVoiceRegionModule.ReadVoiceModerationEnabled(cfg), Is.True);
+            Assert.True(WebRtcVoiceRegionModule.ReadA2AVoiceEnabled(cfg));
+            Assert.True(WebRtcVoiceRegionModule.ReadGroupVoiceEnabled(cfg));
+            Assert.True(WebRtcVoiceRegionModule.ReadAdhocVoiceEnabled(cfg));
+            Assert.True(WebRtcVoiceRegionModule.ReadVoiceModerationEnabled(cfg));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void A2AOff_CallAndStartConferenceAreAnsweredAsBeforeTheFeature()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, Alice);
             var mod = new WebRtcVoiceRegionModule();
             SetPrivate(mod, "m_Enabled", true);
 
-            Assert.That(ChatSession(mod, scene, "call", UUID.Random()), Is.EqualTo((int)HttpStatusCode.BadRequest),
-                "an unhandled method gets 400");
-            Assert.That(ChatSession(mod, scene, "start conference", UUID.Random()), Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(ChatSession(mod, scene, "decline invitation", UUID.Random()), Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(ChatSession(mod, scene, "fetch history", UUID.Random()), Is.EqualTo((int)HttpStatusCode.OK));
+            {
+                var assertedValue = ChatSession(mod, scene, "call", UUID.Random());
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.BadRequest, assertedValue), "an unhandled method gets 400");
+            }
+            Assert.Equal((int)HttpStatusCode.OK, ChatSession(mod, scene, "start conference", UUID.Random()));
+            Assert.Equal((int)HttpStatusCode.OK, ChatSession(mod, scene, "decline invitation", UUID.Random()));
+            Assert.Equal((int)HttpStatusCode.OK, ChatSession(mod, scene, "fetch history", UUID.Random()));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void A2AOn_CallIsHandledByTheInvitationRegistry()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, Alice);
             var mod = new WebRtcVoiceRegionModule();
             SetPrivate(mod, "m_Enabled", true);
             SetPrivate(mod, "m_a2aVoiceEnabled", true);
 
-            Assert.That(ChatSession(mod, scene, "call", UUID.Random()), Is.EqualTo((int)HttpStatusCode.NotFound),
-                "a call for a session nobody started is unknown to the registry");
+            {
+                var assertedValue = ChatSession(mod, scene, "call", UUID.Random());
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.NotFound, assertedValue), "a call for a session nobody started is unknown to the registry");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void GroupAndAdhocOff_TheirPoliciesAreNotUsable()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mod = new WebRtcVoiceRegionModule();
             FieldInfo group = typeof(WebRtcVoiceRegionModule).GetField("m_groupVoice", BindingFlags.Instance | BindingFlags.NonPublic);
             FieldInfo adhoc = typeof(WebRtcVoiceRegionModule).GetField("m_adhocVoiceEnabled", BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.That(((GroupVoicePolicy)group.GetValue(mod)).IsUsable, Is.False, "group voice policy");
-            Assert.That((bool)adhoc.GetValue(mod), Is.False, "ad-hoc voice");
+            Assert.False(((GroupVoicePolicy)group.GetValue(mod)).IsUsable, "group voice policy");
+            Assert.False(((bool)adhoc.GetValue(mod)), "ad-hoc voice");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ModerationOff_TheCapabilityIsNotAdvertised()
         {
-            Assert.That(CapsFor(moderationEnabled: false).CapsHandlers.ContainsCap("SpatialVoiceModerationRequest"), Is.False);
-            Assert.That(CapsFor(moderationEnabled: false).CapsHandlers.ContainsCap("ProvisionVoiceAccountRequest"), Is.True,
-                "the other voice capabilities are unaffected");
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(CapsFor(moderationEnabled: false).CapsHandlers.ContainsCap("SpatialVoiceModerationRequest"));
+            Assert.True(CapsFor(moderationEnabled: false).CapsHandlers.ContainsCap("ProvisionVoiceAccountRequest"), "the other voice capabilities are unaffected");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ModerationOn_TheCapabilityIsAdvertised()
         {
-            Assert.That(CapsFor(moderationEnabled: true).CapsHandlers.ContainsCap("SpatialVoiceModerationRequest"), Is.True);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(CapsFor(moderationEnabled: true).CapsHandlers.ContainsCap("SpatialVoiceModerationRequest"));
         }
 
         private static OpenSim.Framework.Capabilities.Caps CapsFor(bool moderationEnabled)
@@ -189,16 +198,18 @@ namespace osWebRtcVoice.Tests
             return caps;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ConnectorsOff_AConfiguredRecordRegistersNothing()
         {
-            Assert.That(ConnectorRegistryAfterAddRegion(connectorsEnabled: false), Is.Null);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Null(ConnectorRegistryAfterAddRegion(connectorsEnabled: false));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ConnectorsOn_AConfiguredRecordIsRegistered()
         {
-            Assert.That(ConnectorRegistryAfterAddRegion(connectorsEnabled: true)?.Snapshot(), Has.Count.EqualTo(1));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(1, ConnectorRegistryAfterAddRegion(connectorsEnabled: true)?.Snapshot().Count());
         }
 
         private static VoiceConnectorRegistry ConnectorRegistryAfterAddRegion(bool connectorsEnabled)
