@@ -341,6 +341,9 @@ public class SimulationServiceConnector : ISimulationService
 
             bool success = result["success"].AsBoolean();
 
+            // The destination's answer: the parsed JSON body when there is one, otherwise the result map itself
+            OSDMap answer = result;
+
             bool has_Result = false;
             if (!result.ContainsKey("_Result"))
                 ctx.ReadAnswer(result);
@@ -348,6 +351,7 @@ public class SimulationServiceConnector : ISimulationService
             {
                 has_Result = true;
                 OSDMap data = (OSDMap)tmpOSD;
+                answer = data;
                 ctx.ReadAnswer(data);
 
                 // FIXME: If there is a _Result map then it's the success key here that indicates the true success
@@ -409,12 +413,15 @@ public class SimulationServiceConnector : ISimulationService
 
             featuresAvailable.Clear();
 
-            if (result.TryGetValue("features", out tmpOSD) && tmpOSD is OSDArray)
+            if (answer.TryGetValue("features", out tmpOSD) && tmpOSD is OSDArray)
             {
                 OSDArray array = (OSDArray)tmpOSD;
 
                 foreach (OSD o in array)
-                    featuresAvailable.Add(new UUID(o.AsString()));
+                {
+                    if (UUID.TryParse(o.AsString(), out UUID feature))
+                        featuresAvailable.Add(feature);
+                }
             }
 
             // Version stuff
@@ -462,14 +469,19 @@ public class SimulationServiceConnector : ISimulationService
 
         try
         {
-            WebUtil.ServiceOSDRequest(uri, null, "DELETE", 10000, false, false);
+            OSDMap result = WebUtil.ServiceOSDRequest(uri, null, "DELETE", 10000, false, false);
+            if (result["Success"].AsBoolean())
+                return true;
+
+            m_log.LogWarning("[REMOTE SIMULATION CONNECTOR] CloseAgent of {0} in region {1} at {2} failed: {3}",
+                id, destination.RegionID, destination.ServerURI, result["Message"].AsString());
         }
         catch (Exception e)
         {
             m_log.LogWarning("[REMOTE SIMULATION CONNECTOR] CloseAgent failed with exception; {0}",e.ToString());
         }
 
-        return true;
+        return false;
     }
 
     #endregion Agents
