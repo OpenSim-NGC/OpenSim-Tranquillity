@@ -25,7 +25,6 @@ using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Tests.Common;
 using Xunit;
-using Xunit.Abstractions;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.MeshShapesTodayTests;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;

@@ -28,55 +28,59 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ProvisionViewerSessionGuardTests
     {
         // Initial first-provision case: no viewer_session at all -> route to CREATE.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MissingViewerSession_IsNotReal()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var req = new OSDMap { { "channel_type", OSD.FromString("local") } };
-            Assert.That(WebRtcVoiceServiceModule.HasRealViewerSession(req, out _), Is.False);
+            Assert.False(WebRtcVoiceServiceModule.HasRealViewerSession(req, out _));
         }
 
         // The exact shape that caused the field failure: present OSDUUID(UUID.Zero).
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ZeroUuidViewerSession_present_IsNotReal()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var req = new OSDMap { { "viewer_session", OSD.FromUUID(UUID.Zero) } };
 
             // precondition: OSDMap reports the zero UUID as PRESENT (this is why the
             // original `if (TryGetString(...))` wrongly took the lookup branch).
-            Assert.That(req.TryGetString("viewer_session", out string raw), Is.True);
-            Assert.That(raw, Is.EqualTo("00000000-0000-0000-0000-000000000000"));
+            Assert.True(req.TryGetString("viewer_session", out string raw));
+            Assert.Equal("00000000-0000-0000-0000-000000000000", raw);
 
-            Assert.That(WebRtcVoiceServiceModule.HasRealViewerSession(req, out _), Is.False);
+            Assert.False(WebRtcVoiceServiceModule.HasRealViewerSession(req, out _));
         }
 
         // Same zero id but delivered as an OSDString rather than OSDUUID.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ZeroUuidViewerSession_asString_IsNotReal()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var req = new OSDMap { { "viewer_session", OSD.FromString(UUID.Zero.ToString()) } };
-            Assert.That(WebRtcVoiceServiceModule.HasRealViewerSession(req, out _), Is.False);
+            Assert.False(WebRtcVoiceServiceModule.HasRealViewerSession(req, out _));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EmptyViewerSession_IsNotReal()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var req = new OSDMap { { "viewer_session", OSD.FromString(string.Empty) } };
-            Assert.That(WebRtcVoiceServiceModule.HasRealViewerSession(req, out _), Is.False);
+            Assert.False(WebRtcVoiceServiceModule.HasRealViewerSession(req, out _));
         }
 
         // A real, registered-shaped session id must still route to LOOKUP.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RealUuidViewerSession_IsReal_AndPreservesId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var id = UUID.Random();
             var req = new OSDMap { { "viewer_session", OSD.FromUUID(id) } };
 
-            Assert.That(WebRtcVoiceServiceModule.HasRealViewerSession(req, out string got), Is.True);
-            Assert.That(got, Is.EqualTo(id.ToString()));
+            Assert.True(WebRtcVoiceServiceModule.HasRealViewerSession(req, out string got));
+            Assert.Equal(id.ToString(), got);
         }
     }
 }

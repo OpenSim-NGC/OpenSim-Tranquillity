@@ -43,13 +43,6 @@ namespace OpenSim.Tests.Permissions
     {
         public IndirectTransferTests()
         {
-            SetUp();
-        }
-
-
-        public void SetUp()
-        {
-            // In case we're dealing with some older version of nunit
             if (Common.TheInstance == null)
             {
                 Common.TheInstance = new Common();
@@ -87,7 +80,7 @@ namespace OpenSim.Tests.Permissions
             Thread.Sleep(6000);
 
             List<InventoryItemBase> items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[1].UUID, objsFolder.ID);
-            Assert.Equal(0, items.Count);
+            Assert.Empty(items);
 
             // A1 makes the objects copyable
             for (int i = 0; i < 6; i++)
@@ -113,8 +106,8 @@ namespace OpenSim.Tests.Permissions
         private void TakeOneBox(List<SceneObjectGroup> objs, string name, PermissionMask mask)
         {
             // Find the object inworld
-            SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID);
-            Assert.NotNull(box);
+            SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID)
+                ?? throw new InvalidOperationException($"Could not find object {name}.");
 
             // A2's inventory (index 1)
             Common.TheInstance.TakeCopyToInventory(1, box);
@@ -122,8 +115,8 @@ namespace OpenSim.Tests.Permissions
 
         private void MakeCopyable(List<SceneObjectGroup> objs, string name)
         {
-            SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID);
-            Assert.NotNull(box);
+            SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID)
+                ?? throw new InvalidOperationException($"Could not find object {name}.");
 
             // field = 8 is Everyone 
             // set = 1 means add the permission; set = 0 means remove permission

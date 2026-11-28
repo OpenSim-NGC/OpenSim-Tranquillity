@@ -18,12 +18,12 @@ using OpenSim.Tests.Common;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NpcCreateDuplicateIdTests
     {
-        [Test]
+        [Fact(Timeout = 60000)]
         public void CreateNpc_WithTheIdOfAnExistingPresence_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfigSource config = new IniConfigSource();
             config.AddConfig("NPC");
             config.Configs["NPC"].Set("Enabled", "true");
@@ -39,9 +39,18 @@ namespace osWebRtcVoice.Tests
             UUID result = npcModule.CreateNPC("Test", "Npc", new Vector3(128, 128, 30), existingId,
                 UUID.Zero, "", UUID.Zero, true, scene, existing.Appearance);
 
-            Assert.That(result, Is.EqualTo(UUID.Zero), "a taken agent id is refused");
-            Assert.That(scene.GetScenePresences().Count, Is.EqualTo(presencesBefore), "no presence was added");
-            Assert.That(scene.GetScenePresence(existingId), Is.SameAs(existing), "the existing presence is untouched");
+            {
+                var assertedValue = result;
+                TestAssert.WithMessage(() => Assert.Equal(UUID.Zero, assertedValue), "a taken agent id is refused");
+            }
+            {
+                var assertedValue = scene.GetScenePresences().Count;
+                TestAssert.WithMessage(() => Assert.Equal(presencesBefore, assertedValue), "no presence was added");
+            }
+            {
+                var assertedValue = scene.GetScenePresence(existingId);
+                TestAssert.WithMessage(() => Assert.Same(existing, assertedValue), "the existing presence is untouched");
+            }
         }
     }
 }

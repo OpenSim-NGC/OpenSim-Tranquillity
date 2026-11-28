@@ -17,7 +17,6 @@ using InWorldz.Phlox.Types;
 using OpenMetaverse;
 using Phlox.ScriptEngine;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 
