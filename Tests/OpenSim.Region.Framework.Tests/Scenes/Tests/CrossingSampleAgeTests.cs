@@ -42,6 +42,38 @@ public class CrossingSampleAgeTests : OpenSimTestCase
         base.Dispose();
     }
 
+    // ---- implementers outside this tree -----------------------------------------------------------------------------
+
+    // Written as an implementer that does not know the crossing members: it has to compile without them
+    private sealed class ObjectWithoutCrossingMembers : ISceneObject
+    {
+        public string Name => "Test Object";
+        public UUID UUID => UUID.Zero;
+        public UUID OwnerID { get; set; }
+        public ISceneObject CloneForNewScene() => this;
+        public string ToXml2() => string.Empty;
+        public string ExtraToXmlString() => string.Empty;
+        public void ExtraFromXmlString(string xmlstr) { }
+        public string GetStateSnapshot() => string.Empty;
+        public void SetState(string xmlstr, IScene s) { }
+        public bool HasGroupChanged { get; set; }
+    }
+
+    [Fact]
+    public void An_implementer_without_the_crossing_members_has_no_sample_no_cut_and_no_avatars_and_ignores_sets()
+    {
+        TestHelpers.InMethod();
+        ISceneObject so = new ObjectWithoutCrossingMembers();
+
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(3.25f, 0f, 0f);
+        so.CrossingCarriesAvatars = true;
+
+        Assert.True(double.IsNaN(so.CrossingSampleAgeMs));
+        Assert.Equal(Vector3.Zero, so.CrossingCutOffset);
+        Assert.False(so.CrossingCarriesAvatars);
+    }
+
     // ---- one process ------------------------------------------------------------------------------------------------
 
     private sealed class RecordingPrim : BasicPhysicsPrim
