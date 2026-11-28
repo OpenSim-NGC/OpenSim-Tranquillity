@@ -390,13 +390,13 @@ public class GroupRolesTests : OpenSimTestCase
         public readonly Dictionary<UUID, InvitationData> Invites = new();
 
         public bool StoreGroup(GroupData data) { Groups[data.GroupID] = data; return true; }
-        public GroupData RetrieveGroup(UUID groupID) => Groups.GetValueOrDefault(groupID);
-        public GroupData RetrieveGroup(string name) => Groups.Values.FirstOrDefault(g => g.Data["Name"] == name);
+        public GroupData RetrieveGroup(UUID groupID) => Groups.GetValueOrDefault(groupID)!;
+        public GroupData RetrieveGroup(string name) => Groups.Values.FirstOrDefault(g => g.Data["Name"] == name)!;
         public GroupData[] RetrieveGroups(string pattern) => Groups.Values.ToArray();
         public bool DeleteGroup(UUID groupID) => Groups.Remove(groupID);
         public int GroupsCount() => Groups.Count;
 
-        public MembershipData RetrieveMember(UUID groupID, string pricipalID) => Members.GetValueOrDefault((groupID, pricipalID));
+        public MembershipData RetrieveMember(UUID groupID, string pricipalID) => Members.GetValueOrDefault((groupID, pricipalID))!;
         public MembershipData[] RetrieveMembers(UUID groupID) => Members.Values.Where(m => m.GroupID == groupID).ToArray();
         public MembershipData[] RetrieveMemberships(string pricipalID) => Members.Values.Where(m => m.PrincipalID == pricipalID).ToArray();
         public bool StoreMember(MembershipData data) { Members[(data.GroupID, data.PrincipalID)] = data; return true; }
@@ -404,7 +404,7 @@ public class GroupRolesTests : OpenSimTestCase
         public int MemberCount(UUID groupID) => RetrieveMembers(groupID).Length;
 
         public bool StoreRole(RoleData data) { Roles[(data.GroupID, data.RoleID)] = data; return true; }
-        public RoleData RetrieveRole(UUID groupID, UUID roleID) => Roles.GetValueOrDefault((groupID, roleID));
+        public RoleData RetrieveRole(UUID groupID, UUID roleID) => Roles.GetValueOrDefault((groupID, roleID))!;
         public RoleData[] RetrieveRoles(UUID groupID) => Roles.Values.Where(r => r.GroupID == groupID).ToArray();
         public bool DeleteRole(UUID groupID, UUID roleID) => Roles.Remove((groupID, roleID));
         public int RoleCount(UUID groupID) => RetrieveRoles(groupID).Length;
@@ -414,24 +414,24 @@ public class GroupRolesTests : OpenSimTestCase
         public RoleMembershipData[] RetrieveRoleMembers(UUID groupID, UUID roleID) => RoleMembers.Where(x => x.Group == groupID && x.Role == roleID).Select(Rm).ToArray();
         public RoleMembershipData[] RetrieveMemberRoles(UUID groupID, string principalID) => RoleMembers.Where(x => x.Group == groupID && x.Agent == principalID).Select(Rm).ToArray();
         public RoleMembershipData RetrieveRoleMember(UUID groupID, UUID roleID, string principalID)
-            => RoleMembers.Contains((groupID, roleID, principalID)) ? Rm((groupID, roleID, principalID)) : null;
+            => RoleMembers.Contains((groupID, roleID, principalID)) ? Rm((groupID, roleID, principalID)) : null!;
         public int RoleMemberCount(UUID groupID, UUID roleID) => RetrieveRoleMembers(groupID, roleID).Length;
         public bool StoreRoleMember(RoleMembershipData data) => RoleMembers.Add((data.GroupID, data.RoleID, data.PrincipalID));
         public bool DeleteRoleMember(RoleMembershipData data) => RoleMembers.Remove((data.GroupID, data.RoleID, data.PrincipalID));
         public bool DeleteMemberAllRoles(UUID groupID, string principalID) { RoleMembers.RemoveWhere(x => x.Group == groupID && x.Agent == principalID); return true; }
 
         public bool StorePrincipal(PrincipalData data) { Principals[data.PrincipalID] = data; return true; }
-        public PrincipalData RetrievePrincipal(string principalID) => Principals.GetValueOrDefault(principalID);
+        public PrincipalData RetrievePrincipal(string principalID) => Principals.GetValueOrDefault(principalID)!;
         public bool DeletePrincipal(string principalID) => Principals.Remove(principalID);
 
         public bool StoreInvitation(InvitationData data) { Invites[data.InviteID] = data; return true; }
-        public InvitationData RetrieveInvitation(UUID inviteID) => Invites.GetValueOrDefault(inviteID);
-        public InvitationData RetrieveInvitation(UUID groupID, string principalID) => Invites.Values.FirstOrDefault(i => i.GroupID == groupID && i.PrincipalID == principalID);
+        public InvitationData RetrieveInvitation(UUID inviteID) => Invites.GetValueOrDefault(inviteID)!;
+        public InvitationData RetrieveInvitation(UUID groupID, string principalID) => Invites.Values.FirstOrDefault(i => i.GroupID == groupID && i.PrincipalID == principalID)!;
         public bool DeleteInvite(UUID inviteID) => Invites.Remove(inviteID);
         public void DeleteOldInvites() { }
 
         public bool StoreNotice(NoticeData data) => true;
-        public NoticeData RetrieveNotice(UUID noticeID) => null;
+        public NoticeData RetrieveNotice(UUID noticeID) => null!;
         public NoticeData[] RetrieveNotices(UUID groupID) => Array.Empty<NoticeData>();
         public bool DeleteNotice(UUID noticeID) => true;
         public void DeleteOldNotices() { }
@@ -444,8 +444,10 @@ public class GroupRolesTests : OpenSimTestCase
     private class NoGridUsers : DispatchProxy
     {
         public static IGridUserData Create() => Create<IGridUserData, NoGridUsers>();
-        protected override object Invoke(MethodInfo targetMethod, object[] args)
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
+            ArgumentNullException.ThrowIfNull(targetMethod);
+            ArgumentNullException.ThrowIfNull(args);
             var rt = targetMethod.ReturnType;
             return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);
         }

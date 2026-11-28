@@ -18,6 +18,34 @@ using OpenSim.Region.PhysicsModules.Jolt.Backend;
 
 namespace OpenSim.Region.PhysicsModules.Jolt
 {
+    /// <summary>
+    /// One warning when a region's bodies reach 80 % of MaxBodies, before prims start to get no physics. It warns again only
+    /// after the count has fallen below 70 %, so a region that hovers near the line does not write a line every step.
+    /// </summary>
+    internal sealed class BodyLimitWatch
+    {
+        private bool _warned;
+
+        /// <summary>The warning line, or null when there is nothing new to say.</summary>
+        internal string Check(string region, int liveBodies, int maxBodies)
+        {
+            if (maxBodies <= 0)
+                return null;
+            long live = liveBodies, max = maxBodies;
+            if (_warned)
+            {
+                if (live * 10 < max * 7)
+                    _warned = false;
+                return null;
+            }
+            if (live * 5 < max * 4)
+                return null;
+            _warned = true;
+            return $"{JoltScene.LogHeader} {region}: {liveBodies} of {maxBodies} physics bodies in use (80 % or more of MaxBodies); " +
+                   $"at {maxBodies} a new prim gets no physics - raise [Jolt] MaxBodies";
+        }
+    }
+
     internal static class CapacityReport
     {
         /// <summary>

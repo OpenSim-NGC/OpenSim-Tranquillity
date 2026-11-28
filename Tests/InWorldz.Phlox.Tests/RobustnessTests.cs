@@ -13,7 +13,6 @@ using System.Threading.Tasks;
 using InWorldz.Phlox.Glue;
 using OpenMetaverse;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 
@@ -153,8 +152,8 @@ public class RobustnessTests
         h.Engine.ListenManager.Add(h.Prim.LocalId, evil, h.Prim.UUID, 5, "", UUID.Zero, Evil, 2);
 
         var sw = Stopwatch.StartNew();
-        var deliver = Task.Run(() => h.Engine.ListenManager.DeliverChat(5, "someone", UUID.Random(), Victim));
-        Assert.True(await Task.WhenAny(deliver, Task.Delay(TimeSpan.FromSeconds(5))) == deliver, "chat delivery was still inside the regex after 5 s");
+        var deliver = Task.Run(() => h.Engine.ListenManager.DeliverChat(5, "someone", UUID.Random(), Victim), TestContext.Current.CancellationToken);
+        Assert.True(await Task.WhenAny(deliver, Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)) == deliver, "chat delivery was still inside the regex after 5 s");
         Assert.Null(deliver.Exception);
         Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1), $"delivery took {sw.Elapsed.TotalMilliseconds:F0} ms");
         h.Pump();

@@ -19,16 +19,12 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]
-    public class JanusTlsClientTests
-    {
-        private string _dir;
-
-        [SetUp]
-        public void SetUp()
+    public class JanusTlsClientTests : IAsyncLifetime
         {
-            _dir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "tls-client-" + Guid.NewGuid().ToString("N"));
+        private string _dir;
+        private void SetUp()
+        {
+            _dir = Path.Combine(Directory.GetCurrentDirectory(), "tls-client-" + Guid.NewGuid().ToString("N"));
         }
 
         private static async Task<bool> SessionReaches(TlsTestServer server, string caFile)
@@ -47,68 +43,81 @@ namespace osWebRtcVoice.Tests
             return await client.SendPluginMessageAsync("janus.plugin.slvoice", new OSDMap { ["request"] = new OSDString("ping") });
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheAdminClientReachesAnHttpsAdminApiWhenTheKeyNamesTheCa()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using X509Certificate2 ca = TlsTestCerts.NewCa("Example Private CA");
             string caFile = TlsTestCerts.WritePem(ca, _dir, "ca.pem");
             using var server = new TlsTestServer(TlsTestCerts.NewServer("127.0.0.1", ca));
 
-            Assert.That(await SendAdminMessage(server, caFile), Is.EqualTo(AdminSendResult.Ok));
-            Assert.That(server.Requests, Is.EqualTo(1));
+            Assert.Equal(AdminSendResult.Ok, await SendAdminMessage(server, caFile));
+            Assert.Equal(1, server.Requests);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheAdminClientRefusesAnHttpsAdminApiWhoseCertificateNobodyTrusts()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using X509Certificate2 ca = TlsTestCerts.NewCa("Example Private CA");
             using var server = new TlsTestServer(TlsTestCerts.NewServer("127.0.0.1", ca));
 
-            Assert.That(await SendAdminMessage(server, caFile: null), Is.EqualTo(AdminSendResult.TransportError));
-            Assert.That(server.Requests, Is.EqualTo(0), "no admin secret was sent to an untrusted server");
+            Assert.Equal(AdminSendResult.TransportError, await SendAdminMessage(server, caFile: null));
+            {
+                var assertedValue = server.Requests;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no admin secret was sent to an untrusted server");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheAdminClientStillWorksOverPlainHttp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var server = new TlsTestServer(null);
 
-            Assert.That(await SendAdminMessage(server, caFile: null), Is.EqualTo(AdminSendResult.Ok));
+            Assert.Equal(AdminSendResult.Ok, await SendAdminMessage(server, caFile: null));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheSessionClientRefusesAnHttpsGatewayWhoseCertificateNobodyTrusts()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using X509Certificate2 ca = TlsTestCerts.NewCa("Example Private CA");
             using var server = new TlsTestServer(TlsTestCerts.NewServer("127.0.0.1", ca));
 
-            Assert.That(await SessionReaches(server, caFile: null), Is.False);
-            Assert.That(server.Requests, Is.EqualTo(0), "no API secret was sent to an untrusted server");
+            Assert.False(await SessionReaches(server, caFile: null));
+            {
+                var assertedValue = server.Requests;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no API secret was sent to an untrusted server");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheSessionClientStillWorksOverPlainHttp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var server = new TlsTestServer(null);
 
-            Assert.That(await SessionReaches(server, caFile: null), Is.True);
+            Assert.True(await SessionReaches(server, caFile: null));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ACaGivenAsADerFileIsTrusted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using X509Certificate2 ca = TlsTestCerts.NewCa("Example Private CA");
             Directory.CreateDirectory(_dir);
             string derFile = Path.Combine(_dir, "ca.der");
             File.WriteAllBytes(derFile, ca.Export(X509ContentType.Cert));
             using var server = new TlsTestServer(TlsTestCerts.NewServer("127.0.0.1", ca));
 
-            Assert.That(await SessionReaches(server, derFile), Is.True);
+            Assert.True(await SessionReaches(server, derFile));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ACaInsideABundleOfSeveralCertificatesIsTrusted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using X509Certificate2 other = TlsTestCerts.NewCa("Example Other CA");
             using X509Certificate2 ca = TlsTestCerts.NewCa("Example Private CA");
             Directory.CreateDirectory(_dir);
@@ -116,22 +125,37 @@ namespace osWebRtcVoice.Tests
             File.WriteAllText(bundle, other.ExportCertificatePem() + "\n" + ca.ExportCertificatePem());
             using var server = new TlsTestServer(TlsTestCerts.NewServer("127.0.0.1", ca));
 
-            Assert.That(await SessionReaches(server, bundle), Is.True);
+            Assert.True(await SessionReaches(server, bundle));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheSessionClientReachesAnHttpsGatewayWhenTheKeyNamesTheCa()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using X509Certificate2 ca = TlsTestCerts.NewCa("Example Private CA");
             string caFile = TlsTestCerts.WritePem(ca, _dir, "ca.pem");
             using var server = new TlsTestServer(TlsTestCerts.NewServer("127.0.0.1", ca));
             using var session = new JanusSession(server.VoiceUri, "api-secret", server.AdminUri, "admin-secret", false,
                                                  JanusTls.CreateHandler(caFile));
 
-            Assert.That(await session.CreateSession(), Is.True, "the gateway API answered over https");
+            Assert.True((await session.CreateSession()), "the gateway API answered over https");
             var admin = await session.SendToJanusAdmin(new JanusMessageReq("info"));
-            Assert.That(admin.ReturnCode, Is.EqualTo("success"), "the admin API answered over https");
+            {
+                var assertedValue = admin.ReturnCode;
+                TestAssert.WithMessage(() => Assert.Equal("success", assertedValue), "the admin API answered over https");
+            }
             await session.DestroySession();
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

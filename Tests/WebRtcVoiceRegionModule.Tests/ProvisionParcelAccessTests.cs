@@ -18,7 +18,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ProvisionParcelAccessTests
     {
         private static readonly UUID Owner = UUID.Random();
@@ -41,44 +40,50 @@ namespace osWebRtcVoice.Tests
         private static ProvisionAccess Check(LandData ld, bool coreBars)
             => ProvisionParcelAccess.Check(ld, coreBars, Nobody, Nobody, Avatar, Now);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VoiceOffParcel_IsRefused_EvenWhenTheSimBarsNobody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The simulator's answer bars nobody, so only the voice-off flag can stop this.
-            Assert.That(Check(Parcel(voiceOn: false, bannedAvatar: false), coreBars: false), Is.EqualTo(ProvisionAccess.VoiceOff));
+            Assert.Equal(ProvisionAccess.VoiceOff, Check(Parcel(voiceOn: false, bannedAvatar: false), coreBars: false));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VoiceOnParcel_WithNoBan_IsAllowed()
         {
-            Assert.That(Check(Parcel(voiceOn: true, bannedAvatar: false), coreBars: false), Is.EqualTo(ProvisionAccess.Allowed));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(ProvisionAccess.Allowed, Check(Parcel(voiceOn: true, bannedAvatar: false), coreBars: false));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BannedAvatar_IsRefused_EvenWhenTheSimBarsNobody()
         {
-            Assert.That(Check(Parcel(voiceOn: true, bannedAvatar: true), coreBars: false), Is.EqualTo(ProvisionAccess.Barred));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(ProvisionAccess.Barred, Check(Parcel(voiceOn: true, bannedAvatar: true), coreBars: false));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AvatarTheSimBars_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The simulator's restrict or ban answer is honoured.
-            Assert.That(Check(Parcel(voiceOn: true, bannedAvatar: false), coreBars: true), Is.EqualTo(ProvisionAccess.Barred));
+            Assert.Equal(ProvisionAccess.Barred, Check(Parcel(voiceOn: true, bannedAvatar: false), coreBars: true));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BannedParcelOwner_IsNotBarred()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             LandData ld = Parcel(voiceOn: true, bannedAvatar: true);
             ld.OwnerID = Avatar;
-            Assert.That(Check(ld, coreBars: false), Is.EqualTo(ProvisionAccess.Allowed));
+            Assert.Equal(ProvisionAccess.Allowed, Check(ld, coreBars: false));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VoiceOffTakesPrecedence_OverBar()
         {
-            Assert.That(Check(Parcel(voiceOn: false, bannedAvatar: true), coreBars: true), Is.EqualTo(ProvisionAccess.VoiceOff));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(ProvisionAccess.VoiceOff, Check(Parcel(voiceOn: false, bannedAvatar: true), coreBars: true));
         }
     }
 }
