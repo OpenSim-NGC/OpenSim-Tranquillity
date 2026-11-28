@@ -40,6 +40,13 @@ public interface IFSAssetDataPlugin : IPlugin
 
     AssetMetadata   Get(string id, out string hash);
     bool            Store(AssetMetadata metadata, string hash);
+
+    /// <summary>
+    /// As <see cref="Store(AssetMetadata, string)"/>; with <paramref name="force"/> ("force import"), an id that
+    /// already has a row gets the new hash and access time, and keeps its name, description, type, flags and
+    /// creation time. This default ignores <paramref name="force"/>, for stores that have no such update.
+    /// </summary>
+    bool Store(AssetMetadata metadata, string hash, bool force) => Store(metadata, hash);
     void            Import(string conn, string table, int start, int count, bool force, FSStoreDelegate store);
     int             Count();
 

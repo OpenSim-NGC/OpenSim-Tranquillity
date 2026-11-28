@@ -239,7 +239,9 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
         return kept.ToString();
     }
 
-    public bool Store(AssetMetadata meta, string hash)
+    public bool Store(AssetMetadata meta, string hash) => Store(meta, hash, false);
+
+    public bool Store(AssetMetadata meta, string hash, bool force)
     {
         try
         {
@@ -265,13 +267,15 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
                     return ExecuteNonQuery(cmd);
                 }
 
-                //cmd.CommandText = String.Format("update {0} set hash = ?hash, access_time = UNIX_TIMESTAMP() where id = ?id", m_Table);
-
-                //ExecuteNonQuery(cmd);
-
+                // "force import": the row points at the new content; its name, description, type, flags and
+                // creation time stay.
+                if (force)
+                {
+                    cmd.CommandText = String.Format("update {0} set hash = ?hash, access_time = UNIX_TIMESTAMP() where id = ?id", m_Table);
+                    return ExecuteNonQuery(cmd);
+                }
             }
 
-//                return false;
             // if the asset already exits
             // assume it was already correctly stored
             // or regions will keep retry.
