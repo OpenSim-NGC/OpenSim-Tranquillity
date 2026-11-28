@@ -113,7 +113,7 @@ public class SteppedMoverTests
 
     // With the setting on, the first set of a series carries what rests on the prim as the sets after it do: a single llSetPos of a
     // platform with an avatar or a cube on it moves them with it. With it off (the default) they are left where they were.
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 5 scenario(s)")]
+    [Theory]
     [InlineData("box", 1.0, 0.0)]
     [InlineData("box", 1.0, 45.0)]
     [InlineData("avatar", 1.0, 0.0)]
@@ -199,7 +199,7 @@ public class SteppedMoverTests
 
     // A child prim moved on its own carries what stands on it with the setting on (a root's compound is rebuilt for each step; the
     // rider takes the child's step with each set). With the setting off the rider is left behind sideways and shoved up or dropped, as before.
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 3 scenario(s)")]
+    [Theory]
     [InlineData("box", false, 0.0)]
     [InlineData("box", false, 45.0)]
     [InlineData("avatar", false, 0.0)]

@@ -210,7 +210,7 @@ public class RecrossWaitRiderTests
                 yield return new object[] { rate, deckX, ahead };
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Theory]
     [MemberData(nameof(InWorldzCases))]
     public void A_rider_stays_on_a_deck_that_is_told_to_go_back_during_the_wait_and_when_it_crosses_after_it(float physicsRate, float deckX, float ahead)
     {

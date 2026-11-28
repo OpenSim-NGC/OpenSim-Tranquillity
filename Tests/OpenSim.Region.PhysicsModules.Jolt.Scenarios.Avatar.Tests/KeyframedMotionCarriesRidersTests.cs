@@ -98,7 +98,7 @@ public class KeyframedMotionCarriesRidersTests
     // What a platform did before keyframed motion was told apart (the recon's figures for plain sets every 0.2 s, and for
     // keyframed ones the actor is not told of): a sideways move leaves the rider behind to fall the platform's 3 m; a move up
     // leaves an avatar and a cube on it, except a cube on a platform lifted 0.6 m in each step.
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 4 scenario(s)")]
+    [Theory]
     [InlineData("box", false, 1f, 0.0, false)]
     [InlineData("box", false, 3f, 0.0, false)]
     [InlineData("avatar", false, 1f, 0.0, false)]
@@ -119,7 +119,7 @@ public class KeyframedMotionCarriesRidersTests
             Assert.True(f.MaxSink > 2.5, $"{rider} {(up ? "up" : "sideways")} at {speed} m/s: sank only {f.MaxSink:0.00} m ({f.Verdict})");
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData("box", 0.0)]
     [InlineData("avatar", 0.0)]
     [InlineData("box", 45.0)]
@@ -242,7 +242,7 @@ public class KeyframedMotionCarriesRidersTests
         Assert.True(atLast, "and it is where the last pose put it");
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Theory]
     [InlineData("box", 0.0)]
     [InlineData("box", 45.0)]
     [InlineData("avatar", 0.0)]
@@ -336,7 +336,7 @@ public class KeyframedMotionCarriesRidersTests
         Assert.True(plain, "a plain solid prim is the control: it does become kinematic");
     }
 
-    [OpenSim.Tests.Common.KnownFailureFact("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Fact]
     public void The_setting_is_on_by_default_and_off_leaves_the_platform_a_fixed_body()
     {
         Assert.True(new JoltConfig().KeyframedMotionCarriesRiders);

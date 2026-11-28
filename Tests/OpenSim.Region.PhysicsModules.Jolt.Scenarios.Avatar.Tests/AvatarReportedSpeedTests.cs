@@ -101,7 +101,7 @@ public class AvatarReportedSpeedTests
     // push fades, and at 45 Hz the slowed linkset catches it up and goes a little into it before it may push it, so Jolt
     // set it out on the next step: 0.31 m in 1/45 s, reported as 14.05 m/s. The avatar is moved only by the linkset, never
     // faster than the push cap, and reports no more.
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(0.0)]
     [InlineData(45.0)]
     public void A_flying_avatar_carried_by_a_heavy_linkset_reports_no_more_than_the_push_cap(double physicsHz)
@@ -117,7 +117,7 @@ public class AvatarReportedSpeedTests
 
     // The 100 kg box thrown at 5 m/s at a flying avatar: they meet at their common speed by mass, 100 x 5 / (100 + the avatar's mass),
     // and the avatar reports no more than that (the meeting of a box and a flying avatar is unchanged).
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(0.0)]
     [InlineData(45.0)]
     public void A_flying_avatar_struck_by_a_heavy_box_reports_their_common_speed(double physicsHz)
