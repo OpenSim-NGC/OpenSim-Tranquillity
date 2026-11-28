@@ -855,6 +855,9 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
     // The age (ms) an object that crossed in was handed over with, until the region gives it to the object's engine
     private double m_crossSampleAgeMs = double.NaN;
 
+    // How far the engine had cut that position back (PhysicsActor.CrossingCutOffset); read only along with the age
+    private Vector3 m_crossCutOffset;
+
     /// <summary>When (the receiving region's Scene.CrossingClock, ms) an object that crossed in was handed to the region,
     /// until its age is given to its engine; NaN otherwise.</summary>
     public double CrossingHandedOverAtMs { get; set; } = double.NaN;
@@ -877,6 +880,17 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             m_crossSampleAgeMs = value;
             m_crossSampleAtMs = double.NaN;
         }
+    }
+
+    /// <summary>
+    /// For a crossing: how far the position the object is sent with was cut back by its engine. It belongs to the same
+    /// sample as <see cref="CrossingSampleAgeMs"/> and is zero when that age is not known.
+    /// </summary>
+    public Vector3 CrossingCutOffset
+    {
+        // reads no clock: only whether there is a sample or a handed-over age
+        get => double.IsNaN(m_crossSampleAtMs) && double.IsNaN(m_crossSampleAgeMs) ? Vector3.Zero : m_crossCutOffset;
+        set => m_crossCutOffset = value;
     }
 
     /// <summary>
@@ -930,6 +944,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                     inTransit = true;
                     // the position and velocity the object crosses with are the ones its engine reports now
                     m_crossSampleAtMs = Scene.CrossingClock();
+                    m_crossCutOffset = RootPart.PhysActor?.CrossingCutOffset ?? Vector3.Zero;
                     StartCrossing(val, null, "ObjCross-" + UUID.ToString());
                 }
                 return;
@@ -3391,6 +3406,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         dupe.inTransit = false;
         dupe.m_crossSampleAtMs = double.NaN;
         dupe.m_crossSampleAgeMs = double.NaN;
+        dupe.m_crossCutOffset = Vector3.Zero;
         dupe.CrossingHandedOverAtMs = double.NaN;
 
         // a copy is not being dragged: the drag belongs to the original's actor and to the subscriptions it made

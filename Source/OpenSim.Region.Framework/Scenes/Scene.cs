@@ -3103,6 +3103,8 @@ public partial class Scene : SceneBase
         // when the object was handed to this region, for the age of its position and velocity (GiveArrivalAge)
         newObject.CrossingHandedOverAtMs = double.IsFinite(newObject.CrossingSampleAgeMs) ? CrossingClock() : double.NaN;
 
+        newPosition = AddCrossingCut(newObject, newPosition);
+
         bool taken;
         try
         {
@@ -3111,6 +3113,7 @@ public partial class Scene : SceneBase
         catch (Exception e)
         {
             newObject.CrossingSampleAgeMs = double.NaN;
+            newObject.CrossingCutOffset = Vector3.Zero;
             newObject.CrossingHandedOverAtMs = double.NaN;
             // The object may be in the region already, half taken in. The sending region keeps its original when this
             // answers false, so the copy here goes: two copies of one object must not be left.
@@ -3119,8 +3122,9 @@ public partial class Scene : SceneBase
             return false;
         }
 
-        // an age that was not given to an engine is not kept for later
+        // an age that was not given to an engine is not kept for later, nor is what went with it
         newObject.CrossingSampleAgeMs = double.NaN;
+        newObject.CrossingCutOffset = Vector3.Zero;
         newObject.CrossingHandedOverAtMs = double.NaN;
 
         if (!taken)
@@ -3130,6 +3134,25 @@ public partial class Scene : SceneBase
         EventManager.TriggerOnIncomingSceneObject(newObject);
 
         return true;
+    }
+
+    /// <summary>
+    /// A sending region that cuts a fast object back to just past its edge sends that position, and with the sample's age
+    /// how far it cut it (SceneObjectGroup.CrossingCutOffset). The object is then placed where it had really got to,
+    /// before its age is applied (GiveArrivalAge), and kept inside this region as an arriving object's position is
+    /// (EntityTransferModule.GetObjectDestination). An object held for its riders is placed where it was sent to:
+    /// carried riders are sent to that position plus their offset.
+    /// </summary>
+    private Vector3 AddCrossingCut(SceneObjectGroup so, Vector3 sentPosition)
+    {
+        Vector3 cut = so.CrossingCutOffset;
+        if (so.HeldForRiders || sentPosition.IsZero() || (cut.X == 0f && cut.Y == 0f) || !double.IsFinite(so.CrossingSampleAgeMs))
+            return sentPosition;
+
+        const float enterDistance = 0.2f;
+        sentPosition.X = Utils.Clamp(sentPosition.X + cut.X, enterDistance, RegionInfo.RegionSizeX - enterDistance);
+        sentPosition.Y = Utils.Clamp(sentPosition.Y + cut.Y, enterDistance, RegionInfo.RegionSizeY - enterDistance);
+        return sentPosition;
     }
 
     /// <summary>Removes an incoming object whose arrival failed half way, if this region holds that very object.</summary>

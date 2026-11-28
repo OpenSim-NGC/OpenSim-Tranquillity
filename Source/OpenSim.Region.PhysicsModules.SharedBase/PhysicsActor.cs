@@ -328,6 +328,13 @@ public abstract class PhysicsActor
     /// </summary>
     public virtual void CrossedIn(float sampleAgeSeconds) { }
 
+    /// <summary>
+    /// For an object waiting past the region's edge to be crossed: how far the engine cut the position it reports back
+    /// from where its last step took the object (that place is <see cref="Position"/> plus this). The default, and the
+    /// value once the object no longer waits there, is zero.
+    /// </summary>
+    public virtual Vector3 CrossingCutOffset => Vector3.Zero;
+
     public abstract void link(PhysicsActor obj);
 
     public abstract void delink();

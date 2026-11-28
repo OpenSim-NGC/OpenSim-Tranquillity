@@ -46,6 +46,9 @@ public class CrossingSampleAgeTests : OpenSimTestCase
     private sealed class RecordingPrim : BasicPhysicsPrim
     {
         public readonly List<float> CrossedInAges = new();
+        public Vector3 Cut;
+
+        public override Vector3 CrossingCutOffset => Cut;
 
         public RecordingPrim(string name, uint id, Vector3 pos, Vector3 size, Quaternion rot, PrimitiveBaseShape shape)
             : base(name, id, pos, size, rot, shape) { }
@@ -56,11 +59,12 @@ public class CrossingSampleAgeTests : OpenSimTestCase
     private sealed class RecordingEngine : BasicScene
     {
         public readonly List<RecordingPrim> Prims = new();
+        public Vector3 Cut;
 
         public override PhysicsActor AddPrimShape(string primName, PrimitiveBaseShape pbs, Vector3 position, Vector3 size,
             Quaternion rotation, bool isPhysical, uint localid)
         {
-            RecordingPrim prim = new(primName, localid, position, size, rotation, pbs) { IsPhysical = isPhysical };
+            RecordingPrim prim = new(primName, localid, position, size, rotation, pbs) { IsPhysical = isPhysical, Cut = Cut };
             Prims.Add(prim);
             return prim;
         }
@@ -71,6 +75,31 @@ public class CrossingSampleAgeTests : OpenSimTestCase
     {
         TestHelpers.InMethod();
 
+        var (arrived, reads) = CrossInOneProcess(Vector3.Zero);
+
+        RecordingPrim actor = Assert.IsType<RecordingPrim>(arrived.RootPart.PhysActor);
+        float age = Assert.Single(actor.CrossedInAges);
+        Assert.True(reads.Count >= 2, $"the sending region read its clock {reads.Count} times");
+        Assert.Equal((reads[^1] - reads[0]) / 1000.0, age, 6);
+        Assert.True(double.IsNaN(arrived.CrossingSampleAgeMs), "the age is used once, on arrival");
+        Assert.Equal(1f, arrived.AbsolutePosition.X, 3);   // nothing was cut: placed where it was sent to
+    }
+
+    [Fact]
+    public void An_object_its_engine_cut_back_crossing_in_one_process_is_placed_further_on_by_the_cut()
+    {
+        TestHelpers.InMethod();
+
+        var (arrived, _) = CrossInOneProcess(new Vector3(3.25f, 0f, 0f));
+
+        Assert.Equal(1f + 3.25f, arrived.AbsolutePosition.X, 3);
+        Assert.Single(Assert.IsType<RecordingPrim>(arrived.RootPart.PhysActor).CrossedInAges);
+        Assert.Equal(Vector3.Zero, arrived.CrossingCutOffset);   // used once, on arrival
+    }
+
+    // An object of sceneA, whose engine reports the given cut, crosses 1 m past the east border into sceneB.
+    private static (SceneObjectGroup arrived, List<double> reads) CrossInOneProcess(Vector3 cut)
+    {
         EntityTransferModule etmA = new(), etmB = new();
         LocalSimulationConnectorModule lscm = new();
         IConfigSource config = new IniConfigSource();
@@ -85,6 +114,7 @@ public class CrossingSampleAgeTests : OpenSimTestCase
         SceneHelpers.SetupSceneModules(sceneA, config, etmA);
         SceneHelpers.SetupSceneModules(sceneB, config, etmB);
 
+        sceneA.PhysicsScene = new RecordingEngine { Cut = cut };
         RecordingEngine engineB = new();
         sceneB.PhysicsScene = engineB;
         sceneB.CrossingClock = () => 1000;   // the receiving region's own clock: its handling time is then 0
@@ -103,11 +133,7 @@ public class CrossingSampleAgeTests : OpenSimTestCase
 
         SceneObjectGroup arrived = sceneB.GetSceneObjectGroup(so.UUID);
         Assert.NotNull(arrived);
-        RecordingPrim actor = Assert.IsType<RecordingPrim>(arrived.RootPart.PhysActor);
-        float age = Assert.Single(actor.CrossedInAges);
-        Assert.True(reads.Count >= 2, $"the sending region read its clock {reads.Count} times");
-        Assert.Equal((reads[^1] - reads[0]) / 1000.0, age, 6);
-        Assert.True(double.IsNaN(arrived.CrossingSampleAgeMs), "the age is used once, on arrival");
+        return (arrived, reads);
     }
 
     [Fact]
@@ -168,6 +194,7 @@ public class CrossingSampleAgeTests : OpenSimTestCase
     {
         public IScene Scene;
         public ISceneObject Received;
+        public Vector3 Position;
 
         protected override object Invoke(MethodInfo method, object[] args)
         {
@@ -175,6 +202,7 @@ public class CrossingSampleAgeTests : OpenSimTestCase
                 return Scene;
             if (method.Name == nameof(ISimulationService.CreateObject))
             {
+                Position = (Vector3)args[1];
                 Received = (ISceneObject)args[2];
                 return true;
             }
@@ -198,7 +226,7 @@ public class CrossingSampleAgeTests : OpenSimTestCase
         public void Post(OSDMap args, OpenSim.Framework.Servers.HttpServer.IOSHttpResponse response) => DoObjectPost(args, response);
     }
 
-    private static ISceneObject Receive(OSD age)
+    private static ISceneObject Receive(OSD age, OSD cut = null)
     {
         TestScene scene = new SceneHelpers().SetupScene("sceneR", TestHelpers.ParseTail(0x7800), 7300, 7300);
         SceneObjectGroup so = SceneHelpers.CreateSceneObject(1, TestHelpers.ParseTail(0x74), "", 0x7900);
@@ -217,6 +245,8 @@ public class CrossingSampleAgeTests : OpenSimTestCase
         };
         if (age is not null)
             args["sample_age_ms"] = age;
+        if (cut is not null)
+            args["sample_cut_offset"] = cut;
 
         TestOSHttpResponse response = new();
         handler.Post(args, response);
@@ -249,5 +279,169 @@ public class CrossingSampleAgeTests : OpenSimTestCase
     {
         TestHelpers.InMethod();
         Assert.True(double.IsNaN(Receive(null).CrossingSampleAgeMs));
+    }
+
+    // ---- the cut-back position ------------------------------------------------------------------------------------------
+
+    private static readonly GridRegion ExampleDestination =
+        new() { RegionID = UUID.Random(), RegionName = "Example", ServerURI = "http://example.org:9000/" };
+
+    // The object message a sending region builds for an object, with the position (2, 128, 30) in the destination.
+    private static OSDMap MessageFor(SceneObjectGroup so)
+    {
+        var client = new RemoteHeldCrossingTests.RecordingClient();
+        Assert.True(client.CreateObject(ExampleDestination, new Vector3(2f, 128, 30), so, false));
+        return Assert.Single(client.Posts);
+    }
+
+    private static SceneObjectGroup SendingObject(int tail)
+    {
+        TestScene scene = new SceneHelpers().SetupScene("sceneC", TestHelpers.ParseTail(tail), 7500, 7500);
+        return SceneHelpers.AddSceneObject(scene, 1, TestHelpers.ParseTail(tail + 1), "", tail + 2);
+    }
+
+    // The message goes through the object handler into a real region, which takes the object in, held or not.
+    private static SceneObjectGroup TakeIn(OSDMap message, bool held = false)
+    {
+        EntityTransferModule etm = new();
+        IConfigSource config = new IniConfigSource();
+        config.AddConfig("Modules").Set("EntityTransferModule", etm.Name);
+        TestScene scene = new SceneHelpers().SetupScene("sceneD", TestHelpers.ParseTail(0x7c00), 7600, 7600);
+        SceneHelpers.SetupSceneModules(scene, config, etm);
+        scene.CrossingClock = () => 1000;
+
+        ISimulationService service = DispatchProxy.Create<ISimulationService, CapturingService>();
+        CapturingService capture = (CapturingService)(object)service;
+        capture.Scene = scene;
+        message["destination_uuid"] = OSD.FromString(scene.RegionInfo.RegionID.ToString());
+        TestOSHttpResponse response = new();
+        // as it goes over the wire: written as JSON and read back
+        var wire = (OSDMap)OSDParser.DeserializeJson(OSDParser.SerializeJsonString(message));
+        new ClockedHandler(service).Post(wire, response);
+        Assert.Equal(200, response.StatusCode);
+
+        var received = Assert.IsType<SceneObjectGroup>(capture.Received);
+        if (held)
+        {
+            var hold = new CrossingHoldRequest
+            {
+                Source = ExampleDestination,
+                ExpectedRiders = new List<UUID> { TestHelpers.ParseTail(0x7d00) }
+            };
+            Assert.True(scene.IncomingCreateObject(capture.Position, received, hold));
+        }
+        else
+        {
+            Assert.True(scene.IncomingCreateObject(capture.Position, received));
+        }
+        return Assert.IsType<SceneObjectGroup>(scene.GetSceneObjectGroup(received.UUID));
+    }
+
+    [Fact]
+    public void Between_simulators_a_cut_back_object_is_placed_at_the_sent_position_plus_the_cut()
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e00);
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(3.25f, 0f, 0f);
+
+        OSDMap message = MessageFor(so);
+        Assert.True(message.ContainsKey("sample_cut_offset"), "no sample_cut_offset in the object message");
+        SceneObjectGroup arrived = TakeIn(message);
+
+        Assert.Equal(2f + 3.25f, arrived.AbsolutePosition.X, 3);
+        Assert.Equal(128f, arrived.AbsolutePosition.Y, 3);
+        Assert.Equal(30f, arrived.AbsolutePosition.Z, 3);
+    }
+
+    [Fact]
+    public void The_cut_and_the_age_are_the_only_additions_to_the_object_message()
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e10);
+        OSDMap without = MessageFor(so);   // an object with neither: the message as it was before these fields
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(3.25f, 0f, 0f);
+
+        OSDMap with = MessageFor(so);
+
+        var added = with.Keys.Cast<string>().Except(without.Keys.Cast<string>()).OrderBy(k => k, StringComparer.Ordinal);
+        Assert.Equal(new[] { "sample_age_ms", "sample_cut_offset" }, added);
+        Assert.Empty(without.Keys.Cast<string>().Except(with.Keys.Cast<string>()));
+        foreach (string key in without.Keys)
+            Assert.Equal(OSDParser.SerializeJsonString(without[key]), OSDParser.SerializeJsonString(with[key]));
+        Assert.Equal(new Vector3(2f, 128, 30).ToString(), with["new_position"].AsString());
+    }
+
+    [Theory]
+    [InlineData(41.5, 0f)]           // nothing cut
+    [InlineData(double.NaN, 3.25f)]  // no age: the cut means nothing without it
+    public void The_cut_is_left_out_of_the_message_when_there_is_none_or_no_age(double age, float cut)
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e20);
+        so.CrossingSampleAgeMs = age;
+        so.CrossingCutOffset = new Vector3(cut, 0f, 0f);
+
+        Assert.False(MessageFor(so).ContainsKey("sample_cut_offset"));
+    }
+
+    [Theory]
+    [InlineData(true, false)]    // a sender that knows the age only, or an object with nothing cut
+    [InlineData(false, true)]    // a cut without an age
+    [InlineData(false, false)]   // an older sender
+    public void Without_both_fields_the_object_is_placed_at_the_sent_position(bool withAge, bool withCut)
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e30);
+        OSDMap message = MessageFor(so);
+        if (withAge)
+            message["sample_age_ms"] = OSD.FromReal(41.5);
+        if (withCut)
+            message["sample_cut_offset"] = OSD.FromVector3(new Vector3(3.25f, 0f, 0f));
+
+        Assert.Equal(2f, TakeIn(message).AbsolutePosition.X, 3);
+    }
+
+    [Theory]
+    [InlineData(1000f)]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    public void A_cut_that_is_not_sane_is_ignored(float value)
+    {
+        TestHelpers.InMethod();
+        ISceneObject received = Receive(OSD.FromReal(41.5), OSD.FromVector3(new Vector3(value, 0f, 0f)));
+
+        Assert.Equal(Vector3.Zero, received.CrossingCutOffset);
+        Assert.Equal(41.5 + 3, received.CrossingSampleAgeMs, 6);
+    }
+
+    [Fact]
+    public void A_cut_of_the_wrong_type_is_ignored()
+    {
+        TestHelpers.InMethod();
+        Assert.Equal(Vector3.Zero, Receive(OSD.FromReal(41.5), OSD.FromString("<3, 0, 0>")).CrossingCutOffset);
+    }
+
+    [Fact]
+    public void A_cut_never_places_an_object_outside_the_region_it_arrives_in()
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e40);
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(-30f, 0f, 0f);
+
+        Assert.Equal(0.2f, TakeIn(MessageFor(so)).AbsolutePosition.X, 3);
+    }
+
+    [Fact]
+    public void An_object_held_for_its_riders_is_placed_at_the_sent_position()
+    {
+        TestHelpers.InMethod();
+        SceneObjectGroup so = SendingObject(0x7e50);
+        so.CrossingSampleAgeMs = 41.5;
+        so.CrossingCutOffset = new Vector3(3.25f, 0f, 0f);
+
+        Assert.Equal(2f, TakeIn(MessageFor(so), held: true).AbsolutePosition.X, 3);
     }
 }

@@ -54,4 +54,12 @@ public interface ISceneObject
     /// is given it as a duration, so no two clocks are ever compared. NaN when not known.
     /// </summary>
     double CrossingSampleAgeMs { get; set; }
+
+    /// <summary>
+    /// For an object crossing to another region: how far (m) the position it is sent with was cut back from where its
+    /// engine's last step took it (PhysicsActor.CrossingCutOffset). A region that takes the object in with the sample's
+    /// age adds it, in x and y and kept inside the region, to the position it is given, unless it holds the object for
+    /// its riders. Zero when nothing was cut or the age is not known.
+    /// </summary>
+    Vector3 CrossingCutOffset { get; set; }
 }

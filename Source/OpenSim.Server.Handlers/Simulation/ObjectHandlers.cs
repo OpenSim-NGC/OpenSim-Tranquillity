@@ -198,7 +198,17 @@ public class ObjectSimpleHandler : SimpleStreamHandler
         {
             double ageMs = sampleAge.AsReal();
             if (ageMs >= 0 && ageMs <= MaxSampleAgeMs)
+            {
                 sog.CrossingSampleAgeMs = ageMs + Math.Max(0.0, NowMs() - receivedAtMs);
+                // How far the sending region cut "new_position" back, as three reals. Taken only along with the age;
+                // anything else, or a value that is not a number or is above the limit, is ignored.
+                if (args.ContainsKey("sample_cut_offset") && args["sample_cut_offset"] is OSDArray { Count: 3 } sampleCut)
+                {
+                    Vector3 cut = sampleCut.AsVector3();
+                    if (Math.Abs(cut.X) <= MaxCutOffset && Math.Abs(cut.Y) <= MaxCutOffset && Math.Abs(cut.Z) <= MaxCutOffset)
+                        sog.CrossingCutOffset = cut;
+                }
+            }
         }
 
         // Riders listed: the object is to be held until they have arrived
@@ -240,6 +250,9 @@ public class ObjectSimpleHandler : SimpleStreamHandler
 
     /// <summary>The oldest sample age (ms) a crossing object message is taken with.</summary>
     private const double MaxSampleAgeMs = 10000;
+
+    /// <summary>The most (m, on each axis) a crossing object message's position is taken to have been cut back by.</summary>
+    private const float MaxCutOffset = 64f;
 
     private static void RespondWithBool(IOSHttpResponse httpResponse, bool result)
     {

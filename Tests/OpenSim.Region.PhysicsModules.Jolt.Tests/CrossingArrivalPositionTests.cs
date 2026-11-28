@@ -129,23 +129,74 @@ public class CrossingArrivalPositionTests
         Assert.InRange(a.Prim.Position.X, engine - 0.05f, engine + 0.05f);
     }
 
+    // Leaving: the body waits no further than 2 m past the edge, whatever its speed, and reports how far that cut it back.
+    // The position a crossing sends is where it waits, so a region that does not read the cut gets the position it always
+    // did. One heartbeat at 45 Hz covers 4/45 s: from 0.1 m inside, 30 m/s ends 2.57 m out and 60 m/s 5.23 m out.
     [Theory]
-    [InlineData(30f)]
-    [InlineData(60f)]
-    public void An_object_leaving_at_speed_waits_past_the_edge_where_its_last_step_took_it(float speed)
+    [InlineData(255.9f, 30f, 258f)]
+    [InlineData(255.9f, 60f, 258f)]
+    [InlineData(0.1f, -60f, -2f)]
+    public void A_fast_object_leaving_waits_two_metres_out_and_reports_how_far_it_was_cut_back(float from, float speed, float waits)
     {
-        // The position a crossing sends the object with is where it waits past the edge. One heartbeat at 45 Hz covers
-        // 4/45 s: at 60 m/s that is 5.3 m, more than the 2 m a slow object is kept within; cut to 2 m, the object would
-        // be sent behind where it was.
-        const float from = 255.9f;
         using var a = new Arrival(from, new Vector3(speed, 0f, 0f), 0f, crossIn: false);
 
         a.Heartbeat();
 
-        float expected = from + speed * 4f / 45f;
-        _out.WriteLine($"{speed} m/s leaving: waits at x {a.Prim.Position.X:0.000}, expected {expected:0.000}");
+        float reached = from + speed * 4f / 45f;
+        _out.WriteLine($"{speed} m/s leaving: waits at x {a.Prim.Position.X:0.000}, cut {a.Prim.CrossingCutOffset.X:0.000}, its step reached {reached:0.000}");
         Assert.True(a.Prim.HasLeftRegion);
-        Assert.InRange(a.Prim.Position.X, expected - 0.05f, expected + 0.05f);
+        Assert.InRange(a.Prim.Position.X, waits - 0.001f, waits + 0.001f);
+        Assert.InRange(a.Prim.CrossingCutOffset.X, reached - waits - 0.05f, reached - waits + 0.05f);
+        Assert.Equal(0f, a.Prim.CrossingCutOffset.Y);
+        Assert.Equal(0f, a.Prim.CrossingCutOffset.Z);
+    }
+
+    [Fact]
+    public void An_object_leaving_within_two_metres_has_nothing_cut()
+    {
+        using var a = new Arrival(255.9f, new Vector3(10f, 0f, 0f), 0f, crossIn: false);
+
+        a.Heartbeat();
+
+        Assert.True(a.Prim.HasLeftRegion);
+        Assert.InRange(a.Prim.Position.X, 255.9f + 10f * 4f / 45f - 0.05f, 255.9f + 10f * 4f / 45f + 0.05f);
+        Assert.Equal(Vector3.Zero, a.Prim.CrossingCutOffset);
+    }
+
+    [Fact]
+    public void After_a_failed_crossing_the_object_reports_no_cut()
+    {
+        using var a = new Arrival(255.9f, new Vector3(60f, 0f, 0f), 0f, crossIn: false);
+        a.Heartbeat();
+        Assert.True(a.Prim.CrossingCutOffset.X > 3f, $"cut {a.Prim.CrossingCutOffset.X:0.000} while waiting");
+
+        a.Prim.CrossingFailure();
+
+        Assert.Equal(Vector3.Zero, a.Prim.CrossingCutOffset);
+    }
+
+    [Theory]
+    [InlineData(0.028f)]
+    [InlineData(0.150f)]
+    public void A_60_mps_object_cut_back_at_the_edge_arrives_where_it_really_is(float sampleAge)
+    {
+        // The engine's two ends, side by side in one process: the first region's waiting place, as a position in the second
+        // region, plus the cut is where the second one's body is put. The test adds them itself; that a region does so with
+        // what it is sent is covered by CrossingSampleAgeTests.
+        const float from = 255.9f, speed = 60f;
+        using var leaving = new Arrival(from, new Vector3(speed, 0f, 0f), 0f, crossIn: false);
+        leaving.Heartbeat();
+        float sent = leaving.Prim.Position.X - StepRateRig.Size;
+        float cut = leaving.Prim.CrossingCutOffset.X;
+        Assert.InRange(sent, 2f - 0.001f, 2f + 0.001f);
+
+        using var arriving = new Arrival(sent + cut, new Vector3(speed, 0f, 0f), sampleAge);
+        arriving.Heartbeat();
+
+        float expected = from + speed * 4f / 45f - StepRateRig.Size + speed * (float)(sampleAge + TakenInAfter);
+        float x = arriving.Prim.Position.X;
+        _out.WriteLine($"sample {sampleAge * 1000:0} ms old: sent {sent:0.000}, cut {cut:0.000}, x {x:0.000}, true position {expected:0.000}, error {x - expected:+0.000;-0.000} m");
+        Assert.InRange(x, expected - 0.05f, expected + 0.05f);
     }
 
     [Fact]

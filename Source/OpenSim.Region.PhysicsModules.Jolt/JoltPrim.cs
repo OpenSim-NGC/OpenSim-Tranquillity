@@ -892,18 +892,37 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             }
         }
 
+        // How far the 2 m limit cut the waiting place back from where the last step took the body, and that waiting place.
+        // The place a crossing sends the object with is the waiting place, so a region that is not told the cut gets the
+        // position ubODE's rule gives; one that is told it can place a fast object where it had really got to.
+        private Vector3 _edgeCut;
+        private Vector3 _edgeWaitAt;
+
+        // Only while the object still waits where it was left: after a failed crossing or a move there is nothing cut.
+        public override Vector3 CrossingCutOffset
+            => _away == Away.Crossing && _position == _edgeWaitAt ? _edgeCut : Vector3.Zero;
+
+        // How much of an axis the 2 m limit cuts off. What is reported goes no further out than the last step's travel at
+        // this velocity, so a position the velocity does not account for is not passed on.
+        private static float EdgeCut(float reached, float size, float travel)
+        {
+            float max = Math.Max(EdgeWaitMax, Math.Abs(travel) + EdgeWaitMin);
+            if (reached < -EdgeWaitMax) return Math.Max(reached, -max) + EdgeWaitMax;
+            if (reached > size + EdgeWaitMax) return Math.Min(reached, size + max) - (size + EdgeWaitMax);
+            return 0f;
+        }
+
         private void LeaveAcrossEdge(Vector3 pos, Quaternion rot, Vector3 velocity, Vector3 angularVelocity)
         {
             float sx = _module.RegionSizeX, sy = _module.RegionSizeY;
-            // An object faster than 2 m a heartbeat waits as far out as its last step took it: the place it waits at is the
-            // place a crossing sends it with, and one pulled back would arrive behind where it was.
             float stepped = (float)_module.DrainCoversSeconds;
-            float maxX = Math.Max(EdgeWaitMax, Math.Abs(velocity.X) * stepped + EdgeWaitMin);
-            float maxY = Math.Max(EdgeWaitMax, Math.Abs(velocity.Y) * stepped + EdgeWaitMin);
-            if (pos.X < 0f) pos.X = Math.Clamp(pos.X, -maxX, -EdgeWaitMin);
-            else if (pos.X >= sx) pos.X = Math.Clamp(pos.X, sx + EdgeWaitMin, sx + maxX);
-            if (pos.Y < 0f) pos.Y = Math.Clamp(pos.Y, -maxY, -EdgeWaitMin);
-            else if (pos.Y >= sy) pos.Y = Math.Clamp(pos.Y, sy + EdgeWaitMin, sy + maxY);
+            var cut = new Vector3(EdgeCut(pos.X, sx, velocity.X * stepped), EdgeCut(pos.Y, sy, velocity.Y * stepped), 0f);
+            if (pos.X < 0f) pos.X = Math.Clamp(pos.X, -EdgeWaitMax, -EdgeWaitMin);
+            else if (pos.X >= sx) pos.X = Math.Clamp(pos.X, sx + EdgeWaitMin, sx + EdgeWaitMax);
+            if (pos.Y < 0f) pos.Y = Math.Clamp(pos.Y, -EdgeWaitMax, -EdgeWaitMin);
+            else if (pos.Y >= sy) pos.Y = Math.Clamp(pos.Y, sy + EdgeWaitMin, sy + EdgeWaitMax);
+            _edgeCut = cut;
+            _edgeWaitAt = pos;
             _position = pos;
             _orientation = rot;
             _velocity = velocity;
@@ -948,6 +967,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private void Unpark()
         {
             _away = Away.None;
+            _edgeCut = Vector3.Zero;
             BodyId body = _parkedBody;
             ShapeId shape = _parkedShape;
             _parkedBody = BodyId.Invalid;
