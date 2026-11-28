@@ -14,7 +14,6 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using Xunit;
-using Xunit.Abstractions;
 using static InWorldz.Phlox.Tests.InventoryGivesRig;
 
 namespace InWorldz.Phlox.Tests;

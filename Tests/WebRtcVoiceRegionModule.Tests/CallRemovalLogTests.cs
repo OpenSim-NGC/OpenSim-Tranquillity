@@ -12,43 +12,42 @@
 using System.Linq;
 using System.Net;
 using Microsoft.Extensions.Logging;
-using NUnit.Framework;
+using Xunit;
 using static osWebRtcVoice.Tests.CallModerationModuleTests;
 using static osWebRtcVoice.Tests.CallRemovalModuleTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
-    public class CallRemovalLogTests
-    {
+    public class CallRemovalLogTests : IAsyncLifetime
+        {
         private LogCapture _log;
-
-        [SetUp]
-        public void SetUp() => _log = new LogCapture();
-
-        [TearDown]
-        public void TearDown() => _log.Dispose();
+        private void SetUp() => _log = new LogCapture();
+        private void TearDown() => _log.Dispose();
 
         private System.Collections.Generic.List<LogCapture.Line> RefusalLines()
             => _log.AtInfoOrAbove("provision from").Where(l => l.Text.Contains(Member.ToString())).ToList();
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AViewerThatKeepsRetryingAfterARemoval_WritesOneLine_NotOnePerWindow()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             r.Module.RemoveFromCall(GroupId, Officer, Member, "x");
 
             for (int i = 0; i < 300; i++)
-                Assert.That(Provision(r, Member, out _), Is.EqualTo((int)HttpStatusCode.Forbidden));
+                Assert.Equal((int)HttpStatusCode.Forbidden, Provision(r, Member, out _));
 
-            Assert.That(RefusalLines().Count, Is.EqualTo(1), "the first refusal; the 299 retries add nothing");
-            Assert.That(RefusalLines()[0].Text, Does.Contain(Member.ToString()));
+            {
+                var assertedValue = RefusalLines().Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the first refusal; the 299 retries add nothing");
+            }
+            Assert.Contains(Member.ToString(), RefusalLines()[0].Text);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ReadmittingTheMember_EndsTheEpisode_WithOneLineThatCarriesTheNumberOfRefusals()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             r.Module.RemoveFromCall(GroupId, Officer, Member, "x");
             for (int i = 0; i < 300; i++)
@@ -57,8 +56,23 @@ namespace osWebRtcVoice.Tests
             r.Module.ReadmitToCall(GroupId, Officer, Member);
 
             var lines = RefusalLines();
-            Assert.That(lines.Count, Is.EqualTo(2), "the first refusal and the end");
-            Assert.That(lines[1].Text, Does.Contain("300 times"));
+            {
+                var assertedValue = lines.Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the first refusal and the end");
+            }
+            Assert.Contains("300 times", lines[1].Text);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

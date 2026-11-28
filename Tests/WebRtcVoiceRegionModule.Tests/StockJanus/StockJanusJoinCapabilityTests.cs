@@ -26,26 +26,21 @@ using osWebRtcVoice.Tests.StockJanus;
 
 namespace osWebRtcVoice.Tests
 {
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-    [TestFixture, NUnit.Framework.Timeout(240000)]
-#pragma warning restore CS0618
     [NeedsPlugin(JanusPluginKind.Mixer)]
-    public class StockJanusJoinCapabilityTests
-    {
+    public class StockJanusJoinCapabilityTests(RawJanus janus) : IAsyncLifetime, IClassFixture<RawJanus>
+        {
         private static readonly UUID Alice = new UUID("a11ce000-0000-4000-8000-000000000001");
         private static readonly TimeSpan Settle = TimeSpan.FromSeconds(10);
         private const int CapabilityRefused = 496;
 
-        private readonly RawJanus _janus = new();
+        private readonly RawJanus _janus = janus;
         private string _secret;
-
-        [OneTimeSetUp]
-        public void RequireGatewayAndSecret()
+        private void RequireGatewayAndSecret()
         {
-            StockJanusEnvironment.IgnoreUnlessConfigured();
+            StockJanusEnvironment.IgnoreUnlessConfigured(JanusPluginKind.Mixer);
             _secret = StockJanusEnvironment.Get("WEBRTC_JANUS_TEST_JOIN_CAP_SECRET");
             if (string.IsNullOrEmpty(_secret))
-                Assert.Ignore("WEBRTC_JANUS_TEST_JOIN_CAP_SECRET is not set: it is the mixer's JS_JOIN_CAP_SECRET");
+                Assert.Skip("WEBRTC_JANUS_TEST_JOIN_CAP_SECRET is not set: it is the mixer's JS_JOIN_CAP_SECRET");
         }
 
         private void CapabilityOn(IConfig voice, IConfig janus)
@@ -59,26 +54,28 @@ namespace osWebRtcVoice.Tests
         private static string Mint(string secret, string agent, string session, int room, long issuedAtUnix)
             => JoinCapability.Mint(secret, agent, session, room, JoinCapability.NoEpoch, 0, issuedAtUnix);
 
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task ARegionJoinWithTheCapabilityIsAdmitted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create(CapabilityOn);
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
 
             using Joined a = await region.JoinAsync(Alice, o => StockRegion.LocalBody(o));
 
-            Assert.That(a.Answer.Provisioned, Is.True, "the mixer admitted the join: " + a.Answer.Body);
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 1, Settle), Is.True);
+            Assert.True(a.Answer.Provisioned, "the mixer admitted the join: " + a.Answer.Body);
+            Assert.True(await _janus.WaitForParticipantsAsync(a.Answer.Room, 1, Settle));
             await region.LogoutAsync(a);
         }
 
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task AJoinOnTheGatewayIsAdmittedOnlyWithAValidCapability()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create(CapabilityOn);
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             using Joined a = await region.JoinAsync(Alice, o => StockRegion.LocalBody(o));
-            Assert.That(a.Answer.Provisioned, Is.True, "" + a.Answer.Body);
+            Assert.True(a.Answer.Provisioned, "" + a.Answer.Body);
             int room = a.Answer.Room;
             long now = JoinCapability.NowUnix();
             string stranger = UUID.Random().ToString();
@@ -87,31 +84,63 @@ namespace osWebRtcVoice.Tests
             using (var peer = await AiortcPeer.StartAsync())
             {
                 var valid = await _janus.JoinDirectWithCapabilityAsync(room, stranger, peer.Offer, Mint(_secret, stranger, session, room, now), session);
-                Assert.That(valid.AnswerSdp, Is.Not.Null, $"the control join with a valid capability is admitted (error {valid.ErrorCode}, {valid.Reason})");
+                {
+                    var assertedValue = valid.AnswerSdp;
+                    TestAssert.WithMessage(() => Assert.NotNull(assertedValue), $"the control join with a valid capability is admitted (error {valid.ErrorCode}, {valid.Reason})");
+                }
             }
             using (var peer = await AiortcPeer.StartAsync())
             {
                 var none = await _janus.JoinDirectWithCapabilityAsync(room, stranger, peer.Offer, null, null);
-                Assert.That(none.AnswerSdp, Is.Null, "a join with no capability is refused");
-                Assert.That(none.ErrorCode, Is.EqualTo(CapabilityRefused), "no capability: " + none.Reason);
+                {
+                    var assertedValue = none.AnswerSdp;
+                    TestAssert.WithMessage(() => Assert.Null(assertedValue), "a join with no capability is refused");
+                }
+                {
+                    var assertedValue = none.ErrorCode;
+                    TestAssert.WithMessage(() => Assert.Equal(CapabilityRefused, assertedValue), "no capability: " + none.Reason);
+                }
             }
             using (var peer = await AiortcPeer.StartAsync())
             {
                 string forged = Mint(new string('x', 48), stranger, session, room, now);
                 var result = await _janus.JoinDirectWithCapabilityAsync(room, stranger, peer.Offer, forged, session);
-                Assert.That(result.AnswerSdp, Is.Null, "a capability signed with another key is refused");
-                Assert.That(result.ErrorCode, Is.EqualTo(CapabilityRefused), "forged: " + result.Reason);
+                {
+                    var assertedValue = result.AnswerSdp;
+                    TestAssert.WithMessage(() => Assert.Null(assertedValue), "a capability signed with another key is refused");
+                }
+                {
+                    var assertedValue = result.ErrorCode;
+                    TestAssert.WithMessage(() => Assert.Equal(CapabilityRefused, assertedValue), "forged: " + result.Reason);
+                }
             }
             using (var peer = await AiortcPeer.StartAsync())
             {
                 string expired = Mint(_secret, stranger, session, room, now - 3600);
                 var result = await _janus.JoinDirectWithCapabilityAsync(room, stranger, peer.Offer, expired, session);
-                Assert.That(result.AnswerSdp, Is.Null, "an expired capability is refused");
-                Assert.That(result.ErrorCode, Is.EqualTo(CapabilityRefused), "expired: " + result.Reason);
-                Assert.That(result.Reason, Is.EqualTo("cap_expired"));
+                {
+                    var assertedValue = result.AnswerSdp;
+                    TestAssert.WithMessage(() => Assert.Null(assertedValue), "an expired capability is refused");
+                }
+                {
+                    var assertedValue = result.ErrorCode;
+                    TestAssert.WithMessage(() => Assert.Equal(CapabilityRefused, assertedValue), "expired: " + result.Reason);
+                }
+                Assert.Equal("cap_expired", result.Reason);
             }
 
             await region.LogoutAsync(a);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            RequireGatewayAndSecret();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

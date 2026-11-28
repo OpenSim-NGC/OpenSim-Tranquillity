@@ -47,7 +47,7 @@ public class StaleOnlineLoginTests
         public bool LogoutAgent(UUID sessionID) => true;
         public bool LogoutRegionAgents(UUID regionID) => true;
         public bool ReportAgent(UUID sessionID, UUID regionID) => true;
-        public PresenceInfo GetAgent(UUID sessionID) => null;
+        public PresenceInfo GetAgent(UUID sessionID) => null!;
         public PresenceInfo[] GetAgents(string[] userIDs) => Sessions.Where(s => userIDs.Contains(s.UserID)).ToArray();
     }
 

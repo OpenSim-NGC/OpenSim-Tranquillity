@@ -20,7 +20,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class PositionProtocolCheckTests
     {
         private static readonly UUID A = new UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
@@ -82,46 +81,62 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task WithTheFeedOnArmingOffAndNobodyExcluded_PositionRequestsAreSent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new ScriptedMixer { Protocol = 3 };
             (VoicePositionPump pump, JanusPeerCtlBatchSink sink) = Build(mixer);
             using (sink)
             {
-                Assert.That(sink.MixerProtocolKnown, Is.False, "nothing has been asked yet");
+                Assert.False(sink.MixerProtocolKnown, "nothing has been asked yet");
 
                 await TicksAsync(pump, 3);
 
-                Assert.That(sink.MixerVisProtocol, Is.EqualTo(3));
-                Assert.That(sink.MixerProtocolKnown, Is.True);
-                Assert.That(mixer.Of("peer_pos"), Is.Not.Empty, "position requests went out");
-                Assert.That(mixer.Of("peer_ctl_batch"), Is.Empty, "no exclusion was ever sent");
-                Assert.That(mixer.Of("peer_ctl_heartbeat").Count(), Is.EqualTo(1), "the version was asked for once");
+                Assert.Equal(3, sink.MixerVisProtocol);
+                Assert.True(sink.MixerProtocolKnown);
+                {
+                    var assertedValue = mixer.Of("peer_pos");
+                    TestAssert.WithMessage(() => Assert.NotEmpty(assertedValue), "position requests went out");
+                }
+                {
+                    var assertedValue = mixer.Of("peer_ctl_batch");
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no exclusion was ever sent");
+                }
+                {
+                    var assertedValue = mixer.Of("peer_ctl_heartbeat").Count();
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the version was asked for once");
+                }
             }
         }
 
-        [TestCase(0)]
-        [TestCase(1)]
-        [TestCase(2)]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(2)]
+        [Theory(Timeout = 60000)]
         public async Task AnOlderMixer_GetsNothingAfterTheCheck(int protocol)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new ScriptedMixer { Protocol = protocol };
             (VoicePositionPump pump, JanusPeerCtlBatchSink sink) = Build(mixer);
             using (sink)
             {
                 await TicksAsync(pump, 20);
 
-                Assert.That(mixer.Requests.Count, Is.EqualTo(1), "only the version check was sent");
-                Assert.That(mixer.Requests[0]["request"].AsString(), Is.EqualTo("peer_ctl_heartbeat"));
-                Assert.That(sink.MixerProtocolKnown, Is.True, "an older mixer is a known answer, not a reason to ask again");
-                Assert.That(sink.MixerVisProtocol, Is.LessThan(3));
+                {
+                    var assertedValue = mixer.Requests.Count;
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "only the version check was sent");
+                }
+                Assert.Equal("peer_ctl_heartbeat", mixer.Requests[0]["request"].AsString());
+                Assert.True(sink.MixerProtocolKnown, "an older mixer is a known answer, not a reason to ask again");
+                Assert.True(sink.MixerVisProtocol < 3);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheCheckNamesNoRoom_AndCarriesNothingTheMixerWouldApply()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new ScriptedMixer { Protocol = 3 };
             (VoicePositionPump pump, JanusPeerCtlBatchSink sink) = Build(mixer);
             using (sink)
@@ -129,30 +144,40 @@ namespace osWebRtcVoice.Tests
                 await TicksAsync(pump, 1);
 
                 OSDMap check = mixer.Requests[0];
-                Assert.That(check["request"].AsString(), Is.EqualTo("peer_ctl_heartbeat"));
-                Assert.That(check["rooms"], Is.InstanceOf<OSDMap>());
-                Assert.That(((OSDMap)check["rooms"]).Count, Is.EqualTo(0), "no room is named, so no room's authority is touched");
-                Assert.That(check.ContainsKey("state"), Is.False, "not a stopping heartbeat, which would mark records stale");
-                Assert.That(check["room_epoch"].AsString(), Does.Match("^[0-9a-f]{16}$").And.Not.EqualTo("0000000000000000"),
-                    "an epoch the mixer's parser accepts, so the reply is a heartbeat reply");
-                Assert.That(check["interval_ms"].AsInteger(), Is.GreaterThan(0));
+                Assert.Equal("peer_ctl_heartbeat", check["request"].AsString());
+                Assert.IsAssignableFrom<OSDMap>(check["rooms"]);
+                {
+                    var assertedValue = ((OSDMap)check["rooms"]).Count;
+                    TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no room is named, so no room's authority is touched");
+                }
+                Assert.False(check.ContainsKey("state"), "not a stopping heartbeat, which would mark records stale");
+                {
+                    var assertedValue = check["room_epoch"].AsString();
+                    TestAssert.WithMessage(() =>
+                    {
+                        Assert.Matches("^[0-9a-f]{16}$", assertedValue);
+                        Assert.NotEqual("0000000000000000", assertedValue);
+                    }, "an epoch the mixer's parser accepts, so the reply is a heartbeat reply");
+                }
+                Assert.True(check["interval_ms"].AsInteger() > 0);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AFailedRequest_MakesThePumpAskAgain_AndAMixerRestartedAsAnOlderOneStopsTheFeed()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new ScriptedMixer { Protocol = 3 };
             (VoicePositionPump pump, JanusPeerCtlBatchSink sink) = Build(mixer);
             using (sink)
             {
                 await TicksAsync(pump, 2);
-                Assert.That(mixer.Of("peer_pos"), Is.Not.Empty);
+                Assert.NotEmpty(mixer.Of("peer_pos"));
 
                 // The mixer goes away, and comes back older.
                 mixer.Down = true;
                 await TicksAsync(pump, 5);
-                Assert.That(sink.MixerProtocolKnown, Is.False, "what was learned may be out of date");
+                Assert.False(sink.MixerProtocolKnown, "what was learned may be out of date");
                 mixer.Down = false;
                 mixer.Protocol = 0;
                 mixer.Instance = "inst-2";
@@ -160,15 +185,19 @@ namespace osWebRtcVoice.Tests
 
                 await TicksAsync(pump, 10);
 
-                Assert.That(mixer.Requests.Count - before, Is.EqualTo(1), "one check, and then nothing");
-                Assert.That(mixer.Requests[before]["request"].AsString(), Is.EqualTo("peer_ctl_heartbeat"));
-                Assert.That(sink.MixerVisProtocol, Is.EqualTo(0));
+                {
+                    var assertedValue = mixer.Requests.Count - before;
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one check, and then nothing");
+                }
+                Assert.Equal("peer_ctl_heartbeat", mixer.Requests[before]["request"].AsString());
+                Assert.Equal(0, sink.MixerVisProtocol);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AMixerRestartedAsANewerOne_IsLearnedFromTheNextPeerCtlReply_AndTheFeedResumes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // An older mixer is sent nothing, so the pump has no request of its own to notice a restart with. Any peer_ctl
             // request the region sends (an exclusion, or a heartbeat when arming is on) carries the new version.
             var mixer = new ScriptedMixer { Protocol = 2 };
@@ -176,23 +205,24 @@ namespace osWebRtcVoice.Tests
             using (sink)
             {
                 await TicksAsync(pump, 5);
-                Assert.That(mixer.Of("peer_pos"), Is.Empty);
+                Assert.Empty(mixer.Of("peer_pos"));
 
                 mixer.Protocol = 3;
                 mixer.Instance = "inst-2";
                 sink.RoomOf = _ => 7;
                 await sink.SendAsync(VisOp.Replace, new Dictionary<UUID, IReadOnlyCollection<UUID>> { [A] = new[] { UUID.Random() } });
-                Assert.That(sink.MixerVisProtocol, Is.EqualTo(3));
+                Assert.Equal(3, sink.MixerVisProtocol);
 
                 await TicksAsync(pump, 3);
 
-                Assert.That(mixer.Of("peer_pos"), Is.Not.Empty);
+                Assert.NotEmpty(mixer.Of("peer_pos"));
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AVersionLearnedFromAPeerCtlReply_IsNotAskedForAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mixer = new ScriptedMixer { Protocol = 3 };
             (VoicePositionPump pump, JanusPeerCtlBatchSink sink) = Build(mixer);
             using (sink)
@@ -201,13 +231,16 @@ namespace osWebRtcVoice.Tests
                 sink.RoomOf = _ => 7;
                 var excl = new Dictionary<UUID, IReadOnlyCollection<UUID>> { [A] = new[] { UUID.Random() } };
                 await sink.SendAsync(VisOp.Replace, excl);
-                Assert.That(sink.MixerProtocolKnown, Is.True);
+                Assert.True(sink.MixerProtocolKnown);
                 mixer.Requests.Clear();
 
                 await TicksAsync(pump, 3);
 
-                Assert.That(mixer.Of("peer_ctl_heartbeat"), Is.Empty, "the version was already known");
-                Assert.That(mixer.Of("peer_pos"), Is.Not.Empty);
+                {
+                    var assertedValue = mixer.Of("peer_ctl_heartbeat");
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the version was already known");
+                }
+                Assert.NotEmpty(mixer.Of("peer_pos"));
             }
         }
     }

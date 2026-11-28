@@ -271,7 +271,7 @@ public class ZephyrWindSnapshotTests : OpenSimTestCase
         {
             // Everything a sampler calls, from other threads, while the update holds the writers' lock.
             Task<float[]> reader = Task.Run(() => Observe(rig.Plugin));
-            Assert.True(reader.Wait(Cap), "a sampler must not wait for the update");
+            Assert.True(reader.Wait(Cap, TestContext.Current.CancellationToken), "a sampler must not wait for the update");
             Assert.Equal(before, reader.Result);        // it sees the last published wind, not a half-made one
         }
         finally
@@ -293,16 +293,16 @@ public class ZephyrWindSnapshotTests : OpenSimTestCase
         Task set;
         try
         {
-            set = Task.Run(() => rig.Plugin.WindSet((int)WindConstants.WindSpeedFixed, cellOrigin, new Vector3(9f, 1f, 0f)));
+            set = Task.Run(() => rig.Plugin.WindSet((int)WindConstants.WindSpeedFixed, cellOrigin, new Vector3(9f, 1f, 0f)), TestContext.Current.CancellationToken);
             // The set takes its turn behind the update: still waiting after a while, not finished and not dropped.
-            Assert.False(set.Wait(TimeSpan.FromMilliseconds(300)), "the set should wait for the update that is running");
+            Assert.False(set.Wait(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken), "the set should wait for the update that is running");
         }
         finally
         {
             rig.FinishUpdate();
         }
 
-        Assert.True(set.Wait(Cap), "the set should finish after the update");
+        Assert.True(set.Wait(Cap, TestContext.Current.CancellationToken), "the set should finish after the update");
 
         // Right after, the fixed wind is in the cell's wind aloft ...
         Vector3 aloft = rig.Plugin.WindSpeed(2 * 16, 2 * 16, 10000f);
@@ -357,9 +357,9 @@ public class ZephyrWindSnapshotTests : OpenSimTestCase
                 rig.Plugin.WindSet((int)WindConstants.WindSpeedFixed, new Vector3((i % 16) * 16 + 1, (i % 5) * 16 + 1, i % 2 == 0 ? 500f : 1f), new Vector3(i, -i, 0f));
                 rig.Plugin.WindUpdate((uint)i);
             }
-        });
+        }, TestContext.Current.CancellationToken);
 
-        Assert.True(writer.Wait(Cap), "the writer should finish");
+        Assert.True(writer.Wait(Cap, TestContext.Current.CancellationToken), "the writer should finish");
         stop.Cancel();
         Assert.True(Task.WaitAll(readers, Cap), "the samplers should finish");
         Assert.Empty(failures);

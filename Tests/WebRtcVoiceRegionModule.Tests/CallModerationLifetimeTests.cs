@@ -13,14 +13,13 @@
  */
 using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class CallModerationLifetimeTests
     {
         public enum Store { InProcess, GridService }
@@ -73,11 +72,11 @@ namespace osWebRtcVoice.Tests
 
         private static void Moderate(Rig r, UUID id)
         {
-            Assert.That(r.A.Moderate(id, Alice, ModerationOp.VoiceModerated, UUID.Zero, true).Ok, Is.True);
-            Assert.That(r.A.Moderate(id, Alice, ModerationOp.VoiceMute, Bob, false).Ok, Is.True, "Bob is let speak by name");
-            Assert.That(r.A.Moderate(id, Alice, ModerationOp.VoiceMute, Carol, true).Ok, Is.True);
-            Assert.That(r.A.Moderate(id, Alice, ModerationOp.TextMute, Bob, true).Ok, Is.True);
-            Assert.That(r.A.Moderate(id, Alice, ModerationOp.TextMute, Carol, true).Ok, Is.True);
+            Assert.True(r.A.Moderate(id, Alice, ModerationOp.VoiceModerated, UUID.Zero, true).Ok);
+            Assert.True(r.A.Moderate(id, Alice, ModerationOp.VoiceMute, Bob, false).Ok, "Bob is let speak by name");
+            Assert.True(r.A.Moderate(id, Alice, ModerationOp.VoiceMute, Carol, true).Ok);
+            Assert.True(r.A.Moderate(id, Alice, ModerationOp.TextMute, Bob, true).Ok);
+            Assert.True(r.A.Moderate(id, Alice, ModerationOp.TextMute, Carol, true).Ok);
         }
 
         private static void LeaveOneByOne(Rig r, UUID id, DepartureReason reason = DepartureReason.VoiceTeardown)
@@ -94,17 +93,28 @@ namespace osWebRtcVoice.Tests
             {
                 NonSpatialVoiceSession s = region.Get(id, Alice);
                 if (s == null) continue;
-                Assert.That(s.VoiceModerated, Is.False, why + ": mute-all");
-                Assert.That(s.VoiceMuted, Is.Empty, why + ": voice mutes");
-                Assert.That(s.VoiceAllowed, Is.Empty, why + ": voices let speak");
-                Assert.That(s.TextMuted, Is.Empty, why + ": text mutes");
+                Assert.False(s.VoiceModerated, why + ": mute-all");
+                {
+                    var assertedValue = s.VoiceMuted;
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), why + ": voice mutes");
+                }
+                {
+                    var assertedValue = s.VoiceAllowed;
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), why + ": voices let speak");
+                }
+                {
+                    var assertedValue = s.TextMuted;
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), why + ": text mutes");
+                }
             }
         }
 
-        [TestCase(Store.InProcess)]
-        [TestCase(Store.GridService)]
+        [InlineData(Store.InProcess)]
+        [InlineData(Store.GridService)]
+        [Theory(Timeout = 60000)]
         public void MuteAll_DoesNotOutliveTheCall_AndANewGroupCallStartsUnmuted(Store store)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig(store);
             UUID id = StartGroupCall(r);
             Moderate(r, id);
@@ -115,16 +125,18 @@ namespace osWebRtcVoice.Tests
             r.A.Start(NonSpatialSessionType.Group, Carol, Group, Group, RegionA);
             r.B.Accept(Group, Bob, RegionB, "vs-bob-2");
             NonSpatialVoiceSession again = r.B.Get(id, Bob);
-            Assert.That(again.IsVoiceMuted(Bob), Is.False, "the new call is not muted");
-            Assert.That(again.IsVoiceMuted(Carol), Is.False);
-            Assert.That(again.VoiceModerated, Is.False);
-            Assert.That(again.IsTextMuted(Bob), Is.False);
+            Assert.False(again.IsVoiceMuted(Bob), "the new call is not muted");
+            Assert.False(again.IsVoiceMuted(Carol));
+            Assert.False(again.VoiceModerated);
+            Assert.False(again.IsTextMuted(Bob));
         }
 
-        [TestCase(Store.InProcess)]
-        [TestCase(Store.GridService)]
+        [InlineData(Store.InProcess)]
+        [InlineData(Store.GridService)]
+        [Theory(Timeout = 60000)]
         public void MuteAll_DoesNotOutliveAConference(Store store)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig(store);
             UUID id = StartConference(r);
             Moderate(r, id);
@@ -134,10 +146,12 @@ namespace osWebRtcVoice.Tests
             AssertNoModeration(r, id, "the conference is over");
         }
 
-        [TestCase(Store.InProcess)]
-        [TestCase(Store.GridService)]
+        [InlineData(Store.InProcess)]
+        [InlineData(Store.GridService)]
+        [Theory(Timeout = 60000)]
         public void AMembersVoiceAndTextMutes_AreClearedWithTheCall_AndTheGenerationMoves(Store store)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig(store);
             UUID id = StartGroupCall(r);
             r.A.Moderate(id, Alice, ModerationOp.VoiceMute, Bob, true);
@@ -150,15 +164,16 @@ namespace osWebRtcVoice.Tests
             NonSpatialVoiceSession s = r.A.Get(id, Alice);
             if (s != null)
             {
-                Assert.That(s.IsVoiceMuted(Bob), Is.False);
-                Assert.That(s.IsTextMuted(Bob), Is.False);
-                Assert.That(s.ModerationGeneration, Is.GreaterThan(before), "a reader sees that the record changed");
+                Assert.False(s.IsVoiceMuted(Bob));
+                Assert.False(s.IsTextMuted(Bob));
+                Assert.True(s.ModerationGeneration > before, "a reader sees that the record changed");
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ModerationStaysWhileAnySeatIsHeld()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig(Store.InProcess);
             UUID id = StartGroupCall(r);
             Moderate(r, id);
@@ -167,15 +182,19 @@ namespace osWebRtcVoice.Tests
             r.B.Depart(id, Bob, DepartureReason.VoiceTeardown);
 
             NonSpatialVoiceSession s = r.A.Get(id);
-            Assert.That(s.SeatsHeld, Is.EqualTo(1), "Carol is still in the call");
-            Assert.That(s.VoiceModerated, Is.True);
-            Assert.That(s.IsTextMuted(Carol), Is.True);
-            Assert.That(s.IsVoiceMuted(Carol), Is.True);
+            {
+                var assertedValue = s.SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "Carol is still in the call");
+            }
+            Assert.True(s.VoiceModerated);
+            Assert.True(s.IsTextMuted(Carol));
+            Assert.True(s.IsVoiceMuted(Carol));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARemovalThatEmptiesTheCall_ClearsItsMutes_AndKeepsTheRemoval()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig(Store.InProcess);
             r.A.Start(NonSpatialSessionType.Group, Alice, Group, Group, RegionA);
             r.A.Moderate(Group, Bob, ModerationOp.VoiceModerated, UUID.Zero, true);
@@ -184,24 +203,26 @@ namespace osWebRtcVoice.Tests
             r.A.Moderate(Group, Bob, ModerationOp.Remove, Alice, true, "x", TimeSpan.FromMinutes(30));
 
             NonSpatialVoiceSession s = r.A.Get(Group);
-            Assert.That(s.SeatsHeld, Is.EqualTo(0));
-            Assert.That(s.VoiceModerated, Is.False);
-            Assert.That(s.TextMuted, Is.Empty);
-            Assert.That(s.IsRemoved(Alice, r.Clock.Now), Is.True, "the removal keeps its lifetime");
+            Assert.Equal(0, s.SeatsHeld);
+            Assert.False(s.VoiceModerated);
+            Assert.Empty(s.TextMuted);
+            Assert.True(s.IsRemoved(Alice, r.Clock.Now), "the removal keeps its lifetime");
         }
 
         public enum Release { VoiceTeardown, ChatLeave, PresenceLost, LeaseExpired, RegionStarted }
 
-        [TestCase(Store.InProcess, Release.VoiceTeardown)]
-        [TestCase(Store.InProcess, Release.ChatLeave)]
-        [TestCase(Store.InProcess, Release.PresenceLost)]
-        [TestCase(Store.GridService, Release.VoiceTeardown)]
-        [TestCase(Store.GridService, Release.ChatLeave)]
-        [TestCase(Store.GridService, Release.PresenceLost)]
-        [TestCase(Store.GridService, Release.LeaseExpired)]
-        [TestCase(Store.GridService, Release.RegionStarted)]
+        [InlineData(Store.InProcess,Release.VoiceTeardown)]
+        [InlineData(Store.InProcess,Release.ChatLeave)]
+        [InlineData(Store.InProcess,Release.PresenceLost)]
+        [InlineData(Store.GridService,Release.VoiceTeardown)]
+        [InlineData(Store.GridService,Release.ChatLeave)]
+        [InlineData(Store.GridService,Release.PresenceLost)]
+        [InlineData(Store.GridService,Release.LeaseExpired)]
+        [InlineData(Store.GridService,Release.RegionStarted)]
+        [Theory(Timeout = 60000)]
         public void EveryWayTheLastSeatIsReleased_EndsTheModeration(Store store, Release how)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig(store);
             UUID id = StartGroupCall(r);
             Moderate(r, id);
@@ -220,8 +241,8 @@ namespace osWebRtcVoice.Tests
                     r.Service.Sweep();
                     break;
                 case Release.RegionStarted:
-                    Assert.That(((GridNonSpatialSessions)r.A).DepartRegion(RegionA), Is.EqualTo(2));
-                    Assert.That(((GridNonSpatialSessions)r.B).DepartRegion(RegionB), Is.EqualTo(1));
+                    Assert.Equal(2, ((GridNonSpatialSessions)r.A).DepartRegion(RegionA));
+                    Assert.Equal(1, ((GridNonSpatialSessions)r.B).DepartRegion(RegionB));
                     break;
             }
 
@@ -229,14 +250,16 @@ namespace osWebRtcVoice.Tests
             r.A.Start(NonSpatialSessionType.Group, Alice, Group, Group, RegionA);
             r.A.Accept(Group, Carol, RegionA, "vs-carol-2");
             NonSpatialVoiceSession again = r.A.Get(id, Alice);
-            Assert.That(again.IsVoiceMuted(Carol), Is.False, "the next call starts unmuted");
-            Assert.That(again.IsTextMuted(Carol), Is.False);
+            Assert.False(again.IsVoiceMuted(Carol), "the next call starts unmuted");
+            Assert.False(again.IsTextMuted(Carol));
         }
 
-        [TestCase(Store.InProcess)]
-        [TestCase(Store.GridService)]
+        [InlineData(Store.InProcess)]
+        [InlineData(Store.GridService)]
+        [Theory(Timeout = 60000)]
         public void ARemovedMember_IsStillRefusedAfterTheCallEmptiesAndRestarts_WithinTheRemovalsLifetime(Store store)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig(store);
             UUID id = StartGroupCall(r);
             Moderate(r, id);
@@ -248,41 +271,51 @@ namespace osWebRtcVoice.Tests
 
             AssertNoModeration(r, id, "the call is over");
             NonSpatialVoiceSession kept = r.B.Get(id, Bob);
-            Assert.That(kept, Is.Not.Null, "the record is kept for the removal that has time left");
-            Assert.That(kept.IsRemoved(Bob, r.Clock.Now), Is.True);
-            Assert.That(kept.IsRemoved(Carol, r.Clock.Now), Is.False, "the removal that lasts as long as the call ended with it");
+            {
+                var assertedValue = kept;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the record is kept for the removal that has time left");
+            }
+            Assert.True(kept.IsRemoved(Bob, r.Clock.Now));
+            Assert.False(kept.IsRemoved(Carol, r.Clock.Now), "the removal that lasts as long as the call ended with it");
 
             r.B.Start(NonSpatialSessionType.Group, Alice, Group, Group, RegionB);
-            Assert.That(r.B.Accept(Group, Bob, RegionB, "vs-bob-2").Decision, Is.EqualTo(SessionOutcome.Removed), "Bob is refused the new call");
-            Assert.That(r.A.Accept(Group, Bob, RegionA, "vs-bob-3").Decision, Is.EqualTo(SessionOutcome.Removed), "by every region server");
-            Assert.That(r.A.Accept(Group, Carol, RegionA, "vs-carol-2").Ok, Is.True, "Carol may join");
+            {
+                var assertedValue = r.B.Accept(Group, Bob, RegionB, "vs-bob-2").Decision;
+                TestAssert.WithMessage(() => Assert.Equal(SessionOutcome.Removed, assertedValue), "Bob is refused the new call");
+            }
+            {
+                var assertedValue = r.A.Accept(Group, Bob, RegionA, "vs-bob-3").Decision;
+                TestAssert.WithMessage(() => Assert.Equal(SessionOutcome.Removed, assertedValue), "by every region server");
+            }
+            Assert.True(r.A.Accept(Group, Carol, RegionA, "vs-carol-2").Ok, "Carol may join");
 
             r.Clock.Now += TimeSpan.FromMinutes(21);
-            Assert.That(r.B.Accept(Group, Bob, RegionB, "vs-bob-4").Ok, Is.True, "the removal has run out");
+            Assert.True(r.B.Accept(Group, Bob, RegionB, "vs-bob-4").Ok, "the removal has run out");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AcrossTwoRegionServers_OneServiceHoldsOneRecord_ThatTheLastLeaverEnds()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig(Store.GridService);
             UUID id = StartGroupCall(r);
             Moderate(r, id);
             r.A.Moderate(id, Alice, ModerationOp.Remove, Carol, true, "x", TimeSpan.FromMinutes(30));
 
             r.A.Depart(id, Alice, DepartureReason.VoiceTeardown);
-            Assert.That(r.B.Get(id, Bob).VoiceModerated, Is.True, "Bob, in the other region server, is still in the call");
+            Assert.True(r.B.Get(id, Bob).VoiceModerated, "Bob, in the other region server, is still in the call");
             r.B.Depart(id, Bob, DepartureReason.VoiceTeardown);   // the last seat is in the other region server
 
             NonSpatialVoiceSession seenByA = r.A.Get(id, Alice);
-            Assert.That(seenByA.VoiceModerated, Is.False);
-            Assert.That(seenByA.IsTextMuted(Bob), Is.False);
-            Assert.That(seenByA.IsRemoved(Carol, r.Clock.Now), Is.True, "the removal's lifetime is the service's, not either server's");
+            Assert.False(seenByA.VoiceModerated);
+            Assert.False(seenByA.IsTextMuted(Bob));
+            Assert.True(seenByA.IsRemoved(Carol, r.Clock.Now), "the removal's lifetime is the service's, not either server's");
 
             r.B.Start(NonSpatialSessionType.Group, Bob, Group, Group, RegionB);
             NonSpatialVoiceSession seenByBoth = r.A.Get(id, Alice);
-            Assert.That(seenByBoth.IsVoiceMuted(Bob), Is.False);
-            Assert.That(seenByBoth.IsTextMuted(Bob), Is.False);
-            Assert.That(r.A.Accept(Group, Carol, RegionA, "vs-c").Decision, Is.EqualTo(SessionOutcome.Removed));
+            Assert.False(seenByBoth.IsVoiceMuted(Bob));
+            Assert.False(seenByBoth.IsTextMuted(Bob));
+            Assert.Equal(SessionOutcome.Removed, r.A.Accept(Group, Carol, RegionA, "vs-c").Decision);
         }
     }
 }
