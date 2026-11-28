@@ -805,7 +805,19 @@ public class SQLiteSimulationData : ISimulationDataStore
 
         foreach (DataRow row in dbItemRows)
         {
-            TaskInventoryItem item = buildItem(row);
+            TaskInventoryItem item;
+            try
+            {
+                item = buildItem(row);
+            }
+            catch (Exception e)
+            {
+                // Leave this row out. The prim keeps its other items.
+                m_log.LogWarning(
+                    "[SQLITE REGION DB]: Task inventory item {0} in prim {1} cannot be read and is not loaded: {2}",
+                    row["itemID"], prim.UUID, e.Message);
+                continue;
+            }
             inventory.Add(item);
 
 //                m_log.LogDebug("[SQLITE REGION DB]: Restored item {0} {1}", item.Name, item.ItemID);
