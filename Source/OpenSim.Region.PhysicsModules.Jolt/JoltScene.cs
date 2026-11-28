@@ -1590,11 +1590,12 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // keyed on GetMeshKey(size, lod), and returns the SAME instance for every identical prim
             // (the key has no isPhysical/convex part; the one answer that depends on isPhysical, the 8-corner box
             // given to a small non-physical mesh, is kept in a cache of its own, so a physical request for the
-            // same mesh is never handed that box). getIndexListAsInt()/getVertexListAsFloat() throw
-            // NotSupportedException once m_triangles/m_vertices are null, and releaseSourceMeshData()
-            // nulls exactly those - so calling it POISONS the cache and makes the NEXT identical prim's
-            // extraction throw. Both accessors already return FRESH COPIES, so we own the arrays and must
-            // NOT mutate/release the shared mesh (ReleaseMesh is a no-op anyway; the mesher owns eviction).
+            // same mesh is never handed that box). The cache never lets a mesh go (ReleaseMesh is a no-op), so
+            // ReadMeshArrays leaves the cached mesh holding only its flat arrays: getIndexListAsInt()/
+            // getVertexListAsFloat() throw NotSupportedException once releaseSourceMeshData() has nulled the
+            // triangle and vertex objects, and every read of a cached mesh here goes through the *Locked()
+            // accessors, which keep the flat arrays in the mesh and answer from them. We copy those arrays
+            // before use, so nothing here mutates the shared mesh's data.
             // Everything the mesher/extraction can throw is inside ONE guard -> a clean bbox fallback,
             // never a propagating exception that could abort a prim rez or a whole region load.
             SVector3[] points;
@@ -1631,8 +1632,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     return ShapeId.Invalid;
                 }
 
-                indices = mesh.getIndexListAsInt();          // fresh copy - do NOT release the shared mesh
-                float[] verts = mesh.getVertexListAsFloat(); // fresh copy (flattened x,y,z,...)
+                // Own copies (flattened x,y,z,... and triangles). This mesh's objects can go: the mesher's bounding-box
+                // answer reads a cached mesh's objects only for a request with isPhysical false under 0.2 m on every side,
+                // and this scene asks such a request first (for a prim that is not a mesh), or never (a mesh asset).
+                ReadMeshArrays(mesh, true, out float[] verts, out indices);
                 if (verts == null || indices == null || verts.Length < 12 || indices.Length < 3 || (indices.Length % 3) != 0)
                 {
                     if (RepeatingWarnings.MesherGeometryUnusable.ShouldLog(out long occurrence))
@@ -1648,8 +1651,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     IMesh whole = m_mesher.CreateMesh("jolt-prim", pbs, size, MeshLod, true, false, false);
                     if (whole != null)
                     {
-                        float[] wholeVertices = whole.getVertexListAsFloat();
-                        int[] wholeIndices = whole.getIndexListAsInt();
+                        // Under 0.2 m on every side the mesher makes its bounding-box answer for this shape from this mesh
+                        // (Meshmerizer.MakeMesh), which reads its vertex objects: that one keeps them.
+                        ReadMeshArrays(whole, ReferenceEquals(whole, mesh), out float[] wholeVertices, out int[] wholeIndices);
                         meshVolume = PrimHullCells.MeshVolume(wholeVertices, wholeIndices);
                         // The assessment reads the mesh at the size it was made at; a prim is its unit shape scaled on each axis, so
                         // the checks hold at every size and the volume is the unit one times the size's three sides.
@@ -1737,6 +1741,36 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 if (RepeatingWarnings.CookThrew.ShouldLog(out long occurrence))
                     m_log.LogWarning($"{LogHeader} backend cook of mesher output threw ({e.GetType().Name}: {e.Message}); bounding-box fallback.{RepeatLimiter.Suffix(occurrence)}");
                 return ShapeId.Invalid;   // kind stays "bbox(fallback)"
+            }
+        }
+
+        // The mesher keeps every mesh it makes (its cache is static, so it is shared by every scene in the process, and
+        // the physics engine is one per process, [Startup] physics). A mesh is built as Triangle and Vertex objects and
+        // a vertex dictionary, a few times the size of the two flat arrays this scene cooks from, and a later prim of the
+        // same shape reads only those arrays. So the arrays are read with the *Locked() accessors, which keep them in the
+        // mesh, and then, where `release` allows, the builder objects are dropped (releaseSourceMeshData). Both are on
+        // IMesh. Only for the Meshmerizer (the one IMesherShapeData mesher), whose Mesh class this follows; another mesher's
+        // meshes are read as before. One lock for the read and the drop: two scenes can be handed the same cached mesh at
+        // once, and one must not drop the objects between the other's check for the kept arrays and its read of the
+        // objects. The arrays returned are copies, which the caller may change (an inverted sculpt's triangles are turned).
+        private static readonly object s_meshArraysLock = new object();
+
+        private void ReadMeshArrays(IMesh mesh, bool release, out float[] vertices, out int[] indices)
+        {
+            if (!(m_mesher is IMesherShapeData))
+            {
+                indices = mesh.getIndexListAsInt();
+                vertices = mesh.getVertexListAsFloat();
+                return;
+            }
+            lock (s_meshArraysLock)
+            {
+                float[] keptVertices = mesh.getVertexListAsFloatLocked();
+                int[] keptIndices = mesh.getIndexListAsIntLocked();
+                if (release)
+                    mesh.releaseSourceMeshData();
+                vertices = (float[])keptVertices?.Clone();
+                indices = (int[])keptIndices?.Clone();
             }
         }
 
