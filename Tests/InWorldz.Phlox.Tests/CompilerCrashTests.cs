@@ -7,7 +7,6 @@
 
 using InWorldz.Phlox.Glue;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

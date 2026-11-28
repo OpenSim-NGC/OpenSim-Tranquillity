@@ -28,8 +28,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // the log capture is the process-wide current capture while it is alive
     public class VisibilityBatchSenderTests
     {
         private const int Room = -999;
@@ -156,21 +154,29 @@ namespace osWebRtcVoice.Tests
         // (2026-08-28 trace): the [VOICE VISIBILITY] service line logs b.MuteAdded/b.MuteRemoved.
         // A moderation-mute-only change must produce a delta with a NON-ZERO mute count and a ZERO
         // exclusion count — the exact batch that formerly logged "+0/-0 listeners".
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MuteOnlyDelta_HasNonZeroMuteCount_AndZeroExclusionCount()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID L = Id(40), S = Id(41);
             VisibilityBatch b = DeltaComputer.Diff(VisibilityMatrix.Empty, MutedSourceMatrix(L, S), Room);
-            Assert.That(b.IsEmpty, Is.False, "a mute-only change is not an empty batch");
-            Assert.That(b.Added.Count, Is.Zero, "no exclusion listeners — the excl counters read zero, correctly");
-            Assert.That(b.Removed.Count, Is.Zero);
-            Assert.That(b.MuteAdded.Count, Is.EqualTo(1), "the muted count the service line now logs is non-zero");
-            Assert.That(b.MuteAdded.ContainsKey(L), Is.True);
+            Assert.False(b.IsEmpty, "a mute-only change is not an empty batch");
+            {
+                var assertedValue = b.Added.Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no exclusion listeners — the excl counters read zero, correctly");
+            }
+            Assert.Empty(b.Removed);
+            {
+                var assertedValue = b.MuteAdded.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the muted count the service line now logs is non-zero");
+            }
+            Assert.True(b.MuteAdded.ContainsKey(L));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task PendingJoinMute_MainEmitFails_ThenUnmuteWhileUnsynced_SnapshotClearsMute()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID L = Id(1), S = Id(2);
             var feed = new FakeFeed();
             var sink = new FakeSink();
@@ -187,8 +193,7 @@ namespace osWebRtcVoice.Tests
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
 
             // Sanity: did send L's mute (non-empty) on the pending-join replace.
-            Assert.That(sink.MuteCalls.Any(m => m.TryGetValue(L, out var s0) && s0.Count == 1 && s0[0] == S),
-                Is.True, "first-phase pending-join must have sent L's non-empty mute");
+            Assert.True(sink.MuteCalls.Any(m => m.TryGetValue(L, out var s0) && s0.Count == 1 && s0[0] == S), "first-phase pending-join must have sent L's non-empty mute");
 
             int callsAfterFirstPhase = sink.Calls.Count;
 
@@ -203,52 +208,58 @@ namespace osWebRtcVoice.Tests
             // The snapshot (a call) must carry an EXPLICIT empty mute set for L — the clear.
             bool cleared = sink.MuteCalls.Skip(callsAfterFirstPhase)
                 .Any(m => m.TryGetValue(L, out var s) && s.Count == 0);
-            Assert.That(cleared, Is.True,
-                "after the fix, the snapshot clear-tracking must emit mute[L]=[] to clear the stranded mute");
+            Assert.True(cleared, "after the fix, the snapshot clear-tracking must emit mute[L]=[] to clear the stranded mute");
         }
 
         // ---- no-op paths -------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Disabled_SendsNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var sink = new FakeSink();
             var sender = new VisibilityBatchSender(new FakeFeed(), sink, enabled: false);
             sender.OnListenerProvisioned(Id(1));
             await sender.PumpAsync(VisibilityBatch.Delta(Room, Excl((1, new[] { 2 })), null));
-            Assert.That(sink.Count, Is.EqualTo(0));
+            Assert.Equal(0, sink.Count);
         }
 
-        [Test]
-        public void NullSink_NeverThrows_AndSendsNothing()
+        [Fact(Timeout = 60000)]
+        public async Task NullSink_NeverThrows_AndSendsNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var sender = new VisibilityBatchSender(new FakeFeed(), null, enabled: true);
-            Assert.That(async () => await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room)), Throws.Nothing);
+            Assert.Null(await Record.ExceptionAsync(() => sender.PumpAsync(VisibilityBatch.EmptyDelta(Room))));
         }
 
         // ---- bootstrap: first tick snapshots, then deltas flow -----------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task EmptyMatrix_FirstTickSyncsWithoutSending_ThenDeltaFlows()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var feed = new FakeFeed { Current = VisibilityMatrix.Empty };
             var sink = new FakeSink();
             var sender = new VisibilityBatchSender(feed, sink, enabled: true);
 
             // Tick 1: unsynced -> snapshot path, but the empty matrix has nothing to send -> synced.
             await sender.PumpAsync(VisibilityBatch.Delta(Room, Excl((1, new[] { 2 })), null));
-            Assert.That(sink.Count, Is.EqualTo(0), "empty-matrix snapshot sends nothing and preempts the delta");
+            {
+                var assertedValue = sink.Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "empty-matrix snapshot sends nothing and preempts the delta");
+            }
 
             // Tick 2: now synced -> the delta is sent as an Add.
             await sender.PumpAsync(VisibilityBatch.Delta(Room, Excl((1, new[] { 2 })), null));
-            Assert.That(sink.Count, Is.EqualTo(1));
-            Assert.That(sink.Calls[0].op, Is.EqualTo(VisOp.Add));
-            Assert.That(sink.Calls[0].excl[Id(1)], Is.EquivalentTo(new[] { Id(2) }));
+            Assert.Equal(1, sink.Count);
+            Assert.Equal(VisOp.Add, sink.Calls[0].op);
+            Assert.Equivalent(new[] { Id(2) }, sink.Calls[0].excl[Id(1)], strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task NonEmptyMatrix_FirstTickSendsSnapshotReplace()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = Id(1), b = Id(2);
             var feed = new FakeFeed { Current = BannedPairMatrix(a, b) };
             var sink = new FakeSink();
@@ -256,15 +267,22 @@ namespace osWebRtcVoice.Tests
 
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
 
-            Assert.That(sink.Count, Is.EqualTo(1));
-            Assert.That(sink.Calls[0].op, Is.EqualTo(VisOp.Replace));
-            Assert.That(sink.Calls[0].excl[a], Is.EquivalentTo(new[] { b }), "a excludes b in a banned pair");
-            Assert.That(sink.Calls[0].excl[b], Is.EquivalentTo(new[] { a }), "symmetric");
+            Assert.Equal(1, sink.Count);
+            Assert.Equal(VisOp.Replace, sink.Calls[0].op);
+            {
+                var assertedValue = sink.Calls[0].excl[a];
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { b }, assertedValue, strict: true), "a excludes b in a banned pair");
+            }
+            {
+                var assertedValue = sink.Calls[0].excl[b];
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { a }, assertedValue, strict: true), "symmetric");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Delta_SendsAtMostOneAddAndOneRemove_InOrder()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var feed = new FakeFeed { Current = VisibilityMatrix.Empty };
             var sink = new FakeSink();
             var sender = new VisibilityBatchSender(feed, sink, enabled: true);
@@ -272,18 +290,19 @@ namespace osWebRtcVoice.Tests
 
             await sender.PumpAsync(VisibilityBatch.Delta(Room, Excl((1, new[] { 3 })), Excl((2, new[] { 4 }))));
 
-            Assert.That(sink.Count, Is.EqualTo(2));
-            Assert.That(sink.Calls[0].op, Is.EqualTo(VisOp.Add));
-            Assert.That(sink.Calls[0].excl[Id(1)], Is.EquivalentTo(new[] { Id(3) }));
-            Assert.That(sink.Calls[1].op, Is.EqualTo(VisOp.Remove));
-            Assert.That(sink.Calls[1].excl[Id(2)], Is.EquivalentTo(new[] { Id(4) }));
+            Assert.Equal(2, sink.Count);
+            Assert.Equal(VisOp.Add, sink.Calls[0].op);
+            Assert.Equivalent(new[] { Id(3) }, sink.Calls[0].excl[Id(1)], strict: true);
+            Assert.Equal(VisOp.Remove, sink.Calls[1].op);
+            Assert.Equivalent(new[] { Id(4) }, sink.Calls[1].excl[Id(2)], strict: true);
         }
 
         // ---- clear-tracking: a dropped listener gets an EXPLICIT empty replace ----------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ClearTracking_DroppedListenerGetsExplicitEmptyReplace()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = Id(1), b = Id(2);
             var feed = new FakeFeed { Current = BannedPairMatrix(a, b) };
             var sink = new FakeSink();
@@ -304,18 +323,22 @@ namespace osWebRtcVoice.Tests
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
 
             var replace = sink.Calls.Last();
-            Assert.That(replace.op, Is.EqualTo(VisOp.Replace));
-            Assert.That(replace.excl.ContainsKey(a), Is.True, "dropped listener a present in the clearing replace");
-            Assert.That(replace.excl[a], Is.Empty, "a cleared with an explicit empty list");
-            Assert.That(replace.excl.ContainsKey(b), Is.True);
-            Assert.That(replace.excl[b], Is.Empty);
+            Assert.Equal(VisOp.Replace, replace.op);
+            Assert.True(replace.excl.ContainsKey(a), "dropped listener a present in the clearing replace");
+            {
+                var assertedValue = replace.excl[a];
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a cleared with an explicit empty list");
+            }
+            Assert.True(replace.excl.ContainsKey(b));
+            Assert.Empty(replace.excl[b]);
         }
 
         // ---- result mapping ----------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TransportError_OnDelta_ForcesSnapshotNextTick()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = Id(1), b = Id(2);
             var feed = new FakeFeed { Current = BannedPairMatrix(a, b) };
             var sink = new FakeSink();
@@ -327,13 +350,17 @@ namespace osWebRtcVoice.Tests
             sink.NextResult = PeerCtlSendResult.Ok;
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));      // must be a snapshot, not a delta
 
-            Assert.That(sink.Calls.First().op, Is.EqualTo(VisOp.Replace));
-            Assert.That(sink.Calls.Last().op, Is.EqualTo(VisOp.Replace), "after a TransportError the next tick re-snapshots");
+            Assert.Equal(VisOp.Replace, sink.Calls.First().op);
+            {
+                var assertedValue = sink.Calls.Last().op;
+                TestAssert.WithMessage(() => Assert.Equal(VisOp.Replace, assertedValue), "after a TransportError the next tick re-snapshots");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ProtocolError_TwoThenOk_DoesNotLatch()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = Id(1), b = Id(2);
             var feed = new FakeFeed { Current = BannedPairMatrix(a, b) };
             var sink = new FakeSink { NextResult = PeerCtlSendResult.ProtocolError };
@@ -343,19 +370,25 @@ namespace osWebRtcVoice.Tests
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));   // ProtocolError #2
             sink.NextResult = PeerCtlSendResult.Ok;
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));   // Ok -> resets the consecutive run
-            Assert.That(sink.Count, Is.EqualTo(3));
+            Assert.Equal(3, sink.Count);
 
             // Not latched: a further send still reaches the sink (a latch would block it).
             sink.NextResult = PeerCtlSendResult.ProtocolError;
             await sender.PumpAsync(VisibilityBatch.Delta(Room, Excl((1, new[] { 2 })), null));
-            Assert.That(sink.Count, Is.EqualTo(4),
-                "two ProtocolErrors then an Ok must NOT latch — the Ok reset the run, emission continues");
+            {
+                var assertedValue = sink.Count;
+                TestAssert.WithMessage(() => Assert.Equal(4, assertedValue), "two ProtocolErrors then an Ok must NOT latch — the Ok reset the run, emission continues");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ProtocolError_ThreeConsecutive_Latches()
         {
-            Assert.That(VisibilityBatchSender.ProtocolErrorLatchThreshold, Is.EqualTo(3), "guard: the test assumes K=3");
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            {
+                var assertedValue = VisibilityBatchSender.ProtocolErrorLatchThreshold;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "guard: the test assumes K=3");
+            }
 
             UUID a = Id(1), b = Id(2);
             var feed = new FakeFeed { Current = BannedPairMatrix(a, b) };
@@ -365,21 +398,25 @@ namespace osWebRtcVoice.Tests
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));   // ProtocolError #1
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));   // ProtocolError #2
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));   // ProtocolError #3 -> LATCH
-            Assert.That(sink.Count, Is.EqualTo(3));
+            Assert.Equal(3, sink.Count);
 
             // Latched off: further pumps and even a fresh provision do nothing.
             sink.NextResult = PeerCtlSendResult.Ok;
             sender.OnListenerProvisioned(Id(9));
             await sender.PumpAsync(VisibilityBatch.Delta(Room, Excl((1, new[] { 2 })), null));
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
-            Assert.That(sink.Count, Is.EqualTo(3), "three consecutive ProtocolErrors latch — emission stays disabled");
+            {
+                var assertedValue = sink.Count;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "three consecutive ProtocolErrors latch — emission stays disabled");
+            }
         }
 
         // ---- disjoint-bug guard ------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Delta_WithOverlappingAddAndRemove_IsCaught_NoThrow_NoSend()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var feed = new FakeFeed { Current = VisibilityMatrix.Empty };
             var sink = new FakeSink();
             var sender = new VisibilityBatchSender(feed, sink, enabled: true);
@@ -388,25 +425,30 @@ namespace osWebRtcVoice.Tests
             // (listener 1, source 2) in BOTH add and remove -> EnsureDisjoint throws inside the
             // never-throw guard; the tick swallows it and sends nothing.
             var bad = VisibilityBatch.Delta(Room, Excl((1, new[] { 2 })), Excl((1, new[] { 2 })));
-            Assert.That(async () => await sender.PumpAsync(bad), Throws.Nothing);
-            Assert.That(sink.Count, Is.EqualTo(0), "a disjoint-violating tick emits nothing");
+            Assert.Null(await Record.ExceptionAsync(() => sender.PumpAsync(bad)));
+            {
+                var assertedValue = sink.Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "a disjoint-violating tick emits nothing");
+            }
         }
 
-        [Test]
-        public void SinkThrows_PumpNeverThrows()
+        [Fact(Timeout = 60000)]
+        public async Task SinkThrows_PumpNeverThrows()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = Id(1), b = Id(2);
             var feed = new FakeFeed { Current = BannedPairMatrix(a, b) };
             var sink = new FakeSink { Throw = true };
             var sender = new VisibilityBatchSender(feed, sink, enabled: true);
-            Assert.That(async () => await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room)), Throws.Nothing);
+            Assert.Null(await Record.ExceptionAsync(() => sender.PumpAsync(VisibilityBatch.EmptyDelta(Room))));
         }
 
         // ---- correction 1: bounded blind re-send of a joining listener's full column -------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task PendingJoin_ResendsFullColumnBoundedTimes_ThenGivesUp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID listener = Id(10), source = Id(11);
             var feed = new FakeFeed { Current = VisibilityMatrix.Empty };   // main path stays a no-op after sync
             feed.Columns[listener] = new List<UUID> { source };
@@ -420,16 +462,25 @@ namespace osWebRtcVoice.Tests
             for (int i = 0; i < VisibilityBatchSender.PendingJoinMaxAttempts + 3; i++)
                 await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
 
-            Assert.That(sink.Count, Is.EqualTo(VisibilityBatchSender.PendingJoinMaxAttempts),
-                "exactly the bounded number of re-sends, then it stops");
-            Assert.That(sink.Calls.All(c => c.op == VisOp.Replace), Is.True, "join uses a listener-scoped Replace");
-            Assert.That(sink.Calls[0].excl.Keys, Is.EquivalentTo(new[] { listener }), "listener-scoped, not the whole room");
-            Assert.That(sink.Calls[0].excl[listener], Is.EquivalentTo(new[] { source }), "the listener's full column");
+            {
+                var assertedValue = sink.Count;
+                TestAssert.WithMessage(() => Assert.Equal(VisibilityBatchSender.PendingJoinMaxAttempts, assertedValue), "exactly the bounded number of re-sends, then it stops");
+            }
+            Assert.True(sink.Calls.All(c => c.op == VisOp.Replace), "join uses a listener-scoped Replace");
+            {
+                var assertedValue = sink.Calls[0].excl.Keys;
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { listener }, assertedValue, strict: true), "listener-scoped, not the whole room");
+            }
+            {
+                var assertedValue = sink.Calls[0].excl[listener];
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { source }, assertedValue, strict: true), "the listener's full column");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task PendingJoin_EmptyColumnListener_SkipsPending_WhileExclusionListenerStillResends()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Vacuous-confirm guard: a listener whose excl AND mute columns are both empty must never
             // enter the pending machinery -- no re-sends, no GIVING-UP warning (the constant false alarm
             // that fired on every login and made the silent-drop instrument useless). A listener WITH an
@@ -446,15 +497,17 @@ namespace osWebRtcVoice.Tests
             for (int i = 0; i < VisibilityBatchSender.PendingJoinMaxAttempts + 3; i++)
                 await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
 
-            Assert.That(sink.Calls.Any(c => c.excl.ContainsKey(empty)), Is.False,
-                "empty-column listener is never sent (skipped at first drain: no re-send, no give-up)");
-            Assert.That(sink.Calls.Count(c => c.excl.ContainsKey(banned)), Is.EqualTo(VisibilityBatchSender.PendingJoinMaxAttempts),
-                "a listener with an exclusion still gets the full bounded re-send");
+            Assert.False(sink.Calls.Any(c => c.excl.ContainsKey(empty)), "empty-column listener is never sent (skipped at first drain: no re-send, no give-up)");
+            {
+                var assertedValue = sink.Calls.Count(c => c.excl.ContainsKey(banned));
+                TestAssert.WithMessage(() => Assert.Equal(VisibilityBatchSender.PendingJoinMaxAttempts, assertedValue), "a listener with an exclusion still gets the full bounded re-send");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task PendingJoin_DoesNotAffectMainSnapshotState()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The pending path must not touch _synced/_knownListeners. With an empty Current, the main
             // path syncs on tick 1 and thereafter sends nothing; the ONLY sends are the join re-sends.
             // (If the pending path had marked the main path synced/known, the counts below would differ.)
@@ -468,8 +521,11 @@ namespace osWebRtcVoice.Tests
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));   // join send #1 + main snapshot (empty, no send)
             await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));   // join send #2 + main delta (empty, no send)
 
-            Assert.That(sink.Count, Is.EqualTo(2), "only the two join re-sends; the main path emitted nothing");
-            Assert.That(sink.Calls.All(c => c.op == VisOp.Replace && c.excl.ContainsKey(listener)), Is.True);
+            {
+                var assertedValue = sink.Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "only the two join re-sends; the main path emitted nothing");
+            }
+            Assert.True(sink.Calls.All(c => c.op == VisOp.Replace && c.excl.ContainsKey(listener)));
         }
 
         // ==== in-flight staleness self-heal ========================================
@@ -544,11 +600,12 @@ namespace osWebRtcVoice.Tests
         // Hardening note: these tests NEVER await an uncompleted gate. Time is advanced via the fake
         // clock (now[]) so the guard fires without any real wait, and every hung send's gate is
         // completed and its task drained in `finally` — so a leaked never-completing task can't wedge
-        // the runner. The assembly-level [CancelAfter] (AssemblyInfo.cs) is the last-resort backstop.
+        // the runner. The Fact and Theory timeouts are the last-resort backstop.
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task StalledSend_GuardFiresAfterThreshold_ClearsFlag_NextPumpSnapshots()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = Id(1), b = Id(2);
             long[] now = { 0 };
             var feed = new FakeFeed { Current = BannedPairMatrix(a, b) };
@@ -562,27 +619,48 @@ namespace osWebRtcVoice.Tests
                 // Send #1 (bootstrap snapshot Replace) hangs. Capture its task/gate — do NOT await it.
                 hung1 = sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
                 gate1 = sink.LastPending;
-                Assert.That(sink.Count, Is.EqualTo(1));
-                Assert.That(sink.LastOp, Is.EqualTo(VisOp.Replace));
+                Assert.Equal(1, sink.Count);
+                Assert.Equal(VisOp.Replace, sink.LastOp);
 
                 // Before the threshold: a pump skips (returns a COMPLETED task); the guard does NOT fire.
                 System.Threading.Volatile.Write(ref now[0], 500);          // < 800
                 await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
-                Assert.That(sink.Count, Is.EqualTo(1), "still in flight; no new send");
-                Assert.That(StallLogCount(capture), Is.EqualTo(0), "guard must not fire before the threshold");
+                {
+                    var assertedValue = sink.Count;
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "still in flight; no new send");
+                }
+                {
+                    var assertedValue = StallLogCount(capture);
+                    TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "guard must not fire before the threshold");
+                }
 
                 // Past the threshold: the guard fires — force-clears, logs once, forces snapshot next.
                 System.Threading.Volatile.Write(ref now[0], 900);          // > 800
                 await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
-                Assert.That(sink.Count, Is.EqualTo(1), "the guard itself sends nothing");
-                Assert.That(StallLogCount(capture), Is.EqualTo(1), "guard logs exactly once");
+                {
+                    var assertedValue = sink.Count;
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the guard itself sends nothing");
+                }
+                {
+                    var assertedValue = StallLogCount(capture);
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "guard logs exactly once");
+                }
 
                 // Next pump: flag cleared -> acquires; _synced=false -> SNAPSHOT (not a delta). Completes.
                 sink.Hang = false;
                 await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
-                Assert.That(sink.Count, Is.EqualTo(2), "emission resumed after self-heal");
-                Assert.That(sink.LastOp, Is.EqualTo(VisOp.Replace), "recovery send is a snapshot, not a delta");
-                Assert.That(StallLogCount(capture), Is.EqualTo(1), "still exactly one stall log (once per episode)");
+                {
+                    var assertedValue = sink.Count;
+                    TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "emission resumed after self-heal");
+                }
+                {
+                    var assertedValue = sink.LastOp;
+                    TestAssert.WithMessage(() => Assert.Equal(VisOp.Replace, assertedValue), "recovery send is a snapshot, not a delta");
+                }
+                {
+                    var assertedValue = StallLogCount(capture);
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "still exactly one stall log (once per episode)");
+                }
             }
             finally
             {
@@ -592,9 +670,10 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SlowButCompletingSend_DoesNotTripGuard()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = Id(1), b = Id(2);
             long[] now = { 0 };
             var feed = new FakeFeed { Current = BannedPairMatrix(a, b) };
@@ -614,8 +693,14 @@ namespace osWebRtcVoice.Tests
                     System.Threading.Volatile.Write(ref now[0], t);
                     await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
                 }
-                Assert.That(StallLogCount(capture), Is.EqualTo(0), "a slow send within budget must not trip the guard");
-                Assert.That(sink.Count, Is.EqualTo(1), "no force-clear, no extra sends");
+                {
+                    var assertedValue = StallLogCount(capture);
+                    TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "a slow send within budget must not trip the guard");
+                }
+                {
+                    var assertedValue = sink.Count;
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "no force-clear, no extra sends");
+                }
 
                 // The send now completes normally -> its finally releases the flag.
                 gate.SetResult(PeerCtlSendResult.Ok);
@@ -626,9 +711,15 @@ namespace osWebRtcVoice.Tests
                 sink.Hang = false;
                 System.Threading.Volatile.Write(ref now[0], 750);
                 await sender.PumpAsync(VisibilityBatch.Delta(Room, Excl((3, new[] { 4 })), null));
-                Assert.That(sink.Count, Is.EqualTo(2), "emission resumed via the normal single-flight release");
-                Assert.That(sink.LastOp, Is.EqualTo(VisOp.Add));
-                Assert.That(StallLogCount(capture), Is.EqualTo(0), "guard never fired for a completing send");
+                {
+                    var assertedValue = sink.Count;
+                    TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "emission resumed via the normal single-flight release");
+                }
+                Assert.Equal(VisOp.Add, sink.LastOp);
+                {
+                    var assertedValue = StallLogCount(capture);
+                    TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "guard never fired for a completing send");
+                }
             }
             finally
             {
@@ -638,9 +729,10 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AbandonedSendLateCompletion_DoesNotClearANewerSendsFlag()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = Id(1), b = Id(2);
             long[] now = { 0 };
             var feed = new FakeFeed { Current = BannedPairMatrix(a, b) };
@@ -658,12 +750,15 @@ namespace osWebRtcVoice.Tests
                 // Guard fires -> force-clears epoch1.
                 System.Threading.Volatile.Write(ref now[0], 900);
                 await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
-                Assert.That(StallLogCount(capture), Is.EqualTo(1));
+                Assert.Equal(1, StallLogCount(capture));
 
                 // A NEW send (epoch2) acquires and ALSO hangs; it now owns the flag.
                 hung2 = sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
                 gate2 = sink.LastPending;
-                Assert.That(sink.Count, Is.EqualTo(2), "epoch2 started a fresh snapshot while epoch1 is abandoned");
+                {
+                    var assertedValue = sink.Count;
+                    TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "epoch2 started a fresh snapshot while epoch1 is abandoned");
+                }
 
                 // The ABANDONED epoch1 now completes late (while epoch2 is still gated, so no concurrent
                 // shared-state mutation). Its finally must NOT clear epoch2's flag — CAS-against-its-own
@@ -674,8 +769,10 @@ namespace osWebRtcVoice.Tests
                 // Proof epoch2 still holds single-flight: a pump within epoch2's budget SKIPS (no send).
                 System.Threading.Volatile.Write(ref now[0], 950);   // epoch2 started at 900; 50ms elapsed, not stale
                 await sender.PumpAsync(VisibilityBatch.EmptyDelta(Room));
-                Assert.That(sink.Count, Is.EqualTo(2),
-                    "epoch2 still owns the flag; the abandoned late completion did not corrupt single-flight");
+                {
+                    var assertedValue = sink.Count;
+                    TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "epoch2 still owns the flag; the abandoned late completion did not corrupt single-flight");
+                }
             }
             finally
             {

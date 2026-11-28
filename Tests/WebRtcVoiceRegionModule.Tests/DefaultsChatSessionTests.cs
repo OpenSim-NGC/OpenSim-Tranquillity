@@ -20,19 +20,20 @@ using Nini.Config;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class DefaultsChatSessionTests
     {
         private static readonly UUID Alice = new UUID("a11ce000-0000-4000-8000-000000000001");
 
-        [TestCase("call", HttpStatusCode.BadRequest)]
-        [TestCase("start conference", HttpStatusCode.OK)]
-        [TestCase("decline invitation", HttpStatusCode.OK)]
-        [TestCase("decline p2p voice", HttpStatusCode.OK)]
-        [TestCase("fetch history", HttpStatusCode.OK)]
-        [TestCase("no such method", HttpStatusCode.BadRequest)]
+        [InlineData("call",HttpStatusCode.BadRequest)]
+        [InlineData("start conference",HttpStatusCode.OK)]
+        [InlineData("decline invitation",HttpStatusCode.OK)]
+        [InlineData("decline p2p voice",HttpStatusCode.OK)]
+        [InlineData("fetch history",HttpStatusCode.OK)]
+        [InlineData("no such method",HttpStatusCode.BadRequest)]
+        [Theory(Timeout = 60000)]
         public void EverySettingAtItsDefault_ChatSessionRequestAnswersAsBefore(string method, HttpStatusCode expected)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IniConfigSource ini = new IniConfigSource();
             ini.AddConfig("WebRtcVoice").Set("Enabled", "true");
             WebRtcVoiceRegionModule module = new WebRtcVoiceRegionModule();
@@ -50,7 +51,10 @@ namespace osWebRtcVoice.Tests
 
                 module.ChatSessionRequest(new LlsdPost(body), response, Alice, scene);
 
-                Assert.That(response.StatusCode, Is.EqualTo((int)expected), method);
+                {
+                    var assertedValue = response.StatusCode;
+                    TestAssert.WithMessage(() => Assert.Equal((int)expected, assertedValue), method);
+                }
             }
             finally
             {

@@ -208,9 +208,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             };
             foreach (var (name, value) in sl)
             {
-                FieldInfo f = typeof(ScriptBaseClass).GetField(name, BindingFlags.Public | BindingFlags.Static);
+                FieldInfo? f = typeof(ScriptBaseClass).GetField(name, BindingFlags.Public | BindingFlags.Static);
                 Assert.True(f is not null, name + " is missing");
-                Assert.True(value == (int)f!.GetValue(null)!, $"{name} is {f.GetValue(null)}, SL's is {value}");
+                FieldInfo field = f ?? throw new MissingFieldException(typeof(ScriptBaseClass).FullName, name);
+                Assert.True(value == (int)field.GetValue(null)!, $"{name} is {field.GetValue(null)}, SL's is {value}");
             }
         }
     }

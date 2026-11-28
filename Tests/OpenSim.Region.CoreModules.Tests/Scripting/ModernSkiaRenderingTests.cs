@@ -41,7 +41,7 @@ public class ModernSkiaRenderingTests
                 $"PenColour Red; PenSize 2; {command} 8,8,48,8,48,48;",
                 "width:64,height:64,bgcolor:White");
             Assert.NotNull(texture);
-            using var bitmap = J2kImage.FromBytes(texture.Data).As<SKBitmap>();
+            using var bitmap = J2kImage.FromBytes(texture.Data, null, TestContext.Current.CancellationToken).As<SKBitmap>();
             Assert.NotNull(bitmap);
 
             SKColor interior = bitmap.GetPixel(36, 20);

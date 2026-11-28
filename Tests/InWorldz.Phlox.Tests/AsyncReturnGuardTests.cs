@@ -9,7 +9,6 @@ using System.Reflection;
 using InWorldz.Phlox.Glue;
 using InWorldz.Phlox.Types;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

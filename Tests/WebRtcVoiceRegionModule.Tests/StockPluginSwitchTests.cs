@@ -23,10 +23,8 @@ using OpenSim.Tests.Common;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
-    public class StockPluginSwitchTests
-    {
+    public class StockPluginSwitchTests : IAsyncLifetime
+        {
         private sealed class Capture : ILoggerProvider, ILogger
         {
             public readonly List<(LogLevel Level, string Text)> Lines = new();
@@ -49,16 +47,12 @@ namespace osWebRtcVoice.Tests
 
         private Capture _log;
         private LogCapture _logging;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             _logging.Dispose();
             _log.Dispose();
@@ -80,56 +74,65 @@ namespace osWebRtcVoice.Tests
         private static bool Field(WebRtcVoiceRegionModule module, string name)
             => (bool)typeof(WebRtcVoiceRegionModule).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(module);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheRegion_OnTheStockPlugin_RunsWithThePositionFeedOff_AndSaysSo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var module = new WebRtcVoiceRegionModule();
 
             module.Initialise(Config("janus.plugin.audiobridge", "VisibilityFeederEnabled", "VisibilityEmitEnabled", "PositionFeedEnabled"));
 
             object settings = typeof(WebRtcVoiceRegionModule).GetField("m_PositionSettings", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(module);
-            Assert.That(settings, Is.Null, "the position feed stays off");
+            {
+                var assertedValue = settings;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the position feed stays off");
+            }
             List<string> warnings = _log.Warnings();
-            Assert.That(warnings.Any(w => w.Contains("PositionFeedEnabled") && w.Contains("janus.plugin.audiobridge")), Is.True, string.Join(" | ", warnings));
+            Assert.True(warnings.Any(w => w.Contains("PositionFeedEnabled") && w.Contains("janus.plugin.audiobridge")), string.Join(" | ", warnings));
         }
 
-        [TestCase("VisibilityFeederEnabled", "m_VisibilityFeederEnabled")]
-        [TestCase("VisibilityEmitEnabled", "m_VisibilityEmitEnabled")]
-        [TestCase("VisibilityArmingEnabled", "m_VisibilityArmingEnabled")]
+        [InlineData("VisibilityFeederEnabled","m_VisibilityFeederEnabled")]
+        [InlineData("VisibilityEmitEnabled","m_VisibilityEmitEnabled")]
+        [InlineData("VisibilityArmingEnabled","m_VisibilityArmingEnabled")]
+        [Theory(Timeout = 60000)]
         public void TheRegion_OnTheStockPlugin_RunsWithTheSwitchOff_AndSaysSo(string key, string field)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var module = new WebRtcVoiceRegionModule();
 
             module.Initialise(Config("janus.plugin.audiobridge", key));
 
-            Assert.That(Field(module, field), Is.False);
+            Assert.False(Field(module, field));
             List<string> warnings = _log.Warnings();
-            Assert.That(warnings.Any(w => w.Contains(key) && w.Contains("janus.plugin.audiobridge")), Is.True, string.Join(" | ", warnings));
+            Assert.True(warnings.Any(w => w.Contains(key) && w.Contains("janus.plugin.audiobridge")), string.Join(" | ", warnings));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheRegion_WithNoPluginNameSet_IsOnTheStockPlugin()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var module = new WebRtcVoiceRegionModule();
 
             module.Initialise(Config(null, "VisibilityFeederEnabled"));
 
-            Assert.That(Field(module, "m_VisibilityFeederEnabled"), Is.False);
-            Assert.That(_log.Warnings().Any(w => w.Contains("VisibilityFeederEnabled")), Is.True);
+            Assert.False(Field(module, "m_VisibilityFeederEnabled"));
+            Assert.Contains(_log.Warnings(), w => w.Contains("VisibilityFeederEnabled"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheRegion_OnTheStockPlugin_KnowsItIsOnTheStockPlugin()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var stock = new WebRtcVoiceRegionModule();
             stock.Initialise(Config("janus.plugin.audiobridge"));
 
-            Assert.That(Field(stock, "m_stockPlugin"), Is.True);
+            Assert.True(Field(stock, "m_stockPlugin"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheConnectorModule_OnTheStockPlugin_RegistersNothing_AndSaysSo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var cfg = Config("janus.plugin.audiobridge", "ConnectorsEnabled");
             IConfig rec = cfg.AddConfig("VoiceConnector.Recorder");
             rec.Set("Enabled", "true");
@@ -142,9 +145,20 @@ namespace osWebRtcVoice.Tests
             module.Initialise(cfg);
             module.AddRegion(scene);
 
-            Assert.That(scene.RequestModuleInterface<IVoiceConnectorRegistry>(), Is.Null);
-            Assert.That(_log.Warnings().Any(w => w.Contains("ConnectorsEnabled") && w.Contains("janus.plugin.audiobridge")), Is.True,
-                string.Join(" | ", _log.Warnings()));
+            Assert.Null(scene.RequestModuleInterface<IVoiceConnectorRegistry>());
+            Assert.True(_log.Warnings().Any(w => w.Contains("ConnectorsEnabled") && w.Contains("janus.plugin.audiobridge")), string.Join(" | ", _log.Warnings()));
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

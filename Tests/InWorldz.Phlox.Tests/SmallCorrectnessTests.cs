@@ -15,7 +15,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using Xunit;
-using Xunit.Abstractions;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace InWorldz.Phlox.Tests;

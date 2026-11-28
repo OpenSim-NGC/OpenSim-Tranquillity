@@ -6,7 +6,7 @@
  */
 
 using System.Linq;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.ClientStack.LindenCaps.AIS;
@@ -18,7 +18,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// sub-folders, the COF resolve, link-target resolution and the depth walk. No Scene, no ScenePresence — the
 /// composition is exactly what Phase 2 will reuse on Robust.
 /// </summary>
-[TestFixture]
 public class AisInventoryTests
 {
     private static readonly UUID Agent = new("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
@@ -56,59 +55,59 @@ public class AisInventoryTests
 
     // ---------------- primitives ----------------
 
-    [Test]
+    [Fact]
     public void get_item_and_get_folder_are_scoped_to_the_owner()
     {
         var b = Inventory();
-        Assert.That(b.GetItem(Agent, Shirt)?.Name, Is.EqualTo("Blue Shirt"));
-        Assert.That(b.GetItem(Agent, UUID.Random()), Is.Null);
-        Assert.That(b.GetItem(Stranger, Shirt), Is.Null, "another agent must not read this inventory");
-        Assert.That(b.GetFolder(Agent, Clothing)?.Version, Is.EqualTo(7), "the folder version is read fresh (T4)");
-        Assert.That(b.GetFolder(Stranger, Clothing), Is.Null);
+        Assert.Equal("Blue Shirt", b.GetItem(Agent, Shirt)?.Name);
+        Assert.Null(b.GetItem(Agent, UUID.Random()));
+        Assert.True(b.GetItem(Stranger, Shirt) is null, "another agent must not read this inventory");
+        Assert.Equal((ushort?)7, b.GetFolder(Agent, Clothing)?.Version);
+        Assert.Null(b.GetFolder(Stranger, Clothing));
     }
 
-    [Test]
+    [Fact]
     public void get_sub_folders_returns_the_direct_children_only()
     {
         var b = Inventory();
         var subs = b.GetSubFolders(Agent, Clothing);
-        Assert.That(subs.Select(f => f.ID), Is.EquivalentTo(new[] { Outfits }));
-        Assert.That(b.GetSubFolders(Agent, Party), Is.Empty);
+        Assert.Equivalent(new[] { Outfits }, subs.Select(f => f.ID), true);
+        Assert.Empty(b.GetSubFolders(Agent, Party));
     }
 
-    [Test]
+    [Fact]
     public void the_cof_resolves_by_folder_type()
     {
         var b = Inventory();
         var cof = AisInventory.GetCurrentOutfit(b, Agent);
-        Assert.That(cof?.ID, Is.EqualTo(Cof));
+        Assert.Equal(Cof, cof?.ID);
         // A7: resolution moved from the service's own folders[0] to a deterministic scan of the skeleton, because
         // an agent can own more than one folder of a type and the service picks arbitrarily between them.
-        Assert.That(b.Calls, Does.Contain("GetInventorySkeleton"), "resolved by folder type over the skeleton (T2)");
+        Assert.Contains("GetInventorySkeleton", b.Calls);
 
         b.CurrentOutfitId = UUID.Zero;
         b.Folders.Remove(Cof);
-        Assert.That(AisInventory.GetCurrentOutfit(b, Agent), Is.Null, "an agent with no COF resolves to null, not an exception");
+        Assert.True(AisInventory.GetCurrentOutfit(b, Agent) is null, "an agent with no COF resolves to null, not an exception");
     }
 
     // ---------------- links ----------------
 
-    [Test]
+    [Fact]
     public void folder_contents_split_links_out_of_items()
     {
         var b = Inventory();
         var contents = AisInventory.GetContents(b, Agent, Cof);
-        Assert.That(contents, Is.Not.Null);
-        Assert.That(contents.Items, Is.Empty, "the COF holds only links");
-        Assert.That(contents.Links.Select(l => l.ID), Is.EquivalentTo(new[] { LinkToShirt, LinkToPants }));
+        Assert.NotNull(contents);
+        Assert.Empty(contents.Items);
+        Assert.Equivalent(new[] { LinkToShirt, LinkToPants }, contents.Links.Select(l => l.ID), true);
 
         var clothing = AisInventory.GetContents(b, Agent, Clothing);
-        Assert.That(clothing.Items.Select(i => i.ID), Is.EquivalentTo(new[] { Shirt, Pants }));
-        Assert.That(clothing.Links, Is.Empty);
-        Assert.That(AisInventory.GetContents(b, Agent, UUID.Random()), Is.Null);
+        Assert.Equivalent(new[] { Shirt, Pants }, clothing.Items.Select(i => i.ID), true);
+        Assert.Empty(clothing.Links);
+        Assert.Null(AisInventory.GetContents(b, Agent, UUID.Random()));
     }
 
-    [Test]
+    [Fact]
     public void link_targets_in_another_folder_are_resolved_in_one_batched_call()
     {
         var b = Inventory();
@@ -117,14 +116,12 @@ public class AisInventoryTests
 
         var targets = AisInventory.ResolveLinkTargets(b, Agent, contents.Links);
 
-        Assert.That(targets.Select(t => t.ID), Is.EquivalentTo(new[] { Shirt, Pants }),
-            "the targets live in Clothing, not in the folder the links are in");
-        Assert.That(b.Calls.Count(c => c.StartsWith("GetItems")), Is.EqualTo(1),
-            "one GetMultipleItems for every link, as FetchInvDescHandler.ProcessLinks does (T5)");
-        Assert.That(b.Calls, Does.Contain("GetItems[2]"));
+        Assert.Equivalent(new[] { Shirt, Pants }, targets.Select(t => t.ID), true);
+        Assert.Equal(1, b.Calls.Count(c => c.StartsWith("GetItems")));
+        Assert.Contains("GetItems[2]", b.Calls);
     }
 
-    [Test]
+    [Fact]
     public void a_broken_link_resolves_to_nothing_and_a_link_to_a_link_is_dropped()
     {
         var b = Inventory();
@@ -136,45 +133,42 @@ public class AisInventoryTests
         var contents = AisInventory.GetContents(b, Agent, Cof);
         var targets = AisInventory.ResolveLinkTargets(b, Agent, contents.Links);
 
-        Assert.That(targets.Select(t => t.ID), Is.EquivalentTo(new[] { Shirt, Pants }),
-            "broken links resolve to nothing; links to links are dropped as the descendents cap drops them");
+        Assert.Equivalent(new[] { Shirt, Pants }, targets.Select(t => t.ID), true);
     }
 
     // ---------------- depth ----------------
 
-    [Test]
+    [Fact]
     public void walk_expands_exactly_the_requested_number_of_generations()
     {
         var b = Inventory();
 
         var d0 = AisInventory.Walk(b, Agent, Clothing, 0);
-        Assert.That(d0.Select(c => c.Folder.ID), Is.EqualTo(new[] { Clothing }), "depth 0 expands the folder itself only");
+        Assert.Equal(new[] { Clothing }, d0.Select(c => c.Folder.ID));
 
         var d1 = AisInventory.Walk(b, Agent, Clothing, 1);
-        Assert.That(d1.Select(c => c.Folder.ID), Is.EqualTo(new[] { Clothing, Outfits }));
+        Assert.Equal(new[] { Clothing, Outfits }, d1.Select(c => c.Folder.ID));
 
         var d2 = AisInventory.Walk(b, Agent, Clothing, 2);
-        Assert.That(d2.Select(c => c.Folder.ID), Is.EqualTo(new[] { Clothing, Outfits, Party }),
-            "depth 2 reaches the grandchild");
+        Assert.Equal(new[] { Clothing, Outfits, Party }, d2.Select(c => c.Folder.ID));
 
         var d5 = AisInventory.Walk(b, Agent, Clothing, 5);
-        Assert.That(d5.Select(c => c.Folder.ID), Is.EqualTo(new[] { Clothing, Outfits, Party }),
-            "a depth deeper than the tree stops at the tree");
+        Assert.Equal(new[] { Clothing, Outfits, Party }, d5.Select(c => c.Folder.ID));
 
-        Assert.That(AisInventory.Walk(b, Agent, UUID.Random(), 3), Is.Empty, "an unknown folder walks to nothing");
+        Assert.Empty(AisInventory.Walk(b, Agent, UUID.Random(), 3));
     }
 
     // ---------------- orphans ----------------
 
-    [Test]
+    [Fact]
     public void orphans_are_the_folders_whose_parent_is_gone()
     {
         var b = Inventory();
-        Assert.That(AisInventory.FindOrphans(b, Agent).Folders, Is.Empty, "a consistent tree has no orphans");
+        Assert.Empty(AisInventory.FindOrphans(b, Agent).Folders);
 
         b.Folders.Remove(Outfits);   // Party's parent disappears
         var orphans = AisInventory.FindOrphans(b, Agent);
-        Assert.That(orphans.Folders.Select(f => f.ID), Is.EquivalentTo(new[] { Party }));
-        Assert.That(orphans.Items, Is.Empty, "orphaned items are not reported: the service has no query for them");
+        Assert.Equivalent(new[] { Party }, orphans.Folders.Select(f => f.ID), true);
+        Assert.Empty(orphans.Items);
     }
 }
