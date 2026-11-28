@@ -6,7 +6,7 @@
  */
 
 using System.Reflection;
-using Xunit.Sdk;
+using Xunit.v3;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -67,7 +67,7 @@ internal static class ScratchFolders
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
 internal sealed class DeleteScratchFoldersAttribute : BeforeAfterTestAttribute
 {
-    public override void After(MethodInfo methodUnderTest)
+    public override void After(MethodInfo methodUnderTest, IXunitTest test)
     {
         string[] failed = ScratchFolders.DeleteAll();
         if (failed.Length > 0)

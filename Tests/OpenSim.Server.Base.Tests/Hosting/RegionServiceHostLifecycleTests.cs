@@ -35,12 +35,12 @@ public sealed class RegionServiceHostLifecycleTests
 
         using IHost host = BuildHost(runtime);
 
-        await host.StartAsync();
+        await host.StartAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, runtime.InitializeCalls);
         Assert.Equal(0, runtime.StopCalls);
 
-        await host.StopAsync();
+        await host.StopAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, runtime.StopCalls);
     }
@@ -55,7 +55,7 @@ public sealed class RegionServiceHostLifecycleTests
 
         using IHost host = BuildHost(runtime);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -67,10 +67,10 @@ public sealed class RegionServiceHostLifecycleTests
 
         using IHost host = BuildHost(runtime, interactive: false);
 
-        await host.StartAsync();
+        await host.StartAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, runtime.InitializeCalls);
 
-        await host.StopAsync();
+        await host.StopAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, runtime.StopCalls);
     }
 
@@ -90,13 +90,13 @@ public sealed class RegionServiceHostLifecycleTests
 
         try
         {
-            await host.StartAsync();
+            await host.StartAsync(TestContext.Current.CancellationToken);
             Assert.Equal(1, runtime.InitializeCalls);
 
             // Stopping the host must cancel the console runner and stop the runtime
             // within a bounded time (no hang on the blocking prompt loop).
-            Task stop = host.StopAsync();
-            Task completed = await Task.WhenAny(stop, Task.Delay(TimeSpan.FromSeconds(10)));
+            Task stop = host.StopAsync(TestContext.Current.CancellationToken);
+            Task completed = await Task.WhenAny(stop, Task.Delay(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
             Assert.Same(stop, completed);
             await stop;
 

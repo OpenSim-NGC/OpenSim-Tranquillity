@@ -22,13 +22,9 @@ using osWebRtcVoice.Tests.StockJanus;
 
 namespace osWebRtcVoice.Tests
 {
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-    [TestFixture, NUnit.Framework.Timeout(240000)]
-#pragma warning restore CS0618
-    public class DefaultsParityTests
-    {
-        [OneTimeSetUp]
-        public void RequireGateway() => StockJanusEnvironment.IgnoreUnlessConfigured();
+    public class DefaultsParityTests : IAsyncLifetime
+        {
+        private void RequireGateway() => StockJanusEnvironment.IgnoreUnlessConfigured();
 
         // name -> (HTTP status, provisioned, response word, rooms the request created on the gateway; -1: see its row)
         private static readonly Dictionary<string, (int Status, bool Provisioned, string Response, int NewRooms)> Expected = new()
@@ -53,9 +49,10 @@ namespace osWebRtcVoice.Tests
             ["logout, unknown viewer session"] = (200, false, "closed", 0),
         };
 
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task EveryOptionalSettingAtItsDefault_AnswersAsTheRecordedBuildDid()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var janus = new RawJanus();
             using var region = StockRegion.Create();
             UUID agent = new UUID("a11ce000-0000-4000-8000-000000000001");
@@ -64,22 +61,51 @@ namespace osWebRtcVoice.Tests
             List<ProbeRow> rows = await DefaultsProbe.RunAsync(region, agent, janus);
 
             foreach (ProbeRow row in rows)
-                TestContext.Out.WriteLine("ROW " + row);
-            Assert.That(rows.Select(r => r.Name), Is.EquivalentTo(Expected.Keys), "the same set of requests");
+                TestContext.Current.TestOutputHelper.WriteLine("ROW " + row);
+            {
+                var assertedValue = rows.Select(r => r.Name);
+                TestAssert.WithMessage(() => Assert.Equivalent(Expected.Keys, assertedValue, strict: true), "the same set of requests");
+            }
             foreach (ProbeRow row in rows)
             {
                 var want = Expected[row.Name];
                 Assert.Multiple(() =>
                 {
-                    Assert.That(row.Status, Is.EqualTo(want.Status), row.Name + ": HTTP status");
-                    Assert.That(row.Provisioned, Is.EqualTo(want.Provisioned), row.Name + ": provisioned");
-                    Assert.That(row.Response, Is.EqualTo(want.Response), row.Name + ": response");
+                    {
+                        var assertedValue = row.Status;
+                        TestAssert.WithMessage(() => Assert.Equal(want.Status, assertedValue), row.Name + ": HTTP status");
+                    }
+                    {
+                        var assertedValue = row.Provisioned;
+                        TestAssert.WithMessage(() => Assert.Equal(want.Provisioned, assertedValue), row.Name + ": provisioned");
+                    }
+                    {
+                        var assertedValue = row.Response;
+                        TestAssert.WithMessage(() => Assert.Equal(want.Response, assertedValue), row.Name + ": response");
+                    }
                     if (want.NewRooms < 0)
-                        Assert.That(row.NewRooms, Is.InRange(0, 1), row.Name + ": rooms created");
+                        {
+                            var assertedValue = row.NewRooms;
+                            TestAssert.WithMessage(() => Assert.InRange(assertedValue, 0, 1), row.Name + ": rooms created");
+                        }
                     else
-                        Assert.That(row.NewRooms, Is.EqualTo(want.NewRooms), row.Name + ": rooms created");
+                        {
+                            var assertedValue = row.NewRooms;
+                            TestAssert.WithMessage(() => Assert.Equal(want.NewRooms, assertedValue), row.Name + ": rooms created");
+                        }
                 });
             }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            RequireGateway();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

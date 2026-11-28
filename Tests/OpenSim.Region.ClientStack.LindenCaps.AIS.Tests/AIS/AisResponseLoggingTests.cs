@@ -8,7 +8,7 @@
 using System;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -23,7 +23,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// nothing recorded what had been sent back; both hypotheses died on the same missing evidence. This is that
 /// evidence, made permanent.
 /// </summary>
-[TestFixture]
 public class AisResponseLoggingTests
 {
     private static readonly UUID Agent = new("a7d2ff2e-dc32-44d8-aa61-3d22070a4964");
@@ -82,7 +81,7 @@ public class AisResponseLoggingTests
 
     // ------------------------------------------------------------------ the log line
 
-    [Test]
+    [Fact]
     public void a_removal_logs_its_status_and_the_delta_keys_it_actually_sent()
     {
         var (_, handler, linkId) = Inventory();
@@ -91,15 +90,15 @@ public class AisResponseLoggingTests
         Send(handler, "DELETE", "/item/" + linkId);
 
         var line = log.Messages(LogLevel.Debug).SingleOrDefault(m => m.Contains("RemoveItem ->"));
-        Assert.That(line, Is.Not.Null, "a mutation must log what it answered");
-        Assert.That(line, Does.Contain("200"), "the status code");
-        Assert.That(line, Does.Contain(AisMutation.RemovedItems), "the removal delta key");
-        Assert.That(line, Does.Contain(linkId.ToString()), "and the id that was removed");
-        Assert.That(line, Does.Contain(AisMutation.UpdatedCategoryVersions), "the version key that gates it");
-        Assert.That(line, Does.Contain(Cof.ToString()), "naming the folder whose version moved");
+        Assert.True(line is not null, "a mutation must log what it answered");
+        Assert.Contains("200", line);
+        Assert.Contains(AisMutation.RemovedItems, line);
+        Assert.Contains(linkId.ToString(), line);
+        Assert.Contains(AisMutation.UpdatedCategoryVersions, line);
+        Assert.Contains(Cof.ToString(), line);
     }
 
-    [Test]
+    [Fact]
     public void a_failed_mutation_logs_its_status_and_reason()
     {
         var (_, handler, _) = Inventory();
@@ -108,11 +107,11 @@ public class AisResponseLoggingTests
         Send(handler, "DELETE", "/item/" + UUID.Random());   // no such item
 
         var line = log.Messages(LogLevel.Debug).SingleOrDefault(m => m.Contains("RemoveItem ->"));
-        Assert.That(line, Is.Not.Null, "a mutation that fails is exactly the case A10 needed");
-        Assert.That(line, Does.Contain("404"));
+        Assert.True(line is not null, "a mutation that fails is exactly the case A10 needed");
+        Assert.Contains("404", line);
     }
 
-    [Test]
+    [Fact]
     public void a_fetch_does_not_log_a_response_line()
     {
         var (_, handler, _) = Inventory();
@@ -120,11 +119,10 @@ public class AisResponseLoggingTests
         using var log = new CapturedLog();
         Send(handler, "GET", "/category/current/links");
 
-        Assert.That(log.Messages(LogLevel.Debug).Any(m => m.Contains("FetchCOF ->")), Is.False,
-            "fetch bodies are whole inventory listings; logging them would bury the mutations");
+        Assert.False(log.Messages(LogLevel.Debug).Any(m => m.Contains("FetchCOF ->")), "fetch bodies are whole inventory listings; logging them would bury the mutations");
     }
 
-    [Test]
+    [Fact]
     public void fetch_cof_logs_the_folder_current_resolved_to()
     {
         var (_, handler, _) = Inventory();
@@ -133,15 +131,14 @@ public class AisResponseLoggingTests
         Send(handler, "GET", "/category/current/links");
 
         var line = log.Messages(LogLevel.Debug).SingleOrDefault(m => m.Contains("resolved \"current\""));
-        Assert.That(line, Is.Not.Null,
-            "the A7 WARN only fires when there is more than one candidate, so the ordinary case recorded nothing");
-        Assert.That(line, Does.Contain(Cof.ToString()));
-        Assert.That(line, Does.Contain("500"), "and the version it carried");
+        Assert.True(line is not null, "the A7 WARN only fires when there is more than one candidate, so the ordinary case recorded nothing");
+        Assert.Contains(Cof.ToString(), line);
+        Assert.Contains("500", line);
     }
 
     // ------------------------------------------------------------------ the summariser
 
-    [Test]
+    [Fact]
     public void every_delta_key_of_the_contract_is_rendered()
     {
         var a = new UUID("11111111-1111-4111-8111-111111111111");
@@ -161,39 +158,39 @@ public class AisResponseLoggingTests
         var summary = AisMutation.SummariseDeltas(body);
 
         foreach (var key in AisMutation.DeltaKeys)
-            Assert.That(summary, Does.Contain(key), $"{key} must be rendered");
-        Assert.That(summary, Does.Contain("category_id=" + Cof), "the top-level content object");
-        Assert.That(summary, Does.Contain(Cof + ":500"), "a version renders as folder:version");
-        Assert.That(summary, Does.Contain(a.ToString()).And.Contain(b.ToString()));
+            Assert.Contains(key, summary);
+        Assert.Contains("category_id=" + Cof, summary);
+        Assert.Contains(Cof + ":500", summary);
+        Assert.Multiple(() => { Assert.Contains(a.ToString(), summary); Assert.Contains(b.ToString(), summary); });
     }
 
     /// <summary>
     /// The case worth seeing at a glance: a mutation that changed something and reported nothing. That is how a
     /// viewer's model goes stale, and it must not look like an ordinary line.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_response_with_no_deltas_says_so()
     {
-        Assert.That(AisMutation.SummariseDeltas(new OSDMap()), Is.EqualTo("empty body"));
-        Assert.That(AisMutation.SummariseDeltas(new OSDMap { ["tid"] = UUID.Random() }), Is.EqualTo("no deltas"));
-        Assert.That(AisMutation.SummariseDeltas(null), Is.EqualTo("empty body"));
+        Assert.Equal("empty body", AisMutation.SummariseDeltas(new OSDMap()));
+        Assert.Equal("no deltas", AisMutation.SummariseDeltas(new OSDMap { ["tid"] = UUID.Random() }));
+        Assert.Equal("empty body", AisMutation.SummariseDeltas(null));
     }
 
-    [Test]
+    [Fact]
     public void absent_keys_are_omitted_rather_than_printed_empty()
     {
         var body = new OSDMap { [AisMutation.RemovedItems] = new OSDArray { OSD.FromUUID(Cof) } };
 
         var summary = AisMutation.SummariseDeltas(body);
 
-        Assert.That(summary, Does.Contain(AisMutation.RemovedItems));
-        Assert.That(summary, Does.Not.Contain(AisMutation.CreatedItems));
-        Assert.That(summary, Does.Not.Contain(AisMutation.UpdatedCategoryVersions));
+        Assert.Contains(AisMutation.RemovedItems, summary);
+        Assert.DoesNotContain(AisMutation.CreatedItems, summary);
+        Assert.DoesNotContain(AisMutation.UpdatedCategoryVersions, summary);
     }
 
     // ------------------------------------------------------------------ classification
 
-    [Test]
+    [Fact]
     public void every_mutation_is_classified_as_one_and_no_fetch_is()
     {
         foreach (var op in new[]
@@ -202,7 +199,7 @@ public class AisResponseLoggingTests
             AisOperation.RemoveItem, AisOperation.PurgeDescendents, AisOperation.UpdateCategory,
             AisOperation.UpdateItem, AisOperation.CopyCategory,
         })
-            Assert.That(AisOperations.IsMutation(op), Is.True, $"{op} changes inventory");
+            Assert.True(AisOperations.IsMutation(op), $"{op} changes inventory");
 
         foreach (var op in new[]
         {
@@ -210,14 +207,14 @@ public class AisResponseLoggingTests
             AisOperation.FetchCategoryCategories, AisOperation.FetchCategorySubset, AisOperation.FetchCOF,
             AisOperation.FetchCategoryLinks, AisOperation.FetchOrphans,
         })
-            Assert.That(AisOperations.IsMutation(op), Is.False, $"{op} does not");
+            Assert.False(AisOperations.IsMutation(op), $"{op} does not");
     }
 
     /// <summary>
     /// Guards the cost claim. With DEBUG off nothing may be logged — the summariser is only reached inside the
     /// level guard, so a production log level pays two predicates and no allocation.
     /// </summary>
-    [Test]
+    [Fact]
     public void nothing_is_logged_when_debug_is_off()
     {
         var (_, handler, linkId) = Inventory();
@@ -225,6 +222,6 @@ public class AisResponseLoggingTests
         using var log = new CapturedLog { Enabled = LogLevel.Information };
         Send(handler, "DELETE", "/item/" + linkId);
 
-        Assert.That(log.Messages(LogLevel.Debug), Is.Empty, "no DEBUG line may be emitted when DEBUG is disabled");
+        Assert.Empty(log.Messages(LogLevel.Debug));
     }
 }

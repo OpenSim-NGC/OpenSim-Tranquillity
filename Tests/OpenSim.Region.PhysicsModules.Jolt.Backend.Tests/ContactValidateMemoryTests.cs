@@ -11,7 +11,6 @@ using System.Numerics;
 using System.Reflection;
 using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -106,7 +105,7 @@ public class ContactValidateMemoryTests
 
         RunPile(200);   // warm the process: first-use growth lands here
         long grown = RunPile(Steps);
-        Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+        _out.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"CONTACT-VALIDATE-MEMORY grown_kb={grown / 1024} steps={Steps - 100} cleared={JoltPhysicsBackend.ContactValidateProcCleared}"));
     }
 

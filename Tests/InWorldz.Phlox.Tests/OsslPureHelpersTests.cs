@@ -8,7 +8,6 @@
 using System;
 using System.Linq;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

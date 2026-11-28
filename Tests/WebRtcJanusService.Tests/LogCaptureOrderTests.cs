@@ -7,7 +7,7 @@
 
 /*
  * Captures whose lifetimes overlap, as they do when a timed-out test's teardown runs after the next test has set
- * up (NUnit's [Timeout] does not stop a test on .NET, so its teardown runs late). Whatever order the captures are
+ * up (an uncooperative timed-out test can tear down late). Whatever order the captures are
  * disposed in, logging keeps working and each line lands in the capture that is current when it is logged.
  */
 
@@ -16,29 +16,35 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // captures register with the process-wide logger
     public class LogCaptureOrderTests
     {
-        [Test]
+        [Fact(Timeout = 60000)]
         public void CapturesDisposedOutOfOrder_LeaveLoggingWorking()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var a = new LogCapture();
             var b = new LogCapture();
             a.Dispose();
             b.Dispose();
 
             ILogger logger = LoggerProvider.CreateLogger("osWebRtcVoice.Tests.LogCaptureOrder");
-            Assert.DoesNotThrow(() => logger.LogInformation("after both captures are gone"));
+            {
+                var assertedValue = () => logger.LogInformation("after both captures are gone");
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
 
             using var c = new LogCapture();
             logger.LogInformation("seen by a new capture");
-            Assert.That(c.Lines.Select(l => l.Text), Does.Contain("seen by a new capture"));
+            Assert.Contains("seen by a new capture", c.Lines.Select(l => l.Text));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALateDisposeOfAnEarlierCapture_DoesNotStealTheCurrentOnesLines()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             ILogger logger = LoggerProvider.CreateLogger("osWebRtcVoice.Tests.LogCaptureOrder");
             var a = new LogCapture();
             using var b = new LogCapture();
@@ -46,8 +52,8 @@ namespace osWebRtcVoice.Tests
 
             logger.LogInformation("logged while the second capture is current");
 
-            Assert.That(b.Lines.Select(l => l.Text), Does.Contain("logged while the second capture is current"));
-            Assert.That(a.Lines, Is.Empty);
+            Assert.Contains("logged while the second capture is current", b.Lines.Select(l => l.Text));
+            Assert.Empty(a.Lines);
         }
     }
 }
