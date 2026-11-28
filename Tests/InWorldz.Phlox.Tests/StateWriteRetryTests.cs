@@ -130,7 +130,7 @@ public class StateWriteRetryTests
         {
             release.Set();
         }
-        Assert.True(await written.WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.True(await written.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         Assert.False(HasRow(db, script.ItemId));
         Assert.False(m.HasSavedState(script.ItemId, compiled.AssetId));
     }

@@ -15,14 +15,13 @@
  */
 using System;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2ACallsTests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
@@ -40,44 +39,58 @@ namespace osWebRtcVoice.Tests
 
         // ---- session id ------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ComputeSessionId_IsTheViewerXor_AndSymmetric()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID ab = A2ARegistry.ComputeSessionId(Alice, Bob);
             UUID ba = A2ARegistry.ComputeSessionId(Bob, Alice);
-            Assert.That(ab, Is.EqualTo(ba), "XOR is commutative: both parties derive the same id");
-            Assert.That(ab, Is.EqualTo(new UUID(Alice.ulonga ^ Bob.ulonga, Alice.ulongb ^ Bob.ulongb)),
-                "must match the viewer's computeSessionID (llimview.cpp:2561) and the old handler's formula");
-            Assert.That(ab, Is.Not.EqualTo(UUID.Zero));
+            {
+                var assertedValue = ab;
+                TestAssert.WithMessage(() => Assert.Equal(ba, assertedValue), "XOR is commutative: both parties derive the same id");
+            }
+            {
+                var assertedValue = ab;
+                TestAssert.WithMessage(() => Assert.Equal(new UUID(Alice.ulonga ^ Bob.ulonga, Alice.ulongb ^ Bob.ulongb), assertedValue), "must match the viewer's computeSessionID (llimview.cpp:2561) and the old handler's formula");
+            }
+            Assert.NotEqual(UUID.Zero, ab);
         }
 
         // ---- record -----------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Record_CreatesInvitedSession_WithCallerCalleeAndTimestamps()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var clock = new FakeClock();
             var reg = NewRegistry(clock);
 
             A2ASession s = reg.Record(Alice, Bob, out bool created);
 
-            Assert.That(created, Is.True);
-            Assert.That(s.SessionId, Is.EqualTo(A2ARegistry.ComputeSessionId(Alice, Bob)));
-            Assert.That(s.Caller, Is.EqualTo(Alice));
-            Assert.That(s.Callee, Is.EqualTo(Bob));
-            Assert.That(s.State, Is.EqualTo(A2ASessionState.Invited));
-            Assert.That(s.Token, Is.Null, "no token until a party calls");
-            Assert.That(s.CreatedUtc, Is.EqualTo(clock.Now));
-            Assert.That(s.LastSeenUtc, Is.EqualTo(clock.Now));
-            Assert.That(s.ChannelUri, Is.EqualTo(s.SessionId.ToString()));
-            Assert.That(reg.Count, Is.EqualTo(1));
-            Assert.That(reg.TryGet(s.SessionId), Has.Property("SessionId").EqualTo(s.SessionId));
-            Assert.That(reg.TryGetByChannel(s.ChannelUri), Has.Property("SessionId").EqualTo(s.SessionId), "lookup by the provision's channel string");
+            Assert.True(created);
+            Assert.Equal(A2ARegistry.ComputeSessionId(Alice, Bob), s.SessionId);
+            Assert.Equal(Alice, s.Caller);
+            Assert.Equal(Bob, s.Callee);
+            Assert.Equal(A2ASessionState.Invited, s.State);
+            {
+                var assertedValue = s.Token;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no token until a party calls");
+            }
+            Assert.Equal(clock.Now, s.CreatedUtc);
+            Assert.Equal(clock.Now, s.LastSeenUtc);
+            Assert.Equal(s.SessionId.ToString(), s.ChannelUri);
+            Assert.Equal(1, reg.Count);
+            Assert.Equal(s.SessionId, reg.TryGet(s.SessionId).SessionId);
+            {
+                var assertedValue = reg.TryGetByChannel(s.ChannelUri);
+                TestAssert.WithMessage(() => Assert.Equal(s.SessionId, assertedValue.SessionId), "lookup by the provision's channel string");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Record_SamePairAgain_RefreshesNotDuplicates_AndKeepsToken()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var clock = new FakeClock();
             var reg = NewRegistry(clock);
             A2ASession first = reg.Record(Alice, Bob, out _);
@@ -86,110 +99,142 @@ namespace osWebRtcVoice.Tests
             clock.Now = clock.Now.AddSeconds(30);
             A2ASession again = reg.Record(Alice, Bob, out bool created);
 
-            Assert.That(created, Is.False);
-            Assert.That(again, Has.Property("SessionId").EqualTo(first.SessionId));
-            Assert.That(again.LastSeenUtc, Is.EqualTo(clock.Now), "a retry refreshes the TTL");
-            Assert.That(again.Token, Is.EqualTo(token), "a retry must not invalidate credentials already handed out");
-            Assert.That(reg.Count, Is.EqualTo(1));
+            Assert.False(created);
+            Assert.Equal(first.SessionId, again.SessionId);
+            {
+                var assertedValue = again.LastSeenUtc;
+                TestAssert.WithMessage(() => Assert.Equal(clock.Now, assertedValue), "a retry refreshes the TTL");
+            }
+            {
+                var assertedValue = again.Token;
+                TestAssert.WithMessage(() => Assert.Equal(token, assertedValue), "a retry must not invalidate credentials already handed out");
+            }
+            Assert.Equal(1, reg.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Record_FromTheOtherDirection_IsTheSameSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var clock = new FakeClock();
             var reg = NewRegistry(clock);
             A2ASession ab = reg.Record(Alice, Bob, out _);
             A2ASession ba = reg.Record(Bob, Alice, out bool created);
 
-            Assert.That(created, Is.False);
-            Assert.That(ba, Has.Property("SessionId").EqualTo(ab.SessionId));
-            Assert.That(ab.IsParty(Alice) && ab.IsParty(Bob), Is.True);
-            Assert.That(ab.OtherParty(Alice), Is.EqualTo(Bob));
-            Assert.That(ab.OtherParty(Bob), Is.EqualTo(Alice));
-            Assert.That(ab.OtherParty(Carol), Is.EqualTo(UUID.Zero));
+            Assert.False(created);
+            Assert.Equal(ab.SessionId, ba.SessionId);
+            Assert.True(ab.IsParty(Alice) && ab.IsParty(Bob));
+            Assert.Equal(Bob, ab.OtherParty(Alice));
+            Assert.Equal(Alice, ab.OtherParty(Bob));
+            Assert.Equal(UUID.Zero, ab.OtherParty(Carol));
         }
 
         // ---- token ------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void IssueToken_MintsOnce_ForEitherParty_AndRefusesStrangers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var clock = new FakeClock();
             var reg = NewRegistry(clock);
             A2ASession s = reg.Record(Alice, Bob, out _);
 
             A2ASession byAlice = reg.IssueToken(s.SessionId, Alice);
-            Assert.That(byAlice, Has.Property("SessionId").EqualTo(s.SessionId));
-            Assert.That(byAlice.Token, Is.Not.Null.And.Length.EqualTo(A2ARegistry.TokenBytes * 2), "32 random bytes as lowercase hex");
-            Assert.That(byAlice.Token, Does.Match("^[0-9a-f]+$"));
+            Assert.Equal(s.SessionId, byAlice.SessionId);
+            {
+                var assertedValue = byAlice.Token;
+                TestAssert.WithMessage(() =>
+                {
+                    Assert.NotNull(assertedValue);
+                    Assert.Equal(A2ARegistry.TokenBytes * 2, assertedValue.Length);
+                }, "32 random bytes as lowercase hex");
+            }
+            Assert.Matches("^[0-9a-f]+$", byAlice.Token);
 
             A2ASession byBob = reg.IssueToken(s.SessionId, Bob);
-            Assert.That(byBob.Token, Is.EqualTo(byAlice.Token), "one token per session, shared by both parties");
+            {
+                var assertedValue = byBob.Token;
+                TestAssert.WithMessage(() => Assert.Equal(byAlice.Token, assertedValue), "one token per session, shared by both parties");
+            }
 
-            Assert.That(reg.IssueToken(s.SessionId, Carol), Is.Null, "a non-party gets nothing");
-            Assert.That(reg.IssueToken(UUID.Random(), Alice), Is.Null, "an unknown session gets nothing");
+            {
+                var assertedValue = reg.IssueToken(s.SessionId, Carol);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "a non-party gets nothing");
+            }
+            {
+                var assertedValue = reg.IssueToken(UUID.Random(), Alice);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "an unknown session gets nothing");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Tokens_AreUniquePerSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = NewRegistry(new FakeClock());
             A2ASession ab = reg.Record(Alice, Bob, out _);
             A2ASession ac = reg.Record(Alice, Carol, out _);
             string t1 = reg.IssueToken(ab.SessionId, Alice).Token;
             string t2 = reg.IssueToken(ac.SessionId, Alice).Token;
-            Assert.That(t1, Is.Not.EqualTo(t2));
+            Assert.NotEqual(t2, t1);
         }
 
         // ---- decline / remove ---------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Remove_DropsTheRecord_AndIsFalseWhenAbsent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = NewRegistry(new FakeClock());
             A2ASession s = reg.Record(Alice, Bob, out _);
-            Assert.That(reg.Remove(s.SessionId), Is.True);
-            Assert.That(reg.TryGet(s.SessionId), Is.Null);
-            Assert.That(reg.Count, Is.EqualTo(0));
-            Assert.That(reg.Remove(s.SessionId), Is.False, "declining an absent invitation is a no-op");
-            Assert.That(reg.Remove(UUID.Random()), Is.False);
+            Assert.True(reg.Remove(s.SessionId));
+            Assert.Null(reg.TryGet(s.SessionId));
+            Assert.Equal(0, reg.Count);
+            Assert.False(reg.Remove(s.SessionId), "declining an absent invitation is a no-op");
+            Assert.False(reg.Remove(UUID.Random()));
         }
 
         // ---- TTL --------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void UnansweredInvitation_ExpiresAfterTtl_ButNotBefore()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var clock = new FakeClock();
             var reg = NewRegistry(clock, TimeSpan.FromMinutes(2));
             A2ASession s = reg.Record(Alice, Bob, out _);
 
             clock.Now = clock.Now.AddMinutes(2);                 // exactly at TTL: still alive
-            Assert.That(reg.TryGet(s.SessionId), Is.Not.Null);
+            Assert.NotNull(reg.TryGet(s.SessionId));
 
             clock.Now = clock.Now.AddSeconds(1);                 // past TTL: swept
-            Assert.That(reg.TryGet(s.SessionId), Is.Null);
-            Assert.That(reg.Count, Is.EqualTo(0));
-            Assert.That(reg.IssueToken(s.SessionId, Alice), Is.Null, "an expired invitation cannot be called");
+            Assert.Null(reg.TryGet(s.SessionId));
+            Assert.Equal(0, reg.Count);
+            {
+                var assertedValue = reg.IssueToken(s.SessionId, Alice);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "an expired invitation cannot be called");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Activity_RefreshesTtl()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var clock = new FakeClock();
             var reg = NewRegistry(clock, TimeSpan.FromMinutes(2));
             A2ASession s = reg.Record(Alice, Bob, out _);
             clock.Now = clock.Now.AddMinutes(1.5);
             reg.IssueToken(s.SessionId, Alice);                  // the caller's "call" refreshes
             clock.Now = clock.Now.AddMinutes(1.5);               // 3.0 after record, 1.5 after the call
-            Assert.That(reg.TryGet(s.SessionId), Is.Not.Null);
+            Assert.NotNull(reg.TryGet(s.SessionId));
             clock.Now = clock.Now.AddMinutes(0.6);
-            Assert.That(reg.TryGet(s.SessionId), Is.Null);
+            Assert.Null(reg.TryGet(s.SessionId));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Registry_IsSafeUnderConcurrentUse()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             var threads = new System.Threading.Thread[8];
             Exception failure = null;
@@ -214,11 +259,10 @@ namespace osWebRtcVoice.Tests
                 threads[i].Start();
             }
             foreach (var t in threads) t.Join();
-            Assert.That(failure, Is.Null);
+            Assert.Null(failure);
         }
     }
 
-    [TestFixture]
     public class ChatSessionRequestLogicTests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
@@ -246,138 +290,195 @@ namespace osWebRtcVoice.Tests
 
         // ---- "start p2p voice" ----------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StartP2PVoice_WithParams_RecordsPair_AndEchoesTheViewerSessionId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(Xor, OSD.FromUUID(Bob)), Alice, reg);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(o.Body, Is.Null, "no HTTP body; the reply is an event");
-            Assert.That(o.Reply, Is.Not.Null);
-            Assert.That(o.Reply.SessionId, Is.EqualTo(Xor), "session_id = the XOR");
-            Assert.That(o.Reply.TempSessionId, Is.EqualTo(Xor), "temp_session_id echoes the viewer's session-id (llimview.cpp:4881)");
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            {
+                var assertedValue = o.Body;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no HTTP body; the reply is an event");
+            }
+            Assert.NotNull(o.Reply);
+            {
+                var assertedValue = o.Reply.SessionId;
+                TestAssert.WithMessage(() => Assert.Equal(Xor, assertedValue), "session_id = the XOR");
+            }
+            {
+                var assertedValue = o.Reply.TempSessionId;
+                TestAssert.WithMessage(() => Assert.Equal(Xor, assertedValue), "temp_session_id echoes the viewer's session-id (llimview.cpp:4881)");
+            }
             A2ASession s = reg.TryGet(Xor);
-            Assert.That(s, Is.Not.Null);
-            Assert.That(s.Caller, Is.EqualTo(Alice));
-            Assert.That(s.Callee, Is.EqualTo(Bob));
-            Assert.That(o.Instrument, Does.StartWith(ChatSessionRequestLogic.InstrumentTag).And.Contain("decision=recorded").And.Contain("match=true"));
+            Assert.NotNull(s);
+            Assert.Equal(Alice, s.Caller);
+            Assert.Equal(Bob, s.Callee);
+            {
+                var assertedValue = o.Instrument;
+                Assert.StartsWith(ChatSessionRequestLogic.InstrumentTag, assertedValue);
+                Assert.Contains("decision=recorded", assertedValue);
+                Assert.Contains("match=true", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StartP2PVoice_ParamsAbsent_Is400_NothingRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(Xor), Alice, reg);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.BadRequest), "replaces the UUID.Random() fallback");
-            Assert.That(o.Reply, Is.Null);
-            Assert.That(reg.Count, Is.EqualTo(0));
-            Assert.That(o.Instrument, Does.Contain("decision=refused-400").And.Contain("params"));
+            {
+                var assertedValue = o.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.BadRequest, assertedValue), "replaces the UUID.Random() fallback");
+            }
+            Assert.Null(o.Reply);
+            Assert.Equal(0, reg.Count);
+            {
+                var assertedValue = o.Instrument;
+                Assert.Contains("decision=refused-400", assertedValue);
+                Assert.Contains("params", assertedValue);
+            }
         }
 
-        [TestCase("not-a-uuid")]
-        [TestCase("")]
+        [InlineData("not-a-uuid")]
+        [InlineData("")]
+        [Theory(Timeout = 60000)]
         public void StartP2PVoice_ParamsUnparseable_Is400(string bad)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(Xor, OSD.FromString(bad)), Alice, reg);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.BadRequest));
-            Assert.That(reg.Count, Is.EqualTo(0));
+            Assert.Equal(HttpStatusCode.BadRequest, o.Status);
+            Assert.Equal(0, reg.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StartP2PVoice_ParamsIsSelf_Is400()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(Alice, OSD.FromUUID(Alice)), Alice, reg);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.BadRequest));
-            Assert.That(reg.Count, Is.EqualTo(0));
+            Assert.Equal(HttpStatusCode.BadRequest, o.Status);
+            Assert.Equal(0, reg.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StartP2PVoice_ViewerSessionIdMismatch_StillRecords_ButInstrumentSaysSo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The sim derives the id itself; a viewer sending a different session-id still gets its echo
             // (temp_session_id) so it can re-key (llimview.cpp:1712-1716), and the instrument flags it.
             var reg = new A2ARegistry();
             UUID odd = UUID.Random();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(odd, OSD.FromUUID(Bob)), Alice, reg);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(o.Reply.SessionId, Is.EqualTo(Xor));
-            Assert.That(o.Reply.TempSessionId, Is.EqualTo(odd));
-            Assert.That(o.Instrument, Does.Contain("match=false"));
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            Assert.Equal(Xor, o.Reply.SessionId);
+            Assert.Equal(odd, o.Reply.TempSessionId);
+            Assert.Contains("match=false", o.Instrument);
         }
 
         // ---- "call" -----------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Call_ByAParty_Returns200_WithVoiceCredentialsInTheBody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             ChatSessionRequestLogic.Decide(StartBody(Xor, OSD.FromUUID(Bob)), Alice, reg);
 
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(Xor), Alice, reg);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(o.Reply, Is.Null, "call is answered in the HTTP body, not by event (llvoicechannel.cpp:687)");
-            Assert.That(o.Body, Is.Not.Null);
-            Assert.That(o.Body.ContainsKey("voice_credentials"), Is.True);
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            {
+                var assertedValue = o.Reply;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "call is answered in the HTTP body, not by event (llvoicechannel.cpp:687)");
+            }
+            Assert.NotNull(o.Body);
+            Assert.True(o.Body.ContainsKey("voice_credentials"));
             OSDMap creds = (OSDMap)o.Body["voice_credentials"];
             // The viewer's caller stores this map as mChannelInfo and routes/compares by
             // voice_server_type (llvoicechannel.cpp:687, :465-469; llvoicewebrtc.cpp:1682-1687).
-            Assert.That(creds["voice_server_type"].AsString(), Is.EqualTo("webrtc"));
-            Assert.That(creds.ContainsKey("sip_uri"), Is.False);
-            Assert.That(creds["channel_uri"].AsString(), Is.EqualTo(Xor.ToString()), "channel_uri = the XOR session id as a string; becomes the provision's `channel`");
+            Assert.Equal("webrtc", creds["voice_server_type"].AsString());
+            Assert.False(creds.ContainsKey("sip_uri"));
+            {
+                var assertedValue = creds["channel_uri"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal(Xor.ToString(), assertedValue), "channel_uri = the XOR session id as a string; becomes the provision's `channel`");
+            }
             string token = creds["channel_credentials"].AsString();
-            Assert.That(token, Is.EqualTo(reg.TryGet(Xor).Token).And.Length.EqualTo(64));
-            Assert.That(o.Instrument, Does.Contain("decision=credentials-issued").And.Not.Contain(token), "the token never appears in the log");
+            {
+                var assertedValue = token;
+                Assert.Equal(reg.TryGet(Xor).Token, assertedValue);
+                Assert.Equal(64, assertedValue.Length);
+            }
+            {
+                var assertedValue = o.Instrument;
+                TestAssert.WithMessage(() =>
+                {
+                    Assert.Contains("decision=credentials-issued", assertedValue);
+                    Assert.DoesNotContain(token, assertedValue);
+                }, "the token never appears in the log");
+            }
 
             // The callee's own "call" (after it accepts) yields the SAME credentials
             ChatSessionOutcome byBob = ChatSessionRequestLogic.Decide(CallBody(Xor), Bob, reg);
-            Assert.That(((OSDMap)byBob.Body["voice_credentials"])["channel_credentials"].AsString(), Is.EqualTo(token));
+            Assert.Equal(token, ((OSDMap)byBob.Body["voice_credentials"])["channel_credentials"].AsString());
 
             // and the body serialises as LLSD XML the way the handler will send it
             string xml = OSDParser.SerializeLLSDXmlString(o.Body);
-            Assert.That(xml, Does.Contain("voice_credentials").And.Contain("channel_uri").And.Contain("channel_credentials"));
+            {
+                var assertedValue = xml;
+                Assert.Contains("voice_credentials", assertedValue);
+                Assert.Contains("channel_uri", assertedValue);
+                Assert.Contains("channel_credentials", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Call_WithoutInvitation_Is404_NoBody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(Xor), Alice, reg);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.NotFound));
-            Assert.That(o.Body, Is.Null);
-            Assert.That(o.Instrument, Does.Contain("decision=refused-404"));
+            Assert.Equal(HttpStatusCode.NotFound, o.Status);
+            Assert.Null(o.Body);
+            Assert.Contains("decision=refused-404", o.Instrument);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Call_ByAStranger_Is403()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // A live invitation session that the caller is not a party of is 403, distinct from 404 unknown.
             var reg = new A2ARegistry();
             ChatSessionRequestLogic.Decide(StartBody(Xor, OSD.FromUUID(Bob)), Alice, reg);
             UUID carol = UUID.Random();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(Xor), carol, reg);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(o.Instrument, Does.Contain("decision=refused-403"));
-            Assert.That(reg.TryGet(Xor).Token, Is.Null, "a stranger's call mints nothing");
+            Assert.Equal(HttpStatusCode.Forbidden, o.Status);
+            Assert.Contains("decision=refused-403", o.Instrument);
+            {
+                var assertedValue = reg.TryGet(Xor).Token;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "a stranger's call mints nothing");
+            }
         }
 
         // ---- the rest of the switch: stubs (decline p2p voice has real behaviour, see A2ALifecycleTests) --
 
-        [TestCase("decline invitation")]
-        [TestCase("start conference")]
+        [InlineData("decline invitation")]
+        [InlineData("start conference")]
+        [Theory(Timeout = 60000)]
         public void Stubs_Return200_NoBody(string method)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             var m = new OSDMap { ["method"] = OSD.FromString(method), ["session-id"] = OSD.FromUUID(Xor) };
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(m, Alice, reg);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(o.Body, Is.Null);
-            Assert.That(o.Reply, Is.Null);
-            Assert.That(o.Instrument, Does.Contain("decision=stub-ok"));
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            Assert.Null(o.Body);
+            Assert.Null(o.Reply);
+            Assert.Contains("decision=stub-ok", o.Instrument);
         }
 
         /// <summary>
@@ -391,37 +492,49 @@ namespace osWebRtcVoice.Tests
         /// branch is a silent no-op ("Empty history from chat server, nothing to add", :852-855).
         /// It says "none", which is true, in the one shape that says it without being malformed.
         /// </summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public void FetchHistory_AnswersAnEmptyArray_NotAnEmptyBody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             var m = new OSDMap { ["method"] = OSD.FromString("fetch history"), ["session-id"] = OSD.FromUUID(Xor) };
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(m, Alice, reg);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(o.BodyArray, Is.Not.Null, "an ARRAY, or the viewer logs 'Bad array data'");
-            Assert.That(o.BodyArray.Count, Is.EqualTo(0), "we keep no history; empty is the truthful answer");
-            Assert.That(o.Body, Is.Null, "a MAP here would take the viewer's bad-data branch");
-            Assert.That(o.Reply, Is.Null);
-            Assert.That(o.Instrument, Does.Contain("decision=history-empty"));
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            {
+                var assertedValue = o.BodyArray;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "an ARRAY, or the viewer logs 'Bad array data'");
+            }
+            {
+                var assertedValue = o.BodyArray.Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "we keep no history; empty is the truthful answer");
+            }
+            {
+                var assertedValue = o.Body;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "a MAP here would take the viewer's bad-data branch");
+            }
+            Assert.Null(o.Reply);
+            Assert.Contains("decision=history-empty", o.Instrument);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void UnknownMethod_Is400_MissingFields_Are404_NoBody_Is204()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
-            Assert.That(ChatSessionRequestLogic.Decide(new OSDMap { ["method"] = OSD.FromString("nope"), ["session-id"] = OSD.FromUUID(Xor) }, Alice, reg).Status, Is.EqualTo(HttpStatusCode.BadRequest));
-            Assert.That(ChatSessionRequestLogic.Decide(new OSDMap { ["session-id"] = OSD.FromUUID(Xor) }, Alice, reg).Status, Is.EqualTo(HttpStatusCode.NotFound));
-            Assert.That(ChatSessionRequestLogic.Decide(new OSDMap { ["method"] = OSD.FromString("call") }, Alice, reg).Status, Is.EqualTo(HttpStatusCode.NotFound));
-            Assert.That(ChatSessionRequestLogic.Decide(null, Alice, reg).Status, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.Equal(HttpStatusCode.BadRequest, ChatSessionRequestLogic.Decide(new OSDMap { ["method"] = OSD.FromString("nope"), ["session-id"] = OSD.FromUUID(Xor) }, Alice, reg).Status);
+            Assert.Equal(HttpStatusCode.NotFound, ChatSessionRequestLogic.Decide(new OSDMap { ["session-id"] = OSD.FromUUID(Xor) }, Alice, reg).Status);
+            Assert.Equal(HttpStatusCode.NotFound, ChatSessionRequestLogic.Decide(new OSDMap { ["method"] = OSD.FromString("call") }, Alice, reg).Status);
+            Assert.Equal(HttpStatusCode.NoContent, ChatSessionRequestLogic.Decide(null, Alice, reg).Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MethodMatching_IsCaseInsensitive_LikeTheOldSwitch()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             var m = new OSDMap { ["method"] = OSD.FromString("Start P2P Voice"), ["session-id"] = OSD.FromUUID(Xor), ["params"] = OSD.FromUUID(Bob) };
-            Assert.That(ChatSessionRequestLogic.Decide(m, Alice, reg).Status, Is.EqualTo(HttpStatusCode.OK));
+            Assert.Equal(HttpStatusCode.OK, ChatSessionRequestLogic.Decide(m, Alice, reg).Status);
         }
     }
 }

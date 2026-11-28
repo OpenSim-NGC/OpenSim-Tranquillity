@@ -13,7 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice.NonSpatial;
@@ -21,7 +21,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class CallMuteEnforcementTests
     {
         private static readonly UUID Group = NonSpatialIdentityTests.Group;
@@ -37,40 +36,43 @@ namespace osWebRtcVoice.Tests
         private static Func<UUID, bool> AliceModerates => a => a == Alice;
 
         private static void AssertColumns(Dictionary<UUID, IReadOnlyCollection<UUID>> columns, UUID listener, params UUID[] sources)
-            => Assert.That(columns[listener], Is.EquivalentTo(sources), "column of " + listener);
+            => TestAssert.WithMessage(() => { Assert.Equivalent(sources, columns[listener], strict: true); }, "column of " + listener);
 
         // ---- the columns ----------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMutedMemberIsInEveryonesColumn_ItsOwnIncluded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             NonSpatialVoiceSession s = ThreeInRoom(e);
             e.Moderate(Group, Alice, ModerationOp.VoiceMute, Bob, true);
 
             var columns = CallMuteColumns.Build(s, AliceModerates);
 
-            Assert.That(columns.Keys, Is.EquivalentTo(new[] { Alice, Bob, Carol }));
+            Assert.Equivalent(new[] { Alice, Bob, Carol }, columns.Keys, strict: true);
             AssertColumns(columns, Alice, Bob);
             AssertColumns(columns, Bob, Bob);
             AssertColumns(columns, Carol, Bob);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenNobodyIsMutedEveryColumnIsEmpty_SoARepeatClearsWhatWasSet()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             NonSpatialVoiceSession s = ThreeInRoom(e);
 
             var columns = CallMuteColumns.Build(s, AliceModerates);
 
-            Assert.That(columns.Values.All(c => c.Count == 0), Is.True);
-            Assert.That(columns.Count, Is.EqualTo(3));
+            Assert.True(columns.Values.All(c => c.Count == 0));
+            Assert.Equal(3, columns.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MuteAllSilencesEveryoneButTheModerator_AndALetSpeakMemberIsLeftOut()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             NonSpatialVoiceSession s = ThreeInRoom(e);
             e.Moderate(Group, Alice, ModerationOp.VoiceModerated, UUID.Zero, true);
@@ -83,9 +85,10 @@ namespace osWebRtcVoice.Tests
             AssertColumns(columns, Carol, Bob);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlyMembersHoldingASeatHaveAColumn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine();
             NonSpatialVoiceSession s = ThreeInRoom(e);
             e.Depart(Group, Carol, DepartureReason.VoiceTeardown);
@@ -93,7 +96,7 @@ namespace osWebRtcVoice.Tests
 
             var columns = CallMuteColumns.Build(e.Get(Group), AliceModerates);
 
-            Assert.That(columns.Keys, Is.EquivalentTo(new[] { Alice, Bob }));
+            Assert.Equivalent(new[] { Alice, Bob }, columns.Keys, strict: true);
             AssertColumns(columns, Alice, Bob);
         }
 
@@ -102,26 +105,35 @@ namespace osWebRtcVoice.Tests
         private static JanusPeerCtlBatchSink.SlvoiceReply Reply(string status, int muteEntries, string reason = null, bool present = true)
             => new JanusPeerCtlBatchSink.SlvoiceReply { Present = present, Status = status, MuteEntries = muteEntries, Reason = reason };
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheMixersAnswerIsReadHonestly()
         {
-            Assert.That(CallMuteColumns.Classify(PeerCtlSendResult.Ok, Reply("applied", 3), 3), Is.EqualTo(ParticipantMuteResult.Applied));
-            Assert.That(CallMuteColumns.Classify(PeerCtlSendResult.Ok, Reply("applied", 0), 3), Is.EqualTo(ParticipantMuteResult.Unsupported),
-                        "a mixer that parsed no mute entries has no mute channel");
-            Assert.That(CallMuteColumns.Classify(PeerCtlSendResult.Ok, default, 3), Is.EqualTo(ParticipantMuteResult.Unsupported),
-                        "an old mixer answers nothing about it");
-            Assert.That(CallMuteColumns.Classify(PeerCtlSendResult.Ok, Reply("error", 0, "unknown_room"), 3), Is.EqualTo(ParticipantMuteResult.NotInRoom));
-            Assert.That(CallMuteColumns.Classify(PeerCtlSendResult.Ok, Reply("error", 0, "bad_request"), 3), Is.EqualTo(ParticipantMuteResult.Failed));
-            Assert.That(CallMuteColumns.Classify(PeerCtlSendResult.TransportError, default, 3), Is.EqualTo(ParticipantMuteResult.Failed));
-            Assert.That(CallMuteColumns.Classify(PeerCtlSendResult.ProtocolError, default, 3), Is.EqualTo(ParticipantMuteResult.Failed));
-            Assert.That(CallMuteColumns.Classify(PeerCtlSendResult.Ok, default, 0), Is.EqualTo(ParticipantMuteResult.Applied), "no one to tell");
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(ParticipantMuteResult.Applied, CallMuteColumns.Classify(PeerCtlSendResult.Ok, Reply("applied", 3), 3));
+            {
+                var assertedValue = CallMuteColumns.Classify(PeerCtlSendResult.Ok, Reply("applied", 0), 3);
+                TestAssert.WithMessage(() => Assert.Equal(ParticipantMuteResult.Unsupported, assertedValue), "a mixer that parsed no mute entries has no mute channel");
+            }
+            {
+                var assertedValue = CallMuteColumns.Classify(PeerCtlSendResult.Ok, default, 3);
+                TestAssert.WithMessage(() => Assert.Equal(ParticipantMuteResult.Unsupported, assertedValue), "an old mixer answers nothing about it");
+            }
+            Assert.Equal(ParticipantMuteResult.NotInRoom, CallMuteColumns.Classify(PeerCtlSendResult.Ok, Reply("error", 0, "unknown_room"), 3));
+            Assert.Equal(ParticipantMuteResult.Failed, CallMuteColumns.Classify(PeerCtlSendResult.Ok, Reply("error", 0, "bad_request"), 3));
+            Assert.Equal(ParticipantMuteResult.Failed, CallMuteColumns.Classify(PeerCtlSendResult.TransportError, default, 3));
+            Assert.Equal(ParticipantMuteResult.Failed, CallMuteColumns.Classify(PeerCtlSendResult.ProtocolError, default, 3));
+            {
+                var assertedValue = CallMuteColumns.Classify(PeerCtlSendResult.Ok, default, 0);
+                TestAssert.WithMessage(() => Assert.Equal(ParticipantMuteResult.Applied, assertedValue), "no one to tell");
+            }
         }
 
         // ---- the batch to one room ---------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheBatchGoesToTheNamedRoomOnly_NotToTheEstateRoomOrWhereTheTableSaysAnAgentIs()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             List<OSDMap> sent = new();
             JanusPeerCtlBatchSink sink = new JanusPeerCtlBatchSink("http://gateway.example.org:7188/admin", "token", TimeSpan.FromSeconds(1),
                 UUID.Random(), "Test Region", 1,
@@ -137,23 +149,24 @@ namespace osWebRtcVoice.Tests
 
             (PeerCtlSendResult result, JanusPeerCtlBatchSink.SlvoiceReply reply) = await sink.SendToRoomAsync(777, VisOp.Replace, null, mute);
 
-            Assert.That(sent, Has.Count.EqualTo(1));
+            Assert.Single(sent);
             OSDMap body = sent[0];
-            Assert.That(body["request"].AsString(), Is.EqualTo("peer_ctl_batch"));
-            Assert.That(body["op"].AsString(), Is.EqualTo("replace"));
-            Assert.That(body["room"].AsInteger(), Is.EqualTo(777));
-            Assert.That(((OSDMap)body["excl"]).Count, Is.EqualTo(0));
+            Assert.Equal("peer_ctl_batch", body["request"].AsString());
+            Assert.Equal("replace", body["op"].AsString());
+            Assert.Equal(777, body["room"].AsInteger());
+            Assert.Empty(((OSDMap)body["excl"]));
             OSDMap muteMap = (OSDMap)body["mute"];
-            Assert.That(muteMap.Keys, Is.EquivalentTo(new[] { listener.ToString(), source.ToString() }));
-            Assert.That(((OSDArray)muteMap[listener.ToString()]).Select(o => o.AsString()), Is.EqualTo(new[] { source.ToString() }));
-            Assert.That(body.ContainsKey("room_epoch"), Is.False, "a call's room is not under the visibility authority");
-            Assert.That(result, Is.EqualTo(PeerCtlSendResult.Ok));
-            Assert.That(reply.MuteEntries, Is.EqualTo(2));
+            Assert.Equivalent(new[] { listener.ToString(), source.ToString() }, muteMap.Keys, strict: true);
+            Assert.Equal(new[] { source.ToString() }, ((OSDArray)muteMap[listener.ToString()]).Select(o => o.AsString()));
+            Assert.False(body.ContainsKey("room_epoch"), "a call's room is not under the visibility authority");
+            Assert.Equal(PeerCtlSendResult.Ok, result);
+            Assert.Equal(2, reply.MuteEntries);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AnEmptyColumnIsSentAsAnEmptyList_ItClearsThatListener()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             List<OSDMap> sent = new();
             JanusPeerCtlBatchSink sink = new JanusPeerCtlBatchSink("http://gateway.example.org:7188/admin", "token", TimeSpan.FromSeconds(1),
                 UUID.Random(), "Test Region", 1, req => { sent.Add(req); return Task.FromResult((AdminSendResult.Ok, "{}")); });
@@ -161,7 +174,7 @@ namespace osWebRtcVoice.Tests
 
             await sink.SendToRoomAsync(5, VisOp.Replace, null, new Dictionary<UUID, IReadOnlyCollection<UUID>> { [listener] = new List<UUID>() });
 
-            Assert.That(((OSDArray)((OSDMap)sent[0]["mute"])[listener.ToString()]).Count, Is.EqualTo(0));
+            Assert.Empty(((OSDArray)((OSDMap)sent[0]["mute"])[listener.ToString()]));
         }
     }
 }

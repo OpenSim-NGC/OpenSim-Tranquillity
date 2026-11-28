@@ -26,10 +26,8 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // the per-room create gates are process-wide statics
-    public class EmptyRoomReaperTests
-    {
+    public class EmptyRoomReaperTests : IAsyncLifetime
+        {
         // ---- the sweep rules ---------------------------------------------------------------------------
 
         private sealed class Rig
@@ -58,9 +56,10 @@ namespace osWebRtcVoice.Tests
                 });
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task R1_ARoomEmptyForTheGracePeriod_IsRemoved_NotBefore()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig(60);
             rig.Counts[7] = 0;
             rig.Reaper.NoteCreated(7);
@@ -68,19 +67,23 @@ namespace osWebRtcVoice.Tests
             await rig.Sweep();                       // first sight of the empty room: the grace starts here
             rig.Now += 59_000;
             await rig.Sweep();
-            Assert.That(rig.Destroyed, Is.Empty, "59 s after it was first seen empty");
+            {
+                var assertedValue = rig.Destroyed;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "59 s after it was first seen empty");
+            }
 
             rig.Now += 1_000;
             int removed = await rig.Sweep();
 
-            Assert.That(rig.Destroyed, Is.EqualTo(new[] { 7 }));
-            Assert.That(removed, Is.EqualTo(1));
-            Assert.That(rig.Reaper.IsTracked(7), Is.False, "and it is forgotten");
+            Assert.Equal(new[] { 7 }, rig.Destroyed);
+            Assert.Equal(1, removed);
+            Assert.False(rig.Reaper.IsTracked(7), "and it is forgotten");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task R2_ARoomWithSomeoneInIt_IsNeverRemoved_AndItsGraceRestartsWhenItEmpties()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig(60);
             rig.Counts[7] = 0;
             rig.Reaper.NoteCreated(7);
@@ -90,21 +93,28 @@ namespace osWebRtcVoice.Tests
             await rig.Sweep();
             rig.Now += 600_000;                      // and stays a long time
             await rig.Sweep();
-            Assert.That(rig.Destroyed, Is.Empty, "occupied");
+            {
+                var assertedValue = rig.Destroyed;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "occupied");
+            }
 
             rig.Counts[7] = 0;                       // they leave
             await rig.Sweep();
             rig.Now += 59_000;
             await rig.Sweep();
-            Assert.That(rig.Destroyed, Is.Empty, "the grace counts from when it emptied, not from the old sighting");
+            {
+                var assertedValue = rig.Destroyed;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the grace counts from when it emptied, not from the old sighting");
+            }
             rig.Now += 1_000;
             await rig.Sweep();
-            Assert.That(rig.Destroyed, Is.EqualTo(new[] { 7 }));
+            Assert.Equal(new[] { 7 }, rig.Destroyed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task R3_ARoomTheServiceDidNotCreate_IsNeverRemoved()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig(0);
             rig.Counts[1234] = 0;                    // an operator's room: empty on the gateway, never reported as created
             rig.Counts[8] = 0;
@@ -114,13 +124,14 @@ namespace osWebRtcVoice.Tests
             rig.Now += 10_000;
             await rig.Sweep();
 
-            Assert.That(rig.Destroyed, Is.EqualTo(new[] { 8 }));
-            Assert.That(rig.Counts.ContainsKey(1234), Is.True, "the room nobody reported creating is still there");
+            Assert.Equal(new[] { 8 }, rig.Destroyed);
+            Assert.True(rig.Counts.ContainsKey(1234), "the room nobody reported creating is still there");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task R4_AListThatCannotBeRead_ChangesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig(0);
             rig.Counts[7] = 0;
             rig.Reaper.NoteCreated(7);
@@ -130,38 +141,40 @@ namespace osWebRtcVoice.Tests
 
             int removed = await rig.Sweep();
 
-            Assert.That(removed, Is.Zero);
-            Assert.That(rig.Destroyed, Is.Empty);
-            Assert.That(rig.Reaper.IsTracked(7), Is.True, "still watched");
+            Assert.Equal(0, removed);
+            Assert.Empty(rig.Destroyed);
+            Assert.True(rig.Reaper.IsTracked(7), "still watched");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task R5_AFailedDestroy_IsTriedAgainOnTheNextSweep()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig(0);
             rig.Counts[7] = 0;
             rig.Reaper.NoteCreated(7);
             await rig.Sweep();
             rig.Now += 1_000;
             rig.DestroyFails = true;
-            Assert.That(await rig.Sweep(), Is.Zero);
-            Assert.That(rig.Reaper.IsTracked(7), Is.True);
+            Assert.Equal(0, await rig.Sweep());
+            Assert.True(rig.Reaper.IsTracked(7));
 
             rig.DestroyFails = false;
-            Assert.That(await rig.Sweep(), Is.EqualTo(1));
-            Assert.That(rig.Destroyed, Is.EqualTo(new[] { 7 }));
+            Assert.Equal(1, await rig.Sweep());
+            Assert.Equal(new[] { 7 }, rig.Destroyed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task R6_ARoomTheGatewayNoLongerHas_IsForgotten()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig(60);
             rig.Reaper.NoteCreated(7);               // the gateway restarted: it lists nothing
 
             await rig.Sweep();
 
-            Assert.That(rig.Reaper.IsTracked(7), Is.False);
-            Assert.That(rig.Destroyed, Is.Empty);
+            Assert.False(rig.Reaper.IsTracked(7));
+            Assert.Empty(rig.Destroyed);
         }
 
         // ---- the settings ------------------------------------------------------------------------------
@@ -175,32 +188,38 @@ namespace osWebRtcVoice.Tests
             return cfg;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void C1_TheDefault_OnTheStockPlugin_IsOn()
         {
-            Assert.That(EmptyRoomReaper.DefaultEnabled, Is.True);
-            Assert.That(EmptyRoomReaper.DefaultGraceSeconds, Is.EqualTo(60));
-            Assert.That(WebRtcJanusService.CreateRoomReaper(Janus(), WebRtcJanusService.DefaultPluginName, NullLogger.Instance), Is.Not.Null);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(EmptyRoomReaper.DefaultEnabled);
+            Assert.Equal(60, EmptyRoomReaper.DefaultGraceSeconds);
+            Assert.NotNull(WebRtcJanusService.CreateRoomReaper(Janus(), WebRtcJanusService.DefaultPluginName, NullLogger.Instance));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void C2_TheKeyTurnsItOff()
         {
-            Assert.That(WebRtcJanusService.CreateRoomReaper(Janus(("RemoveEmptyRooms", "false")),
-                WebRtcJanusService.DefaultPluginName, NullLogger.Instance), Is.Null);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Null(WebRtcJanusService.CreateRoomReaper(Janus(("RemoveEmptyRooms", "false")),
+                WebRtcJanusService.DefaultPluginName, NullLogger.Instance));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void C3_TheSlvoiceMixerRemovesItsOwnRooms_SoNoReaperIsMade()
         {
-            Assert.That(WebRtcJanusService.CreateRoomReaper(Janus(), "janus.plugin.slvoice", NullLogger.Instance), Is.Null);
-            Assert.That(WebRtcJanusService.CreateRoomReaper(Janus(("RemoveEmptyRooms", "true")), "janus.plugin.slvoice", NullLogger.Instance), Is.Null,
-                "also with the key on");
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Null(WebRtcJanusService.CreateRoomReaper(Janus(), "janus.plugin.slvoice", NullLogger.Instance));
+            {
+                var assertedValue = WebRtcJanusService.CreateRoomReaper(Janus(("RemoveEmptyRooms", "true")), "janus.plugin.slvoice", NullLogger.Instance);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "also with the key on");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task C4_TheGraceSecondsKeyIsRead()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             long now = 0;
             EmptyRoomReaper reaper = WebRtcJanusService.CreateRoomReaper(Janus(("EmptyRoomGraceSeconds", "5")),
                 WebRtcJanusService.DefaultPluginName, NullLogger.Instance, () => now);
@@ -211,15 +230,16 @@ namespace osWebRtcVoice.Tests
             await reaper.SweepAsync(list, destroy);
             now = 4_999;
             await reaper.SweepAsync(list, destroy);
-            Assert.That(destroyed, Is.Empty);
+            Assert.Empty(destroyed);
             now = 5_000;
             await reaper.SweepAsync(list, destroy);
-            Assert.That(destroyed, Is.EqualTo(new[] { 3 }));
+            Assert.Equal(new[] { 3 }, destroyed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task C5_ANegativeGraceFallsBackToTheDefault()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             long now = 0;
             EmptyRoomReaper reaper = WebRtcJanusService.CreateRoomReaper(Janus(("EmptyRoomGraceSeconds", "-5")),
                 WebRtcJanusService.DefaultPluginName, NullLogger.Instance, () => now);
@@ -230,18 +250,16 @@ namespace osWebRtcVoice.Tests
             await reaper.SweepAsync(list, destroy);
             now = 59_999;
             await reaper.SweepAsync(list, destroy);
-            Assert.That(destroyed, Is.Empty);
+            Assert.Empty(destroyed);
             now = 60_000;
             await reaper.SweepAsync(list, destroy);
-            Assert.That(destroyed, Is.EqualTo(new[] { 3 }));
+            Assert.Equal(new[] { 3 }, destroyed);
         }
 
         // ---- the service against the fake gateway --------------------------------------------------------
 
         private FakeJanusGateway _gw;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _gw = new FakeJanusGateway { ModelRooms = true, ModelRoomLifecycle = true };
         }
@@ -285,7 +303,7 @@ namespace osWebRtcVoice.Tests
                 ["parcel_local_id"] = JanusAudioBridge.REGION_ROOM_ID,
             };
             OSDMap reply = await Task.Run(() => svc.ProvisionVoiceAccountRequest(vs, request, agent, region));
-            Assert.That(reply.ContainsKey("jsep"), Is.True, "precondition: joined");
+            Assert.True(reply.ContainsKey("jsep"), "precondition: joined");
             return new Caller { Session = vs, Agent = agent, Region = region };
         }
 
@@ -315,48 +333,51 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task S1_AfterTheLastLeave_TheRoomTheServiceMadeIsRemoved()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService("janus.plugin.audiobridge");
             UUID region = UUID.Random();
             int room = EstateRoomOf(region);
             Caller a = await Join(svc, region);
             Caller b = await Join(svc, region);
-            Assert.That(_gw.Rooms.ContainsKey(room), Is.True);
-            Assert.That(svc.RoomReaper.IsTracked(room), Is.True, "the create was answered 'created'");
+            Assert.True(_gw.Rooms.ContainsKey(room));
+            Assert.True(svc.RoomReaper.IsTracked(room), "the create was answered 'created'");
 
             await Leave(svc, a);
             await SweepAFewTimes(svc);
-            Assert.That(_gw.Rooms.ContainsKey(room), Is.True, "one person still in it");
+            Assert.True(_gw.Rooms.ContainsKey(room), "one person still in it");
 
             await Leave(svc, b);
             await SweepUntil(svc, () => !_gw.Rooms.ContainsKey(room));
 
-            Assert.That(_gw.Rooms.ContainsKey(room), Is.False, "removed once empty");
-            Assert.That(_gw.Destroyed, Does.Contain(room));
+            Assert.False(_gw.Rooms.ContainsKey(room), "removed once empty");
+            Assert.Contains(room, _gw.Destroyed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task S2_ARoomTheServiceDidNotCreate_IsLeftInPlace_EvenWhenEmpty()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService("janus.plugin.audiobridge");
             UUID region = UUID.Random();
             int room = EstateRoomOf(region);
             _gw.Rooms[room] = true;                  // an operator's room: the create is answered 486
             Caller a = await Join(svc, region);
-            Assert.That(svc.RoomReaper.IsTracked(room), Is.False);
+            Assert.False(svc.RoomReaper.IsTracked(room));
 
             await Leave(svc, a);
             await SweepAFewTimes(svc);
 
-            Assert.That(_gw.Rooms.ContainsKey(room), Is.True);
-            Assert.That(_gw.Destroyed, Is.Empty);
+            Assert.True(_gw.Rooms.ContainsKey(room));
+            Assert.Empty(_gw.Destroyed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task S3_AnOccupiedRoom_IsNotRemoved()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService("janus.plugin.audiobridge");
             UUID region = UUID.Random();
             int room = EstateRoomOf(region);
@@ -364,13 +385,14 @@ namespace osWebRtcVoice.Tests
 
             await SweepAFewTimes(svc);
 
-            Assert.That(_gw.Rooms.ContainsKey(room), Is.True);
-            Assert.That(_gw.Destroyed, Is.Empty);
+            Assert.True(_gw.Rooms.ContainsKey(room));
+            Assert.Empty(_gw.Destroyed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task S4_OnTheSlvoiceMixer_NothingIsRemoved_TheMixerDoesItsOwn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService("janus.plugin.slvoice");
             UUID region = UUID.Random();
             int room = EstateRoomOf(region);
@@ -379,14 +401,15 @@ namespace osWebRtcVoice.Tests
 
             await SweepAFewTimes(svc);
 
-            Assert.That(svc.RoomReaper, Is.Null);
-            Assert.That(_gw.Rooms.ContainsKey(room), Is.True, "left for the mixer's grace sweep");
-            Assert.That(_gw.Destroyed, Is.Empty);
+            Assert.Null(svc.RoomReaper);
+            Assert.True(_gw.Rooms.ContainsKey(room), "left for the mixer's grace sweep");
+            Assert.Empty(_gw.Destroyed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task S5_WithTheKeyOff_NothingIsRemoved()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService("janus.plugin.audiobridge", ("RemoveEmptyRooms", "false"));
             UUID region = UUID.Random();
             int room = EstateRoomOf(region);
@@ -395,9 +418,20 @@ namespace osWebRtcVoice.Tests
 
             await SweepAFewTimes(svc);
 
-            Assert.That(svc.RoomReaper, Is.Null);
-            Assert.That(_gw.Rooms.ContainsKey(room), Is.True);
-            Assert.That(_gw.Destroyed, Is.Empty);
+            Assert.Null(svc.RoomReaper);
+            Assert.True(_gw.Rooms.ContainsKey(room));
+            Assert.Empty(_gw.Destroyed);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

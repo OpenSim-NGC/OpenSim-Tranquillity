@@ -15,7 +15,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
@@ -24,7 +24,6 @@ using static osWebRtcVoice.Tests.CallModerationModuleTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class CallModerationCommandsTests
     {
         private static readonly UUID GroupId = new UUID("5e0c9a41-7b2d-4f86-a3c1-92d84b6e0f17");
@@ -73,22 +72,24 @@ namespace osWebRtcVoice.Tests
 
         // ---- the switch ----------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCommandsExistOnlyWhenCallModerationIsOn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region off = Region.Create();
-            Assert.That(off.Module.CallCommands, Is.Null);
+            Assert.Null(off.Module.CallCommands);
 
             (Region on, _) = Rig();
             using (on)
-                Assert.That(on.Module.CallCommands, Is.Not.Null);
+                Assert.NotNull(on.Module.CallCommands);
         }
 
         // ---- listing -------------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ShowVoiceCalls_ListsEachCallWithItsSeatsAndModeration()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig(conference: true);
             using (r)
             {
@@ -101,28 +102,41 @@ namespace osWebRtcVoice.Tests
 
                 Run(r, "show voice calls");
 
-                Assert.That(c.Lines[0], Does.Contain("2 call(s)"));
+                Assert.Contains("2 call(s)", c.Lines[0]);
                 string group = c.Lines.Single(l => l.Contains(GroupId.ToString()));
-                Assert.That(group, Does.Contain("group call").And.Contain("seats 2/").And.Contain("text-muted 1").And.Contain("removed 0"));
+                {
+                    var assertedValue = group;
+                    Assert.Contains("group call", assertedValue);
+                    Assert.Contains("seats 2/", assertedValue);
+                    Assert.Contains("text-muted 1", assertedValue);
+                    Assert.Contains("removed 0", assertedValue);
+                }
                 string conference = c.Lines.Single(l => l.Contains(conf.ToString()));
-                Assert.That(conference, Does.Contain("conference").And.Contain("voice-moderated YES").And.Contain("removed 1"));
+                {
+                    var assertedValue = conference;
+                    Assert.Contains("conference", assertedValue);
+                    Assert.Contains("voice-moderated YES", assertedValue);
+                    Assert.Contains("removed 1", assertedValue);
+                }
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ShowVoiceCalls_WithNoCall_SaysSo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
                 Run(r, "show voice calls");
-                Assert.That(c.Text, Does.Contain("No group call or conference"));
+                Assert.Contains("No group call or conference", c.Text);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ShowVoiceCall_ListsMembersWithMuteAndRemovalState_AndNeverACredential()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig(conference: true);
             using (r)
             {
@@ -141,22 +155,41 @@ namespace osWebRtcVoice.Tests
 
                 string text = c.Text;
                 string groupRow = c.Lines.Single(l => l.Contains(Member.ToString()) && l.Contains("voice MUTED"));
-                Assert.That(groupRow, Does.Contain("text MUTED").And.Contain("in voice"));
+                {
+                    var assertedValue = groupRow;
+                    Assert.Contains("text MUTED", assertedValue);
+                    Assert.Contains("in voice", assertedValue);
+                }
                 string officerRow = c.Lines.First(l => l.Contains(Officer.ToString()));
-                Assert.That(officerRow, Does.Contain("voice -").And.Contain("removal -"));
+                {
+                    var assertedValue = officerRow;
+                    Assert.Contains("voice -", assertedValue);
+                    Assert.Contains("removal -", assertedValue);
+                }
                 string removedRow = c.Lines.Single(l => l.Contains(Other.ToString()));
-                Assert.That(removedRow, Does.Contain("REMOVED by console until the call ends (too loud)"));
-                Assert.That(token, Is.Not.Empty);
-                Assert.That(text, Does.Not.Contain(token), "the group call's token is never printed");
-                Assert.That(text, Does.Not.Contain(confToken), "nor a conference's");
-                Assert.That(string.IsNullOrEmpty(textKey) || !text.Contains(textKey), Is.True, "nor its text key");
-                Assert.That(text, Does.Not.Contain("credentials").And.Not.Contain("secret"));
+                Assert.Contains("REMOVED by console until the call ends (too loud)", removedRow);
+                Assert.NotEmpty(token);
+                {
+                    var assertedValue = text;
+                    TestAssert.WithMessage(() => Assert.DoesNotContain(token, assertedValue), "the group call's token is never printed");
+                }
+                {
+                    var assertedValue = text;
+                    TestAssert.WithMessage(() => Assert.DoesNotContain(confToken, assertedValue), "nor a conference's");
+                }
+                Assert.True((string.IsNullOrEmpty(textKey) || !text.Contains(textKey)), "nor its text key");
+                {
+                    var assertedValue = text;
+                    Assert.DoesNotContain("credentials", assertedValue);
+                    Assert.DoesNotContain("secret", assertedValue);
+                }
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ShowVoiceCall_ForAnUnknownCall_OrABadId_SaysSo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
@@ -164,17 +197,18 @@ namespace osWebRtcVoice.Tests
                 Run(r, "show voice call nonsense");
                 Run(r, "show voice call");
 
-                Assert.That(c.Lines[0], Does.StartWith("No such call"));
-                Assert.That(c.Lines[1], Does.StartWith("Usage: show voice call"));
-                Assert.That(c.Lines[2], Does.StartWith("Usage:"));
+                Assert.StartsWith("No such call", c.Lines[0]);
+                Assert.StartsWith("Usage: show voice call", c.Lines[1]);
+                Assert.StartsWith("Usage:", c.Lines[2]);
             }
         }
 
         // ---- mute and unmute ------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VoiceCallMute_AndUnmute_OfOneMemberVoice_AreRecordedAndHeard()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
@@ -182,23 +216,24 @@ namespace osWebRtcVoice.Tests
 
                 Run(r, $"voice call mute {GroupId} {Member} voice");
 
-                Assert.That(c.Lines.Last(), Does.StartWith("Done:"));
-                Assert.That(r.Sessions.Get(GroupId).IsVoiceMuted(Member), Is.True);
-                Assert.That(r.Voice.Mutes, Has.Some.Matches<(UUID Agent, int Room, bool Muted)>(m => m.Agent == Member && m.Muted));
+                Assert.StartsWith("Done:", c.Lines.Last());
+                Assert.True(r.Sessions.Get(GroupId).IsVoiceMuted(Member));
+                Assert.Contains<(UUID Agent, int Room, bool Muted)>(r.Voice.Mutes, m => m.Agent == Member && m.Muted);
 
                 Run(r, $"voice call mute {GroupId} {Member} voice");
-                Assert.That(c.Lines.Last(), Does.StartWith("No change:"));
+                Assert.StartsWith("No change:", c.Lines.Last());
 
                 Run(r, $"voice call unmute {GroupId} {Member} voice");
-                Assert.That(c.Lines.Last(), Does.StartWith("Done:"));
-                Assert.That(r.Sessions.Get(GroupId).IsVoiceMuted(Member), Is.False);
-                Assert.That(r.Voice.Mutes.Last(m => m.Agent == Member).Muted, Is.False);
+                Assert.StartsWith("Done:", c.Lines.Last());
+                Assert.False(r.Sessions.Get(GroupId).IsVoiceMuted(Member));
+                Assert.False(r.Voice.Mutes.Last(m => m.Agent == Member).Muted);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VoiceCallMute_OfText_DropsTheMembersGroupChat_AndTellsThem()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
@@ -207,16 +242,17 @@ namespace osWebRtcVoice.Tests
 
                 Run(r, $"voice call mute {GroupId} {Member} text");
 
-                Assert.That(gate.MaySend(GroupId, Member), Is.False);
-                Assert.That(r.Events.Lists.Any(l => l.To == Member && l.Updates.Any(u => u.mutedText)), Is.True);
+                Assert.False(gate.MaySend(GroupId, Member));
+                Assert.Contains(r.Events.Lists, l => l.To == Member && l.Updates.Any(u => u.mutedText));
                 Run(r, $"voice call unmute {GroupId} {Member} text");
-                Assert.That(gate.MaySend(GroupId, Member), Is.True);
+                Assert.True(gate.MaySend(GroupId, Member));
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MuteAll_AndUnmuteAll_OfAGroupCall()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
@@ -224,30 +260,43 @@ namespace osWebRtcVoice.Tests
 
                 Run(r, $"voice call mute-all {GroupId}");
 
-                Assert.That(r.Sessions.Get(GroupId).VoiceModerated, Is.True);
-                Assert.That(r.Voice.Mutes.Where(m => m.Muted).Select(m => m.Agent), Does.Contain(Member).And.Not.Contain(Officer),
-                            "the moderator is not silenced");
-                Assert.That(r.Events.Modes.Any(m => m.To == Member && m.Moderated), Is.True);
+                Assert.True(r.Sessions.Get(GroupId).VoiceModerated);
+                {
+                    var assertedValue = r.Voice.Mutes.Where(m => m.Muted).Select(m => m.Agent);
+                    TestAssert.WithMessage(() =>
+                    {
+                        Assert.Contains(Member, assertedValue);
+                        Assert.DoesNotContain(Officer, assertedValue);
+                    }, "the moderator is not silenced");
+                }
+                Assert.Contains(r.Events.Modes, m => m.To == Member && m.Moderated);
 
                 Run(r, $"voice call unmute-all {GroupId}");
-                Assert.That(r.Sessions.Get(GroupId).VoiceModerated, Is.False);
-                Assert.That(r.Voice.Mutes.Last(m => m.Agent == Member).Muted, Is.False);
+                Assert.False(r.Sessions.Get(GroupId).VoiceModerated);
+                Assert.False(r.Voice.Mutes.Last(m => m.Agent == Member).Muted);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MuteAll_OfAConference_SilencesWhoJoinsAfterwardsToo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig(conference: true);
             using (r)
             {
                 UUID conf = StartConference(r);
 
                 Run(r, $"voice call mute-all {conf}");
-                Assert.That(c.Lines.Last(), Does.StartWith("Done:"));
-                Assert.That(r.Sessions.Get(conf).VoiceModerated, Is.True);
-                Assert.That(r.Voice.Mutes.Where(m => m.Muted).Select(m => m.Agent), Does.Contain(Member).And.Contain(Officer),
-                            "no conference member is a moderator");
+                Assert.StartsWith("Done:", c.Lines.Last());
+                Assert.True(r.Sessions.Get(conf).VoiceModerated);
+                {
+                    var assertedValue = r.Voice.Mutes.Where(m => m.Muted).Select(m => m.Agent);
+                    TestAssert.WithMessage(() =>
+                    {
+                        Assert.Contains(Member, assertedValue);
+                        Assert.Contains(Officer, assertedValue);
+                    }, "no conference member is a moderator");
+                }
 
                 UUID home = r.Scene.RegionInfo.RegionID;
                 r.Sessions.Accept(conf, Other, home, "vs-other");
@@ -255,14 +304,17 @@ namespace osWebRtcVoice.Tests
                 r.Voice.Mutes.Clear();
                 typeof(WebRtcVoiceRegionModule).GetMethod("SyncCallVoiceOnJoin", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(r.Module, new object[] { Other, r.Sessions.Get(conf) });
-                Assert.That(r.Voice.Mutes, Has.Some.Matches<(UUID Agent, int Room, bool Muted)>(m => m.Agent == Other && m.Muted),
-                            "whoever joins the conference afterwards is silenced");
+                {
+                    var assertedValue = r.Voice.Mutes;
+                    TestAssert.WithMessage(() => Assert.Contains<(UUID Agent, int Room, bool Muted)>(assertedValue, m => m.Agent == Other && m.Muted), "whoever joins the conference afterwards is silenced");
+                }
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AVoiceMuteOfAMemberTheRoomHasNoParticipantFor_IsRefusedAndNothingIsRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig(conference: true);
             using (r)
             {
@@ -271,15 +323,20 @@ namespace osWebRtcVoice.Tests
 
                 Run(r, $"voice call mute {conf} {Member} voice");
 
-                Assert.That(c.Lines.Last(), Does.StartWith("Not done (404)").And.Contain("target-unresolved"));
-                Assert.That(r.Sessions.Get(conf).ModerationGeneration, Is.EqualTo(0));
-                Assert.That(r.Voice.Mutes, Is.Empty);
+                {
+                    var assertedValue = c.Lines.Last();
+                    Assert.StartsWith("Not done (404)", assertedValue);
+                    Assert.Contains("target-unresolved", assertedValue);
+                }
+                Assert.Equal(0, r.Sessions.Get(conf).ModerationGeneration);
+                Assert.Empty(r.Voice.Mutes);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMuteOfSomeoneNotInTheCall_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
@@ -287,13 +344,18 @@ namespace osWebRtcVoice.Tests
 
                 Run(r, $"voice call mute {GroupId} {UUID.Random()} voice");
 
-                Assert.That(c.Lines.Last(), Does.StartWith("Not done (404)").And.Contain("target-not-in-call"));
+                {
+                    var assertedValue = c.Lines.Last();
+                    Assert.StartsWith("Not done (404)", assertedValue);
+                    Assert.Contains("target-not-in-call", assertedValue);
+                }
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AVoiceMuteWithAVoiceServerThatCannotCarryItOut_IsRefusedWith501_ButTextStillWorks()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
@@ -301,17 +363,18 @@ namespace osWebRtcVoice.Tests
                 r.Voice.Answer = ParticipantMuteResult.Unsupported;
 
                 Run(r, $"voice call mute {GroupId} {Member} voice");
-                Assert.That(c.Lines.Last(), Does.StartWith("Not done (501)"));
-                Assert.That(r.Sessions.Get(GroupId).IsVoiceMuted(Member), Is.False);
+                Assert.StartsWith("Not done (501)", c.Lines.Last());
+                Assert.False(r.Sessions.Get(GroupId).IsVoiceMuted(Member));
 
                 Run(r, $"voice call mute {GroupId} {Member} text");
-                Assert.That(c.Lines.Last(), Does.StartWith("Done:"));
+                Assert.StartsWith("Done:", c.Lines.Last());
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupModeratorMuted_FromTheConsole_IsRecordedButNeverSilenced_AndTheOutputSaysSo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
@@ -319,16 +382,17 @@ namespace osWebRtcVoice.Tests
 
                 Run(r, $"voice call mute {GroupId} {Officer} voice");
 
-                Assert.That(c.Lines.Last(), Does.Contain("never silenced"));
-                Assert.That(r.Voice.Mutes.Where(m => m.Agent == Officer).All(m => !m.Muted), Is.True);
+                Assert.Contains("never silenced", c.Lines.Last());
+                Assert.True(r.Voice.Mutes.Where(m => m.Agent == Officer).All(m => !m.Muted));
             }
         }
 
         // ---- remove and readmit ------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VoiceCallRemove_OfAConferenceMember_AndReadmit()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig(conference: true);
             using (r)
             {
@@ -336,29 +400,41 @@ namespace osWebRtcVoice.Tests
 
                 Run(r, $"voice call remove {conf} {Member} talking over the speaker");
 
-                Assert.That(c.Lines.Last(), Does.Contain("removed from call").And.Contain("1 participant(s) dropped"));
+                {
+                    var assertedValue = c.Lines.Last();
+                    Assert.Contains("removed from call", assertedValue);
+                    Assert.Contains("1 participant(s) dropped", assertedValue);
+                }
                 NonSpatialVoiceSession s = r.Sessions.Get(conf);
-                Assert.That(s.IsRemoved(Member, DateTime.UtcNow), Is.True);
-                Assert.That(s.RemovalOf(Member).Reason, Is.EqualTo("talking over the speaker"));
-                Assert.That(s.RemovalOf(Member).By, Is.EqualTo(CallModerationCommands.Operator));
-                Assert.That(s.ChatMembers(), Does.Not.Contain(Member), "removed from the conference text");
-                Assert.That(r.Events.Closes, Has.Some.Matches<(UUID To, UUID Session, string Reason)>(x => x.To == Member && x.Session == conf));
+                Assert.True(s.IsRemoved(Member, DateTime.UtcNow));
+                Assert.Equal("talking over the speaker", s.RemovalOf(Member).Reason);
+                Assert.Equal(CallModerationCommands.Operator, s.RemovalOf(Member).By);
+                {
+                    var assertedValue = s.ChatMembers();
+                    TestAssert.WithMessage(() => Assert.DoesNotContain(Member, assertedValue), "removed from the conference text");
+                }
+                Assert.Contains<(UUID To, UUID Session, string Reason)>(r.Events.Closes, x => x.To == Member && x.Session == conf);
 
                 Run(r, $"voice call remove {conf} {Member}");
-                Assert.That(c.Lines.Last(), Does.Contain("already removed"));
+                Assert.Contains("already removed", c.Lines.Last());
 
                 Run(r, $"voice call readmit {conf} {Member}");
-                Assert.That(c.Lines.Last(), Does.Contain("may join call").And.Contain("not seated"));
-                Assert.That(r.Sessions.Accept(conf, Member, r.Scene.RegionInfo.RegionID).Ok, Is.True);
+                {
+                    var assertedValue = c.Lines.Last();
+                    Assert.Contains("may join call", assertedValue);
+                    Assert.Contains("not seated", assertedValue);
+                }
+                Assert.True(r.Sessions.Accept(conf, Member, r.Scene.RegionInfo.RegionID).Ok);
 
                 Run(r, $"voice call readmit {conf} {Member}");
-                Assert.That(c.Lines.Last(), Does.Contain("was not removed"));
+                Assert.Contains("was not removed", c.Lines.Last());
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VoiceCallRemove_OfAGroupMember_LeavesTheGroupsText()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
@@ -367,19 +443,20 @@ namespace osWebRtcVoice.Tests
 
                 Run(r, $"voice call remove {GroupId} {Member}");
 
-                Assert.That(c.Lines.Last(), Does.Contain("removed from call"));
-                Assert.That(r.Sessions.Get(GroupId).RemovalOf(Member).Reason, Is.EqualTo("removed from the console"));
-                Assert.That(r.Sessions.Get(GroupId).Find(Member).InChat, Is.True);
-                Assert.That(gate.MaySend(GroupId, Member), Is.True);
-                Assert.That(r.Call(Member), Is.EqualTo((int)HttpStatusCode.Forbidden));
+                Assert.Contains("removed from call", c.Lines.Last());
+                Assert.Equal("removed from the console", r.Sessions.Get(GroupId).RemovalOf(Member).Reason);
+                Assert.True(r.Sessions.Get(GroupId).Find(Member).InChat);
+                Assert.True(gate.MaySend(GroupId, Member));
+                Assert.Equal((int)HttpStatusCode.Forbidden, r.Call(Member));
             }
         }
 
         // ---- bad input --------------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BadInputIsAnsweredWithAMessage_AndChangesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (Region r, Console c) = Rig();
             using (r)
             {
@@ -398,12 +475,15 @@ namespace osWebRtcVoice.Tests
                 Run(r, $"voice call frobnicate {GroupId}");
                 Run(r, "voice call");
 
-                Assert.That(c.Lines.Count, Is.EqualTo(10));
-                Assert.That(c.Lines.All(l => l.Length > 0 && !l.StartsWith("Done")), Is.True, c.Text);
-                Assert.That(c.Lines[1], Does.StartWith("No such call"));
-                Assert.That(c.Lines[7], Does.Contain("not moderated"));
-                Assert.That(r.Sessions.Get(GroupId).ModerationGeneration, Is.EqualTo(generation), "nothing was changed");
-                Assert.That(r.Sessions.Get(GroupId).Removed, Is.Empty);
+                Assert.Equal(10, c.Lines.Count);
+                Assert.True(c.Lines.All(l => l.Length > 0 && !l.StartsWith("Done")), c.Text);
+                Assert.StartsWith("No such call", c.Lines[1]);
+                Assert.Contains("not moderated", c.Lines[7]);
+                {
+                    var assertedValue = r.Sessions.Get(GroupId).ModerationGeneration;
+                    TestAssert.WithMessage(() => Assert.Equal(generation, assertedValue), "nothing was changed");
+                }
+                Assert.Empty(r.Sessions.Get(GroupId).Removed);
             }
         }
     }

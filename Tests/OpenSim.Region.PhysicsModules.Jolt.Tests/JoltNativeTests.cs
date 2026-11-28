@@ -181,19 +181,19 @@ public class JoltNativeTests
         JoltNativeBuild stockOsx = JoltNative.Known.Single(b => b.Folder == "osx");
 
         var stock = new JoltNativeInfo("win-x64", "p", stockWin.Sha256, stockWin);
-        Assert.Equal($"joltc for win-x64: p sha256 {stockWin.Sha256} (stock JoltPhysics.Native 1.0.4; one job pool)", stock.Describe());
+        Assert.Equal($"joltc for win-x64: p sha256 {stockWin.Sha256} (stock JoltPhysics.Native 1.3.0; one job pool)", stock.Describe());
         Assert.Null(stock.UntestedNotice);
 
         // The record has no build safe for more than one pool; the line for one that was, built here.
         var safeBuild = new JoltNativeBuild("linux-x64", "libjoltc.so", new string('A', 64), JoltNativeOrigin.Package, JoltNative.PackageVersion,
                                             safeForMultiplePools: true, testedByProject: true);
         var safe = new JoltNativeInfo("linux-x64", "p", safeBuild.Sha256, safeBuild);
-        Assert.Equal($"joltc for linux-x64: p sha256 {safeBuild.Sha256} (stock JoltPhysics.Native 1.0.4; safe for more than one job pool)", safe.Describe());
+        Assert.Equal($"joltc for linux-x64: p sha256 {safeBuild.Sha256} (stock JoltPhysics.Native 1.3.0; safe for more than one job pool)", safe.Describe());
         Assert.True(safe.SafeForMultiplePools);
         Assert.Null(safe.UntestedNotice);
 
         var mac = new JoltNativeInfo("osx-arm64", "p", stockOsx.Sha256, stockOsx);
-        Assert.Equal("the joltc for osx-arm64 (stock JoltPhysics.Native 1.0.4) is recorded from its package, but this project does not test it: " +
+        Assert.Equal("the joltc for osx-arm64 (stock JoltPhysics.Native 1.3.0) is recorded from its package, but this project does not test it: " +
                      "the module's tests run on win-x64 and linux-x64.", mac.UntestedNotice);
 
         var unrecorded = new JoltNativeInfo("win-x64", "p", new string('0', 64), null);
@@ -332,7 +332,7 @@ public class JoltNativeTests
         Assert.Null(JoltPhysicsBackend.JobPoolLimitReason(3, safe));
         Assert.Null(CapacityReport.JobPoolLimitWarning(3, safe));
 
-        string reason = "the loaded joltc (stock JoltPhysics.Native 1.0.4) is not safe for more than one job pool: its physics systems " +
+        string reason = "the loaded joltc (stock JoltPhysics.Native 1.3.0) is not safe for more than one job pool: its physics systems " +
                         "share one scratch allocator, and two physics updates at once would stop the process";
         Assert.Equal(reason, JoltPhysicsBackend.JobPoolLimitReason(3, stock));
         Assert.Equal(

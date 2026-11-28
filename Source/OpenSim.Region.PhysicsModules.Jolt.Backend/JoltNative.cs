@@ -123,9 +123,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
     public static class JoltNative
     {
         /// <summary>The package the stock native comes from, and the version the projects use (the one JoltPhysicsSharp
-        /// 2.19.1 depends on). A package bump fails JoltNativePackageTests until the record below is checked again.</summary>
+        /// 2.26.0 depends on). A package bump fails JoltNativePackageTests until the record below is checked again.</summary>
         public const string PackageId = "JoltPhysics.Native";
-        public const string PackageVersion = "1.0.4";
+        public const string PackageVersion = "1.3.0";
 
         /// <summary>
         /// The platforms the module has a native for, by runtime identifier: the runtimes/ folder the package puts the
@@ -148,11 +148,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         /// </summary>
         public static readonly IReadOnlyList<JoltNativeBuild> Known = new[]
         {
-            Stock("win-x64", "joltc.dll", "67BECFC70CFBDA643AB9B75ABA895042900C3E339B001080BA4107E4929B0910", tested: true),
-            Stock("linux-x64", "libjoltc.so", "5FC051708BDD05031A816796612A2F87E17ED32CC198F195A43B2305B3D990FD", tested: true),
-            Stock("win-arm64", "joltc.dll", "B0A7D05151A8E504765A39E23B2EC196B88B3BF2CE3E8B884161E6925E7578E4", tested: false),
-            Stock("linux-arm64", "libjoltc.so", "FDE70508C826370B5CF6BB54C6EA9CEEAB0C37C826BCD71579EBB9B4AC3E0D61", tested: false),
-            Stock("osx", "libjoltc.dylib", "39E4A8728307E48026D965D8AB661348A8808A9A2AFDDDE6CE58272B37D83E91", tested: false),
+            Stock("win-x64", "joltc.dll", "2DF8E823A82FCBA0E5FCF33F0E162760CE88C1BDE481436A36A356C478F17844", tested: true),
+            Stock("linux-x64", "libjoltc.so", "1ACCF71DC32C4125C161C989AF26D1EDAC9C8361AD7B3DA0EF23B55EC5D43232", tested: true),
+            Stock("win-arm64", "joltc.dll", "3B57E253211BAF1A0BDA773A997329AC5C1E9C48AE3B6630457DEDBBDFF94D37", tested: false),
+            Stock("linux-arm64", "libjoltc.so", "EE6BC8BD85B2FAAC0D74094D97443A35E73604D60A1FC203788A831CE9B78E6A", tested: false),
+            Stock("osx", "libjoltc.dylib", "AD00673D2597313468E6B7F521C90BE3084431BAB6DEFD13198A08FD94612739", tested: false),
         };
 
         private static JoltNativeBuild Stock(string folder, string file, string sha256, bool tested)
@@ -331,7 +331,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             if (hook == null || hook.EventHandlerType != typeof(DllImportResolver))
                 throw new JoltNativeException(
                     "Jolt physics: JoltPhysicsSharp has no JoltApi.JoltDllImporterResolver hook, so the module cannot make it " +
-                    "load the checked joltc. The binding is pinned to 2.19.1; a newer one needs this loader updated.");
+                    "load the checked joltc. The binding is pinned to 2.26.0; a different one needs this loader updated.");
             hook.AddEventHandler(null, new DllImportResolver(Resolve));
         }
     }

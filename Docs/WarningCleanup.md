@@ -1,5 +1,318 @@
 # Build warning cleanup
 
+## Incremental modern-C# policy
+
+[Directory.Build.props](../Directory.Build.props) enables nullable annotations with
+`<Nullable>annotations</Nullable>` and loads the .NET 10 `10-recommended` analyzer
+set. This lets existing and new files use `string?` and other nullable syntax
+without immediately turning the entire legacy flow-analysis backlog into build
+warnings.
+
+For a converted project, set `<Nullable>enable</Nullable>` in its project file
+after fixing its nullable diagnostics. New files that need full flow analysis
+before the containing project is converted can start with `#nullable enable`.
+Do not use a null-forgiving operator unless the surrounding invariant makes the
+value provably non-null.
+
+[.editorconfig](../.editorconfig) supplies formatting and modern-C# preferences.
+Recommended .NET analyzers are suggestions while the legacy backlog is being
+converted. This is a migration baseline, not a waiver: promote them to warnings
+in a nested `.editorconfig` for the area being converted, then enable
+`TreatWarningsAsErrors` for that project after its diagnostics are clear. For
+example:
+
+```xml
+<PropertyGroup>
+  <Nullable>enable</Nullable>
+  <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+</PropertyGroup>
+```
+
+In that project's nested `.editorconfig`, promote each rule whose baseline entry
+has been retained in the root configuration. Rule-specific entries intentionally
+override category-wide defaults. For example:
+
+```ini
+[*.cs]
+dotnet_diagnostic.CA1707.severity = warning
+dotnet_diagnostic.CA1848.severity = warning
+dotnet_diagnostic.CA5351.severity = warning
+```
+
+Keep promotions local until every project built by the solution can enforce the
+same standard. The final repository-wide switch belongs in
+`Directory.Build.props`; individual suppressions must document a specific
+compatibility reason. Remove a root baseline entry rather than leave it at a
+non-enforcing severity once no matching diagnostics remain. Strict opt-in
+projects must keep warnings-as-errors local until their existing diagnostics,
+including compiler, xUnit and SDK analyzer findings, have been cleared.
+
+## Converting a project
+
+Use the following workflow for one bounded project or feature area at a time.
+Do not enable strict checking for the entire solution while the legacy backlog
+remains.
+
+### 1. Select and build one project
+
+Choose an area with a clear test project and a manageable diagnostic count:
+
+```sh
+dotnet build Source/OpenSim.SomeProject/OpenSim.SomeProject.csproj \
+  -c Debug --no-incremental
+```
+
+The root `.editorconfig` loads the .NET 10 analyzer rules, so the IDE can show
+migration suggestions while the existing solution continues to build. Build
+the project once before changing it so that unrelated failures are identified
+separately from conversion work.
+
+### 2. Enable nullable flow analysis
+
+Add full nullable analysis to the selected project:
+
+```xml
+<PropertyGroup>
+  <Nullable>enable</Nullable>
+</PropertyGroup>
+```
+
+Rebuild and fix all reported `CS86xx` diagnostics. Prefer:
+
+- accurate `T?` annotations for values that are genuinely optional;
+- proper initialization, validation, or required constructor parameters;
+- `TryGet...` patterns instead of unchecked dereferences;
+- explicit failure handling for invalid configuration or external input.
+
+Do not use the null-forgiving operator, `!`, as a default. Use it only when the
+surrounding invariant makes a value provably non-null and the compiler cannot
+represent that invariant.
+
+When only one new or isolated file can be migrated before its containing
+project, enable nullable flow analysis for that file:
+
+```csharp
+#nullable enable
+```
+
+Keep the file-level scope narrow and do not spread it to existing files merely
+to satisfy a warning.
+
+### 3. Promote analyzer rules locally
+
+Create or update a nested `.editorconfig` inside the selected project or
+converted folder. Promote a small, related group of rules from `suggestion` to
+`warning`:
+
+```ini
+[*.cs]
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1707.severity = warning
+dotnet_diagnostic.CA1848.severity = warning
+```
+
+Available legacy-baseline entries are listed in the root `.editorconfig`. Use
+rule-specific entries: they override the root entry for the same diagnostic.
+Do not promote every rule at once unless the resulting work remains reviewable
+as one conversion.
+
+### 4. Fix, test, and commit in focused batches
+
+For each batch:
+
+1. Promote one or several related rules.
+2. Run a non-incremental project build.
+3. Fix the resulting diagnostics without changing unrelated behavior.
+4. Run the complete affected test project.
+5. Add a regression test when the warning exposed a correctness problem.
+6. Commit the focused conversion with a clear message.
+
+Use formatting or code-fix tools selectively. Reformatting an entire legacy
+project can obscure the meaningful changes and make review difficult. Fixes
+must preserve public contracts, wire formats, configuration behavior and test
+assertions unless the conversion deliberately includes an approved behavior
+change.
+
+### 5. Turn on warnings-as-errors
+
+After all enabled rules are clean and the project has been tested, make the
+standard enforceable in that project's `.csproj`:
+
+```xml
+<PropertyGroup>
+  <Nullable>enable</Nullable>
+  <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+</PropertyGroup>
+```
+
+This only affects the converted project. New compiler, nullable, xUnit and
+analyzer warnings then prevent that project from building, while the rest of
+the repository remains on the incremental baseline.
+
+Keep warnings-as-errors local until every diagnostic included by the project
+is clear. Do not add blanket `NoWarn` entries or exemptions to make the gate
+pass.
+
+### 6. Retire the global baseline entry
+
+When a rule no longer has any remaining occurrences in the repository, remove
+its root `.editorconfig` entry:
+
+```ini
+dotnet_diagnostic.CA1305.severity = suggestion
+```
+
+Removing the entry returns that rule to the .NET 10 recommended severity, so a
+new violation becomes visible normally across the repository. This is the
+forward-cleaning gate: legacy work is retained explicitly and disappears as it
+is fixed.
+
+The overall progression is:
+
+```text
+suggestion globally
+    -> warning in one migrated area
+    -> fix and test that area
+    -> warnings-as-errors for the project
+    -> remove the global baseline entry
+    -> migrate the next area
+```
+
+## Current dependency-update baseline
+
+On the dependency-update branch at `a225f5581b`, a non-incremental Release
+solution build with .NET SDK 10.0.115 reported 120 warnings and 242 errors.
+After the first test cleanup it reported 120 warnings and 216 errors.
+Adapting the Jolt backend and Jolt tests to the pinned JoltPhysicsSharp 2.26
+API removed the eight backend compilation errors and three readonly-reference
+test call-contract errors. A refreshed solution build reports 120 warnings and
+208 errors, concentrated in test-project xUnit migration, nullable fixture
+initialization and inherited test-double methods. The solution does not yet
+build.
+
+The follow-up cleanup resolves the remaining warning-level nullable diagnostics
+in Release, but does not make the solution warning-free. Release promotes
+warnings to errors through `TreatWarningsAsErrors` in `Directory.Build.props`;
+its zero-warning summary must not be interpreted as a completed cleanup.
+The committed follow-up reported **0 warnings and 179 errors** in Release:
+
+```sh
+dotnet build Tranquillity.sln -c Release --no-restore --no-incremental -m:1
+```
+
+After adding the missing `System.Reflection` import in
+`OSSL_ApiSetScriptEngineTests.cs`, non-incremental builds on .NET SDK 10.0.115
+report **178 warnings and 0 errors in Debug**, and **0 warnings and 178 errors
+in Release**. All 178 diagnostics are in test projects. The Debug log prints
+each warning again in its summary (356 warning lines, 178 unique diagnostics).
+
+```sh
+dotnet build Tranquillity.sln -c Debug --no-restore --no-incremental -m:1
+dotnet build Tranquillity.sln -c Release --no-incremental -m:1
+```
+
+The remaining diagnostics include hidden test-double members (CS0108, 56),
+nullable fixture initialization (CS8618, 52), xUnit analyzers (52), nullable
+annotations outside an enabled context (CS8632, 11), null arguments (CS8625, 4),
+obsolete HTTP APIs (SYSLIB0014, 2), and nullable value access (CS8629, 1).
+Release still cannot build; no tests were run for this follow-up.
+
+The Jolt native package is also pinned consistently to 1.3.0:
+`JoltPhysics.Native`, managed API and native hash allowlist now agree. The native
+allowlist tests pass 35/35. The full Jolt test project reports 1316 passed,
+2 skipped and 5 failed. The failures are native-behavior changes in hold/resume,
+terrain jitter, rough-ground vehicle/box response and mesh-asset settling, not
+compiler or hash-record failures. Their thresholds were not weakened.
+
+The full solution run found a wider Jolt 2.26 migration backlog in the backend,
+harness, avatar, prim and vehicle projects. Those failures, including the five
+above, use the shared `KnownFailure` helpers or discovery attributes in
+`OpenSim.Tests.Common`. An ordinary local or Visual Studio Code run shows them
+as skipped with the Jolt 2.26 update reason. Runtime guards on the five
+physically mixed cases skip only the failing theory rows, while
+`KnownFailureFact`/`KnownFailureTheory` mark methods whose observed Jolt behavior
+changed across their scenario set. CI sets `RUN_KNOWN_FAILURES=1`, so every
+marked test still runs and remains subject to an exact entry in
+`Tests/known-failures.txt`. The allowlist cannot accept a renamed test or a
+different test project.
+
+The full solution check also reproduced three existing malformed-landmark theory
+rows in `OpenSim.Region.ClientStack.LindenUDP.Tests`. They are unrelated to the
+Jolt update and use the same visible local marker and exact CI allowlist without
+changing production or test behavior.
+
+Developers investigating the debt run the suite with
+`RUN_KNOWN_FAILURES=1`. Once behavior is corrected, remove the local guard and
+its matching allowlist entry in the same change; neither test assertions nor
+thresholds should be weakened to make a known failure pass.
+
+The first cleanup moves inventory-handler scene initialization into the
+fixture methods' return values and initializes framework test fixtures in their
+constructors. It also corrects nullable theory parameters and uses asynchronous
+task completion in the rate-limited log tests. The full Release test projects
+passed: `OpenSim.Capabilities.Handlers.Tests` 11 passed, 0 failed, 0 skipped;
+`OpenSim.Framework.Tests` 267 passed, 0 failed, 0 skipped.
+
+The earlier framework package migration replaced xUnit v2 with `xunit.v3` 4.0.3
+in 35 projects, including mixed NUnit/xUnit assemblies and the NUnit AIS
+harness, whose shared helpers require an xUnit app host. NUnit tests remained
+NUnit at that stage, and VSTest discovery and TRX reporting were retained. The shared fixture
+uses `ValueTask` lifecycle methods and forwards async disposal to existing
+synchronous teardown overrides; its regression test fails without that
+forwarding and the seven shared tests pass with it.
+
+New v3 cancellation-token, custom-Fact source-location and nullable-return
+diagnostics were resolved without suppressions. The non-incremental Debug
+build still reports **178 warnings and 0 errors**, and Release still reports
+**0 warnings and 178 promoted errors**. This migration does not close the
+remaining warning backlog. Six migrated projects outside the solution remain
+blocked at restore by pre-existing direct-package downgrades against
+`OpenSim.Tests.Common`; their test bodies could not be validated.
+
+The full Debug test run recorded **15416 passed, 1963 failed and 102 skipped
+or not executed**, with no timeout abort. Phlox completed with 5951 passed,
+0 failed and 2 skipped. The suite is not green: NUnit voice tests reject
+their timeout attributes, physics and UDP tests fail, and CoreModules reports
+foreground threads left running after its 1004 tests pass. The AIS app-host
+compatibility fix was then verified separately: 232 passed, 0 failed, 0 skipped.
+Child-process physics diagnostics now use `ITestOutputHelper`, preserving the
+output their parent tests parse under v3. No failing assertions or known-failure
+entries were weakened.
+
+## Active NUnit suites converted to xUnit v3
+
+The AIS and both voice suites now use native xUnit v3 assertions, data attributes and fixture APIs.
+Unused NUnit dependencies were removed from Framework.Servers, Server.Handlers and the asset-client
+console harness. All **115 solution project manifests** are free of NUnit references; excluded projects
+remain unchanged. VSTest/TRX compatibility, serial execution and external-service opt-in guards are retained.
+Two regression cases verify that an incompatible plugin is refused before fixture setup; both fail
+without the guard and pass with it.
+
+Full Debug project runs after a non-incremental solution build recorded:
+
+| Project | Passed | Failed | Skipped / not executed |
+| --- | ---: | ---: | ---: |
+| OpenSim.Region.ClientStack.LindenCaps.AIS.Tests | 232 | 0 | 0 |
+| WebRtcJanusService.Tests | 625 | 0 | 4 |
+| WebRtcVoiceRegionModule.Tests | 1198 | 0 | 47 |
+| OpenSim.Framework.Servers.Tests | 5 | 0 | 0 |
+| OpenSim.Server.Handlers.Tests | 243 | 0 | 14 |
+
+Each project was run with `dotnet test Tests/<Project>/<Project>.csproj -c Debug --no-build --logger trx`.
+External opt-in environment variables were unset for these runs. Counts are taken from TRX records:
+the Janus console summary omits three explicit skips. Its 629 cases match the runnable NUnit baseline.
+The region suite preserves its 1206 baseline cases and adds 37 separately reported race repetitions
+and two plugin-guard cases. Baselines required temporarily removing NUnit timeout attributes that
+are unsupported on .NET 10; no assertions were removed. The asset-client harness has no tests and
+builds with its existing single CS8618 warning.
+
+`dotnet build Tranquillity.sln -c Debug --no-incremental -m:1` succeeds with **178 warnings, 0 errors**.
+`dotnet build Tranquillity.sln -c Release --no-restore --no-incremental -m:1` still fails with
+**0 warnings, 178 promoted errors**. The converted AIS and voice projects add no warnings.
+Live gateway, media and external-store checks remain pending; the full solution test suite was not rerun.
+
+## Earlier cleanup baseline
+
 Original baseline: Release build of `Tranquillity.sln` on .NET SDK 10.0.112,
 648 warning occurrences, 0 errors. Counts identify diagnostic occurrences by
 project, file, position, code and message; the build summary repeats diagnostics

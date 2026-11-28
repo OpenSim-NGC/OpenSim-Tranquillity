@@ -9,7 +9,6 @@ using System;
 using System.Linq;
 using Nini.Config;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

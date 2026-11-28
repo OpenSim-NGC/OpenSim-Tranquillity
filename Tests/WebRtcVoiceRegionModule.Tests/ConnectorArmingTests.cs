@@ -38,8 +38,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]
     public class ConnectorArmingTests
     {
         private static readonly UUID Owner = new UUID("00000000-0000-0000-0000-0000000000f1");
@@ -130,7 +128,10 @@ namespace osWebRtcVoice.Tests
                 rig.Scene.RegionInfo.RegionName, sendOne: rig.Transport.SendAsync);
             rig.Svc = new VoiceVisibilityService(rig.Scene, CadenceMs, emitEnabled: true, sink: sink,
                 adminTimeout: TimeSpan.FromSeconds(5), armingEnabled: armingEnabled);
-            Assert.That(sink.FallbackRoom, Is.EqualTo(rig.EstateRoom), "the connector's estate room is the sink's fallback room");
+            {
+                var assertedValue = sink.FallbackRoom;
+                TestAssert.WithMessage(() => Assert.Equal(rig.EstateRoom, assertedValue), "the connector's estate room is the sink's fallback room");
+            }
             rig.Svc.StartLoop();
         }
 
@@ -159,9 +160,12 @@ namespace osWebRtcVoice.Tests
             rig.Scene.AuthenticateHandler.AddNewCircuit(acd);
             var client = new TestClient(acd, rig.Scene);
             rig.Scene.AddNewAgent(client, PresenceType.Npc);
-            Assert.That(rig.Scene.TryGetScenePresence(id, out ScenePresence sp), Is.True, "NPC presence created");
+            Assert.True(rig.Scene.TryGetScenePresence(id, out ScenePresence sp), "NPC presence created");
             sp.CompleteMovement(client, false);
-            Assert.That(sp.PresenceType, Is.EqualTo(PresenceType.Npc), "the presence is a real NPC-typed presence");
+            {
+                var assertedValue = sp.PresenceType;
+                TestAssert.WithMessage(() => Assert.Equal(PresenceType.Npc, assertedValue), "the presence is a real NPC-typed presence");
+            }
             return id;
         }
 
@@ -181,13 +185,16 @@ namespace osWebRtcVoice.Tests
                 pMute: npcId =>
                 {
                     ILandObject parcel = rig.Scene.LandChannel?.GetLandObject(record.Position.X, record.Position.Y);
-                    Assert.That(parcel?.LandData, Is.Not.Null, "the NPC stands on a parcel");
+                    {
+                        var assertedValue = parcel?.LandData;
+                        TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the NPC stands on a parcel");
+                    }
                     svc.Moderation.MuteAgent(parcel.LandData.GlobalID, npcId);
                 },
                 pLog: null);
-            Assert.That(ok, Is.True, "registered");
+            Assert.True(ok, "registered");
             rig.SessionIds.Add(record.ViewerSessionId);
-            Assert.That(VoiceViewerSession.IsAgentInRegion(rig.RegionId, derived), Is.True, "membership on");
+            Assert.True(VoiceViewerSession.IsAgentInRegion(rig.RegionId, derived), "membership on");
             return derived;
         }
 
@@ -235,18 +242,20 @@ namespace osWebRtcVoice.Tests
 
         private static void AssertArmingReplace(OSDMap replace, Rig rig, UUID npc)
         {
-            Assert.That(replace["room"].AsInteger(), Is.EqualTo(rig.EstateRoom), "arming replace addressed at the estate room");
-            Assert.That(replace.ContainsKey("room_epoch"), Is.True, "stamped with the authority's epoch");
-            Assert.That(Channel(replace, "excl")[npc.ToString()] is OSDArray e && e.Count == 0, Is.True,
-                "the NPC's exclusion column is present and empty");
-            Assert.That(Channel(replace, "mute")[npc.ToString()] is OSDArray m && m.Count == 0, Is.True,
-                "the NPC's mute column is present and empty");
+            {
+                var assertedValue = replace["room"].AsInteger();
+                TestAssert.WithMessage(() => Assert.Equal(rig.EstateRoom, assertedValue), "arming replace addressed at the estate room");
+            }
+            Assert.True(replace.ContainsKey("room_epoch"), "stamped with the authority's epoch");
+            Assert.True((Channel(replace, "excl")[npc.ToString()] is OSDArray e && e.Count == 0), "the NPC's exclusion column is present and empty");
+            Assert.True((Channel(replace, "mute")[npc.ToString()] is OSDArray m && m.Count == 0), "the NPC's mute column is present and empty");
         }
 
         // ---- inject connector ----
-        [Test]
+        [Fact(Timeout = 60000)]
         public void T1_RegisterInjectConnector_ArmsTheNpcAtTheEstateRoom_WithEmptyColumns()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Rig rig = NewRig(armingEnabled: true);
             AddAvatar(rig, Avatar);
             WaitFor(rig.Transport, 0, m => IsReplace(m) && Names(m, Avatar), "the avatar's arming replace");
@@ -256,13 +265,17 @@ namespace osWebRtcVoice.Tests
 
             OSDMap replace = WaitFor(rig.Transport, mark, m => IsReplace(m) && Names(m, npc), "an arming replace naming the NPC");
             AssertArmingReplace(replace, rig, npc);
-            Assert.That(rig.Svc.RoomOf(npc), Is.EqualTo(rig.EstateRoom), "pRecordRoom recorded the estate room");
+            {
+                var assertedValue = rig.Svc.RoomOf(npc);
+                TestAssert.WithMessage(() => Assert.Equal(rig.EstateRoom, assertedValue), "pRecordRoom recorded the estate room");
+            }
         }
 
         // ---- recorder ----
-        [Test]
+        [Fact(Timeout = 60000)]
         public void T2_RegisterRecorder_ArmsTheNpcTheSameWay_AndTheMuteNamesTheNpc()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Rig rig = NewRig(armingEnabled: true);
             AddAvatar(rig, Avatar);
             WaitFor(rig.Transport, 0, m => IsReplace(m) && Names(m, Avatar), "the avatar's arming replace");
@@ -272,17 +285,17 @@ namespace osWebRtcVoice.Tests
 
             OSDMap replace = WaitFor(rig.Transport, mark, m => IsReplace(m) && Names(m, npc), "an arming replace naming the recorder NPC");
             AssertArmingReplace(replace, rig, npc);
-            Assert.That(rig.Svc.Moderation.IsModerated(rig.Parcel.LandData.GlobalID, npc), Is.True,
-                "the moderation store's mute key is (parcel, NPC id)");
+            Assert.True(rig.Svc.Moderation.IsModerated(rig.Parcel.LandData.GlobalID, npc), "the moderation store's mute key is (parcel, NPC id)");
             // The mute reaches the wire as the avatar's mute column naming the NPC as the silenced source.
             WaitFor(rig.Transport, mark, m => IsBatch(m) && Channel(m, "mute")[Avatar.ToString()] is OSDArray a
                 && a.Any(s => s.AsString() == npc.ToString()), "a batch whose mute column for the avatar names the NPC");
         }
 
         // ---- mixer restart ----
-        [Test]
+        [Fact(Timeout = 60000)]
         public void T3_MixerRestartAndNewEpoch_ReArmTheNpcAlongWithAvatars()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Rig rig = NewRig(armingEnabled: true);
             AddAvatar(rig, Avatar);
             UUID npc = Register(rig, NewRecord("Speaker", mayInject: true));
@@ -307,15 +320,21 @@ namespace osWebRtcVoice.Tests
             OSDMap freshNpc = WaitFor(rig.Transport, 0, m => IsReplace(m) && Names(m, npc), "the new epoch arming the NPC");
             OSDMap freshAvatar = WaitFor(rig.Transport, 0, m => IsReplace(m) && Names(m, Avatar), "the new epoch arming the avatar");
             AssertArmingReplace(freshNpc, rig, npc);
-            Assert.That(freshNpc["room_epoch"].AsString(), Is.Not.EqualTo(first["room_epoch"].AsString()), "a new epoch");
-            Assert.That(freshAvatar["room_epoch"].AsString(), Is.EqualTo(freshNpc["room_epoch"].AsString()),
-                "the avatar armed in the same new epoch");
+            {
+                var assertedValue = freshNpc["room_epoch"].AsString();
+                TestAssert.WithMessage(() => Assert.NotEqual(first["room_epoch"].AsString(), assertedValue), "a new epoch");
+            }
+            {
+                var assertedValue = freshAvatar["room_epoch"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal(freshNpc["room_epoch"].AsString(), assertedValue), "the avatar armed in the same new epoch");
+            }
         }
 
         // ---- heartbeat ----
-        [Test]
+        [Fact(Timeout = 60000)]
         public void T4_HeartbeatListenersMap_CarriesTheNpcWhileRegistered()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Rig rig = NewRig(armingEnabled: true);
             AddAvatar(rig, Avatar);
             UUID npc = Register(rig, NewRecord("Recorder", mayInject: false));
@@ -324,13 +343,14 @@ namespace osWebRtcVoice.Tests
             OSDMap hb = WaitFor(rig.Transport, 0,
                 m => IsHeartbeat(m) && HeartbeatListeners(m, rig.EstateRoom).TryGetValue(npc.ToString(), out OSD g) && g.AsInteger() > 0,
                 "a heartbeat listing the NPC as armed (generation > 0) at the estate room");
-            Assert.That(HeartbeatListeners(hb, rig.EstateRoom).ContainsKey(Avatar.ToString()), Is.True, "alongside the avatar");
+            Assert.True(HeartbeatListeners(hb, rig.EstateRoom).ContainsKey(Avatar.ToString()), "alongside the avatar");
         }
 
         // ---- unregister ----
-        [Test]
+        [Fact(Timeout = 60000)]
         public void T5_AfterUnregister_TheNextHeartbeatOmitsTheNpc_AndNothingLaterNamesIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Rig rig = NewRig(armingEnabled: true);
             AddAvatar(rig, Avatar);
             var record = NewRecord("Speaker", mayInject: true);
@@ -340,7 +360,7 @@ namespace osWebRtcVoice.Tests
 
             int mark = rig.Transport.Count;
             Unregister(rig, record);
-            Assert.That(VoiceViewerSession.IsAgentInRegion(rig.RegionId, npc), Is.False, "membership off");
+            Assert.False(VoiceViewerSession.IsAgentInRegion(rig.RegionId, npc), "membership off");
 
             // A heartbeat already in flight at Unregister may still carry it; the first one that omits it is the disarm.
             int omit = IndexOf(rig.Transport, mark,
@@ -355,26 +375,36 @@ namespace osWebRtcVoice.Tests
             WaitFor(rig.Transport, rig.Transport.Count, IsHeartbeat, "one more heartbeat");
 
             List<OSDMap> later = rig.Transport.Since(after);
-            Assert.That(later.Where(IsBatch).Count(), Is.GreaterThan(0), "later batches exist to check");
-            Assert.That(later.Where(m => Mentions(m, npc)).Select(m => OSDParser.SerializeJsonString(m)).ToList(), Is.Empty,
-                "no batch or heartbeat after the omitting heartbeat names the NPC");
+            Assert.True(later.Where(IsBatch).Count() > 0, "later batches exist to check");
+            {
+                var assertedValue = later.Where(m => Mentions(m, npc)).Select(m => OSDParser.SerializeJsonString(m)).ToList();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no batch or heartbeat after the omitting heartbeat names the NPC");
+            }
         }
 
         // ---- knob off (real-service half; the golden half is VisibilityKnobOffGoldenTests) ----
-        [Test]
+        [Fact(Timeout = 60000)]
         public void T6_KnobOff_ConnectorRegistered_NoArmingTrafficAtAll()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Rig rig = NewRig(armingEnabled: false);
             AddAvatar(rig, Avatar);
             UUID npc = Register(rig, NewRecord("Speaker", mayInject: true));
             Thread.Sleep(2500);   // > two heartbeat intervals and ~100 ticks
 
             List<OSDMap> all = rig.Transport.Since(0);
-            Assert.That(all.Where(IsHeartbeat), Is.Empty, "no heartbeat with the knob off");
-            Assert.That(all.Where(m => m.ContainsKey("room_epoch") || m.ContainsKey("policy_generation") || m.ContainsKey("base")),
-                Is.Empty, "no authority stamps with the knob off");
-            Assert.That(all.Where(m => Mentions(m, npc)), Is.Empty,
-                "an empty-column connector is never sent knob-off (the join path skips empty columns)");
+            {
+                var assertedValue = all.Where(IsHeartbeat);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no heartbeat with the knob off");
+            }
+            {
+                var assertedValue = all.Where(m => m.ContainsKey("room_epoch") || m.ContainsKey("policy_generation") || m.ContainsKey("base"));
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no authority stamps with the knob off");
+            }
+            {
+                var assertedValue = all.Where(m => Mentions(m, npc));
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "an empty-column connector is never sent knob-off (the join path skips empty columns)");
+            }
         }
     }
 }
