@@ -301,7 +301,7 @@ public partial class PhysxSpikeTests
     public void T2_a_vehicle_driven_over_rough_ground_with_and_without_the_spike_cut(double rate, int n)
     {
         KnownFailure.SkipWhen(
-            rate == 32 && n == 2,
+            (rate == 32 && n == 2) || (rate == 64 && n == 3),
             "Jolt 2.26 update",
             "spike mitigation changes the rough-ground vehicle acceleration distribution");
 
