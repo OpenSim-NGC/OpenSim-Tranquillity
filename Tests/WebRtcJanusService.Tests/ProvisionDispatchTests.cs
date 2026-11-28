@@ -23,23 +23,20 @@
  */
 using System;
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    public class ProvisionDispatchTests
-    {
+    public class ProvisionDispatchTests : IAsyncLifetime
+        {
         private static readonly UUID Region = new UUID("bbbbbbbb-0000-0000-0000-0000000a2a31");
         private static readonly UUID Alice = new UUID("aaaaaaaa-1111-1111-1111-0000000a2a31");
 
         private WebRtcVoiceServiceModule _module;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             var config = new IniConfigSource();
             IConfig voice = config.AddConfig("WebRtcVoice");
@@ -52,9 +49,7 @@ namespace osWebRtcVoice.Tests
             _module = new WebRtcVoiceServiceModule();
             _module.Initialise(config);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             // The multiagent test may register a viewer session in the static table; sweep it out so other
             // fixtures see a clean table. Generation UUID.Zero captures any session of the agent.
@@ -72,25 +67,35 @@ namespace osWebRtcVoice.Tests
             // REAL service answers its own failure map -- the proof the dispatch reached it.
         };
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SameServiceName_MultiagentFirstProvision_CreatesASessionAndReachesTheService()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap resp = _module.ProvisionVoiceAccountRequest(MultiagentFirstProvision(), Alice, Region);
 
-            Assert.That(resp, Is.Not.Null, "pre-fix this was a swallowed NullReferenceException (m_nonSpatialVoiceService null)");
-            Assert.That(resp["response"].AsString(), Is.EqualTo("failed"), "the Janus service's own BuildFailure map: the dispatch reached the service");
+            {
+                var assertedValue = resp;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "pre-fix this was a swallowed NullReferenceException (m_nonSpatialVoiceService null)");
+            }
+            {
+                var assertedValue = resp["response"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal("failed", assertedValue), "the Janus service's own BuildFailure map: the dispatch reached the service");
+            }
             // The service's connect fails (no Janus configured) and it answers that with its own
             // failure map rather than carrying on to the jsep check.
-            Assert.That(resp["error"].AsString(), Is.EqualTo("janus unavailable"), "died INSIDE the service, at its connect check");
+            {
+                var assertedValue = resp["error"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal("janus unavailable", assertedValue), "died INSIDE the service, at its connect check");
+            }
             // The dispatch created and registered a viewer session (as local does), and removes it again
             // because the provision failed, so nothing leaks.
-            Assert.That(VoiceViewerSession.IsAgentInRegion(Region, Alice), Is.False,
-                "a failed first provision leaves no registered session behind");
+            Assert.False(VoiceViewerSession.IsAgentInRegion(Region, Alice), "a failed first provision leaves no registered session behind");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ZeroUuidLogout_IsANoOpClosedReply()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Observed live: retry-era teardowns POST logout with viewer_session zero and no
             // channel_type; this used to ERROR "no channel_type in request" in the create branch.
             var logout = new OSDMap
@@ -100,14 +105,18 @@ namespace osWebRtcVoice.Tests
                 ["voice_server_type"] = OSD.FromString("webrtc"),
             };
             OSDMap resp = _module.ProvisionVoiceAccountRequest(logout, Alice, Region);
-            Assert.That(resp, Is.Not.Null);
-            Assert.That(resp["response"].AsString(), Is.EqualTo("closed"), "the same shape a successful logout answers (BuildClosed)");
-            Assert.That(VoiceViewerSession.IsAgentInRegion(Region, Alice), Is.False, "a no-op logout must not create a session");
+            Assert.NotNull(resp);
+            {
+                var assertedValue = resp["response"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal("closed", assertedValue), "the same shape a successful logout answers (BuildClosed)");
+            }
+            Assert.False(VoiceViewerSession.IsAgentInRegion(Region, Alice), "a no-op logout must not create a session");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void UnknownViewerSessionLogout_IsANoOpClosedReply()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var logout = new OSDMap
             {
                 ["logout"] = OSD.FromBoolean(true),
@@ -115,17 +124,30 @@ namespace osWebRtcVoice.Tests
                 ["voice_server_type"] = OSD.FromString("webrtc"),
             };
             OSDMap resp = _module.ProvisionVoiceAccountRequest(logout, Alice, Region);
-            Assert.That(resp, Is.Not.Null);
-            Assert.That(resp["response"].AsString(), Is.EqualTo("closed"));
+            Assert.NotNull(resp);
+            Assert.Equal("closed", resp["response"].AsString());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MissingViewerSessionNonLogoutNonChannelType_StillErrorsToNull()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The pre-existing shape for a malformed initial request is unchanged: null response
             // (the region module answers "got null response" / empty 200).
             var bad = new OSDMap { ["voice_server_type"] = OSD.FromString("webrtc") };
-            Assert.That(_module.ProvisionVoiceAccountRequest(bad, Alice, Region), Is.Null);
+            Assert.Null(_module.ProvisionVoiceAccountRequest(bad, Alice, Region));
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

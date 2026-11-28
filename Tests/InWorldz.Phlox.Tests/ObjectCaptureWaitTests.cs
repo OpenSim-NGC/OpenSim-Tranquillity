@@ -13,7 +13,6 @@ using System.Threading;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

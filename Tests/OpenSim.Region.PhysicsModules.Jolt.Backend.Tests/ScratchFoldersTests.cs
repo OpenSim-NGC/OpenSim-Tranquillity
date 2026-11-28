@@ -40,7 +40,7 @@ public class ScratchFoldersTests
         Directory.CreateDirectory(Path.Combine(b, "sub"));
         File.WriteAllText(Path.Combine(b, "sub", "f"), "y");
 
-        new DeleteScratchFoldersAttribute().After(typeof(ScratchFoldersTests).GetMethod(nameof(The_attribute_deletes_the_folder_and_what_is_in_it_when_the_test_ends))!);
+        new DeleteScratchFoldersAttribute().After(typeof(ScratchFoldersTests).GetMethod(nameof(The_attribute_deletes_the_folder_and_what_is_in_it_when_the_test_ends))!, Assert.IsAssignableFrom<Xunit.v3.IXunitTest>(TestContext.Current.Test));
 
         Assert.False(Directory.Exists(a));
         Assert.False(Directory.Exists(b));
@@ -52,7 +52,7 @@ public class ScratchFoldersTests
     {
         string a = ScratchFolders.Create();
         Directory.Delete(a);
-        new DeleteScratchFoldersAttribute().After(typeof(ScratchFoldersTests).GetMethod(nameof(A_folder_that_is_already_gone_is_not_an_error))!);
+        new DeleteScratchFoldersAttribute().After(typeof(ScratchFoldersTests).GetMethod(nameof(A_folder_that_is_already_gone_is_not_an_error))!, Assert.IsAssignableFrom<Xunit.v3.IXunitTest>(TestContext.Current.Test));
         Assert.Empty(ScratchFolders.Pending());
     }
 
@@ -64,7 +64,7 @@ public class ScratchFoldersTests
         using var held = new FileStream(Path.Combine(a, "held"), FileMode.Create, FileAccess.ReadWrite, FileShare.None);
         var method = typeof(ScratchFoldersTests).GetMethod(nameof(A_folder_that_cannot_be_deleted_fails_the_test_instead_of_being_left_behind_silently))!;
         if (OperatingSystem.IsWindows())
-            Assert.Throws<IOException>(() => new DeleteScratchFoldersAttribute().After(method));
+            Assert.Throws<IOException>(() => new DeleteScratchFoldersAttribute().After(method, Assert.IsAssignableFrom<Xunit.v3.IXunitTest>(TestContext.Current.Test)));
         held.Dispose();
         ScratchFolders.DeleteAll();
         Assert.False(Directory.Exists(a));

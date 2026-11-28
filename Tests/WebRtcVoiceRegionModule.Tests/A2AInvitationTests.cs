@@ -16,7 +16,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -27,7 +27,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2AInvitationTests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
@@ -50,9 +49,10 @@ namespace osWebRtcVoice.Tests
 
         // ---- body shape ---------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildBody_HasExactlyTheViewerVoiceBranchShape()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
             s = reg.IssueToken(s.SessionId, Alice);
@@ -60,74 +60,108 @@ namespace osWebRtcVoice.Tests
             OSDMap body = A2AInvitation.BuildBody(s, Alice, "Alice Caller");
 
             // top-level keys the viewer reads (llimview.cpp:5207-5210)
-            Assert.That(body["session_id"].AsUUID(), Is.EqualTo(Xor));
-            Assert.That(body["session_name"].AsString(), Is.EqualTo("Alice Caller"), "labels the callee's incoming-call UI: the CALLER's name");
-            Assert.That(body["from_id"].AsUUID(), Is.EqualTo(Alice));
-            Assert.That(body["from_name"].AsString(), Is.EqualTo("Alice Caller"));
+            Assert.Equal(Xor, body["session_id"].AsUUID());
+            {
+                var assertedValue = body["session_name"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal("Alice Caller", assertedValue), "labels the callee's incoming-call UI: the CALLER's name");
+            }
+            Assert.Equal(Alice, body["from_id"].AsUUID());
+            Assert.Equal("Alice Caller", body["from_name"].AsString());
             // the branch selector
-            Assert.That(body.ContainsKey("voice"), Is.True);
-            Assert.That(body.ContainsKey("instantmessage"), Is.False, "its presence routes the viewer to the IM branch (llimview.cpp:5047)");
-            Assert.That(body.ContainsKey("immediate"), Is.False);
+            Assert.True(body.ContainsKey("voice"));
+            Assert.False(body.ContainsKey("instantmessage"), "its presence routes the viewer to the IM branch (llimview.cpp:5047)");
+            Assert.False(body.ContainsKey("immediate"));
             // the voice map becomes voice_channel_info verbatim
             OSDMap voice = (OSDMap)body["voice"];
-            Assert.That(voice["invitation_type"].AsInteger(), Is.EqualTo(2), "P2P_CHAT_SESSION (llimview.cpp:5204)");
-            Assert.That(voice["channel_uri"].AsString(), Is.EqualTo(Xor.ToString()), "= the provision's `channel` (llvoicewebrtc.cpp:1497)");
-            Assert.That(voice["channel_credentials"].AsString(), Is.EqualTo(s.Token), "= the provision's `credentials` (llvoicewebrtc.cpp:1498)");
+            {
+                var assertedValue = voice["invitation_type"].AsInteger();
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "P2P_CHAT_SESSION (llimview.cpp:5204)");
+            }
+            {
+                var assertedValue = voice["channel_uri"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal(Xor.ToString(), assertedValue), "= the provision's `channel` (llvoicewebrtc.cpp:1497)");
+            }
+            {
+                var assertedValue = voice["channel_credentials"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal(s.Token, assertedValue), "= the provision's `credentials` (llvoicewebrtc.cpp:1498)");
+            }
             // This routes the channel to the webrtc module (llvoiceclient.cpp:514-528; absent
             // defaults to Vivox, :126-132) and satisfies compareChannels' first test (llvoicewebrtc.cpp:1684).
-            Assert.That(voice["voice_server_type"].AsString(), Is.EqualTo("webrtc"));
-            Assert.That(voice.ContainsKey("sip_uri"), Is.False,
-                "compareChannels tests sip_uri equality and the module's own maps lack it (getAudioSessionChannelInfo, llvoicewebrtc.cpp:1626-1636): absent==absent is what compares equal");
-            Assert.That(voice.Count, Is.EqualTo(4));
-            Assert.That(body.Count, Is.EqualTo(5));
+            Assert.Equal("webrtc", voice["voice_server_type"].AsString());
+            Assert.False(voice.ContainsKey("sip_uri"), "compareChannels tests sip_uri equality and the module's own maps lack it (getAudioSessionChannelInfo, llvoicewebrtc.cpp:1626-1636): absent==absent is what compares equal");
+            Assert.Equal(4, voice.Count);
+            Assert.Equal(5, body.Count);
 
             // and it survives the event serialisation the queue applies
             string xml = OSDParser.SerializeLLSDXmlString(body);
-            Assert.That(xml, Does.Contain("channel_credentials").And.Contain("invitation_type"));
+            {
+                var assertedValue = xml;
+                Assert.Contains("channel_credentials", assertedValue);
+                Assert.Contains("invitation_type", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildBody_RequiresAMintedToken()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
-            Assert.That(() => A2AInvitation.BuildBody(s, Alice, "x"), Throws.InvalidOperationException);
+            {
+                var assertedValue = () => A2AInvitation.BuildBody(s, Alice, "x");
+                Assert.Throws<InvalidOperationException>(() =>
+                {
+                    assertedValue();
+                });
+            }
         }
 
         // ---- trigger: on "call", never on "start p2p voice" ---------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StartP2PVoice_NeverProducesAnInvitation()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(), Alice, "Alice Caller", reg);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(o.Invite, Is.Null, "the viewer sends start p2p voice on every P2P IM window open (Firestorm llimview.cpp:634, SL llimview.cpp:485); it must not ring");
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            {
+                var assertedValue = o.Invite;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the viewer sends start p2p voice on every P2P IM window open (Firestorm llimview.cpp:634, SL llimview.cpp:485); it must not ring");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Call_ProducesTheInvitation_ForTheOtherParty_WithTheSameToken()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             ChatSessionRequestLogic.Decide(StartBody(), Alice, "Alice Caller", reg);
 
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Alice, "Alice Caller", reg);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(o.Invite, Is.Not.Null);
-            Assert.That(o.Invite.Callee, Is.EqualTo(Bob));
-            Assert.That(o.Invite.Caller, Is.EqualTo(Alice));
-            Assert.That(o.Invite.SessionId, Is.EqualTo(Xor));
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            Assert.NotNull(o.Invite);
+            Assert.Equal(Bob, o.Invite.Callee);
+            Assert.Equal(Alice, o.Invite.Caller);
+            Assert.Equal(Xor, o.Invite.SessionId);
             string token = ((OSDMap)o.Body["voice_credentials"])["channel_credentials"].AsString();
-            Assert.That(((OSDMap)o.Invite.Body["voice"])["channel_credentials"].AsString(), Is.EqualTo(token),
-                "caller and callee join with the same session credentials");
-            Assert.That(o.Invite.Body["session_name"].AsString(), Is.EqualTo("Alice Caller"));
-            Assert.That(o.Instrument, Does.Contain("invite=pending").And.Not.Contain(token));
+            {
+                var assertedValue = ((OSDMap)o.Invite.Body["voice"])["channel_credentials"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal(token, assertedValue), "caller and callee join with the same session credentials");
+            }
+            Assert.Equal("Alice Caller", o.Invite.Body["session_name"].AsString());
+            {
+                var assertedValue = o.Instrument;
+                Assert.Contains("invite=pending", assertedValue);
+                Assert.DoesNotContain(token, assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RepeatCall_ReSendsTheInvitation_WithTheSameCredentials()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The viewer retries "call" up to 3x on ERROR_NOT_AVAILABLE (llvoicechannel.cpp:571-579). The
             // callee viewer ignores a duplicate while the first invitation is pending
             // (mPendingInvitations, llimview.cpp:4257-4281), so re-sending is safe.
@@ -135,26 +169,27 @@ namespace osWebRtcVoice.Tests
             ChatSessionRequestLogic.Decide(StartBody(), Alice, "Alice Caller", reg);
             ChatSessionOutcome first = ChatSessionRequestLogic.Decide(CallBody(), Alice, "Alice Caller", reg);
             ChatSessionOutcome second = ChatSessionRequestLogic.Decide(CallBody(), Alice, "Alice Caller", reg);
-            Assert.That(second.Invite, Is.Not.Null);
-            Assert.That(((OSDMap)second.Invite.Body["voice"])["channel_credentials"].AsString(),
-                Is.EqualTo(((OSDMap)first.Invite.Body["voice"])["channel_credentials"].AsString()));
-            Assert.That(reg.Count, Is.EqualTo(1));
+            Assert.NotNull(second.Invite);
+            Assert.Equal(((OSDMap)first.Invite.Body["voice"])["channel_credentials"].AsString(), ((OSDMap)second.Invite.Body["voice"])["channel_credentials"].AsString());
+            Assert.Equal(1, reg.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Call_WithoutInvitation_ProducesNoInvite()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Alice, "Alice Caller", reg);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.NotFound));
-            Assert.That(o.Invite, Is.Null);
+            Assert.Equal(HttpStatusCode.NotFound, o.Status);
+            Assert.Null(o.Invite);
         }
 
         // ---- delivery on this instance ------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Deliver_CalleeRootPresence_EnqueuesTheEventToTheCallee()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, Bob);
             var queue = new CapturingEventQueue();
@@ -162,77 +197,95 @@ namespace osWebRtcVoice.Tests
 
             string decision = A2AInviteDelivery.Deliver(new[] { scene }, Bob, body, _ => queue, out string region);
 
-            Assert.That(decision, Is.EqualTo(A2AInviteDelivery.DecisionSent));
-            Assert.That(region, Is.EqualTo(scene.RegionInfo.RegionName));
-            Assert.That(queue.Built, Has.Count.EqualTo(1));
-            Assert.That(queue.Built[0].Name, Is.EqualTo("ChatterBoxInvitation"));
-            Assert.That(queue.Built[0].Body, Is.SameAs(body));
-            Assert.That(queue.Enqueued, Has.Count.EqualTo(1));
-            Assert.That(queue.Enqueued[0], Is.EqualTo(Bob), "delivered to the CALLEE, not the caller");
+            Assert.Equal(A2AInviteDelivery.DecisionSent, decision);
+            Assert.Equal(scene.RegionInfo.RegionName, region);
+            Assert.Single(queue.Built);
+            Assert.Equal("ChatterBoxInvitation", queue.Built[0].Name);
+            Assert.Same(body, queue.Built[0].Body);
+            Assert.Single(queue.Enqueued);
+            {
+                var assertedValue = queue.Enqueued[0];
+                TestAssert.WithMessage(() => Assert.Equal(Bob, assertedValue), "delivered to the CALLEE, not the caller");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Deliver_CalleeNotOnAnyScene_IsUnreachable_NothingEnqueued()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, Alice);          // only the caller is here
             var queue = new CapturingEventQueue();
 
             string decision = A2AInviteDelivery.Deliver(new[] { scene }, Bob, SomeBody(), _ => queue, out string region);
 
-            Assert.That(decision, Is.EqualTo(A2AInviteDelivery.DecisionNoPresence));
-            Assert.That(region, Is.EqualTo("-"));
-            Assert.That(queue.Enqueued, Is.Empty);
-            Assert.That(A2AInviteDelivery.Deliver(Array.Empty<Scene>(), Bob, SomeBody(), _ => queue, out _), Is.EqualTo(A2AInviteDelivery.DecisionNoPresence));
-            Assert.That(A2AInviteDelivery.Deliver(null, Bob, SomeBody(), _ => queue, out _), Is.EqualTo(A2AInviteDelivery.DecisionNoPresence));
+            Assert.Equal(A2AInviteDelivery.DecisionNoPresence, decision);
+            Assert.Equal("-", region);
+            Assert.Empty(queue.Enqueued);
+            Assert.Equal(A2AInviteDelivery.DecisionNoPresence, A2AInviteDelivery.Deliver(Array.Empty<Scene>(), Bob, SomeBody(), _ => queue, out _));
+            Assert.Equal(A2AInviteDelivery.DecisionNoPresence, A2AInviteDelivery.Deliver(null, Bob, SomeBody(), _ => queue, out _));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Deliver_CalleePresentButNoEventQueue_IsUnreachable()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, Bob);
             string decision = A2AInviteDelivery.Deliver(new[] { scene }, Bob, SomeBody(), _ => null, out _);
-            Assert.That(decision, Is.EqualTo(A2AInviteDelivery.DecisionNoQueue));
+            Assert.Equal(A2AInviteDelivery.DecisionNoQueue, decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Deliver_EnqueueRefused_IsReported_NotThrown()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, Bob);
             var queue = new CapturingEventQueue { EnqueueResult = false };
-            Assert.That(A2AInviteDelivery.Deliver(new[] { scene }, Bob, SomeBody(), _ => queue, out _), Is.EqualTo(A2AInviteDelivery.DecisionEnqueueFailed));
+            Assert.Equal(A2AInviteDelivery.DecisionEnqueueFailed, A2AInviteDelivery.Deliver(new[] { scene }, Bob, SomeBody(), _ => queue, out _));
             var thrower = new CapturingEventQueue { Throw = true };
-            Assert.That(A2AInviteDelivery.Deliver(new[] { scene }, Bob, SomeBody(), _ => thrower, out _), Is.EqualTo(A2AInviteDelivery.DecisionEnqueueFailed));
+            Assert.Equal(A2AInviteDelivery.DecisionEnqueueFailed, A2AInviteDelivery.Deliver(new[] { scene }, Bob, SomeBody(), _ => thrower, out _));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ResolveCalleeScene_PrefersRoot_FallsBackToChild()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene a = new SceneHelpers().SetupScene("a", UUID.Random(), 1000, 1000);
             Scene b = new SceneHelpers().SetupScene("b", UUID.Random(), 1001, 1000);
             ScenePresence child = SceneHelpers.AddScenePresence(a, Bob);
             child.IsChildAgent = true;
             SceneHelpers.AddScenePresence(b, Bob);                 // root here
 
-            Assert.That(A2AInviteDelivery.ResolveCalleeScene(new[] { a, b }, Bob, out bool isChild), Is.SameAs(b));
-            Assert.That(isChild, Is.False);
-            Assert.That(A2AInviteDelivery.ResolveCalleeScene(new[] { a }, Bob, out isChild), Is.SameAs(a), "a child presence is a fallback, as in GetActiveClient");
-            Assert.That(isChild, Is.True);
+            Assert.Same(b, A2AInviteDelivery.ResolveCalleeScene(new[] { a, b }, Bob, out bool isChild));
+            Assert.False(isChild);
+            {
+                var assertedValue = A2AInviteDelivery.ResolveCalleeScene(new[] { a }, Bob, out isChild);
+                TestAssert.WithMessage(() => Assert.Same(a, assertedValue), "a child presence is a fallback, as in GetActiveClient");
+            }
+            Assert.True(isChild);
         }
 
         // ---- instrument ----------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void InviteLine_NamesBothParties_AndNeverTheToken()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
             s = reg.IssueToken(s.SessionId, Alice);
             string line = A2AInviteDelivery.Line(Bob, Alice, s.SessionId, "Elm", A2AInviteDelivery.DecisionSent);
-            Assert.That(line, Does.StartWith("[A2A INVITE] agent=" + Bob).And.Contain("from=" + Alice).And.Contain("session-id=" + s.SessionId).And.Contain("region=Elm").And.Contain("decision=sent"));
-            Assert.That(line, Does.Not.Contain(s.Token));
+            {
+                var assertedValue = line;
+                Assert.StartsWith("[A2A INVITE] agent=" + Bob, assertedValue);
+                Assert.Contains("from=" + Alice, assertedValue);
+                Assert.Contains("session-id=" + s.SessionId, assertedValue);
+                Assert.Contains("region=Elm", assertedValue);
+                Assert.Contains("decision=sent", assertedValue);
+            }
+            Assert.DoesNotContain(s.Token, line);
         }
 
         // ---- fixtures ---------------------------------------------------------------------------------
