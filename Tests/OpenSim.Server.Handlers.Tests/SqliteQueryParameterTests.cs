@@ -140,6 +140,20 @@ public class SqliteQueryParameterTests
         Xunit.Assert.Single(s_gridUser.Value.GetAll("it's-"));
     }
 
+    [Xunit.Fact]
+    public void GridUserPrefixWildcardsMatchOnlyThemselves()
+    {
+        string local = UUID.Random().ToString();
+        Xunit.Assert.True(s_gridUser.Value.Store(new GridUserData { UserID = local }));
+        string marked = "!_%-" + UUID.Random();
+        Xunit.Assert.True(s_gridUser.Value.Store(new GridUserData { UserID = marked }));
+
+        Xunit.Assert.Empty(s_gridUser.Value.GetAll("%"));
+        Xunit.Assert.Empty(s_gridUser.Value.GetAll("_"));
+        Xunit.Assert.Empty(s_gridUser.Value.GetAll(local[..8] + "_"));
+        Xunit.Assert.Equal(marked, Xunit.Assert.Single(s_gridUser.Value.GetAll("!_%-")).UserID);
+    }
+
     private static void AddAccount(string first, string last)
     {
         Xunit.Assert.True(s_accounts.Value.Store(new UserAccountData

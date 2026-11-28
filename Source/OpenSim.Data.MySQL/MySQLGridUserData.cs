@@ -28,6 +28,7 @@ using OpenSim.Framework;
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using MySqlConnector;
 using OpenMetaverse;
 
 namespace OpenSim.Data.MySQL;
@@ -61,7 +62,13 @@ public class MySQLGridUserData : MySQLGenericTableHandler<GridUserData>, IGridUs
 
     public GridUserData[] GetAll(string userID)
     {
-        return base.Get(String.Format("UserID LIKE '{0}%'", userID));
+        using (MySqlCommand cmd = new MySqlCommand())
+        {
+            cmd.CommandText = $"select * from {m_Realm} where UserID LIKE ?userID ESCAPE '{SqlLike.Escape}'";
+            cmd.Parameters.AddWithValue("?userID", SqlLike.PrefixPattern(userID));
+
+            return DoQuery(cmd);
+        }
     }
 
     public GridUserData[] GetOnlineInRegion(UUID regionID)
