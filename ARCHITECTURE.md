@@ -431,7 +431,8 @@ All are referenced by the region server project and found by plugin discovery.
   `HGFSAssetService`, `HGRemoteAssetService`). On the region, `[Modules] AssetServices = "RegionAssetConnector"`
   ([RegionAssetConnectorModule.cs](Source/OpenSim.Region.CoreModules/ServiceConnectorsOut/Asset/RegionAssetConnectorModule.cs))
   serves `IAssetService` to the scene, backed by the local or remote service and the region asset cache
-  (`FlotsamAssetCache`, configured by `config-include/FlotsamCache.ini.example`).
+  (`FlotsamAssetCache`, with its `[AssetCache]` defaults in `RegionServerDefaults.ini`; the options are described in
+  `config-include/FlotsamCache.ini.example`).
 - **Region datastore.** `[SimulationDataStore] LocalServiceModule = "OpenSim.Services.SimulationService.dll:SimulationDataService"`
   loads an `ISimulationDataStore` (interface in
   [Source/OpenSim.Region.Framework/Interfaces/ISimulationDataStore.cs](Source/OpenSim.Region.Framework/Interfaces/ISimulationDataStore.cs))

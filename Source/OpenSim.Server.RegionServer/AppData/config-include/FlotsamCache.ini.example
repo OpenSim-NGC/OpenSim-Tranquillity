@@ -2,6 +2,10 @@
     ;;
     ;; Options for FlotsamAssetCache
     ;;
+    ;; RegionServerDefaults.ini sets the values shown here. To change any of them, copy this
+    ;; file to FlotsamCache.ini and uncomment Include-FlotsamCache in the [Modules] section of
+    ;; StandaloneCommon.ini or GridCommon.ini.
+    ;;
 
     ; cache directory can be shared by multiple instances
     CacheDirectory = ./assetcache
