@@ -197,7 +197,16 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     public async Task<BakeOutcome> BakeAsync(ScenePresence sp, BakeReason reason, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(sp);
-        if (sp.IsChildAgent) throw new InvalidOperationException($"{sp.Name} is a child agent here");
+
+        // A queued bake can outlive the presence's time as root here. The login bake is queued when the agent is
+        // made root, and a teleport or crossing that leaves before it runs turns this presence into a child agent:
+        // the agent is root in another region now, whose own MakeRootAgent queued the bake there (OnMakeRootAgent
+        // runs on every arrival, not only at login). There is nothing to bake for here and nobody to send it to.
+        if (sp.IsChildAgent)
+        {
+            m_log.LogDebug("[SSB]: bake for {Name} ({Agent}) reason={Reason} not run: the agent is a child agent here", sp.Name, sp.UUID, reason);
+            return new BakeOutcome(sp.UUID, reason, Array.Empty<ChannelOutcome>(), 0);
+        }
 
         // A queued bake can outlive its presence. Logging out with an appearance save pending flushes that save
         // (AvatarFactoryModule.FlushAppearanceSaveOnClose), which raises the change trigger; Scene.RemoveClient
@@ -648,7 +657,9 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     public async Task<BakeOutcome> LoginBakeAsync(ScenePresence sp, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(sp);
-        if (!sp.IsNPC && sp.Appearance is not null)
+        // A presence that has left (child) or closed (no appearance) since the bake was queued needs no read; BakeAsync
+        // ends such a bake quietly.
+        if (!sp.IsNPC && !sp.IsChildAgent && sp.Appearance is not null)
         {
             // The read runs on its own task so that a slow inventory service holds it, not the bake. Its result is used
             // only if it answers within the limit.

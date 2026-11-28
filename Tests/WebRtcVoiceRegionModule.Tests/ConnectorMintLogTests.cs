@@ -21,10 +21,8 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // JoinCapabilityAuthority is process-wide
-    public class ConnectorMintLogTests
-    {
+    public class ConnectorMintLogTests : IAsyncLifetime
+        {
         private const string Secret = "connector-bearer-secret-0123456789abcdef";
         private const string MintKey = "mixer-join-cap-hmac-key-fedcba9876543210";
 
@@ -40,12 +38,8 @@ namespace osWebRtcVoice.Tests
                     Lines.Add((logLevel, formatter(state, exception)));
             }
         }
-
-        [SetUp]
-        public void SetUp() => JoinCapabilityAuthority.Clear();
-
-        [TearDown]
-        public void TearDown() => JoinCapabilityAuthority.Clear();
+        private void SetUp() => JoinCapabilityAuthority.Clear();
+        private void TearDown() => JoinCapabilityAuthority.Clear();
 
         private static VoiceConnectorRecord ActiveRecord()
         {
@@ -71,38 +65,64 @@ namespace osWebRtcVoice.Tests
         private static VoiceConnectorJoinCapEndpoint.Response Fetch(VoiceConnectorJoinCapEndpoint endpoint)
             => endpoint.Handle("POST", "/voice/connector/Recorder/join-cap", "Bearer " + Secret);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASuccessfulFetch_WritesNothingAtInformationOrAbove()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (VoiceConnectorJoinCapEndpoint endpoint, Capture log) = Attached();
 
             for (int i = 0; i < 5; i++)
-                Assert.That(Fetch(endpoint).Status, Is.EqualTo(200));
+                Assert.Equal(200, Fetch(endpoint).Status);
 
             lock (log.Lines)
-                Assert.That(log.Lines.Where(l => l.Level >= LogLevel.Information).Select(l => l.Text), Is.Empty,
-                    "a fetch every minute for every connector must not write an Information line");
+                {
+                    var assertedValue = log.Lines.Where(l => l.Level >= LogLevel.Information).Select(l => l.Text);
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a fetch every minute for every connector must not write an Information line");
+                }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASuccessfulFetch_WritesTheMintedLineAtDebug_WithoutTheCapability()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (VoiceConnectorJoinCapEndpoint endpoint, Capture log) = Attached();
 
             VoiceConnectorJoinCapEndpoint.Response response = Fetch(endpoint);
 
-            Assert.That(response.Status, Is.EqualTo(200));
+            Assert.Equal(200, response.Status);
             string capability = ((OSDMap)OSDParser.DeserializeJson(Encoding.UTF8.GetString(response.Body)))["join_cap"].AsString();
             lock (log.Lines)
             {
                 var minted = log.Lines.Where(l => l.Text.Contains("join capability minted")).ToList();
-                Assert.That(minted, Has.Count.EqualTo(1));
-                Assert.That(minted[0].Level, Is.EqualTo(LogLevel.Debug));
-                Assert.That(minted[0].Text, Does.Contain("Recorder").And.Contain("226001844"));
-                Assert.That(log.Lines.Select(l => l.Text), Has.None.Contain(Secret).And.None.Contain(MintKey));
-                Assert.That(log.Lines.Select(l => l.Text), Has.None.Contain(capability),
-                    "the capability itself is never logged");
+                Assert.Single(minted);
+                Assert.Equal(LogLevel.Debug, minted[0].Level);
+                {
+                    var assertedValue = minted[0].Text;
+                    Assert.Contains("Recorder", assertedValue);
+                    Assert.Contains("226001844", assertedValue);
+                }
+                {
+                    var assertedValue = log.Lines.Select(l => l.Text);
+                    Assert.DoesNotContain(assertedValue, item => item.Contains(Secret));
+                    Assert.DoesNotContain(assertedValue, item => item.Contains(MintKey));
+                }
+                {
+                    var assertedValue = log.Lines.Select(l => l.Text);
+                    TestAssert.WithMessage(() => Assert.DoesNotContain(assertedValue, item => item.Contains(capability)), "the capability itself is never logged");
+                }
             }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

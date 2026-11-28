@@ -184,6 +184,11 @@ public class XInventoryService : ServiceBase, IInventoryService
 
         EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Landmark, "Landmarks");
 
+        // The Linden viewer and Firestorm make My Outfits at login when the root has none
+        // (LLInventoryModel::createCommonSystemCategories), as they do Settings and Materials, which are made here
+        // too. Made here, it is also there for clients that do not make it.
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.MyOutfits, "My Outfits");
+
         EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.LostAndFound, "Lost And Found");
 
         EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Notecard, "Notecards");

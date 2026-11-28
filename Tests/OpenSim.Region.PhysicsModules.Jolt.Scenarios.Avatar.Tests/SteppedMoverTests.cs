@@ -10,7 +10,6 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.Jolt.Harness;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 

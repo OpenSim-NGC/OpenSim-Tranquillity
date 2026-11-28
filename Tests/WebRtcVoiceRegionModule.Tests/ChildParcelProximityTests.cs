@@ -19,7 +19,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ChildParcelProximityTests
     {
         // A parcel along the west edge of the region, 64 m square.
@@ -29,85 +28,95 @@ namespace osWebRtcVoice.Tests
         private static readonly Vector3 EastMin = new Vector3(192f, 0f, 0f);
         private static readonly Vector3 EastMax = new Vector3(256f, 64f, 0f);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void NearbyParcel_IsAccepted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Viewer 5 m west of this region, level with the west parcel.
-            Assert.That(ChildParcelProximity.IsNear(new Vector3(-5f, 100f, 25f), WestMin, WestMax), Is.True);
+            Assert.True(ChildParcelProximity.IsNear(new Vector3(-5f, 100f, 25f), WestMin, WestMax));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void PositionInsideParcel_IsAccepted()
         {
-            Assert.That(ChildParcelProximity.IsNear(new Vector3(10f, 100f, 25f), WestMin, WestMax), Is.True);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.True(ChildParcelProximity.IsNear(new Vector3(10f, 100f, 25f), WestMin, WestMax));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void FarParcel_IsRejected()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The same viewer naming a parcel on the far side of the region.
-            Assert.That(ChildParcelProximity.IsNear(new Vector3(-5f, 100f, 25f), EastMin, EastMax), Is.False);
+            Assert.False(ChildParcelProximity.IsNear(new Vector3(-5f, 100f, 25f), EastMin, EastMax));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParcelJustInsideTolerance_IsAccepted_JustOutsideIsRejected()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             float tol = ChildParcelProximity.ToleranceMetres;
-            Assert.That(ChildParcelProximity.IsNear(new Vector3(-tol, 100f, 25f), WestMin, WestMax), Is.True);
-            Assert.That(ChildParcelProximity.IsNear(new Vector3(-(tol + 1f), 100f, 25f), WestMin, WestMax), Is.False);
+            Assert.True(ChildParcelProximity.IsNear(new Vector3(-tol, 100f, 25f), WestMin, WestMax));
+            Assert.False(ChildParcelProximity.IsNear(new Vector3(-(tol + 1f), 100f, 25f), WestMin, WestMax));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Tolerance_CoversTheStalenessCoreAllows()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // 10 m unsent movement + 2 s at 8 m/s + 5 m margin.
-            Assert.That(ChildParcelProximity.ToleranceMetres, Is.EqualTo(31f));
+            Assert.Equal(31f, ChildParcelProximity.ToleranceMetres);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void DiagonalDistance_UsesBothAxes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // 25 m west and 25 m south of the west parcel's corner: about 35 m, outside 31 m.
-            Assert.That(ChildParcelProximity.IsNear(new Vector3(-25f, 39f, 25f), WestMin, WestMax), Is.False);
+            Assert.False(ChildParcelProximity.IsNear(new Vector3(-25f, 39f, 25f), WestMin, WestMax));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChildWithNoKnownPosition_IsRejected()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // A child that has had no update from its root region sits at the origin, which is also inside the
             // west parcel's box, so the origin must count as unknown rather than as a position.
-            Assert.That(ChildParcelProximity.IsNear(Vector3.Zero, new Vector3(0f, 0f, 0f), new Vector3(64f, 64f, 0f)), Is.False);
-            Assert.That(ChildParcelProximity.HasKnownPosition(Vector3.Zero), Is.False);
+            Assert.False(ChildParcelProximity.IsNear(Vector3.Zero, new Vector3(0f, 0f, 0f), new Vector3(64f, 64f, 0f)));
+            Assert.False(ChildParcelProximity.HasKnownPosition(Vector3.Zero));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChildWithNonFinitePosition_IsRejected()
         {
-            Assert.That(ChildParcelProximity.IsNear(new Vector3(float.NaN, 100f, 25f), WestMin, WestMax), Is.False);
-            Assert.That(ChildParcelProximity.IsNear(new Vector3(-5f, float.PositiveInfinity, 25f), WestMin, WestMax), Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(ChildParcelProximity.IsNear(new Vector3(float.NaN, 100f, 25f), WestMin, WestMax));
+            Assert.False(ChildParcelProximity.IsNear(new Vector3(-5f, float.PositiveInfinity, 25f), WestMin, WestMax));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RejectHint_DropsAChildsHintedParcel_ToTheEstateRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             ParcelResolution hinted = ProvisionParcelResolver.Resolve(new ParcelResolveInput(12, IsChildAgent: true), serverLocalId: null);
-            Assert.That(hinted.Source, Is.EqualTo(ParcelSource.ClientHint));
+            Assert.Equal(ParcelSource.ClientHint, hinted.Source);
 
             ParcelResolution res = ProvisionParcelResolver.RejectHint(hinted);
 
-            Assert.That(res.Source, Is.EqualTo(ParcelSource.None));
-            Assert.That(res.LocalId, Is.Null);
-            Assert.That(res.HintRejected, Is.True);
+            Assert.Equal(ParcelSource.None, res.Source);
+            Assert.Null(res.LocalId);
+            Assert.True(res.HintRejected);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RejectHint_LeavesOtherResolutionsAlone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             ParcelResolution root = ProvisionParcelResolver.Resolve(clientLocalId: 12, serverLocalId: 7);
             ParcelResolution none = ProvisionParcelResolver.Resolve(new ParcelResolveInput(null, IsChildAgent: true), serverLocalId: null);
 
-            Assert.That(ProvisionParcelResolver.RejectHint(root), Is.EqualTo(root));
-            Assert.That(ProvisionParcelResolver.RejectHint(none), Is.EqualTo(none));
+            Assert.Equal(root, ProvisionParcelResolver.RejectHint(root));
+            Assert.Equal(none, ProvisionParcelResolver.RejectHint(none));
         }
     }
 }

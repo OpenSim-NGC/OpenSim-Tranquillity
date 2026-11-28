@@ -12,13 +12,12 @@
  * resolution the region module's Initialise uses (WebRtcVoiceRegionModule.cs, the two Read*
  * calls), independent of any ini file.
  */
-using NUnit.Framework;
+using Xunit;
 using Nini.Config;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VisibilityDefaultsTests
     {
         // A [WebRtcVoice] section as a minimal install writes it: enabled, no visibility keys.
@@ -30,34 +29,38 @@ namespace osWebRtcVoice.Tests
             return cfg;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Defaults_AreFalse()
         {
-            Assert.That(WebRtcVoiceRegionModule.DefaultVisibilityFeederEnabled, Is.False);
-            Assert.That(WebRtcVoiceRegionModule.DefaultVisibilityEmitEnabled, Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(WebRtcVoiceRegionModule.DefaultVisibilityFeederEnabled);
+            Assert.False(WebRtcVoiceRegionModule.DefaultVisibilityEmitEnabled);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VisibilityFeederEnabled_ResolvesFalse_WhenKeyAbsent()
         {
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityFeederEnabled(SectionWithoutVisibilityKeys()), Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(WebRtcVoiceRegionModule.ReadVisibilityFeederEnabled(SectionWithoutVisibilityKeys()));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void VisibilityEmitEnabled_ResolvesFalse_WhenKeyAbsent()
         {
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityEmitEnabled(SectionWithoutVisibilityKeys()), Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(WebRtcVoiceRegionModule.ReadVisibilityEmitEnabled(SectionWithoutVisibilityKeys()));
         }
 
         // An operator turns the feeder and emission on explicitly.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ExplicitTrue_IsHonored()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfig cfg = SectionWithoutVisibilityKeys();
             cfg.Set("VisibilityFeederEnabled", "true");
             cfg.Set("VisibilityEmitEnabled", "true");
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityFeederEnabled(cfg), Is.True);
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityEmitEnabled(cfg), Is.True);
+            Assert.True(WebRtcVoiceRegionModule.ReadVisibilityFeederEnabled(cfg));
+            Assert.True(WebRtcVoiceRegionModule.ReadVisibilityEmitEnabled(cfg));
         }
     }
 }

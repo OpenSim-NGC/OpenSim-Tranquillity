@@ -17,7 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -28,7 +28,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2AAgentListTests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
@@ -83,39 +82,44 @@ namespace osWebRtcVoice.Tests
 
         // ---- the can_voice_chat invariant (impossible-false by construction) -----------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EveryUpdateTheDeliveryCanProduce_HasCanVoiceTrue()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             foreach (GroupChatListAgentUpdateData u in A2AAgentListDelivery.EnterUpdates(Bob, Alice))
             {
-                Assert.That(u.canVoice, Is.True, "can_voice_chat:false hangs up a P2P call (llimview.cpp:4366-4382)");
-                Assert.That(u.isModerator, Is.False);
-                Assert.That(u.mutedText, Is.False);
-                Assert.That(u.enterOrLeave, Is.True, "ENTER");
+                Assert.True(u.canVoice, "can_voice_chat:false hangs up a P2P call (llimview.cpp:4366-4382)");
+                Assert.False(u.isModerator);
+                Assert.False(u.mutedText);
+                Assert.True(u.enterOrLeave, "ENTER");
             }
             foreach (GroupChatListAgentUpdateData u in A2AAgentListDelivery.LeaveUpdates(Alice))
             {
-                Assert.That(u.canVoice, Is.True, "true even on LEAVE: the flag must never read as a decline");
-                Assert.That(u.enterOrLeave, Is.False, "LEAVE");
+                Assert.True(u.canVoice, "true even on LEAVE: the flag must never read as a decline");
+                Assert.False(u.enterOrLeave, "LEAVE");
             }
-            Assert.That(A2AAgentListDelivery.Update(Alice, true).canVoice, Is.True,
-                "the single seam every list goes through hardcodes cv:true (the group 1-arg ctor defaults FALSE)");
+            Assert.True(A2AAgentListDelivery.Update(Alice, true).canVoice, "the single seam every list goes through hardcodes cv:true (the group 1-arg ctor defaults FALSE)");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EnterUpdates_CarryOtherThenSelf()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             List<GroupChatListAgentUpdateData> ups = A2AAgentListDelivery.EnterUpdates(Bob, Alice);
-            Assert.That(ups.Count, Is.EqualTo(2), "the other party plus, per the group pattern, the recipient's own entry");
-            Assert.That(ups[0].agentID, Is.EqualTo(Bob));
-            Assert.That(ups[1].agentID, Is.EqualTo(Alice));
+            {
+                var assertedValue = ups.Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the other party plus, per the group pattern, the recipient's own entry");
+            }
+            Assert.Equal(Bob, ups[0].agentID);
+            Assert.Equal(Alice, ups[1].agentID);
         }
 
         // ---- delivery ------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ActivePair_BothPartiesReceive()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, Alice);
             SceneHelpers.AddScenePresence(scene, Bob);
@@ -124,23 +128,36 @@ namespace osWebRtcVoice.Tests
 
             List<string> lines = A2AAgentListDelivery.SendActivePair(new[] { scene }, s, _ => queue);
 
-            Assert.That(queue.Sent.Count, Is.EqualTo(2));
-            Assert.That(queue.Sent[0].ToAgent, Is.EqualTo(Alice), "caller first");
-            Assert.That(queue.Sent[0].SessionId, Is.EqualTo(Xor));
-            Assert.That(queue.Sent[0].Updates[0].agentID, Is.EqualTo(Bob), "the caller learns about the callee");
-            Assert.That(queue.Sent[1].ToAgent, Is.EqualTo(Bob));
-            Assert.That(queue.Sent[1].Updates[0].agentID, Is.EqualTo(Alice));
+            Assert.Equal(2, queue.Sent.Count);
+            {
+                var assertedValue = queue.Sent[0].ToAgent;
+                TestAssert.WithMessage(() => Assert.Equal(Alice, assertedValue), "caller first");
+            }
+            Assert.Equal(Xor, queue.Sent[0].SessionId);
+            {
+                var assertedValue = queue.Sent[0].Updates[0].agentID;
+                TestAssert.WithMessage(() => Assert.Equal(Bob, assertedValue), "the caller learns about the callee");
+            }
+            Assert.Equal(Bob, queue.Sent[1].ToAgent);
+            Assert.Equal(Alice, queue.Sent[1].Updates[0].agentID);
             foreach (var sent in queue.Sent)
                 foreach (GroupChatListAgentUpdateData u in sent.Updates)
-                    Assert.That(u.canVoice, Is.True);
-            Assert.That(lines, Has.Count.EqualTo(2));
-            Assert.That(lines[0], Does.Contain("[A2A AGENTLIST]").And.Contain($"agent={Alice}")
-                .And.Contain("transition=ENTER").And.Contain($"about={Bob}").And.Contain("decision=sent"));
+                    Assert.True(u.canVoice);
+            Assert.Equal(2, lines.Count());
+            {
+                var assertedValue = lines[0];
+                Assert.Contains("[A2A AGENTLIST]", assertedValue);
+                Assert.Contains($"agent={Alice}", assertedValue);
+                Assert.Contains("transition=ENTER", assertedValue);
+                Assert.Contains($"about={Bob}", assertedValue);
+                Assert.Contains("decision=sent", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Leave_GoesToTheRemainingParty()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, Bob);           // only the remaining party is present
             var queue = new CapturingAgentListQueue();
@@ -148,70 +165,82 @@ namespace osWebRtcVoice.Tests
 
             string line = A2AAgentListDelivery.SendLeave(new[] { scene }, s, Alice, _ => queue);
 
-            Assert.That(queue.Sent.Count, Is.EqualTo(1));
-            Assert.That(queue.Sent[0].ToAgent, Is.EqualTo(Bob));
-            Assert.That(queue.Sent[0].Updates.Count, Is.EqualTo(1));
-            Assert.That(queue.Sent[0].Updates[0].agentID, Is.EqualTo(Alice));
-            Assert.That(queue.Sent[0].Updates[0].enterOrLeave, Is.False);
-            Assert.That(line, Does.Contain($"agent={Bob}").And.Contain("transition=LEAVE")
-                .And.Contain($"about={Alice}").And.Contain("decision=sent"));
+            Assert.Single(queue.Sent);
+            Assert.Equal(Bob, queue.Sent[0].ToAgent);
+            Assert.Single(queue.Sent[0].Updates);
+            Assert.Equal(Alice, queue.Sent[0].Updates[0].agentID);
+            Assert.False(queue.Sent[0].Updates[0].enterOrLeave);
+            {
+                var assertedValue = line;
+                Assert.Contains($"agent={Bob}", assertedValue);
+                Assert.Contains("transition=LEAVE", assertedValue);
+                Assert.Contains($"about={Alice}", assertedValue);
+                Assert.Contains("decision=sent", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void UnreachableRecipient_IsToleratedAndInstrumented()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();       // nobody present
             var queue = new CapturingAgentListQueue();
             A2ASession s = LiveSession();
 
             List<string> lines = A2AAgentListDelivery.SendActivePair(new[] { scene }, s, _ => queue);
-            Assert.That(queue.Sent, Is.Empty);
-            Assert.That(lines[0], Does.Contain("decision=unreachable(no-presence)"));
+            Assert.Empty(queue.Sent);
+            Assert.Contains("decision=unreachable(no-presence)", lines[0]);
 
             string leave = A2AAgentListDelivery.SendLeave(new[] { scene }, s, Alice, _ => queue);
-            Assert.That(leave, Does.Contain("decision=unreachable(no-presence)"));
+            Assert.Contains("decision=unreachable(no-presence)", leave);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ThrowingQueue_NeverPropagates()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             SceneHelpers.AddScenePresence(scene, Alice);
             var queue = new CapturingAgentListQueue { Throw = true };
             A2ASession s = LiveSession();
             string d = A2AAgentListDelivery.Deliver(new[] { scene }, Alice, Xor,
                 A2AAgentListDelivery.EnterUpdates(Bob, Alice), _ => queue);
-            Assert.That(d, Is.EqualTo(A2AAgentListDelivery.DecisionSendFailed));
+            Assert.Equal(A2AAgentListDelivery.DecisionSendFailed, d);
         }
 
         // ---- no session ever formed -> nothing to announce ----------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void InvitedStateRemoval_YieldsNoLeaveCandidates()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Decline / TTL / client-close of an unanswered invitation: MarkGoneSessions removes only
             // Active records, so the handler's LEAVE loop has nothing to send -- by construction.
             var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
             reg.IssueToken(s.SessionId, Alice);
             reg.MarkProvisioned(s.SessionId, Alice, "vs-a");     // caller joined, still Invited
-            Assert.That(reg.MarkGoneSessions(Alice, null), Is.Empty);
-            Assert.That(reg.Decline(Xor, Bob, out _), Is.True, "the record is gone");
-            Assert.That(reg.MarkGoneSessions(Bob, null), Is.Empty);
+            Assert.Empty(reg.MarkGoneSessions(Alice, null));
+            Assert.True(reg.Decline(Xor, Bob, out _), "the record is gone");
+            Assert.Empty(reg.MarkGoneSessions(Bob, null));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BothLogout_ReturnsTheSessionWithItsParties()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
             reg.IssueToken(s.SessionId, Alice);
             reg.MarkProvisioned(s.SessionId, Alice, "vs-a");
             reg.MarkProvisioned(s.SessionId, Bob, "vs-b");
-            Assert.That(reg.MarkGoneSessions(Alice, "vs-a"), Is.Empty);
+            Assert.Empty(reg.MarkGoneSessions(Alice, "vs-a"));
             List<A2ASession> removed = reg.MarkGoneSessions(Bob, "vs-b");
-            Assert.That(removed, Has.Count.EqualTo(1));
-            Assert.That(removed[0].OtherParty(Bob), Is.EqualTo(Alice), "the remaining-party lookup the LEAVE needs");
+            Assert.Single(removed);
+            {
+                var assertedValue = removed[0].OtherParty(Bob);
+                TestAssert.WithMessage(() => Assert.Equal(Alice, assertedValue), "the remaining-party lookup the LEAVE needs");
+            }
         }
     }
 }

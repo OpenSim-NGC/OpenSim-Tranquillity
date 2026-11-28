@@ -284,7 +284,7 @@ public class ExternalIPResolverTests
 
         DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (r.CurrentIP != "203.0.113.77" && DateTime.UtcNow < deadline)
-            await Task.Delay(20);
+            await Task.Delay(20, TestContext.Current.CancellationToken);
 
         Assert.Equal("203.0.113.77", r.CurrentIP);
         Assert.True(calls >= 2, $"expected the timer to re-resolve; calls={calls}");
@@ -300,7 +300,7 @@ public class ExternalIPResolverTests
 
         DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (Volatile.Read(ref call) < 4 && DateTime.UtcNow < deadline)
-            await Task.Delay(20);
+            await Task.Delay(20, TestContext.Current.CancellationToken);
 
         Assert.True(Volatile.Read(ref call) >= 4, "timer stopped firing after a failure");
         Assert.Equal("198.51.100.7", r.CurrentIP);
@@ -326,13 +326,13 @@ public class ExternalIPResolverTests
 
         DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (Volatile.Read(ref calls) < 3 && DateTime.UtcNow < deadline)
-            await Task.Delay(10);
+            await Task.Delay(10, TestContext.Current.CancellationToken);
         Assert.True(Volatile.Read(ref calls) >= 3);
 
         r.Dispose();
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
         int after = Volatile.Read(ref calls);
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         Assert.Equal(after, Volatile.Read(ref calls));
     }
 

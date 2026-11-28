@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -24,7 +24,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// several independent writes with no transaction underneath, so what matters is exactly what the
 /// folder looks like when one of them fails.
 /// </summary>
-[TestFixture]
 public class AisSlamCreateHttpTests
 {
     private const string Cap = "/CAP/0a1b2c3d-0000-4000-8000-000000000000";
@@ -122,7 +121,7 @@ public class AisSlamCreateHttpTests
         var response = new TestOSHttpResponse();
         handler.Handle(new SlamTestRequest(verb, Cap + path, body), response);
         var parsed = OSDParser.DeserializeLLSDXml(response.RawBuffer);
-        Assert.That(parsed, Is.InstanceOf<OSDMap>());
+        Assert.IsAssignableFrom<OSDMap>(parsed);
         return (response.StatusCode, (OSDMap)parsed);
     }
 
@@ -133,7 +132,7 @@ public class AisSlamCreateHttpTests
         var response = new TestOSHttpResponse();
         handler.Handle(new SlamTestRequest(verb, Cap + path, raw), response);
         var parsed = OSDParser.DeserializeLLSDXml(response.RawBuffer);
-        Assert.That(parsed, Is.InstanceOf<OSDMap>());
+        Assert.IsAssignableFrom<OSDMap>(parsed);
         return (response.StatusCode, (OSDMap)parsed);
     }
 
@@ -149,7 +148,7 @@ public class AisSlamCreateHttpTests
 
     // ------------------------------------------------------------------ the happy paths
 
-    [Test]
+    [Fact]
     public void a_slam_replaces_the_links_and_reports_created_removed_and_the_new_version()
     {
         var b = Inventory();
@@ -158,22 +157,20 @@ public class AisSlamCreateHttpTests
 
         var (status, body) = Send(b, "PUT", $"/category/{Cof}/links", Body(Targets[2], Targets[3], Targets[4]));
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(LinkTargets(b, Cof), Is.EquivalentTo(new[] { Targets[2], Targets[3], Targets[4] }));
-        Assert.That(LinkIds(b, Cof).Intersect(oldIds), Is.Empty, "every old link row is gone");
+        Assert.Equal(200, status);
+        Assert.Equivalent(new[] { Targets[2], Targets[3], Targets[4] }, LinkTargets(b, Cof), true);
+        Assert.Empty(LinkIds(b, Cof).Intersect(oldIds));
 
         var created = ((OSDArray)body["_created_items"]).Select(o => o.AsUUID()).ToList();
-        Assert.That(created, Is.EquivalentTo(LinkIds(b, Cof)));
+        Assert.Equivalent(LinkIds(b, Cof), created, true);
         var embeddedLinks = (OSDMap)((OSDMap)body["_embedded"])["links"];
-        Assert.That(embeddedLinks.Keys, Is.EquivalentTo(created.Select(c => c.ToString())),
-            "the created links must ride in _embedded.links, and the viewer only accepts embedded objects listed in _created_items");
-        Assert.That(((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), Is.EquivalentTo(oldIds));
-        Assert.That(((OSDMap)body["_updated_category_versions"])[Cof.ToString()].AsInteger(),
-            Is.EqualTo(b.Folders[Cof].Version), "the slammed folder's version, read fresh");
-        Assert.That(b.Folders[Cof].Version, Is.GreaterThan(before));
+        Assert.Equivalent(created.Select(c => c.ToString()), embeddedLinks.Keys, true);
+        Assert.Equivalent(oldIds, ((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), true);
+        Assert.Equal(b.Folders[Cof].Version, ((OSDMap)body["_updated_category_versions"])[Cof.ToString()].AsInteger());
+        Assert.True(b.Folders[Cof].Version > before);
     }
 
-    [Test]
+    [Fact]
     public void a_slam_of_an_empty_array_empties_the_folders_links()
     {
         var b = Inventory();
@@ -181,49 +178,49 @@ public class AisSlamCreateHttpTests
 
         var (status, body) = Send(b, "PUT", $"/category/{Cof}/links", new OSDArray());
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(LinkIds(b, Cof), Is.Empty);
-        Assert.That(body.ContainsKey("_created_items"), Is.False, "nothing was created, so the key is absent (an absent key and an empty one are identical to the viewer)");
-        Assert.That(((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), Is.EquivalentTo(oldIds));
-        Assert.That(body.ContainsKey("_updated_category_versions"), Is.True);
+        Assert.Equal(200, status);
+        Assert.Empty(LinkIds(b, Cof));
+        Assert.False(body.ContainsKey("_created_items"), "nothing was created, so the key is absent (an absent key and an empty one are identical to the viewer)");
+        Assert.Equivalent(oldIds, ((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), true);
+        Assert.True(body.ContainsKey("_updated_category_versions"));
     }
 
-    [Test]
+    [Fact]
     public void the_cof_alias_slams_the_current_outfit_folder()
     {
         var b = Inventory();
         var (status, _) = Send(b, "PUT", "/category/current/links", Body(Targets[4]));
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(LinkTargets(b, Cof), Is.EquivalentTo(new[] { Targets[4] }));
-        Assert.That(b.Calls, Does.Contain("GetInventorySkeleton"), "resolved deterministically over the skeleton (A7)");
+        Assert.Equal(200, status);
+        Assert.Equivalent(new[] { Targets[4] }, LinkTargets(b, Cof), true);
+        Assert.Contains("GetInventorySkeleton", b.Calls);
     }
 
-    [Test]
+    [Fact]
     public void a_slam_leaves_non_link_items_in_the_folder_alone()
     {
         // the viewer builds a slam body from AT_LINK / AT_LINK_FOLDER rows only (llappearancemgr.cpp:1795-1833),
         // so a slam has nothing to say about ordinary items that happen to live in the folder
         var b = Inventory();
         var (status, _) = Send(b, "PUT", $"/category/{Cof}/links", Body(Targets[2]));
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Items.ContainsKey(PlainItem), Is.True, "the non-link item must survive a slam");
-        Assert.That(b.Items[PlainItem].Folder, Is.EqualTo(Cof));
+        Assert.Equal(200, status);
+        Assert.True(b.Items.ContainsKey(PlainItem), "the non-link item must survive a slam");
+        Assert.Equal(Cof, b.Items[PlainItem].Folder);
     }
 
-    [Test]
+    [Fact]
     public void the_cof_is_slammable_even_though_it_is_a_protected_folder()
     {
         // lookupIsProtectedType governs move/delete/retype (llfoldertype.cpp:151-153); FT_CURRENT_OUTFIT is
         // protected AND is the folder the viewer slams constantly (llappearancemgr.cpp:2251)
         var b = Inventory();
-        Assert.That(AisHandler.IsProtected(b.Folders[Cof]), Is.True, "the COF is protected against deletion");
+        Assert.True(AisHandler.IsProtected(b.Folders[Cof]), "the COF is protected against deletion");
         var (status, _) = Send(b, "PUT", $"/category/{Cof}/links", Body(Targets[3]));
-        Assert.That(status, Is.EqualTo(200), "but a slam is not a delete");
+        Assert.Equal(200, status);
     }
 
     // ------------------------------------------------------------------ fault injection
 
-    [Test]
+    [Fact]
     public void a_failure_on_the_third_of_five_creations_leaves_the_folder_exactly_as_it_was()
     {
         var b = Inventory();
@@ -235,18 +232,18 @@ public class AisSlamCreateHttpTests
         var (status, body) = Send(b, "PUT", $"/category/{Cof}/links",
             Body(Targets[0], Targets[1], Targets[2], Targets[3], Targets[4]));
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.InternalServerError));
-        Assert.That(body["error_code"].AsInteger(), Is.EqualTo(500));
+        Assert.Equal((int)HttpStatusCode.InternalServerError, status);
+        Assert.Equal(500, body["error_code"].AsInteger());
 
         // the whole point: the folder's link contents are byte-for-byte what they were
-        Assert.That(LinkIds(b, Cof), Is.EquivalentTo(beforeIds), "no link row was added or lost");
-        Assert.That(LinkTargets(b, Cof), Is.EquivalentTo(beforeTargets), "and the outfit is unchanged");
-        Assert.That(b.Items.ContainsKey(PlainItem), Is.True);
-        Assert.That(body.ContainsKey("_removed_items"), Is.False, "nothing was removed, so nothing is reported removed");
-        Assert.That(body.ContainsKey("_created_items"), Is.False);
+        Assert.Equivalent(beforeIds, LinkIds(b, Cof), true);
+        Assert.Equivalent(beforeTargets, LinkTargets(b, Cof), true);
+        Assert.True(b.Items.ContainsKey(PlainItem));
+        Assert.False(body.ContainsKey("_removed_items"), "nothing was removed, so nothing is reported removed");
+        Assert.False(body.ContainsKey("_created_items"));
     }
 
-    [Test]
+    [Fact]
     public void a_failure_during_the_rollback_itself_leaves_extra_links_never_fewer_and_says_so()
     {
         // This documents the worst case rather than pretending it cannot happen: the creation fails AND the
@@ -261,18 +258,16 @@ public class AisSlamCreateHttpTests
         var (status, body) = Send(b, "PUT", $"/category/{Cof}/links",
             Body(Targets[0], Targets[1], Targets[2], Targets[3], Targets[4]));
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.InternalServerError));
-        Assert.That(body["message"].AsString(), Does.Contain("rollback also failed"),
-            "the response must name the state it left behind");
+        Assert.Equal((int)HttpStatusCode.InternalServerError, status);
+        Assert.Contains("rollback also failed", body["message"].AsString());
 
         var after = LinkIds(b, Cof);
-        Assert.That(after.IsSupersetOf(beforeIds), Is.True, "every original link is still there");
-        Assert.That(after.Count, Is.EqualTo(beforeIds.Count + 2), "plus the two that were created before the failure");
-        Assert.That(LinkTargets(b, Cof).IsSupersetOf(new[] { Targets[0], Targets[1] }), Is.True,
-            "the leftovers are duplicates of the first two links, recoverable by the next slam");
+        Assert.True(after.IsSupersetOf(beforeIds), "every original link is still there");
+        Assert.Equal(beforeIds.Count + 2, after.Count);
+        Assert.True(LinkTargets(b, Cof).IsSupersetOf(new[] { Targets[0], Targets[1] }), "the leftovers are duplicates of the first two links, recoverable by the next slam");
     }
 
-    [Test]
+    [Fact]
     public void a_removal_failure_after_every_creation_keeps_both_sets_and_reports_the_failure()
     {
         var b = Inventory();
@@ -281,16 +276,16 @@ public class AisSlamCreateHttpTests
 
         var (status, body) = Send(b, "PUT", $"/category/{Cof}/links", Body(Targets[2], Targets[3]));
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.InternalServerError));
-        Assert.That(body["message"].AsString(), Does.Contain("could not be removed"));
+        Assert.Equal((int)HttpStatusCode.InternalServerError, status);
+        Assert.Contains("could not be removed", body["message"].AsString());
         var after = LinkIds(b, Cof);
-        Assert.That(after.IsSupersetOf(beforeIds), Is.True, "nothing was lost");
-        Assert.That(after.Count, Is.EqualTo(beforeIds.Count + 2), "and the new links are there too");
+        Assert.True(after.IsSupersetOf(beforeIds), "nothing was lost");
+        Assert.Equal(beforeIds.Count + 2, after.Count);
     }
 
     // ------------------------------------------------------------------ create
 
-    [Test]
+    [Fact]
     public void create_makes_categories_and_links_with_the_right_deltas()
     {
         var b = Inventory();
@@ -314,24 +309,22 @@ public class AisSlamCreateHttpTests
             },
         });
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(((OSDArray)body["_created_categories"]).Count, Is.EqualTo(1));
-        Assert.That(((OSDArray)body["_created_items"]).Count, Is.EqualTo(1), "a link is a created item");
+        Assert.Equal(200, status);
+        Assert.Single((OSDArray)body["_created_categories"]);
+        Assert.Single((OSDArray)body["_created_items"]);
 
         var embedded = (OSDMap)body["_embedded"];
-        Assert.That(embedded.ContainsKey("categories"), Is.True);
-        Assert.That(embedded.ContainsKey("links"), Is.True, "links are their own collection, never items");
-        Assert.That(embedded.ContainsKey("items"), Is.False);
+        Assert.True(embedded.ContainsKey("categories"));
+        Assert.True(embedded.ContainsKey("links"), "links are their own collection, never items");
+        Assert.False(embedded.ContainsKey("items"));
         var link = (OSDMap)((OSDMap)embedded["links"]).Values.First();
-        Assert.That(link["linked_id"].AsUUID(), Is.EqualTo(Targets[0]));
-        Assert.That(link["inv_type"].AsInteger(), Is.EqualTo((int)InventoryType.Wearable),
-            "the body's inv_type is the target's and is kept");
+        Assert.Equal(Targets[0], link["linked_id"].AsUUID());
+        Assert.Equal((int)InventoryType.Wearable, link["inv_type"].AsInteger());
 
-        Assert.That(((OSDMap)body["_updated_category_versions"])[Clothing.ToString()].AsInteger(),
-            Is.EqualTo(b.Folders[Clothing].Version));
-        Assert.That(b.Folders[Clothing].Version, Is.GreaterThan(before));
-        Assert.That(body["tid"].Type, Is.EqualTo(OSDType.UUID), "tid is echoed");
-        Assert.That(b.Folders.Values.Count(f => f.ParentID == Clothing && f.Name == "New Folder"), Is.EqualTo(1));
+        Assert.Equal(b.Folders[Clothing].Version, ((OSDMap)body["_updated_category_versions"])[Clothing.ToString()].AsInteger());
+        Assert.True(b.Folders[Clothing].Version > before);
+        Assert.Equal(OSDType.UUID, body["tid"].Type);
+        Assert.Equal(1, b.Folders.Values.Count(f => f.ParentID == Clothing && f.Name == "New Folder"));
     }
 
     /// <summary>
@@ -340,7 +333,7 @@ public class AisSlamCreateHttpTests
     /// (llviewerinventory.cpp:1124-1157) and is compiled out behind USE_AIS_FOR_NC, above the comment "not yet
     /// implemented within AIS3" (:1120-1121). A3 guessed and created assetless items; this replaces that.
     /// </summary>
-    [Test]
+    [Fact]
     public void an_items_create_array_is_refused_before_anything_is_written()
     {
         var b = Inventory();
@@ -354,14 +347,14 @@ public class AisSlamCreateHttpTests
             ["items"] = new OSDArray { new OSDMap { ["name"] = "New Note", ["type"] = (int)AssetType.Notecard } },
         });
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotImplemented));
-        Assert.That(body["error_code"].AsInteger(), Is.EqualTo(501));
-        Assert.That(b.Folders.Count, Is.EqualTo(foldersBefore), "the refusal happens before any write");
-        Assert.That(b.Items.Count, Is.EqualTo(itemsBefore));
+        Assert.Equal((int)HttpStatusCode.NotImplemented, status);
+        Assert.Equal(501, body["error_code"].AsInteger());
+        Assert.Equal(foldersBefore, b.Folders.Count);
+        Assert.Equal(itemsBefore, b.Items.Count);
     }
 
     /// <summary>An empty items array is not a request to create items, so it does not trip the refusal.</summary>
-    [Test]
+    [Fact]
     public void an_empty_items_array_is_not_refused()
     {
         var b = Inventory();
@@ -370,10 +363,10 @@ public class AisSlamCreateHttpTests
             ["items"] = new OSDArray(),
             ["categories"] = new OSDArray { new OSDMap { ["name"] = "fine" } },
         });
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Folders.Values.Any(f => f.Name == "fine"), Is.True);
+        Assert.Equal(200, status);
+        Assert.Contains(b.Folders.Values, f => f.Name == "fine");
     }
-    [Test]
+    [Fact]
     public void creating_a_second_object_with_the_same_name_is_allowed()
     {
         // inventory names are not unique in SL or in this tree; a duplicate is a normal outcome, not an error
@@ -383,13 +376,12 @@ public class AisSlamCreateHttpTests
         var (first, _) = Send(b, "POST", $"/category/{Clothing}", body);
         var (second, _) = Send(b, "POST", $"/category/{Clothing}", body);
 
-        Assert.That(first, Is.EqualTo(200));
-        Assert.That(second, Is.EqualTo(200));
-        Assert.That(b.Folders.Values.Count(f => f.ParentID == Clothing && f.Name == "Twin"), Is.EqualTo(2),
-            "two folders of the same name, with different ids");
+        Assert.Equal(200, first);
+        Assert.Equal(200, second);
+        Assert.Equal(2, b.Folders.Values.Count(f => f.ParentID == Clothing && f.Name == "Twin"));
     }
 
-    [Test]
+    [Fact]
     public void creating_a_link_to_a_target_that_does_not_exist_succeeds_as_a_broken_link()
     {
         // broken links are a normal inventory state - the viewer has a whole delta key for removing them
@@ -402,21 +394,21 @@ public class AisSlamCreateHttpTests
             ["links"] = new OSDArray { new OSDMap { ["name"] = "dangling", ["linked_id"] = missing, ["type"] = (int)AssetType.Link } },
         });
 
-        Assert.That(status, Is.EqualTo(200));
+        Assert.Equal(200, status);
         var created = ((OSDArray)body["_created_items"]).Single().AsUUID();
-        Assert.That(b.Items[created].AssetID, Is.EqualTo(missing));
-        Assert.That(b.Items[created].AssetType, Is.EqualTo((int)AssetType.Link));
+        Assert.Equal(missing, b.Items[created].AssetID);
+        Assert.Equal((int)AssetType.Link, b.Items[created].AssetType);
     }
 
-    [Test]
+    [Fact]
     public void creating_in_an_unknown_category_is_404()
     {
         var (status, body) = Send(Inventory(), "POST", $"/category/{UUID.Random()}", new OSDMap());
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(body["error_code"].AsInteger(), Is.EqualTo(404));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.Equal(404, body["error_code"].AsInteger());
     }
 
-    [Test]
+    [Fact]
     public void slam_and_create_through_the_library_cap_are_405()
     {
         foreach (var (verb, path, body) in new (string, string, OSD)[]
@@ -427,17 +419,17 @@ public class AisSlamCreateHttpTests
         {
             var b = Inventory();
             var (status, _) = Send(b, verb, path, body, AisMode.Library);
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.MethodNotAllowed), $"{verb} {path}");
-            Assert.That(LinkTargets(b, Cof), Is.EquivalentTo(new[] { Targets[0], Targets[1] }), "nothing changed");
+            Assert.Equal((int)HttpStatusCode.MethodNotAllowed, status);
+            Assert.Equivalent(new[] { Targets[0], Targets[1] }, LinkTargets(b, Cof), true);
         }
     }
 
-    [Test]
+    [Fact]
     public void a_slam_body_that_is_not_an_array_is_400()
     {
         var (status, body) = Send(Inventory(), "PUT", $"/category/{Cof}/links", new OSDMap { ["nonsense"] = 1 });
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest));
-        Assert.That(body["error_code"].AsInteger(), Is.EqualTo(400));
+        Assert.Equal((int)HttpStatusCode.BadRequest, status);
+        Assert.Equal(400, body["error_code"].AsInteger());
     }
 
     /// <summary>
@@ -445,7 +437,7 @@ public class AisSlamCreateHttpTests
     /// type_default as an integer, name, and optionally thumbnail and favorite. Everything is accepted; the two
     /// optional ones have no column in this tree and are dropped.
     /// </summary>
-    [Test]
+    [Fact]
     public void the_categories_create_map_is_accepted_exactly_as_the_viewer_sends_it()
     {
         var b = Inventory();
@@ -466,15 +458,15 @@ public class AisSlamCreateHttpTests
             },
         });
 
-        Assert.That(status, Is.EqualTo(200), "thumbnail and favorite must not make the create fail");
+        Assert.Equal(200, status);
         var created = ((OSDArray)body["_created_categories"]).Single().AsUUID();
-        Assert.That(created, Is.Not.EqualTo(UUID.Zero), "the server assigned an id rather than echoing the null one");
+        Assert.NotEqual(UUID.Zero, created);
 
         var folder = b.Folders[created];
-        Assert.That(folder.Name, Is.EqualTo("Beach Outfit"));
-        Assert.That(folder.Type, Is.EqualTo((short)FolderType.Outfit), "type_default is the integer folder type");
-        Assert.That(folder.ParentID, Is.EqualTo(Clothing));
-        Assert.That(folder.Owner, Is.EqualTo(Agent));
+        Assert.Equal("Beach Outfit", folder.Name);
+        Assert.Equal((short)FolderType.Outfit, folder.Type);
+        Assert.Equal(Clothing, folder.ParentID);
+        Assert.Equal(Agent, folder.Owner);
     }
 
     // ================================================================== AIS-SEC-2
@@ -514,17 +506,16 @@ public class AisSlamCreateHttpTests
     {
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(expected));
-            Assert.That(body["error_code"].AsInteger(), Is.EqualTo(expected));
-            Assert.That(b.Writes, Is.Empty, "a refused body must not reach a single backend write");
-            Assert.That(LinkRows(b, Cof), Is.EqualTo(before), "the COF's link rows must be byte-for-byte what they were");
-            Assert.That(body.ContainsKey("_removed_items"), Is.False, "and nothing may be reported as removed");
-            Assert.That(body.ContainsKey("_updated_category_versions"), Is.False,
-                "no version delta either, or the viewer advances past a state the server never reached");
+            Assert.Equal(expected, status);
+            Assert.Equal(expected, body["error_code"].AsInteger());
+            Assert.Empty(b.Writes);
+            Assert.Equal(before, LinkRows(b, Cof));
+            Assert.False(body.ContainsKey("_removed_items"), "and nothing may be reported as removed");
+            Assert.False(body.ContainsKey("_updated_category_versions"), "no version delta either, or the viewer advances past a state the server never reached");
         });
     }
 
-    [Test]
+    [Fact]
     public void a_slam_body_of_truncated_xml_is_400_and_writes_nothing()
     {
         var b = Inventory();
@@ -534,7 +525,7 @@ public class AisSlamCreateHttpTests
         AssertRefused(b, before, status, body, 400);
     }
 
-    [Test]
+    [Fact]
     public void a_slam_body_of_valid_xml_that_is_not_llsd_is_400_and_writes_nothing()
     {
         var b = Inventory();
@@ -548,7 +539,7 @@ public class AisSlamCreateHttpTests
     /// No body at all. This is the one that made the defect reachable without malice: an interrupted PUT arrives
     /// with nothing in it, and "nothing" used to mean "empty slam".
     /// </summary>
-    [Test]
+    [Fact]
     public void a_slam_with_no_body_is_400_and_writes_nothing()
     {
         var b = Inventory();
@@ -562,7 +553,7 @@ public class AisSlamCreateHttpTests
     /// (<c>llappearancemgr.cpp:2209-2245</c>), so <c>{}</c> can only be a client we do not know or a
     /// body that arrived damaged — and under replacement semantics the safe reading of both is "refuse".
     /// </summary>
-    [Test]
+    [Fact]
     public void a_slam_body_of_an_empty_map_is_400_and_writes_nothing()
     {
         var b = Inventory();
@@ -575,7 +566,7 @@ public class AisSlamCreateHttpTests
     /// All-or-nothing. Accepting the good entries and dropping the bad one would delete the old links the viewer
     /// meant to keep, which is the same outfit loss by a quieter route.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_slam_array_holding_a_non_map_entry_is_400_and_writes_nothing()
     {
         var b = Inventory();
@@ -585,7 +576,7 @@ public class AisSlamCreateHttpTests
         AssertRefused(b, before, status, body, 400);
     }
 
-    [Test]
+    [Fact]
     public void a_slam_link_with_a_zero_linked_id_is_400_and_writes_nothing()
     {
         var b = Inventory();
@@ -601,7 +592,7 @@ public class AisSlamCreateHttpTests
     /// (<c>llappearancemgr.cpp:1795-1833</c>). A type-0 (Texture) entry would have been stored as a link row with
     /// an asset type no fetch route knows how to present.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_slam_link_of_a_type_that_is_not_a_link_is_400_and_writes_nothing()
     {
         var b = Inventory();
@@ -616,13 +607,12 @@ public class AisSlamCreateHttpTests
     /// The ceiling is enforced while the stream is copied, so an oversized body is refused without ever being
     /// held in memory — the point being that a body too big to trust is also a body too big to buffer.
     /// </summary>
-    [Test]
+    [Fact]
     public void a_slam_body_over_the_size_ceiling_is_413_and_writes_nothing()
     {
         var b = Inventory();
         var before = LinkRows(b, Cof);
-        Assert.That(AisHandler.MaxBodyBytes, Is.EqualTo(BodyCeiling),
-            "the handler's ceiling and the one this test exercises must be the same number");
+        Assert.Equal(BodyCeiling, AisHandler.MaxBodyBytes);
         var raw = new byte[BodyCeiling + 1];
         for (var i = 0; i < raw.Length; i++) raw[i] = (byte)'a';
         var (status, body) = SendRaw(b, "PUT", $"/category/{Cof}/links", raw);
@@ -634,21 +624,21 @@ public class AisSlamCreateHttpTests
     /// last garment — and is the case the negative ones must not sweep up with them.
     /// (<c>a_slam_of_an_empty_array_empties_the_folders_links</c> is the same assertion from A3's side.)
     /// </summary>
-    [Test]
+    [Fact]
     public void the_empty_array_is_still_an_intentional_empty_slam()
     {
         var b = Inventory();
         var oldIds = LinkIds(b, Cof);
         var (status, body) = Send(b, "PUT", $"/category/{Cof}/links", new OSDArray());
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(LinkIds(b, Cof), Is.Empty);
-        Assert.That(((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), Is.EquivalentTo(oldIds));
-        Assert.That(b.Writes, Is.Not.Empty, "an intentional empty slam DOES write - it removes the old links");
+        Assert.Equal(200, status);
+        Assert.Empty(LinkIds(b, Cof));
+        Assert.Equivalent(oldIds, ((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), true);
+        Assert.NotEmpty(b.Writes);
     }
 
     /// <summary>Positive control: an ordinary two-link slam still replaces the folder's links.</summary>
-    [Test]
+    [Fact]
     public void a_valid_two_link_slam_still_replaces_the_links()
     {
         var b = Inventory();
@@ -658,17 +648,17 @@ public class AisSlamCreateHttpTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(200));
-            Assert.That(LinkTargets(b, Cof), Is.EquivalentTo(new[] { Targets[2], Targets[3] }));
-            Assert.That(LinkIds(b, Cof).Intersect(oldIds), Is.Empty, "the previous link rows are gone");
-            Assert.That(((OSDArray)body["_created_items"]), Has.Count.EqualTo(2));
-            Assert.That(((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), Is.EquivalentTo(oldIds));
+            Assert.Equal(200, status);
+            Assert.Equivalent(new[] { Targets[2], Targets[3] }, LinkTargets(b, Cof), true);
+            Assert.Empty(LinkIds(b, Cof).Intersect(oldIds));
+            Assert.Equal(2, ((OSDArray)body["_created_items"]).Count);
+            Assert.Equivalent(oldIds, ((OSDArray)body["_removed_items"]).Select(o => o.AsUUID()), true);
         });
     }
 
     // ------------------------------------------------------------------ the other body-carrying mutations
 
-    [Test]
+    [Fact]
     public void a_PATCH_item_with_a_malformed_body_is_400_and_writes_nothing()
     {
         var b = Inventory();
@@ -678,14 +668,14 @@ public class AisSlamCreateHttpTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(400));
-            Assert.That(body["error_code"].AsInteger(), Is.EqualTo(400));
-            Assert.That(b.Writes, Is.Empty);
-            Assert.That(b.Items[PlainItem].Name, Is.EqualTo(nameBefore));
+            Assert.Equal(400, status);
+            Assert.Equal(400, body["error_code"].AsInteger());
+            Assert.Empty(b.Writes);
+            Assert.Equal(nameBefore, b.Items[PlainItem].Name);
         });
     }
 
-    [Test]
+    [Fact]
     public void a_PATCH_category_with_a_malformed_body_is_400_and_writes_nothing()
     {
         var b = Inventory();
@@ -696,11 +686,11 @@ public class AisSlamCreateHttpTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(status, Is.EqualTo(400));
-            Assert.That(body["error_code"].AsInteger(), Is.EqualTo(400));
-            Assert.That(b.Writes, Is.Empty);
-            Assert.That(b.Folders[Clothing].Name, Is.EqualTo(nameBefore));
-            Assert.That(b.Folders[Clothing].Version, Is.EqualTo(versionBefore));
+            Assert.Equal(400, status);
+            Assert.Equal(400, body["error_code"].AsInteger());
+            Assert.Empty(b.Writes);
+            Assert.Equal(nameBefore, b.Folders[Clothing].Name);
+            Assert.Equal(versionBefore, b.Folders[Clothing].Version);
         });
     }
 }

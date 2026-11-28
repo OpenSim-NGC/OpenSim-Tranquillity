@@ -199,7 +199,7 @@ public class RateLimitedLogTests
     }
 
     [Fact]
-    public void ManyCallersAtOnceWriteOneLineAndCountTheRest()
+    public async Task ManyCallersAtOnceWriteOneLineAndCountTheRest()
     {
         var clock = new Clock();
         var gate = new RateLimitedLog(clock.Now);
@@ -210,7 +210,7 @@ public class RateLimitedLogTests
         {
             for (int i = 0; i < perThread; i++) gate.Log(log, LogLevel.Information, "refused");
         })).ToArray();
-        Task.WaitAll(workers);
+        await Task.WhenAll(workers);
         Assert.Single(log.Entries);
 
         clock.AdvanceSeconds(60);
@@ -220,7 +220,7 @@ public class RateLimitedLogTests
     }
 
     [Fact]
-    public void ManyCallersRacingAtTheEndOfAWindowWriteExactlyOneSummary()
+    public async Task ManyCallersRacingAtTheEndOfAWindowWriteExactlyOneSummary()
     {
         var clock = new Clock();
         var gate = new RateLimitedLog(clock.Now);
@@ -235,7 +235,7 @@ public class RateLimitedLogTests
             gate.Log(log, LogLevel.Information, "refused");
         })).ToArray();
         start.Set();
-        Task.WaitAll(workers);
+        await Task.WhenAll(workers);
 
         Assert.Equal(2, log.Entries.Count);
         Assert.Equal("refused (99 more like this in the last 60 s)", log.Entries[1].Text);

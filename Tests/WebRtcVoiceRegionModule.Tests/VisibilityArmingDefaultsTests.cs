@@ -9,13 +9,12 @@
  * [WebRtcVoice] VisibilityArmingEnabled defaults to FALSE, so deploying it changes nothing on the wire until
  * an operator turns it on. Pins the key-absent resolution the region module's Initialise uses.
  */
-using NUnit.Framework;
+using Xunit;
 using Nini.Config;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VisibilityArmingDefaultsTests
     {
         private static IConfig Section()
@@ -28,20 +27,27 @@ namespace osWebRtcVoice.Tests
             return cfg;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Default_IsFalse()
-            => Assert.That(WebRtcVoiceRegionModule.DefaultVisibilityArmingEnabled, Is.False);
 
-        [Test]
+            {
+    TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+    Assert.False(WebRtcVoiceRegionModule.DefaultVisibilityArmingEnabled);
+}
+        [Fact(Timeout = 60000)]
         public void ResolvesFalse_WhenKeyAbsent_EvenWithFeederAndEmissionOn()
-            => Assert.That(WebRtcVoiceRegionModule.ReadVisibilityArmingEnabled(Section()), Is.False);
 
-        [Test]
+            {
+    TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+    Assert.False(WebRtcVoiceRegionModule.ReadVisibilityArmingEnabled(Section()));
+}
+        [Fact(Timeout = 60000)]
         public void ExplicitTrue_IsHonored()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfig cfg = Section();
             cfg.Set("VisibilityArmingEnabled", "true");
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityArmingEnabled(cfg), Is.True);
+            Assert.True(WebRtcVoiceRegionModule.ReadVisibilityArmingEnabled(cfg));
         }
     }
 }

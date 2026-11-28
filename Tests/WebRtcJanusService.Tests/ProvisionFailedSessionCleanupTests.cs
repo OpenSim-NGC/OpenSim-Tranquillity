@@ -80,16 +80,13 @@ namespace osWebRtcVoice.Tests
         }
     }
 
-    [TestFixture]
-    public class ProvisionFailedSessionCleanupTests
-    {
+    public class ProvisionFailedSessionCleanupTests : IAsyncLifetime
+        {
         private static readonly UUID Region = new UUID("bbbbbbbb-0000-0000-0000-00000000a053");
         private static readonly UUID Alice = new UUID("aaaaaaaa-1111-1111-1111-00000000a053");
 
         private WebRtcVoiceServiceModule _module;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             FakeVoiceService.Mode = FakeProvisionMode.Fail;
             lock (FakeVoiceService.Created) FakeVoiceService.Created.Clear();
@@ -102,9 +99,7 @@ namespace osWebRtcVoice.Tests
             _module = new WebRtcVoiceServiceModule();
             _module.Initialise(config);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             foreach (IVoiceViewerSession s in VoiceViewerSession.CaptureSessionsForClose(Region, Alice, UUID.Zero))
                 VoiceViewerSession.CloseCompleted(s);
@@ -131,7 +126,10 @@ namespace osWebRtcVoice.Tests
         {
             lock (FakeVoiceService.Created)
             {
-                Assert.That(FakeVoiceService.Created, Has.Count.EqualTo(1), "the module created exactly one session");
+                {
+                    var assertedValue = FakeVoiceService.Created;
+                    TestAssert.WithMessage(() => Assert.Single(assertedValue), "the module created exactly one session");
+                }
                 return FakeVoiceService.Created[0];
             }
         }
@@ -143,48 +141,67 @@ namespace osWebRtcVoice.Tests
                 Thread.Sleep(10);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void FailedFirstProvision_RemovesTheNewSession_AndShutsItDown()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeVoiceService.Mode = FakeProvisionMode.Fail;
 
             OSDMap resp = _module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
 
-            Assert.That(resp["response"].AsString(), Is.EqualTo("failed"), "the failure map is still returned to the viewer");
-            Assert.That(VoiceViewerSession.IsAgentInRegion(Region, Alice), Is.False, "a failed provision leaves the agent unvoiced");
+            {
+                var assertedValue = resp["response"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal("failed", assertedValue), "the failure map is still returned to the viewer");
+            }
+            Assert.False(VoiceViewerSession.IsAgentInRegion(Region, Alice), "a failed provision leaves the agent unvoiced");
             FakeViewerSession created = OnlyCreated();
             WaitForShutdown(created);
-            Assert.That(created.ShutdownCalls, Is.EqualTo(1), "its voice-service resources are shut down");
-            Assert.That(RegisteredSessionCount(), Is.EqualTo(0), "no registry entry left for the agent");
+            {
+                var assertedValue = created.ShutdownCalls;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "its voice-service resources are shut down");
+            }
+            {
+                var assertedValue = RegisteredSessionCount();
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no registry entry left for the agent");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void NullResponseFirstProvision_RemovesTheNewSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeVoiceService.Mode = FakeProvisionMode.Null;
 
-            Assert.That(_module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region), Is.Null);
+            Assert.Null(_module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region));
 
-            Assert.That(VoiceViewerSession.IsAgentInRegion(Region, Alice), Is.False);
-            Assert.That(RegisteredSessionCount(), Is.EqualTo(0));
+            Assert.False(VoiceViewerSession.IsAgentInRegion(Region, Alice));
+            Assert.Equal(0, RegisteredSessionCount());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SuccessfulFirstProvision_KeepsExactlyOneSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeVoiceService.Mode = FakeProvisionMode.Succeed;
 
             OSDMap resp = _module.ProvisionVoiceAccountRequest(LocalFirstProvision(), Alice, Region);
 
-            Assert.That(resp.ContainsKey("viewer_session"), Is.True, "success map");
-            Assert.That(VoiceViewerSession.IsAgentInRegion(Region, Alice), Is.True);
-            Assert.That(OnlyCreated().ShutdownCalls, Is.EqualTo(0), "a successful session is not shut down");
-            Assert.That(RegisteredSessionCount(), Is.EqualTo(1), "exactly one registry entry");
+            Assert.True(resp.ContainsKey("viewer_session"), "success map");
+            Assert.True(VoiceViewerSession.IsAgentInRegion(Region, Alice));
+            {
+                var assertedValue = OnlyCreated().ShutdownCalls;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "a successful session is not shut down");
+            }
+            {
+                var assertedValue = RegisteredSessionCount();
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "exactly one registry entry");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void FailedReprovisionOfAnExistingSession_LeavesThatSessionAlone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The viewer already owns this viewer session (it holds its id); a failed re-provision must not
             // tear it down behind the viewer's back.
             var existing = new FakeViewerSession { VoiceService = new FakeVoiceService(null), AgentId = Alice, RegionId = Region };
@@ -195,11 +212,26 @@ namespace osWebRtcVoice.Tests
             req["viewer_session"] = OSD.FromString(existing.ViewerSessionID);
             OSDMap resp = _module.ProvisionVoiceAccountRequest(req, Alice, Region);
 
-            Assert.That(resp["response"].AsString(), Is.EqualTo("failed"));
-            Assert.That(VoiceViewerSession.IsAgentInRegion(Region, Alice), Is.True, "the viewer's existing session stays registered");
+            Assert.Equal("failed", resp["response"].AsString());
+            Assert.True(VoiceViewerSession.IsAgentInRegion(Region, Alice), "the viewer's existing session stays registered");
             Thread.Sleep(50);
-            Assert.That(existing.ShutdownCalls, Is.EqualTo(0), "and is not shut down");
-            Assert.That(RegisteredSessionCount(), Is.EqualTo(1));
+            {
+                var assertedValue = existing.ShutdownCalls;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "and is not shut down");
+            }
+            Assert.Equal(1, RegisteredSessionCount());
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

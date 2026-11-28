@@ -29,12 +29,14 @@ public class JoltConfigTests
         return src;
     }
 
-    /// <summary>What AddRegion builds with no [Jolt] settings: Default, MaxBodies by the area rule, CollisionSteps 6,
-    /// VelocityIterations 20.</summary>
-    private static PhysicsBackendSettings Today(uint sx, uint sy)
+    /// <summary>What AddRegion builds with no [Jolt] settings for a region of the standard capacity (MaxPrims 15000,
+    /// MaxAgents 100): Default, the automatic body, pair and contact limits, CollisionSteps 6, VelocityIterations 20.</summary>
+    private static PhysicsBackendSettings Today(uint sx, uint sy, int maxBodies, int maxBodyPairs, int maxContactConstraints)
     {
         var s = PhysicsBackendSettings.Default;
-        s.MaxBodies = (int)(65536L * Math.Max((long)sx * sy, 256L * 256L) / (256L * 256L));
+        s.MaxBodies = maxBodies;
+        s.MaxBodyPairs = maxBodyPairs;
+        s.MaxContactConstraints = maxContactConstraints;
         s.CollisionSteps = 6;
         s.VelocityIterations = 20;
         s.SpeculativeContactDistance = 0.02f;   // Jolt's own value, set explicitly
@@ -43,9 +45,9 @@ public class JoltConfigTests
     }
 
     [Theory]
-    [InlineData(256u, 256u, 65536)]
-    [InlineData(1024u, 1024u, 1048576)]
-    public void Empty_config_reproduces_todays_settings(uint sx, uint sy, int expectedMaxBodies)
+    [InlineData(256u, 256u, 65536, 65536, 16384)]
+    [InlineData(1024u, 1024u, 360448, 65536, 16384)]
+    public void Empty_config_reproduces_todays_settings(uint sx, uint sy, int expectedMaxBodies, int expectedPairs, int expectedContacts)
     {
         foreach (var src in new[] { new IniConfigSource(), Source() })   // no section, and an empty section
         {
@@ -53,7 +55,7 @@ public class JoltConfigTests
             var c = JoltConfig.FromConfig(src, warnings);
             Assert.Empty(warnings);
             var s = c.ToBackendSettings(sx, sy);
-            Assert.Equal(Today(sx, sy), s);
+            Assert.Equal(Today(sx, sy, expectedMaxBodies, expectedPairs, expectedContacts), s);
             Assert.Equal(expectedMaxBodies, s.MaxBodies);
             Assert.Equal(new Vector3(0f, 0f, -9.80665f), s.Gravity);
             Assert.Equal(4.0f, c.AvatarJumpSpeed);
@@ -125,7 +127,7 @@ public class JoltConfigTests
     [InlineData("DeterministicMode", "yes please")]
     [InlineData("MaxBodies", "-1")]
     [InlineData("MaxBodies", "99999999999")]
-    [InlineData("MaxBodyPairs", "0")]
+    [InlineData("MaxBodyPairs", "-1")]
     [InlineData("MaxContactConstraints", "")]
     [InlineData("ScaleCapsWithArea", "2")]
     [InlineData("BodyUpdateBufferMax", "0")]
@@ -364,7 +366,7 @@ public class JoltConfigTests
         var big = c.ToBackendSettings(1024, 1024);
         Assert.Equal(65536 * 16, big.MaxBodyPairs);
         Assert.Equal(16384 * 16, big.MaxContactConstraints);
-        Assert.Equal(1048576, big.MaxBodies);
+        Assert.Equal(360448, big.MaxBodies);           // automatic: from the capacity of a standard 1024 m region
 
         var small = c.ToBackendSettings(256, 256);   // a standard region is unchanged
         Assert.Equal(65536, small.MaxBodyPairs);
