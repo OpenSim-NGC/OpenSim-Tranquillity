@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Globalization;
 using System.Text;
 
 using OpenSim.Framework;
@@ -187,6 +188,28 @@ public class AvatarData
         return result;
     }
 
+    /// <summary>
+    /// Reads a stored or sent avatar height whatever the culture of the process that wrote it. Servers write it with
+    /// <c>float.ToString()</c> in their current culture, so a server in a comma-decimal locale writes "1,8" and one in
+    /// an English or invariant locale writes "1.8". A float written that way has no group separators, so a value with
+    /// no dot and at most one comma is read with the comma as the decimal mark; anything else that does not read in
+    /// the invariant culture is read in the current culture, as before.
+    /// </summary>
+    public static bool TryParseHeight(string value, out float height)
+    {
+        if (value is null)
+        {
+            height = 0f;
+            return false;
+        }
+
+        string v = value;
+        if (v.IndexOf('.') < 0 && v.IndexOf(',') == v.LastIndexOf(','))
+            v = v.Replace(',', '.');
+        return float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out height)
+            || float.TryParse(value, out height);
+    }
+
     public AvatarData(AvatarAppearance appearance)
     {
         AvatarType = 1; // SL avatars
@@ -263,7 +286,8 @@ public class AvatarData
 
             if (Data.ContainsKey("AvatarHeight"))
             {
-                float h = float.Parse(Data["AvatarHeight"]);
+                if (!TryParseHeight(Data["AvatarHeight"], out float h))
+                    h = float.Parse(Data["AvatarHeight"]); // throws, as before: the appearance reads as null
                 if( h == 0f)
                     h = 1.9f;
                 appearance.SetSize(new Vector3(0.45f, 0.6f, h ));

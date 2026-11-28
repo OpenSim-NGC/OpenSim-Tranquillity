@@ -135,13 +135,12 @@ public class AvatarService : AvatarServiceBase, IAvatarService
             // It should be possible to remove this in half a year if we don't want to police values server side.
             if (kvp.Key == "AvatarHeight")
             {
+                // Read with a dot or a comma decimal whatever this server's culture: a region in another locale
+                // than Robust sends the other one.
                 float height;
-                if (!float.TryParse(kvp.Value, out height) || height < 0 || height > 10)
+                if (!AvatarData.TryParseHeight(kvp.Value, out height) || height < 0 || height > 10)
                 {
-                    string rawHeight = kvp.Value.Replace(",", ".");
-
-                    if (!float.TryParse(rawHeight, out height) || height < 0 || height > 10)
-                        height = 1.771488f;
+                    height = 1.771488f;
 
                     m_log.LogDebug(
                         "[AVATAR SERVICE]: Rectifying height of avatar {0} from {1} to {2}",
