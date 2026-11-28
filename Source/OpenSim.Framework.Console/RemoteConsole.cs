@@ -186,6 +186,8 @@ public class RemoteConsole : CommandConsole
         m_Server.AddHTTPHandler("/StartSession", HandleHttpStartSession);
         m_Server.AddHTTPHandler("/CloseSession", HandleHttpCloseSession);
         m_Server.AddHTTPHandler("/SessionCommand", HandleHttpSessionCommand);
+        // A live session's /ReadResponses/<id> is a poll handler, found before this one. Any other id ends here.
+        m_Server.AddHTTPHandler("/ReadResponses", HandleHttpUnknownSession);
     }
 
     public override void Output(string format)
@@ -475,13 +477,12 @@ public class RemoteConsole : CommandConsole
         if (!UUID.TryParse(post["ID"].ToString(), out id))
             return reply;
 
+        // An id that names no session is refused, as SessionCommand refuses it.
         lock (m_Connections)
         {
-            if (m_Connections.ContainsKey(id))
-            {
-                m_Connections.Remove(id);
-                CloseConnection(id);
-            }
+            if (!m_Connections.Remove(id))
+                return reply;
+            CloseConnection(id);
         }
 
         XmlDocument xmldoc = new XmlDocument();
@@ -503,6 +504,18 @@ public class RemoteConsole : CommandConsole
         reply["int_response_code"] = 200;
         reply["content_type"] = "text/xml";
         reply = CheckOrigin(reply);
+
+        return reply;
+    }
+
+    // A poll for a session that does not exist, or no longer does.
+    protected Hashtable HandleHttpUnknownSession(Hashtable request)
+    {
+        Hashtable reply = new Hashtable();
+
+        reply["str_response_string"] = "";
+        reply["int_response_code"] = 404;
+        reply["content_type"] = "text/plain";
 
         return reply;
     }
@@ -597,7 +610,8 @@ public class RemoteConsole : CommandConsole
     {
         try
         {
-            string uri = "/ReadResponses/" + id.ToString() + "/";
+            // The key the session's poll handler was added under, in HandleHttpStartSession.
+            string uri = "/ReadResponses/" + id.ToString();
 
             m_Server.RemovePollServiceHTTPHandler("", uri);
         }
