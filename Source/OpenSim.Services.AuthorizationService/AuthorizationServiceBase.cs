@@ -63,10 +63,11 @@ public class AuthorizationServiceBase : ServiceBase
         }
 
         //
-        // We tried, but this doesn't exist. We can't proceed.
+        // AuthorizationService answers without reading a database, so a StorageProvider is optional. One that is
+        // named is still loaded, as before, for configurations and subclasses that set it.
         //
         if (string.IsNullOrEmpty(dllName))
-            throw new Exception("No StorageProvider configured");
+            return;
 
         m_Database = LoadPlugin<IAssetDataPlugin>(dllName);
         if (m_Database == null)
