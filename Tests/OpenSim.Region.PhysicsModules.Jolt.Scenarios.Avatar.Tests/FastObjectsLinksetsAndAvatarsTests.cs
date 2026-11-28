@@ -85,7 +85,7 @@ public class FastObjectsLinksetsAndAvatarsTests
 
     // ------------------------------------------------------------------ 1. a fast ball at a standing avatar
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(45.0)]
     [InlineData(0.0)]
     public void A_fast_small_ball_does_not_pass_through_a_standing_avatar_and_both_are_told_its_speed(double physicsHz)
@@ -284,7 +284,7 @@ public class FastObjectsLinksetsAndAvatarsTests
 
     // ------------------------------------------------------------------ 4. a linkset thrown at an avatar
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 4 scenario(s)")]
+    [Theory]
     [InlineData(45.0, 1f)]
     [InlineData(0.0, 1f)]
     [InlineData(45.0, 100f)]
@@ -362,7 +362,7 @@ public class FastObjectsLinksetsAndAvatarsTests
 
     // ------------------------------------------------------------------ 5. an avatar walking into a linkset
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(45.0)]
     [InlineData(0.0)]
     public void An_avatar_walking_into_a_linkset_pushes_it_along_as_one_object(double physicsHz)

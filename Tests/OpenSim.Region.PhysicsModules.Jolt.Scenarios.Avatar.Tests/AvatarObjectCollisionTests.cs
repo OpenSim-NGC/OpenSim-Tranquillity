@@ -56,7 +56,7 @@ public class AvatarObjectCollisionTests
 
     // ------------------------------------------------------------------ an object thrown at an avatar
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 3 scenario(s)")]
+    [Theory]
     [InlineData(45.0, 1f)]
     [InlineData(0.0, 1f)]
     [InlineData(45.0, 100f)]
@@ -98,7 +98,7 @@ public class AvatarObjectCollisionTests
 
     // ------------------------------------------------------------------ an avatar walking into an object
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(45.0, 1f)]
     [InlineData(0.0, 1f)]
     [InlineData(45.0, 1000f)]
@@ -153,7 +153,7 @@ public class AvatarObjectCollisionTests
 
     // ------------------------------------------------------------------ an object dropped on an avatar
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(45.0)]
     [InlineData(0.0)]
     public void A_box_dropped_on_an_avatar_comes_to_rest_and_does_not_push_it_into_the_ground(double physicsRate)
@@ -178,7 +178,7 @@ public class AvatarObjectCollisionTests
         Assert.InRange(-AvatarWatch(r).Strikes[box.LocalId], strike * 0.95f, strike * 1.05f);
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(45.0)]
     [InlineData(0.0)]
     public void A_box_resting_on_an_avatar_falls_when_the_avatar_walks_away(double physicsRate)
@@ -212,7 +212,7 @@ public class AvatarObjectCollisionTests
 
     // ------------------------------------------------------------------ the speed core needs for sounds and damage
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(45.0)]
     [InlineData(0.0)]
     public void An_avatar_falling_20_m_tells_core_the_speed_it_lands_at(double physicsRate)
@@ -224,7 +224,7 @@ public class AvatarObjectCollisionTests
         Assert.InRange(-w.Strikes[0], landing * 0.95f, landing * 1.05f);
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(45.0)]
     [InlineData(0.0)]
     public void A_box_hitting_an_avatar_at_10_m_s_tells_core_that_speed_on_both_sides(double physicsRate)
