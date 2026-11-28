@@ -82,11 +82,9 @@ public class MySQLGroupsData : IGroupsData
     public GroupData[] RetrieveGroups(string pattern)
     {
         if (string.IsNullOrEmpty(pattern))
-            pattern = "1";
-        else
-            pattern = string.Format("Name LIKE '%{0}%'", MySqlHelper.EscapeString(pattern));
+            return m_Groups.Get("ShowInList=1");
 
-        return m_Groups.Get(string.Format("ShowInList=1 AND ({0})", pattern));
+        return m_Groups.SearchListed(pattern);
     }
 
     public bool DeleteGroup(UUID groupID)
@@ -387,6 +385,19 @@ public class MySqlGroupsGroupsHandler : MySQLGenericTableHandler<GroupData>
     {
     }
 
+    /// <summary>
+    /// The listed groups whose name contains <paramref name="text"/>. The text is a parameter, never part of the
+    /// statement, and its % and _ match only themselves.
+    /// </summary>
+    public GroupData[] SearchListed(string text)
+    {
+        using (MySqlCommand cmd = new MySqlCommand())
+        {
+            cmd.CommandText = $"select * from {m_Realm} where ShowInList=1 AND Name LIKE ?pattern ESCAPE '{SqlLike.Escape}'";
+            cmd.Parameters.AddWithValue("?pattern", "%" + SqlLike.PrefixPattern(text));
+            return DoQuery(cmd);
+        }
+    }
 }
 
 public class MySqlGroupsMembershipHandler : MySQLGenericTableHandler<MembershipData>
