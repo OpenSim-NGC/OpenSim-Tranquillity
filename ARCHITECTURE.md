@@ -15,6 +15,8 @@ services, which hold users, inventory, assets and the region directory.
   support and the .NET 10 recommended analyzer level for every project. Projects being migrated can enable full
   nullable flow analysis. It also adds Nerdbank.GitVersioning ([version.json](version.json)), `nini-core` (INI
   configuration) and the `UtopiaSkye.OpenMetaverse*` packages (viewer protocol types and packets).
+  [Directory.Build.targets](Directory.Build.targets) marks test projects as not publishable, so publishing the
+  solution leaves them out.
 - [.editorconfig](.editorconfig) provides shared C# formatting and modern-language preferences. Recommended
   analyzer findings start as suggestions so converted projects can promote them to warnings and then errors
   without suppressing the legacy baseline.

@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Test projects are run with dotnet test from their build output and are never deployed, so publishing the
+         solution publishes only the servers and the projects they need. IsTestProject is set by the test project
+         or by Microsoft.NET.Test.Sdk, both of which are read before this file. -->
+    <IsPublishable Condition="'$(IsTestProject)' == 'true'">false</IsPublishable>
+  </PropertyGroup>
+</Project>
