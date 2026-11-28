@@ -10,12 +10,11 @@
  * can change, and what an unusable value falls back to.
  */
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using osWebRtcVoice.NonSpatial;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialLimitSettingsTests
     {
         private static IConfig Section(params (string Key, string Value)[] values)
@@ -27,42 +26,46 @@ namespace osWebRtcVoice.Tests
             return section;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnEmptySectionReadsAsTheFiniteDefaults()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialLimits limits = WebRtcVoiceRegionModule.ReadNonSpatialLimits(Section());
 
-            Assert.That(limits.MaxNonSpatialSessions, Is.EqualTo(5000));
-            Assert.That(limits.MaxSessionsPerAgent, Is.EqualTo(20));
-            Assert.That(limits.ConferenceRequestBurst, Is.EqualTo(5));
-            Assert.That(limits.ConferenceRequestRefillSeconds, Is.EqualTo(10));
+            Assert.Equal(5000, limits.MaxNonSpatialSessions);
+            Assert.Equal(20, limits.MaxSessionsPerAgent);
+            Assert.Equal(5, limits.ConferenceRequestBurst);
+            Assert.Equal(10, limits.ConferenceRequestRefillSeconds);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheKeysSetTheCeilings()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialLimits limits = WebRtcVoiceRegionModule.ReadNonSpatialLimits(
                 Section(("MaxNonSpatialSessions", "250"), ("MaxSessionsPerAgent", "3"),
                         ("ConferenceRequestBurst", "8"), ("ConferenceRequestRefillSeconds", "2.5")));
 
-            Assert.That(limits.MaxNonSpatialSessions, Is.EqualTo(250));
-            Assert.That(limits.MaxSessionsPerAgent, Is.EqualTo(3));
-            Assert.That(limits.ConferenceRequestBurst, Is.EqualTo(8));
-            Assert.That(limits.ConferenceRequestRefillSeconds, Is.EqualTo(2.5));
+            Assert.Equal(250, limits.MaxNonSpatialSessions);
+            Assert.Equal(3, limits.MaxSessionsPerAgent);
+            Assert.Equal(8, limits.ConferenceRequestBurst);
+            Assert.Equal(2.5, limits.ConferenceRequestRefillSeconds);
         }
 
-        [TestCase("0")]
-        [TestCase("-4")]
+        [InlineData("0")]
+        [InlineData("-4")]
+        [Theory(Timeout = 60000)]
         public void AValueBelowOneReadsAsTheDefault(string value)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialLimits limits = WebRtcVoiceRegionModule.ReadNonSpatialLimits(
                 Section(("MaxNonSpatialSessions", value), ("MaxSessionsPerAgent", value),
                         ("ConferenceRequestBurst", value), ("ConferenceRequestRefillSeconds", value)));
 
-            Assert.That(limits.MaxNonSpatialSessions, Is.EqualTo(5000));
-            Assert.That(limits.MaxSessionsPerAgent, Is.EqualTo(20));
-            Assert.That(limits.ConferenceRequestBurst, Is.EqualTo(5));
-            Assert.That(limits.ConferenceRequestRefillSeconds, Is.EqualTo(10));
+            Assert.Equal(5000, limits.MaxNonSpatialSessions);
+            Assert.Equal(20, limits.MaxSessionsPerAgent);
+            Assert.Equal(5, limits.ConferenceRequestBurst);
+            Assert.Equal(10, limits.ConferenceRequestRefillSeconds);
         }
     }
 }

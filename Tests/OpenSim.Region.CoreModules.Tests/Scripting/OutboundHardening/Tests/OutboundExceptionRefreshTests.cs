@@ -302,14 +302,14 @@ public class OutboundExceptionRefreshTests
 
         // The first request finds the refresh due and waits in the lookup.
         Task<bool> first = Task.Run(() => filter.CheckAllowed(AtNew));
-        await dns.GateEntered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await dns.GateEntered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         // The second does not wait for it or repeat it: it is judged on the addresses held until now.
         Assert.True(filter.CheckAllowed(AtOld));
         Assert.Equal(2, dns.Calls(ExceptionHost));
 
         dns.Gate.SetResult();
-        Assert.True(await first.WaitAsync(TimeSpan.FromSeconds(30)));
+        Assert.True(await first.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         Assert.Equal(2, dns.Calls(ExceptionHost));
         Assert.False(filter.CheckAllowed(AtOld));
     }

@@ -54,7 +54,7 @@ public class RegionAssetDeleteTests : OpenSimTestCase
 
         IAssetService local = StubProxy.Create<IAssetService>((method, args) => method.Name switch
         {
-            "Get" when args.Length == 1 => (true, store.TryGetValue((string)args[0], out AssetBase a) ? a : null),
+            "Get" when args.Length == 1 => (true, store.TryGetValue((string)args[0], out AssetBase? a) ? a : null),
             "Store" => (true, Put(store, (AssetBase)args[0])),
             "Delete" => (true, store.Remove((string)args[0])),
             _ => (false, null),

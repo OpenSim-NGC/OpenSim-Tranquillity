@@ -9,7 +9,6 @@ using System.Diagnostics;
 using System.Reflection;
 using OpenMetaverse;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

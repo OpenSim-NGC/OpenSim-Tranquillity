@@ -19,7 +19,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
@@ -29,11 +29,8 @@ using osWebRtcVoice.Tests.StockJanus;
 namespace osWebRtcVoice.Tests
 {
     // The assembly-wide 10 s backstop is too short for a session with a real gateway and real peers.
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-    [TestFixture, NUnit.Framework.Timeout(300000)]
-#pragma warning restore CS0618
-    public class StockJanusCallModerationTests
-    {
+    public class StockJanusCallModerationTests(RawJanus janus) : IAsyncLifetime, IClassFixture<RawJanus>
+        {
         private static readonly UUID Officer = new UUID("a11ce000-0000-4000-8000-000000000001");
         private static readonly UUID Member = new UUID("b0b00000-0000-4000-8000-000000000002");
         private static readonly UUID Late = new UUID("c0de0000-0000-4000-8000-000000000003");
@@ -41,10 +38,8 @@ namespace osWebRtcVoice.Tests
         private static readonly TimeSpan Settle = TimeSpan.FromSeconds(10);
         private const double OfficerHz = 440, MemberHz = 880, LateHz = 1320;
 
-        private readonly RawJanus _janus = new();
-
-        [OneTimeSetUp]
-        public void RequireGateway() => StockJanusEnvironment.IgnoreUnlessConfigured();
+        private readonly RawJanus _janus = janus;
+        private void RequireGateway() => StockJanusEnvironment.IgnoreUnlessConfigured();
 
         private static StockRegion NewRegion()
         {
@@ -71,7 +66,7 @@ namespace osWebRtcVoice.Tests
         private async Task InRoom(int room, int count)
         {
             if (StockJanusEnvironment.PluginName == "janus.plugin.audiobridge")
-                Assert.That(await _janus.WaitForParticipantsAsync(room, count, Settle), Is.True);
+                Assert.True(await _janus.WaitForParticipantsAsync(room, count, Settle));
             else
                 await Task.Delay(2500);
         }
@@ -103,11 +98,14 @@ namespace osWebRtcVoice.Tests
         private static async Task<Joined> JoinCall(StockRegion region, UUID agent, double hz)
         {
             CapAnswer call = await region.ChatSessionAsync(agent, Chat("call"));
-            Assert.That(call.Status, Is.EqualTo(200), "call: " + call.Body);
+            {
+                var assertedValue = call.Status;
+                TestAssert.WithMessage(() => Assert.Equal(200, assertedValue), "call: " + call.Body);
+            }
             var creds = (OSDMap)call.Body["voice_credentials"];
             string channel = creds["channel_uri"].AsString(), token = creds["channel_credentials"].AsString();
             Joined j = await region.JoinAsync(agent, o => StockRegion.MultiagentBody(o, channel, token), hz);
-            Assert.That(j.Answer.Provisioned, Is.True, "joined: " + j.Answer.Body);
+            Assert.True(j.Answer.Provisioned, "joined: " + j.Answer.Body);
             return j;
         }
 
@@ -115,113 +113,131 @@ namespace osWebRtcVoice.Tests
         {
             await Task.Delay(1000);   // let the mix settle after a change
             List<Measurement> m = await listener.Peer.MeasureWindowsAsync(4, 0.5, hz);
-            TestContext.Out.WriteLine($"{listener.Agent} heard: " + Measurement.Describe(m, hz));
+            TestContext.Current.TestOutputHelper.WriteLine($"{listener.Agent} heard: " + Measurement.Describe(m, hz));
             return m;
         }
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 300000)]
         public async Task AMutedMembersAudioStopsReachingTheOthers_AndUnmuteRestoresIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StockJanusEnvironment.IgnoreUnlessPeerAvailable();
             using StockRegion region = NewRegion();
             using Joined officer = await JoinCall(region, Officer, OfficerHz);
             using Joined member = await JoinCall(region, Member, MemberHz);
             using Joined late = await JoinCall(region, Late, LateHz);
             await InRoom(officer.Answer.Room, 3);
-            await Task.Delay(1500);
+            await Task.Delay(1500, TestContext.Current.CancellationToken);
             List<Measurement> before = await Hear(late, OfficerHz, MemberHz);
-            Assert.That(Measurement.MedianShare(before, MemberHz), Is.GreaterThan(0.3), "precondition: the member is heard");
-            Assert.That(Measurement.MedianShare(before, OfficerHz), Is.GreaterThan(0.3), "precondition: the officer is heard");
+            Assert.True(Measurement.MedianShare(before, MemberHz) > 0.3, "precondition: the member is heard");
+            Assert.True(Measurement.MedianShare(before, OfficerHz) > 0.3, "precondition: the officer is heard");
 
             CapAnswer muted = await region.ChatSessionAsync(Officer, MuteUpdate(Member, true));
-            Assert.That(muted.Status, Is.EqualTo(200));
+            Assert.Equal(200, muted.Status);
             List<Measurement> afterMute = await Hear(late, OfficerHz, MemberHz);
-            Assert.That(Measurement.MedianShare(afterMute, MemberHz), Is.LessThan(0.05), "the muted member is no longer heard");
-            Assert.That(Measurement.MedianShare(afterMute, OfficerHz), Is.GreaterThan(0.5), "the others still are");
+            Assert.True(Measurement.MedianShare(afterMute, MemberHz) < 0.05, "the muted member is no longer heard");
+            Assert.True(Measurement.MedianShare(afterMute, OfficerHz) > 0.5, "the others still are");
             List<Measurement> officerHears = await Hear(officer, MemberHz, LateHz);
-            Assert.That(Measurement.MedianShare(officerHears, MemberHz), Is.LessThan(0.05), "nor by the moderator");
-            Assert.That(Measurement.MedianShare(officerHears, LateHz), Is.GreaterThan(0.5));
+            Assert.True(Measurement.MedianShare(officerHears, MemberHz) < 0.05, "nor by the moderator");
+            Assert.True(Measurement.MedianShare(officerHears, LateHz) > 0.5);
 
             CapAnswer unmuted = await region.ChatSessionAsync(Officer, MuteUpdate(Member, false));
-            Assert.That(unmuted.Status, Is.EqualTo(200));
+            Assert.Equal(200, unmuted.Status);
             List<Measurement> afterUnmute = await Hear(late, OfficerHz, MemberHz);
-            Assert.That(Measurement.MedianShare(afterUnmute, MemberHz), Is.GreaterThan(0.3), "unmute restores the member");
+            Assert.True(Measurement.MedianShare(afterUnmute, MemberHz) > 0.3, "unmute restores the member");
 
             CapAnswer refused = await region.ChatSessionAsync(Late, MuteUpdate(Member, true));
-            Assert.That(refused.Status, Is.EqualTo(403), "a member without the power cannot mute");
+            {
+                var assertedValue = refused.Status;
+                TestAssert.WithMessage(() => Assert.Equal(403, assertedValue), "a member without the power cannot mute");
+            }
             await region.LogoutAsync(officer);
             await region.LogoutAsync(member);
             await region.LogoutAsync(late);
         }
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 300000)]
         public async Task TwoMembersWithTheSameAvatarName_MutingOneLeavesTheOtherHeard()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StockJanusEnvironment.IgnoreUnlessPeerAvailable();
             using StockRegion region = NewRegion();
             // Every avatar a test scene makes is called the same thing, so the three here share one name. A mute names
             // the agent id the region set at join, never the name.
-            Assert.That(region.Scene.GetScenePresence(Member).Name, Is.EqualTo(region.Scene.GetScenePresence(Late).Name),
-                        "precondition: the two members share an avatar name");
+            {
+                var assertedValue = region.Scene.GetScenePresence(Member).Name;
+                TestAssert.WithMessage(() => Assert.Equal(region.Scene.GetScenePresence(Late).Name, assertedValue), "precondition: the two members share an avatar name");
+            }
             using Joined officer = await JoinCall(region, Officer, OfficerHz);
             using Joined member = await JoinCall(region, Member, MemberHz);
             using Joined late = await JoinCall(region, Late, LateHz);
             await InRoom(officer.Answer.Room, 3);
-            await Task.Delay(1500);
+            await Task.Delay(1500, TestContext.Current.CancellationToken);
             List<Measurement> before = await Hear(officer, MemberHz, LateHz);
-            Assert.That(Measurement.MedianShare(before, MemberHz), Is.GreaterThan(0.2), "precondition: the first is heard");
-            Assert.That(Measurement.MedianShare(before, LateHz), Is.GreaterThan(0.2), "precondition: the second is heard");
+            Assert.True(Measurement.MedianShare(before, MemberHz) > 0.2, "precondition: the first is heard");
+            Assert.True(Measurement.MedianShare(before, LateHz) > 0.2, "precondition: the second is heard");
 
             CapAnswer muted = await region.ChatSessionAsync(Officer, MuteUpdate(Member, true));
-            Assert.That(muted.Status, Is.EqualTo(200));
+            Assert.Equal(200, muted.Status);
 
             List<Measurement> after = await Hear(officer, MemberHz, LateHz);
-            Assert.That(Measurement.MedianShare(after, MemberHz), Is.LessThan(0.05), "the one muted is no longer heard");
-            Assert.That(Measurement.MedianShare(after, LateHz), Is.GreaterThan(0.5), "the other, with the same name, still is");
+            Assert.True(Measurement.MedianShare(after, MemberHz) < 0.05, "the one muted is no longer heard");
+            Assert.True(Measurement.MedianShare(after, LateHz) > 0.5, "the other, with the same name, still is");
             List<Measurement> lateHears = await Hear(late, OfficerHz, MemberHz);
-            Assert.That(Measurement.MedianShare(lateHears, MemberHz), Is.LessThan(0.05));
-            Assert.That(Measurement.MedianShare(lateHears, OfficerHz), Is.GreaterThan(0.5));
+            Assert.True(Measurement.MedianShare(lateHears, MemberHz) < 0.05);
+            Assert.True(Measurement.MedianShare(lateHears, OfficerHz) > 0.5);
             await region.LogoutAsync(officer);
             await region.LogoutAsync(member);
             await region.LogoutAsync(late);
         }
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 300000)]
         public async Task MuteAll_SilencesEveryoneButTheModerator_AndALaterJoinerIsSilent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StockJanusEnvironment.IgnoreUnlessPeerAvailable();
             using StockRegion region = NewRegion();
             using Joined officer = await JoinCall(region, Officer, OfficerHz);
             using Joined member = await JoinCall(region, Member, MemberHz);
             await InRoom(officer.Answer.Room, 2);
-            await Task.Delay(1500);
-            Assert.That(Measurement.MedianShare(await Hear(officer, MemberHz), MemberHz), Is.GreaterThan(0.8), "precondition");
+            await Task.Delay(1500, TestContext.Current.CancellationToken);
+            Assert.True(Measurement.MedianShare(await Hear(officer, MemberHz), MemberHz) > 0.8, "precondition");
 
             CapAnswer all = await region.ChatSessionAsync(Officer, MuteAll(true));
-            Assert.That(all.Status, Is.EqualTo(200));
+            Assert.Equal(200, all.Status);
             List<Measurement> officerHears = await Hear(officer, MemberHz);
-            Assert.That(Measurement.MedianRms(officerHears), Is.LessThan(0.005), "the officer hears nobody now");
+            Assert.True(Measurement.MedianRms(officerHears) < 0.005, "the officer hears nobody now");
             List<Measurement> memberHears = await Hear(member, OfficerHz);
-            Assert.That(Measurement.MedianShare(memberHears, OfficerHz), Is.GreaterThan(0.8), "the moderator is still heard");
+            Assert.True(Measurement.MedianShare(memberHears, OfficerHz) > 0.8, "the moderator is still heard");
 
             using Joined late = await JoinCall(region, Late, LateHz);
             await InRoom(officer.Answer.Room, 3);
             List<Measurement> lateIsSilent = await Hear(officer, MemberHz, LateHz);
-            Assert.That(Measurement.MedianRms(lateIsSilent), Is.LessThan(0.005), "whoever joins afterwards is silent");
-            Assert.That(Measurement.MedianShare(await Hear(late, OfficerHz), OfficerHz), Is.GreaterThan(0.8),
-                        "and hears the moderator");
+            Assert.True(Measurement.MedianRms(lateIsSilent) < 0.005, "whoever joins afterwards is silent");
+            Assert.True(Measurement.MedianShare(await Hear(late, OfficerHz), OfficerHz) > 0.8, "and hears the moderator");
 
             CapAnswer none = await region.ChatSessionAsync(Officer, MuteAll(false));
-            Assert.That(none.Status, Is.EqualTo(200));
+            Assert.Equal(200, none.Status);
             List<Measurement> back = await Hear(officer, MemberHz, LateHz);
-            Assert.That(Measurement.MedianShare(back, MemberHz), Is.GreaterThan(0.3), "unmute all restores the member");
-            Assert.That(Measurement.MedianShare(back, LateHz), Is.GreaterThan(0.3), "and the later joiner");
+            Assert.True(Measurement.MedianShare(back, MemberHz) > 0.3, "unmute all restores the member");
+            Assert.True(Measurement.MedianShare(back, LateHz) > 0.3, "and the later joiner");
             await region.LogoutAsync(officer);
             await region.LogoutAsync(member);
             await region.LogoutAsync(late);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            RequireGateway();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

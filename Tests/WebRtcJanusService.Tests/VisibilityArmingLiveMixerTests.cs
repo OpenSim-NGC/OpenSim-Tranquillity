@@ -36,7 +36,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture, Explicit("live scratch mixer; see the file header")]
     public class VisibilityArmingLiveMixerTests
     {
         private static readonly UUID ParcelQ = new UUID("00000000-0000-0000-0000-0000000000ca");
@@ -95,7 +94,7 @@ namespace osWebRtcVoice.Tests
                     string line = $"{DateTime.UtcNow:HH:mm:ss.fff} {logLevel,-11} {formatter(state, exception)}";
                     lock (_owner.Lines)
                         _owner.Lines.Add(line);
-                    TestContext.Out.WriteLine(line);
+                    TestContext.Current.TestOutputHelper.WriteLine(line);
                 }
             }
         }
@@ -103,7 +102,7 @@ namespace osWebRtcVoice.Tests
         private static string Env(string name)
         {
             string v = Environment.GetEnvironmentVariable(name);
-            Assume.That(string.IsNullOrEmpty(v), Is.False, $"{name} is not set: this live test needs a scratch mixer");
+            Assert.SkipWhen(string.IsNullOrEmpty(v), $"{name} is not set: this live test needs a scratch mixer");
             return v;
         }
 
@@ -113,7 +112,7 @@ namespace osWebRtcVoice.Tests
             using Process p = Process.Start(psi);
             string output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
             p.WaitForExit();
-            TestContext.Out.WriteLine($"$ {file} {args} -> exit {p.ExitCode}: {output.Trim()}");
+            TestContext.Current.TestOutputHelper.WriteLine($"$ {file} {args} -> exit {p.ExitCode}: {output.Trim()}");
             return p.ExitCode;
         }
 
@@ -144,11 +143,10 @@ namespace osWebRtcVoice.Tests
 
         // The test restarts the mixer's container and waits up to 90 s for its Admin API, so the
         // assembly-wide 10 s limit is too short for it.
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-        [Test, Timeout(240000)]
-#pragma warning restore CS0618
+        [Fact(Timeout = 240000, Explicit = true)]
         public async Task RealSimPath_ArmsHeartbeatsAndDetectsAMixerRestart()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string url = Env("LVM_LIVE_ADMIN_URL");
             string secret = Env("LVM_LIVE_ADMIN_SECRET");
             int room = int.Parse(Env("LVM_LIVE_ROOM"));
@@ -174,34 +172,44 @@ namespace osWebRtcVoice.Tests
 
                 // Arming: the first tick sends a replace for both listeners, empty columns included.
                 await sender.PumpAsync(feed.Tick(world));
-                Assert.That(auth.IsArmed(room, a) && auth.IsArmed(room, b), Is.True, "both listeners armed by the mixer's applied reply");
-                Assert.That(auth.HeartbeatCapable, Is.True, "the mixer's reply advertised vis_protocol 2 or later");
+                Assert.True((auth.IsArmed(room, a) && auth.IsArmed(room, b)), "both listeners armed by the mixer's applied reply");
+                Assert.True(auth.HeartbeatCapable, "the mixer's reply advertised vis_protocol 2 or later");
                 string firstInstance = auth.MixerInstance;
-                Assert.That(firstInstance, Is.Not.Null.And.Length.EqualTo(16), "the mixer's reply carried a mixer_instance");
-                Assert.That(Logged(collector, "advertises vis_protocol"), Is.True);
-                Assert.That(Logged(collector, "arming replace sent for 2 listener(s)"), Is.True);
+                {
+                    var assertedValue = firstInstance;
+                    TestAssert.WithMessage(() =>
+                    {
+                        Assert.NotNull(assertedValue);
+                        Assert.Equal(16, assertedValue.Length);
+                    }, "the mixer's reply carried a mixer_instance");
+                }
+                Assert.True(Logged(collector, "advertises vis_protocol"));
+                Assert.True(Logged(collector, "arming replace sent for 2 listener(s)"));
 
                 // Heartbeat: the sender sends one now and acknowledges it.
                 await sender.PumpHeartbeatAsync();
-                Assert.That(Logged(collector, "first peer_ctl_heartbeat acknowledged"), Is.True, "the mixer acknowledged a heartbeat");
+                Assert.True(Logged(collector, "first peer_ctl_heartbeat acknowledged"), "the mixer acknowledged a heartbeat");
 
                 // Mixer restart: the next heartbeat's reply carries a new mixer_instance (and unknown_room).
-                Assert.That(Run("docker", $"restart {container}"), Is.EqualTo(0));
+                Assert.Equal(0, Run("docker", $"restart {container}"));
                 await WaitForAdmin(url, secret);
                 clock += VisAuthority.DefaultHeartbeatIntervalMs + 1;
                 await sender.PumpHeartbeatAsync();
-                Assert.That(auth.MixerInstance, Is.Not.EqualTo(firstInstance), "the sim saw the new mixer_instance");
-                Assert.That(Logged(collector, "mixer_instance changed"), Is.True, "and logged it as a restart");
-                Assert.That(auth.IsArmed(room, a), Is.False, "the restart disarmed everything at the sim");
+                {
+                    var assertedValue = auth.MixerInstance;
+                    TestAssert.WithMessage(() => Assert.NotEqual(firstInstance, assertedValue), "the sim saw the new mixer_instance");
+                }
+                Assert.True(Logged(collector, "mixer_instance changed"), "and logged it as a restart");
+                Assert.False(auth.IsArmed(room, a), "the restart disarmed everything at the sim");
 
                 // Re-arm: once the room exists again, the next tick arms every listener (the snapshot after TakeRearmAll).
-                Assert.That(Run("sh", $"-c \"{createRoom.Replace("\"", "\\\"")}\""), Is.EqualTo(0));
+                Assert.Equal(0, Run("sh", $"-c \"{createRoom.Replace("\"", "\\\"")}\""));
                 clock += VisAuthority.UnknownRoomRetryMs + 1;
                 await sender.PumpAsync(feed.Tick(world));
-                Assert.That(auth.IsArmed(room, a) && auth.IsArmed(room, b), Is.True, "re-armed after the restart");
+                Assert.True((auth.IsArmed(room, a) && auth.IsArmed(room, b)), "re-armed after the restart");
                 clock += VisAuthority.DefaultHeartbeatIntervalMs + 1;
                 await sender.PumpHeartbeatAsync();
-                Assert.That(auth.IsArmed(room, a), Is.True, "the heartbeat after re-arming leaves them armed");
+                Assert.True(auth.IsArmed(room, a), "the heartbeat after re-arming leaves them armed");
             }
             finally
             {
