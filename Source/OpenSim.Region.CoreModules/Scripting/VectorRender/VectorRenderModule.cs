@@ -163,11 +163,25 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
             var typeface = SKTypeface.FromFamilyName(fontName, SKFontStyle.Normal);
             using (var font = new SKFont(typeface, fontSize))
             {
-                xSize = (int)font.MeasureText(text);
-                // For height, use the font metrics
-                ySize = (int)(font.Metrics.Descent - font.Metrics.Ascent);
+                // The size of the text as the Text command draws it: the widest line, and each line after the
+                // first one line spacing lower.
+                string[] lines = TextLines(text);
+                float width = 0;
+                foreach (string line in lines)
+                    width = Math.Max(width, font.MeasureText(line));
+                xSize = (int)width;
+                ySize = (int)(font.Metrics.Descent - font.Metrics.Ascent + (lines.Length - 1) * font.Spacing);
             }
         }
+    }
+
+    /// <summary>
+    /// The lines of a Text command's text. System.Drawing's DrawString, which upstream drew text with, starts a
+    /// new line at each line feed (osDrawText's "\n"); SkiaSharp's DrawText draws a single line.
+    /// </summary>
+    private static string[] TextLines(string text)
+    {
+        return text.Replace("\r\n", "\n").Split('\n');
     }
 
     /// <summary>
@@ -593,7 +607,12 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                         // The pen position is the TOP-LEFT of the text, as System.Drawing's DrawString took it
                         // and as every script written against upstream expects; SkiaSharp's DrawText takes the
                         // BASELINE, which put "MoveTo 20,20; Text Hello" with its glyphs ABOVE y=20. Ascent is negative.
-                        canvas.DrawText(nextLine, startPoint.X, startPoint.Y - myFont.Metrics.Ascent, SKTextAlign.Left, myFont, textPaint);
+                        float baseline = startPoint.Y - myFont.Metrics.Ascent;
+                        foreach (string textLine in TextLines(nextLine))
+                        {
+                            canvas.DrawText(textLine, startPoint.X, baseline, SKTextAlign.Left, myFont, textPaint);
+                            baseline += myFont.Spacing;
+                        }
                         textPaint.Dispose();
                     }
                     continue;
