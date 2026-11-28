@@ -13,7 +13,6 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -84,7 +83,7 @@ public class FirstRayCastTests
                 backendMs[i] = scene.CapacityStats().SimulatorRayCasts.MsTotal - before;
                 hits = Math.Min(hits, r.Count);
             }
-            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            _out.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"FIRST-RAY-CAST warmup={scene.RayWarmUpMs:0.0000} hits={hits} " +
                 $"counted={loaded.SimulatorRayCasts.Casts + loaded.ScriptRayCasts.Casts} jit={string.Join(",", jit)} " +
                 $"backend={string.Join(",", backendMs.Select(v => v.ToString("0.0000", CultureInfo.InvariantCulture)))} " +

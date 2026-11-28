@@ -46,6 +46,8 @@ jobs:
     # known failures that pass are listed so the file can be trimmed. See Tests/README-CI.md.
     - name: Test
       continue-on-error: true
+      env:
+        RUN_KNOWN_FAILURES: '1'
       run: >
         dotnet test ./Tranquillity.sln --configuration Release --no-build
         --logger "trx;LogFilePrefix=results" --results-directory TestResults

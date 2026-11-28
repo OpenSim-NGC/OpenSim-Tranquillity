@@ -19,26 +19,32 @@
  */
 
 using System;
-using NUnit.Framework;
+using Xunit;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class RoomNumberFoldTests
     {
-        [Test]
+        [Fact(Timeout = 60000)]
         public void FoldHashToRoom_IntMinValue_DoesNotThrow_AndIsPositive()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int room = 0;
-            Assert.That(() => room = JanusAudioBridge.FoldHashToRoom(int.MinValue), Throws.Nothing,
-                "int.MinValue must not throw (Math.Abs(int.MinValue) would)");
-            Assert.That(room, Is.GreaterThan(0), "the fallback room is a valid positive integer");
-            Assert.That(room, Is.EqualTo(int.MaxValue));
+            {
+                var assertedValue = () => room = JanusAudioBridge.FoldHashToRoom(int.MinValue);
+                TestAssert.WithMessage(() => Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                })), "int.MinValue must not throw (Math.Abs(int.MinValue) would)");
+            }
+            Assert.True(room > 0, "the fallback room is a valid positive integer");
+            Assert.Equal(int.MaxValue, room);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void FoldHashToRoom_OrdinaryValues_MatchOldMathAbs()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Every value EXCEPT int.MinValue: the fold must equal the OLD expression, computed here.
             int[] values =
             {
@@ -49,14 +55,17 @@ namespace osWebRtcVoice.Tests
             {
                 int expectedOld = Math.Abs(v);                       // the pre-fix expression
                 int actualNew = JanusAudioBridge.FoldHashToRoom(v);  // the fix
-                Assert.That(actualNew, Is.EqualTo(expectedOld),
-                    $"FoldHashToRoom({v}) must equal the old Math.Abs({v}) = {expectedOld}");
+                {
+                    var assertedValue = actualNew;
+                    TestAssert.WithMessage(() => Assert.Equal(expectedOld, assertedValue), $"FoldHashToRoom({v}) must equal the old Math.Abs({v}) = {expectedOld}");
+                }
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void CalcRoomNumber_OrdinaryInputs_PreserveTheOldNumber()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Rebuild the hash the way CalcRoomNumber does, compute BOTH the old Math.Abs form and the
             // live CalcRoomNumber, and assert they agree (they must, unless the hash is exactly
             // int.MinValue, which is astronomically unlikely for these fixed inputs and asserted away).
@@ -74,13 +83,15 @@ namespace osWebRtcVoice.Tests
                 hasher.Add("local");
                 hasher.Add(parcel);
                 int hc = hasher.Finish().GetHashCode();
-                Assume.That(hc, Is.Not.EqualTo(int.MinValue), "fixed-input hash is not the 1-in-2^32 crash value");
+                Assert.SkipWhen(hc == int.MinValue, "fixed-input hash is not the 1-in-2^32 crash value");
 
                 int oldRoom = Math.Abs(hc);
                 int liveRoom = JanusAudioBridge.CalcRoomNumber(string.Empty, region, "local", parcel, string.Empty);
-                Assert.That(liveRoom, Is.EqualTo(oldRoom),
-                    $"CalcRoomNumber(local, {region}, {parcel}) must be unchanged by the fix");
-                Assert.That(liveRoom, Is.GreaterThanOrEqualTo(0), "a room number is non-negative");
+                {
+                    var assertedValue = liveRoom;
+                    TestAssert.WithMessage(() => Assert.Equal(oldRoom, assertedValue), $"CalcRoomNumber(local, {region}, {parcel}) must be unchanged by the fix");
+                }
+                Assert.True(liveRoom >= 0, "a room number is non-negative");
             }
         }
     }

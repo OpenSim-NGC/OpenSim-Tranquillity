@@ -20,8 +20,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 /// </summary>
 public class VehicleStepRateTests
 {
-    private readonly Xunit.Abstractions.ITestOutputHelper _out;
-    public VehicleStepRateTests(Xunit.Abstractions.ITestOutputHelper output) { _out = output; }
+    private readonly Xunit.ITestOutputHelper _out;
+    public VehicleStepRateTests(Xunit.ITestOutputHelper output) { _out = output; }
 
     private const double Deg = Math.PI / 180.0;
 

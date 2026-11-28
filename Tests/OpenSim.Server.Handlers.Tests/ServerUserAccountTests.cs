@@ -62,7 +62,8 @@ public sealed class ServerUserAccountTests : IDisposable
 
     private UserAccountService MySQL()
     {
-        string server = Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar);
+        string server = Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar)
+            ?? throw new InvalidOperationException($"Set {MySQLServerFactAttribute.EnvVar} to run the MySQL test.");
         string name = "useracct_" + Guid.NewGuid().ToString("N");
         string admin = new MySqlConnectionStringBuilder(server) { Database = "", Pooling = false }.ConnectionString;
         string conn = new MySqlConnectionStringBuilder(server) { Database = name }.ConnectionString;
@@ -79,7 +80,8 @@ public sealed class ServerUserAccountTests : IDisposable
 
     private UserAccountService PGSQL()
     {
-        string server = Environment.GetEnvironmentVariable(PGSQLServerFactAttribute.EnvVar);
+        string server = Environment.GetEnvironmentVariable(PGSQLServerFactAttribute.EnvVar)
+            ?? throw new InvalidOperationException($"Set {PGSQLServerFactAttribute.EnvVar} to run the PostgreSQL test.");
         string name = "useracct_" + Guid.NewGuid().ToString("N");
         string admin = new NpgsqlConnectionStringBuilder(server) { Database = "postgres", Pooling = false }.ConnectionString;
         string conn = new NpgsqlConnectionStringBuilder(server) { Database = name }.ConnectionString;

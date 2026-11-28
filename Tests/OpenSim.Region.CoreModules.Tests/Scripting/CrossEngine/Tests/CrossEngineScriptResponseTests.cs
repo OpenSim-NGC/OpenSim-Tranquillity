@@ -357,7 +357,7 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
         UUID channel = xmlrpc.OpenXMLRPCChannel(prim, otherScript, UUID.Zero);
         Task<XmlRpcResponse> call = SendRemoteData(xmlrpc, channel, 3, "hello");
 
-        XmlRpcResponse result = await call.WaitAsync(Limit);
+        XmlRpcResponse result = await call.WaitAsync(Limit, TestContext.Current.CancellationToken);
         WaitForPumpPasses(yengine);
 
         Assert.False(result.IsFault, "the script did not answer: " + result.FaultString);
@@ -393,7 +393,7 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
         UUID channel = xmlrpc.OpenXMLRPCChannel(prim, yScript, UUID.Zero);
         Task<XmlRpcResponse> call = SendRemoteData(xmlrpc, channel, 1, "ping");
 
-        XmlRpcResponse result = await call.WaitAsync(Limit);
+        XmlRpcResponse result = await call.WaitAsync(Limit, TestContext.Current.CancellationToken);
         WaitForPumpPasses(yengine);
 
         Assert.False(result.IsFault, "the script did not answer: " + result.FaultString);
@@ -427,7 +427,7 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
 
         xmlrpc.RemoveCompletedRequest(first.GetMessageID());
         xmlrpc.RemoteDataReply(channel.ToString(), first.GetMessageID().ToString(), "done", 0);
-        XmlRpcResponse result = await call.WaitAsync(Limit);
+        XmlRpcResponse result = await call.WaitAsync(Limit, TestContext.Current.CancellationToken);
         Assert.False(result.IsFault);
     }
 

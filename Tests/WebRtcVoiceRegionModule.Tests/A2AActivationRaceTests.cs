@@ -18,14 +18,13 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2AActivationRaceTests
     {
         private const int Joiners = 8;
@@ -39,15 +38,16 @@ namespace osWebRtcVoice.Tests
 
         private static void RingingCall(A2ACalls calls)
         {
-            Assert.That(calls.Record(Alice, Bob, RegionA, out _), Is.Not.Null);
-            Assert.That(calls.IssueToken(CallId, Alice), Is.Not.Null);
+            Assert.NotNull(calls.Record(Alice, Bob, RegionA, out _));
+            Assert.NotNull(calls.IssueToken(CallId, Alice));
             calls.MarkProvisioned(CallId, Alice, RegionA, "vs-alice", out bool callerBecameActive);
-            Assert.That(callerBecameActive, Is.False, "the caller's join never makes the call active");
+            Assert.False(callerBecameActive, "the caller's join never makes the call active");
         }
 
-        [Test]
-        public void CalleeJoinsFromTwoRegionServers_ExactlyOneMakesTheCallActive()
+        [Fact(Timeout = 60000)]
+        public async Task CalleeJoinsFromTwoRegionServers_ExactlyOneMakesTheCallActive()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int tooMany = 0, none = 0;
             for (int round = 0; round < 100; round++)
             {
@@ -57,29 +57,36 @@ namespace osWebRtcVoice.Tests
                 A2ACalls a = new A2ACalls(() => regionA);
                 A2ACalls b = new A2ACalls(() => regionB);
                 RingingCall(a);
-                Assert.That(b.TryGet(CallId, Bob).State, Is.EqualTo(A2ASessionState.Invited));
+                Assert.Equal(A2ASessionState.Invited, b.TryGet(CallId, Bob).State);
 
                 int winners = 0;
                 using Barrier gate = new Barrier(Joiners);
                 Task[] joins = Enumerable.Range(0, Joiners).Select(n => Task.Factory.StartNew(() =>
                 {
-                    gate.SignalAndWait();
+                    gate.SignalAndWait(TestContext.Current.CancellationToken);
                     bool won = n % 2 == 0
                         ? CalleeJoin(a, RegionA, "vs-bob-" + n)
                         : CalleeJoin(b, RegionB, "vs-bob-" + n);
                     if (won) Interlocked.Increment(ref winners);
                 }, TaskCreationOptions.LongRunning)).ToArray();
-                Task.WaitAll(joins);
+                await Task.WhenAll(joins);
                 if (winners > 1) tooMany++;
                 if (winners == 0) none++;
             }
-            Assert.That(tooMany, Is.EqualTo(0), "rounds in which more than one join was told it made the call active");
-            Assert.That(none, Is.EqualTo(0), "rounds in which no join was told it made the call active");
+            {
+                var assertedValue = tooMany;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "rounds in which more than one join was told it made the call active");
+            }
+            {
+                var assertedValue = none;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "rounds in which no join was told it made the call active");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARejoinFromAnotherRegionServer_IsNotATransition()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             GridNonSpatialSessions regionA = VoiceSessionServiceTests.NewRegion(service);
             GridNonSpatialSessions regionB = VoiceSessionServiceTests.NewRegion(service);
@@ -87,9 +94,9 @@ namespace osWebRtcVoice.Tests
             A2ACalls b = new A2ACalls(() => regionB);
             RingingCall(a);
 
-            Assert.That(CalleeJoin(a, RegionA, "vs-1"), Is.True);
-            Assert.That(CalleeJoin(b, RegionB, "vs-2"), Is.False, "the callee arriving again from another process is not a new accept");
-            Assert.That(b.TryGet(CallId, Bob).State, Is.EqualTo(A2ASessionState.Active));
+            Assert.True(CalleeJoin(a, RegionA, "vs-1"));
+            Assert.False(CalleeJoin(b, RegionB, "vs-2"), "the callee arriving again from another process is not a new accept");
+            Assert.Equal(A2ASessionState.Active, b.TryGet(CallId, Bob).State);
         }
     }
 }

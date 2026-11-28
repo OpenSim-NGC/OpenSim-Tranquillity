@@ -11,7 +11,6 @@ using OpenMetaverse;
 using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using OpenSim.Region.PhysicsModules.Jolt.Vehicles;
 using Xunit;
-using Xunit.Abstractions;
 using Rig = OpenSim.Region.PhysicsModules.Jolt.Tests.StepRateRig;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
@@ -139,7 +138,7 @@ public class StepRateWindSceneTests
             Take(0);
         }) { IsBackground = true };
         holder.Start();
-        Assert.True(held.Wait(TimeSpan.FromSeconds(10)), "the holder thread could not take the locks");
+        Assert.True(held.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), "the holder thread could not take the locks");
 
         bool finished;
         try
@@ -147,7 +146,7 @@ public class StepRateWindSceneTests
             Task step = Task.Run(() => rig.Backend.Step(1f / 64f, Span<BodyState>.Empty, Span<CharacterState>.Empty, Span<ContactReport>.Empty));
             // the test needs to know whether the step returned within a bound, so it waits on the task here
 #pragma warning disable xUnit1031
-            finished = step.Wait(TimeSpan.FromSeconds(10));
+            finished = step.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 #pragma warning restore xUnit1031
         }
         finally

@@ -36,7 +36,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Tests.Common;
 
-using Xunit.Abstractions;
+using Xunit;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {

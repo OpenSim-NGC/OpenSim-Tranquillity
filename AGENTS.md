@@ -51,7 +51,9 @@ Always verify changes by building and running the relevant tests before finishin
 
 ## C# & .NET 10 Coding Conventions
 ### Do
-- **Nullable Reference Types:** Keep `<Nullable>enable</Nullable>` active and resolve all nullability warnings properly rather than suppressing them with `!` unless strictly justified.
+- **Nullable Reference Types:** The repository default is `<Nullable>annotations</Nullable>`. Converted projects must
+  use `<Nullable>enable</Nullable>` and resolve all nullability warnings properly rather than suppressing them with
+  `!` unless strictly justified.
 - **Modern C# Features:** Prefer primary constructors for DI, file-scoped namespaces, collection expressions (`[]`), `record` types for immutable DTOs, and pattern matching.
 - **Async/Await:** Suffix asynchronous methods with `Async`, accept a `CancellationToken cancellationToken = default` parameter on I/O-bound methods, and pass it down the call chain.
 - **Dependency Injection:** Register services using standard `Microsoft.Extensions.DependencyInjection` extension methods (`AddApplication()`, `AddInfrastructure()`).
@@ -155,7 +157,8 @@ request drafts) outside the repository or in a git-ignored folder; never commit 
 ## 5. Code quality
 
 - **Follow the code around you**: naming (`*Module`, `*Service`, `*Connector`, `*Handler`), layout and style.
-  `Nullable` is disabled and implicit usings are enabled for every project ([Directory.Build.props](Directory.Build.props)).
+  Annotation-only nullable support and implicit usings are enabled for every project
+  ([Directory.Build.props](Directory.Build.props)); converted areas use full nullable flow analysis.
 - **One change, one purpose.** No unrelated reformatting, renames or clean-ups in a fix.
 - **Input from outside is never trusted**: viewer packets, capability bodies, Robust requests, database rows,
   archives, assets and configuration. Check lengths and ranges, bound sizes, and handle the failure with a log
