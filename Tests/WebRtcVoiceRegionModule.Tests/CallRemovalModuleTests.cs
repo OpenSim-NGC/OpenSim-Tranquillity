@@ -16,7 +16,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework.Servers.HttpServer;
@@ -28,7 +28,6 @@ using static osWebRtcVoice.Tests.CallModerationModuleTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class CallRemovalModuleTests
     {
         internal static readonly UUID GroupId = new UUID("5e0c9a41-7b2d-4f86-a3c1-92d84b6e0f17");
@@ -106,73 +105,96 @@ namespace osWebRtcVoice.Tests
 
         // ---- the removal ------------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARemoval_DropsTheMembersMedia_TellsTheirViewerToClose_AndTheOthersThatTheyLeft()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             r.Events.Lists.Clear();
 
             WebRtcVoiceRegionModule.CallRemovalResult result = r.Module.RemoveFromCall(GroupId, Officer, Member, "disruptive");
 
-            Assert.That(result.Ok, Is.True, result.Decision);
-            Assert.That(result.Changed, Is.True);
-            Assert.That(result.Dropped, Is.EqualTo(1));
-            Assert.That(r.Voice.Drops, Is.EqualTo(new[] { (Member, RoomOf(r)) }), "the member's participants, in the call's room, and nobody else's");
-            Assert.That(r.Events.Closes, Is.EqualTo(new[] { (Member, GroupId, "close_on_no_ability") }));
+            Assert.True(result.Ok, result.Decision);
+            Assert.True(result.Changed);
+            Assert.Equal(1, result.Dropped);
+            {
+                var assertedValue = r.Voice.Drops;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { (Member, RoomOf(r)) }, assertedValue), "the member's participants, in the call's room, and nobody else's");
+            }
+            Assert.Equal(new[] { (Member, GroupId, "close_on_no_ability") }, r.Events.Closes);
             var told = r.Events.Lists.Where(l => l.To == Officer).SelectMany(l => l.Updates).ToList();
-            Assert.That(told.Any(u => u.agentID == Member && !u.enterOrLeave), Is.True, "the officer sees the member leave");
+            Assert.True(told.Any(u => u.agentID == Member && !u.enterOrLeave), "the officer sees the member leave");
             NonSpatialVoiceSession s = r.Sessions.Get(GroupId);
-            Assert.That(s.Find(Member).HoldsSeat, Is.False);
-            Assert.That(s.IsRemoved(Member, DateTime.UtcNow), Is.True);
-            Assert.That(s.Find(Officer).HoldsSeat, Is.True, "the rest of the call is untouched");
+            Assert.False(s.Find(Member).HoldsSeat);
+            Assert.True(s.IsRemoved(Member, DateTime.UtcNow));
+            Assert.True(s.Find(Officer).HoldsSeat, "the rest of the call is untouched");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARemovalTwice_DropsAndTellsOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
 
             r.Module.RemoveFromCall(GroupId, Officer, Member, "a");
             WebRtcVoiceRegionModule.CallRemovalResult again = r.Module.RemoveFromCall(GroupId, Officer, Member, "b");
 
-            Assert.That(again.Ok, Is.True);
-            Assert.That(again.Changed, Is.False);
-            Assert.That(r.Voice.Drops.Count, Is.EqualTo(1));
-            Assert.That(r.Events.Closes.Count, Is.EqualTo(1));
+            Assert.True(again.Ok);
+            Assert.False(again.Changed);
+            Assert.Single(r.Voice.Drops);
+            Assert.Single(r.Events.Closes);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheRemovalIsRefusedWhenTheFeatureIsOff_AndForACallThatIsNotThere()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region off = Region.Create();
-            Assert.That(off.Module.RemoveFromCall(GroupId, Officer, Member, "x").Decision, Is.EqualTo("call-moderation-off"));
+            Assert.Equal("call-moderation-off", off.Module.RemoveFromCall(GroupId, Officer, Member, "x").Decision);
 
             using Region on = InACall();
-            Assert.That(on.Module.RemoveFromCall(UUID.Random(), Officer, Member, "x").Ok, Is.False);
-            Assert.That(on.Voice.Drops, Is.Empty);
-            Assert.That(on.Events.Closes, Is.Empty);
+            Assert.False(on.Module.RemoveFromCall(UUID.Random(), Officer, Member, "x").Ok);
+            Assert.Empty(on.Voice.Drops);
+            Assert.Empty(on.Events.Closes);
         }
 
         // ---- the way back is closed ---------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARemovedMemberIsRefusedOnProvision_Call_AndAcceptInvitation()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
-            Assert.That(Provision(r, Member, out _), Is.Not.EqualTo((int)HttpStatusCode.Forbidden), "precondition: admitted before the removal");
+            {
+                var assertedValue = Provision(r, Member, out _);
+                TestAssert.WithMessage(() => Assert.NotEqual((int)HttpStatusCode.Forbidden, assertedValue), "precondition: admitted before the removal");
+            }
             r.Module.RemoveFromCall(GroupId, Officer, Member, "x");
 
-            Assert.That(Provision(r, Member, out _), Is.EqualTo((int)HttpStatusCode.Forbidden), "provision");
-            Assert.That(r.Call(Member), Is.EqualTo((int)HttpStatusCode.Forbidden), "call");
+            {
+                var assertedValue = Provision(r, Member, out _);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.Forbidden, assertedValue), "provision");
+            }
+            {
+                var assertedValue = r.Call(Member);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.Forbidden, assertedValue), "call");
+            }
             int accept = r.Post(Member, new OSDMap { ["method"] = OSD.FromString("accept invitation"), ["session-id"] = OSD.FromUUID(GroupId) });
-            Assert.That(accept, Is.EqualTo((int)HttpStatusCode.Forbidden), "accept invitation");
-            Assert.That(r.Sessions.Get(GroupId).Find(Member).HoldsSeat, Is.False);
-            Assert.That(r.Call(Officer), Is.EqualTo((int)HttpStatusCode.OK), "everyone else is unaffected");
+            {
+                var assertedValue = accept;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.Forbidden, assertedValue), "accept invitation");
+            }
+            Assert.False(r.Sessions.Get(GroupId).Find(Member).HoldsSeat);
+            {
+                var assertedValue = r.Call(Officer);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "everyone else is unaffected");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AProvisionRefusedBecauseOfARemoval_NamesTheRemovalOnTheDecisionWord()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             r.Module.RemoveFromCall(GroupId, Officer, Member, "x");
             NonSpatialVoiceSession s = r.Sessions.Get(GroupId);
@@ -186,9 +208,9 @@ namespace osWebRtcVoice.Tests
             NonSpatialProvisionResult g = NonSpatialProvisionAdmission.Decide(body, Member, new GroupVoicePolicy { Enabled = true, IsMember = (a, gr) => true, Powers = (a, gr) => ulong.MaxValue },
                                                                               r.Sessions, UUID.Zero);
 
-            Assert.That(g.Admitted, Is.False);
-            Assert.That(g.Decision, Is.EqualTo(NonSpatialProvisionAdmission.DecisionRemoved));
-            Assert.That(g.Status, Is.EqualTo(403));
+            Assert.False(g.Admitted);
+            Assert.Equal(NonSpatialProvisionAdmission.DecisionRemoved, g.Decision);
+            Assert.Equal(403, g.Status);
         }
 
         // ---- a conference ---------------------------------------------------------------------------------------
@@ -208,25 +230,34 @@ namespace osWebRtcVoice.Tests
             return r;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARemovalFromAConference_DropsTheMedia_LeavesTheText_AndShutsEveryWayBack()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InAConference(out UUID id);
             r.Events.Lists.Clear();
 
             WebRtcVoiceRegionModule.CallRemovalResult result = r.Module.RemoveFromCall(id, Officer, Member, "x");
 
-            Assert.That(result.Ok && result.Changed, Is.True, result.Decision);
-            Assert.That(r.Events.Closes, Is.EqualTo(new[] { (Member, id, "close_on_no_ability") }), "told with the conference's own id");
-            Assert.That(r.Voice.Drops.Select(d => d.Agent), Is.EqualTo(new[] { Member }));
+            Assert.True((result.Ok && result.Changed), result.Decision);
+            {
+                var assertedValue = r.Events.Closes;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { (Member, id, "close_on_no_ability") }, assertedValue), "told with the conference's own id");
+            }
+            Assert.Equal(new[] { Member }, r.Voice.Drops.Select(d => d.Agent));
             NonSpatialVoiceSession s = r.Sessions.Get(id);
-            Assert.That(s.ChatMembers(), Does.Not.Contain(Member), "removed from the conference's text with the seat");
-            Assert.That(s.ChatMembers(), Does.Contain(Officer));
-            Assert.That(r.Events.Lists.Any(l => l.To == Officer && l.Updates.Any(u => u.agentID == Member && !u.enterOrLeave)), Is.True,
-                        "the rest of the conference sees them leave");
+            {
+                var assertedValue = s.ChatMembers();
+                TestAssert.WithMessage(() => Assert.DoesNotContain(Member, assertedValue), "removed from the conference's text with the seat");
+            }
+            Assert.Contains(Officer, s.ChatMembers());
+            Assert.True(r.Events.Lists.Any(l => l.To == Officer && l.Updates.Any(u => u.agentID == Member && !u.enterOrLeave)), "the rest of the conference sees them leave");
 
             OSDMap accept = new OSDMap { ["method"] = OSD.FromString("accept invitation"), ["session-id"] = OSD.FromUUID(id) };
-            Assert.That(r.Post(Member, accept), Is.EqualTo((int)HttpStatusCode.Forbidden), "accept invitation");
+            {
+                var assertedValue = r.Post(Member, accept);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.Forbidden, assertedValue), "accept invitation");
+            }
 
             OSDMap invite = new OSDMap
             {
@@ -234,8 +265,14 @@ namespace osWebRtcVoice.Tests
                 ["session-id"] = OSD.FromUUID(id),
                 ["params"] = new OSDArray { OSD.FromUUID(Member) },
             };
-            Assert.That(r.Post(Officer, invite), Is.EqualTo((int)HttpStatusCode.OK), "the invite is answered");
-            Assert.That(r.Sessions.Get(id).Find(Member).State, Is.EqualTo(MemberState.Departed), "and does not ring the removed member back in");
+            {
+                var assertedValue = r.Post(Officer, invite);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "the invite is answered");
+            }
+            {
+                var assertedValue = r.Sessions.Get(id).Find(Member).State;
+                TestAssert.WithMessage(() => Assert.Equal(MemberState.Departed, assertedValue), "and does not ring the removed member back in");
+            }
 
             OSDMap body = new OSDMap
             {
@@ -246,20 +283,27 @@ namespace osWebRtcVoice.Tests
             };
             TestOSHttpResponse response = new TestOSHttpResponse();
             r.Module.ProvisionVoiceAccountRequest(new ProvisionPost(body), response, Member, r.Scene);
-            Assert.That(response.StatusCode, Is.EqualTo((int)HttpStatusCode.Forbidden), "provision");
+            {
+                var assertedValue = response.StatusCode;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.Forbidden, assertedValue), "provision");
+            }
 
-            Assert.That(r.Post(Other, accept), Is.EqualTo((int)HttpStatusCode.OK), "another invitee is unaffected");
+            {
+                var assertedValue = r.Post(Other, accept);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "another invitee is unaffected");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCreatorOfAConferenceCanBeRemovedToo_AndIsNotSeatedAgainByTheirOwnAccept()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InAConference(out UUID id);
 
             r.Module.RemoveFromCall(id, Member, Officer, "x");
 
-            Assert.That(r.Sessions.Get(id).Find(Officer).HoldsSeat, Is.False);
-            Assert.That(r.Sessions.Accept(id, Officer, r.Scene.RegionInfo.RegionID).Decision, Is.EqualTo(SessionOutcome.Removed));
+            Assert.False(r.Sessions.Get(id).Find(Officer).HoldsSeat);
+            Assert.Equal(SessionOutcome.Removed, r.Sessions.Accept(id, Officer, r.Scene.RegionInfo.RegionID).Decision);
         }
 
         // ---- the viewer that keeps asking --------------------------------------------------------------------
@@ -276,9 +320,10 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AViewerThatKeepsRetryingAfterARemoval_IsRefusedFromTheCache_NotTheStore()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             r.Module.RemoveFromCall(GroupId, Officer, Member, "x");
             CountingSessions counting = (CountingSessions)(object)DispatchProxy.Create<INonSpatialSessions, CountingSessions>();
@@ -289,21 +334,27 @@ namespace osWebRtcVoice.Tests
             const int Retries = 300;
             var clock = System.Diagnostics.Stopwatch.StartNew();
             for (int i = 0; i < Retries; i++)
-                Assert.That(Provision(r, Member, out _), Is.EqualTo((int)HttpStatusCode.Forbidden), $"retry {i}");
+                {
+                    var assertedValue = Provision(r, Member, out _);
+                    TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.Forbidden, assertedValue), $"retry {i}");
+                }
             clock.Stop();
 
-            TestContext.Out.WriteLine($"{Retries} refused provisions in {clock.ElapsedMilliseconds} ms "
+            TestContext.Current.TestOutputHelper.WriteLine($"{Retries} refused provisions in {clock.ElapsedMilliseconds} ms "
                 + $"({Retries * 1000.0 / Math.Max(1, clock.ElapsedMilliseconds):F0} per second); store lookups by room key: "
                 + counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.GetByRoomKey)));
             // The test's own Provision() reads the call's record once per retry to build the body; what the module itself
             // asks the store for by room key is what the cache saves.
-            Assert.That(counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.GetByRoomKey)), Is.EqualTo(1),
-                        "the first retry asked; the other 299 were answered from the cache");
+            {
+                var assertedValue = counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.GetByRoomKey));
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the first retry asked; the other 299 were answered from the cache");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AViewerThatHonoursTheForcedClose_StopsAfterOneMorePost()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             r.Module.RemoveFromCall(GroupId, Officer, Member, "x");
             int posts = 0;
@@ -318,94 +369,115 @@ namespace osWebRtcVoice.Tests
                 closed = r.Events.Closes.Any(c => c.To == Member && c.Session == GroupId);
             }
 
-            Assert.That(posts, Is.EqualTo(1));
-            Assert.That(r.Events.Closes.Count, Is.EqualTo(1), "and was sent once, not once per retry");
+            Assert.Equal(1, posts);
+            {
+                var assertedValue = r.Events.Closes.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "and was sent once, not once per retry");
+            }
         }
 
         // ---- the end of the removal -------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheEndOfTheCallEndsTheRemoval()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             r.Module.RemoveFromCall(GroupId, Officer, Member, "x");
-            Assert.That(r.Call(Member), Is.EqualTo((int)HttpStatusCode.Forbidden), "during the call");
+            {
+                var assertedValue = r.Call(Member);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.Forbidden, assertedValue), "during the call");
+            }
 
             r.Sessions.Depart(GroupId, Officer, DepartureReason.VoiceTeardown);   // the last seat: the call ends
 
-            Assert.That(r.Call(Member), Is.EqualTo((int)HttpStatusCode.OK), "a new call");
-            Assert.That(r.Sessions.Get(GroupId).Removed, Is.Empty);
+            {
+                var assertedValue = r.Call(Member);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "a new call");
+            }
+            Assert.Empty(r.Sessions.Get(GroupId).Removed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ReadmittingLiftsTheRefusalAtOnce_EvenForAViewerWhoseRefusalWasCached()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             r.Module.RemoveFromCall(GroupId, Officer, Member, "x");
-            Assert.That(Provision(r, Member, out _), Is.EqualTo((int)HttpStatusCode.Forbidden));
+            Assert.Equal((int)HttpStatusCode.Forbidden, Provision(r, Member, out _));
 
             WebRtcVoiceRegionModule.CallRemovalResult back = r.Module.ReadmitToCall(GroupId, Officer, Member);
 
-            Assert.That(back.Ok && back.Changed, Is.True);
-            Assert.That(r.Call(Member), Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(Provision(r, Member, out _), Is.Not.EqualTo((int)HttpStatusCode.Forbidden), "the cached refusal went with the removal");
+            Assert.True(back.Ok && back.Changed);
+            Assert.Equal((int)HttpStatusCode.OK, r.Call(Member));
+            {
+                var assertedValue = Provision(r, Member, out _);
+                TestAssert.WithMessage(() => Assert.NotEqual((int)HttpStatusCode.Forbidden, assertedValue), "the cached refusal went with the removal");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARemovalLastsAsLongAsTheKeySays_AndTheCallWhenItIsNotSet()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region plain = InACall();
             plain.Module.RemoveFromCall(GroupId, Officer, Member, "x");
-            Assert.That(plain.Sessions.Get(GroupId).RemovalOf(Member).ExpiresUtc, Is.Null, "default: until the call ends");
+            {
+                var assertedValue = plain.Sessions.Get(GroupId).RemovalOf(Member).ExpiresUtc;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "default: until the call ends");
+            }
 
             using Region keyed = InACall(v => v.Set("CallRemovalMinutes", "90"));
             DateTime before = DateTime.UtcNow;
             keyed.Module.RemoveFromCall(GroupId, Officer, Member, "x");
             DateTime? ends = keyed.Sessions.Get(GroupId).RemovalOf(Member).ExpiresUtc;
-            Assert.That(ends, Is.Not.Null);
-            Assert.That(ends.Value - before, Is.InRange(TimeSpan.FromMinutes(89), TimeSpan.FromMinutes(91)));
+            Assert.NotNull(ends);
+            Assert.InRange(ends.Value - before, TimeSpan.FromMinutes(89), TimeSpan.FromMinutes(91));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheRemovalKey_DefaultsToUntilTheCallEnds_AndIsBounded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Nini.Config.IConfig cfg = new Nini.Config.IniConfigSource().AddConfig("WebRtcVoice");
-            Assert.That(CallModerationSettings.Read(cfg).RemovalMinutes, Is.EqualTo(0));
+            Assert.Equal(0, CallModerationSettings.Read(cfg).RemovalMinutes);
             cfg.Set("CallRemovalMinutes", "120");
-            Assert.That(CallModerationSettings.Read(cfg).RemovalMinutes, Is.EqualTo(120));
+            Assert.Equal(120, CallModerationSettings.Read(cfg).RemovalMinutes);
             cfg.Set("CallRemovalMinutes", "-5");
-            Assert.That(CallModerationSettings.Read(cfg).RemovalMinutes, Is.EqualTo(0));
+            Assert.Equal(0, CallModerationSettings.Read(cfg).RemovalMinutes);
             cfg.Set("CallRemovalMinutes", "999999999");
-            Assert.That(CallModerationSettings.Read(cfg).RemovalMinutes, Is.EqualTo(VoiceSessionService.MaxRemovalMinutes));
+            Assert.Equal(VoiceSessionService.MaxRemovalMinutes, CallModerationSettings.Read(cfg).RemovalMinutes);
         }
 
         // ---- the group's text ------------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupRemovalLeavesTheGroupsText()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             IGroupChatGate gate = r.Scene.RequestModuleInterface<IGroupChatGate>();
 
             r.Module.RemoveFromCall(GroupId, Officer, Member, "x");
 
-            Assert.That(gate.MaySend(GroupId, Member), Is.True, "the removed member's group chat is not muted");
-            Assert.That(r.Sessions.Get(GroupId).Find(Member).InChat, Is.True);
+            Assert.True(gate.MaySend(GroupId, Member), "the removed member's group chat is not muted");
+            Assert.True(r.Sessions.Get(GroupId).Find(Member).InChat);
         }
 
         // ---- a removal made elsewhere -----------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASeatTheServiceSaysWasRemovedElsewhere_IsTornDownHere()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             r.Voice.Drops.Clear();
 
             typeof(WebRtcVoiceRegionModule).GetMethod("OnGridSeatRemoved", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(r.Module, new object[] { new SeatKey(GroupId, Member) });
 
-            Assert.That(r.Voice.Drops, Is.EqualTo(new[] { (Member, RoomOf(r)) }));
-            Assert.That(r.Events.Closes, Is.EqualTo(new[] { (Member, GroupId, "close_on_no_ability") }));
+            Assert.Equal(new[] { (Member, RoomOf(r)) }, r.Voice.Drops);
+            Assert.Equal(new[] { (Member, GroupId, "close_on_no_ability") }, r.Events.Closes);
         }
 
         // ---- the moderator's power and the call's powers --------------------------------------------------------
@@ -414,64 +486,85 @@ namespace osWebRtcVoice.Tests
             => typeof(WebRtcVoiceRegionModule).GetMethod("RevalidateCallFlags", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(r.Module, null);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALostModeratorPower_WithdrawsTheFlagOnTheTick_AndFurtherModerationIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
-            Assert.That(r.Post(Officer, MuteRequest(Member, true)), Is.EqualTo((int)HttpStatusCode.OK), "precondition: a moderator can mute");
+            {
+                var assertedValue = r.Post(Officer, MuteRequest(Member, true));
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "precondition: a moderator can mute");
+            }
             r.Events.Lists.Clear();
 
             FakeGroups.Powers[Officer] = GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice;   // still in the call, no longer a moderator
             Tick(r);
 
             var flags = r.Events.Lists.Where(l => l.To == Officer).SelectMany(l => l.Updates).Where(u => u.agentID == Officer).ToList();
-            Assert.That(flags.Count, Is.EqualTo(1));
-            Assert.That(flags[0].isModerator, Is.False, "the flag is withdrawn");
-            Assert.That(flags[0].canVoice, Is.True);
-            Assert.That(r.Post(Officer, MuteRequest(Member, false)), Is.EqualTo((int)HttpStatusCode.Forbidden), "and the next request is refused");
-            Assert.That(r.Sessions.Get(GroupId).Find(Officer).HoldsSeat, Is.True, "the officer stays in the call");
-            Assert.That(r.Voice.Drops, Is.Empty);
+            Assert.Single(flags);
+            Assert.False(flags[0].isModerator, "the flag is withdrawn");
+            Assert.True(flags[0].canVoice);
+            {
+                var assertedValue = r.Post(Officer, MuteRequest(Member, false));
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.Forbidden, assertedValue), "and the next request is refused");
+            }
+            Assert.True(r.Sessions.Get(GroupId).Find(Officer).HoldsSeat, "the officer stays in the call");
+            Assert.Empty(r.Voice.Drops);
 
             r.Events.Lists.Clear();
             Tick(r);
-            Assert.That(r.Events.Lists, Is.Empty, "a stable call generates no traffic");
+            {
+                var assertedValue = r.Events.Lists;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a stable call generates no traffic");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMemberWhoLosesThePowerToBeInTheCall_IsLetGoOnTheTick_WithNoRemovalRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             FakeGroups.Powers[Member] = 0;
 
             Tick(r);
 
             NonSpatialVoiceSession s = r.Sessions.Get(GroupId);
-            Assert.That(s.Find(Member).HoldsSeat, Is.False);
-            Assert.That(s.Find(Member).Departure, Is.EqualTo(DepartureReason.PowerLost));
-            Assert.That(r.Voice.Drops, Is.EqualTo(new[] { (Member, RoomOf(r)) }));
-            Assert.That(r.Events.Closes, Is.EqualTo(new[] { (Member, GroupId, "close_on_no_ability") }));
-            Assert.That(s.Removed, Is.Empty, "no removal: the powers decide, and they can come back");
-            Assert.That(s.Find(Officer).HoldsSeat, Is.True);
+            Assert.False(s.Find(Member).HoldsSeat);
+            Assert.Equal(DepartureReason.PowerLost, s.Find(Member).Departure);
+            Assert.Equal(new[] { (Member, RoomOf(r)) }, r.Voice.Drops);
+            Assert.Equal(new[] { (Member, GroupId, "close_on_no_ability") }, r.Events.Closes);
+            {
+                var assertedValue = s.Removed;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no removal: the powers decide, and they can come back");
+            }
+            Assert.True(s.Find(Officer).HoldsSeat);
 
             FakeGroups.Powers[Member] = GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice;
-            Assert.That(r.Call(Member), Is.EqualTo((int)HttpStatusCode.OK), "back with the powers");
+            {
+                var assertedValue = r.Call(Member);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "back with the powers");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMemberWhoIsNoLongerInTheGroup_IsLetGoOnTheTick_WithNoRemovalRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using Region r = InACall();
             FakeGroups.Powers.Remove(Member);   // the groups service no longer knows them as a member (a ban and eject, say)
 
             Tick(r);
 
             NonSpatialVoiceSession s = r.Sessions.Get(GroupId);
-            Assert.That(s.Find(Member).HoldsSeat, Is.False);
-            Assert.That(s.Find(Member).Departure, Is.EqualTo(DepartureReason.PowerLost));
-            Assert.That(r.Voice.Drops, Is.EqualTo(new[] { (Member, RoomOf(r)) }));
-            Assert.That(r.Events.Closes, Is.EqualTo(new[] { (Member, GroupId, "close_on_no_ability") }));
-            Assert.That(s.Removed, Is.Empty);
-            Assert.That(r.Call(Member), Is.Not.EqualTo((int)HttpStatusCode.OK), "and a new call is not answered: they are not a member");
+            Assert.False(s.Find(Member).HoldsSeat);
+            Assert.Equal(DepartureReason.PowerLost, s.Find(Member).Departure);
+            Assert.Equal(new[] { (Member, RoomOf(r)) }, r.Voice.Drops);
+            Assert.Equal(new[] { (Member, GroupId, "close_on_no_ability") }, r.Events.Closes);
+            Assert.Empty(s.Removed);
+            {
+                var assertedValue = r.Call(Member);
+                TestAssert.WithMessage(() => Assert.NotEqual((int)HttpStatusCode.OK, assertedValue), "and a new call is not answered: they are not a member");
+            }
         }
 
         private static OSDMap MuteRequest(UUID target, bool muted) => new OSDMap

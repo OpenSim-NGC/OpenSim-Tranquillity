@@ -78,7 +78,7 @@ public class DataserverLockOrderTests
                     commandPassHoldsTheStaticLock.Set();
                     dataserver.ExpireRequests();
                 }
-            });
+            }, TestContext.Current.CancellationToken);
 
             // A request whose action reaches the command manager, as llGetNotecardLine's does.
             Task request = Task.Run(() =>

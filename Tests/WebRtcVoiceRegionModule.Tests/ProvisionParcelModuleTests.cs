@@ -29,7 +29,6 @@ using OpenSim.Tests.Common;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ProvisionParcelModuleTests
     {
         private static readonly UUID Owner = new UUID("a11ce000-0000-4000-8000-000000000001");
@@ -126,115 +125,145 @@ namespace osWebRtcVoice.Tests
             return sp;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RootAgent_TheParcelWhereItStandsWins_OverTheOneTheViewerNames()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree: false);
             Root(rig, Visitor, InWest);
 
             // The viewer names the estate-channel parcel while standing on the west parcel.
             var (status, sent) = Provision(rig, Visitor, rig.East.LandData.LocalID);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(sent, Is.Not.Null, "the request went on to the voice service");
-            Assert.That(sent["parcel_local_id"].AsInteger(), Is.EqualTo(rig.West.LandData.LocalID), "the room is the west parcel's");
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            {
+                var assertedValue = sent;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the request went on to the voice service");
+            }
+            {
+                var assertedValue = sent["parcel_local_id"].AsInteger();
+                TestAssert.WithMessage(() => Assert.Equal(rig.West.LandData.LocalID, assertedValue), "the room is the west parcel's");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RootAgent_WithNoParcelNamed_GetsTheParcelWhereItStands()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree: false);
             Root(rig, Visitor, InWest);
 
             var (status, sent) = Provision(rig, Visitor, null);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(sent["parcel_local_id"].AsInteger(), Is.EqualTo(rig.West.LandData.LocalID));
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.Equal(rig.West.LandData.LocalID, sent["parcel_local_id"].AsInteger());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RootAgent_OnAnEstateChannelParcel_GetsNoParcelId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree: false);
             Root(rig, Visitor, InEast);
 
             var (status, sent) = Provision(rig, Visitor, rig.West.LandData.LocalID);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(sent.ContainsKey("parcel_local_id"), Is.False, "the estate channel is the region-wide room");
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.False(sent.ContainsKey("parcel_local_id"), "the estate channel is the region-wide room");
         }
 
-        [TestCase(true)]
-        [TestCase(false)]
+        [InlineData(true)]
+        [InlineData(false)]
+        [Theory(Timeout = 60000)]
         public void ParcelWithVoiceOff_IsRefused_OnAnyEstate(bool taxFree)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree);
             rig.West.LandData.Flags &= ~(uint)ParcelFlags.AllowVoiceChat;
             Root(rig, Visitor, InWest);
 
             var (status, sent) = Provision(rig, Visitor, rig.West.LandData.LocalID);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(sent, Is.Null, "the voice service was not called");
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            {
+                var assertedValue = sent;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the voice service was not called");
+            }
         }
 
-        [TestCase(true)]
-        [TestCase(false)]
+        [InlineData(true)]
+        [InlineData(false)]
+        [Theory(Timeout = 60000)]
         public void BannedAgent_IsRefused_OnAnyEstate(bool taxFree)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree);
             Ban(rig.West, Visitor);
             Root(rig, Visitor, InWest);
 
             var (status, sent) = Provision(rig, Visitor, null);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(sent, Is.Null, "the voice service was not called");
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            {
+                var assertedValue = sent;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the voice service was not called");
+            }
         }
 
-        [TestCase(true)]
-        [TestCase(false)]
+        [InlineData(true)]
+        [InlineData(false)]
+        [Theory(Timeout = 60000)]
         public void BannedAgent_IsRefused_OnAParcelUsingTheEstateChannel(bool taxFree)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree);
             Ban(rig.East, Visitor);
             Root(rig, Visitor, InEast);
 
             var (status, sent) = Provision(rig, Visitor, null);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(sent, Is.Null, "the voice service was not called");
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            {
+                var assertedValue = sent;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "the voice service was not called");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BanOnAnotherParcel_DoesNotStopAgentStandingElsewhere()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree: true);
             Ban(rig.East, Visitor);
             Root(rig, Visitor, InWest);
 
             var (status, sent) = Provision(rig, Visitor, rig.East.LandData.LocalID);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK), "the parcel checked is the one the agent stands on");
-            Assert.That(sent, Is.Not.Null);
+            {
+                var assertedValue = status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "the parcel checked is the one the agent stands on");
+            }
+            Assert.NotNull(sent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParcelOwner_IsNotRefusedByItsOwnBanList()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree: true);
             Ban(rig.West, Owner);
             Root(rig, Owner, InWest);
 
             var (status, sent) = Provision(rig, Owner, null);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(sent, Is.Not.Null);
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.NotNull(sent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChildAgent_WithNoParcelNamed_GetsNoParcelChecksAndTheRegionRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree: false);
             Ban(rig.West, Visitor);
             ScenePresence child = SceneHelpers.AddChildScenePresence(rig.Scene, Visitor);
@@ -242,21 +271,25 @@ namespace osWebRtcVoice.Tests
 
             var (status, sent) = Provision(rig, Visitor, null);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(sent.ContainsKey("parcel_local_id"), Is.False);
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.False(sent.ContainsKey("parcel_local_id"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChildAgent_NamingAParcelFarFromItsKnownPosition_IsAnsweredAsIfItNamedNone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig rig = NewRig(taxFree: false);
             ScenePresence child = SceneHelpers.AddChildScenePresence(rig.Scene, Visitor);
             child.AbsolutePosition = new Vector3(-200, 128, 25);   // well clear of the east parcel
 
             var (status, sent) = Provision(rig, Visitor, rig.East.LandData.LocalID);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK), "never a refusal for a hint that is dropped");
-            Assert.That(sent.ContainsKey("parcel_local_id"), Is.False, "the dropped id is not forwarded");
+            {
+                var assertedValue = status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "never a refusal for a hint that is dropped");
+            }
+            Assert.False(sent.ContainsKey("parcel_local_id"), "the dropped id is not forwarded");
         }
     }
 }

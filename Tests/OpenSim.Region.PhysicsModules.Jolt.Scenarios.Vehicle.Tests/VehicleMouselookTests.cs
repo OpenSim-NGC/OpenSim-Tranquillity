@@ -23,9 +23,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 /// </summary>
 public class VehicleMouselookTests
 {
-    private readonly Xunit.Abstractions.ITestOutputHelper output;
+    private readonly Xunit.ITestOutputHelper output;
 
-    public VehicleMouselookTests(Xunit.Abstractions.ITestOutputHelper output) => this.output = output;
+    public VehicleMouselookTests(Xunit.ITestOutputHelper output) => this.output = output;
 
     private static readonly double[] Rates = { 11.0, 22.5, 45.0, 90.0 };
     private const int SteerFlag = 0x80, BankFlag = 0x100;
