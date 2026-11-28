@@ -12,15 +12,14 @@
  * constructed; the module wires the real surfaces (SendNotificationToUsersInRegion,
  * SendAlertToUser, SendChatMessage) and stays a thin adapter.
  */
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    public class VoiceConnectorDisclosureTests
-    {
+    public class VoiceConnectorDisclosureTests : IAsyncLifetime
+        {
         private const float Range = 20f;
 
         private List<string> m_alerts;
@@ -43,9 +42,7 @@ namespace osWebRtcVoice.Tests
             r.NpcId = UUID.Random();
             return r;
         }
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             m_alerts = new List<string>();
             m_notices = new List<(UUID, string)>();
@@ -59,22 +56,22 @@ namespace osWebRtcVoice.Tests
 
         // ---- Attach/detach door notices
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AttachAndDetach_AlertWithTheRightText()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceConnectorRecord r = Recording();
             m_disclosure.OnAttach(r);
             m_disclosure.OnDetach(r);
-            Assert.That(m_alerts, Has.Count.EqualTo(2));
-            Assert.That(m_alerts[0], Is.EqualTo(
-                "Voice connector Recorder NPC attached — an NPC (recording / automated voice) is present in this region's voice."));
-            Assert.That(m_alerts[1], Is.EqualTo(
-                "Voice connector Recorder NPC detached — its NPC has left this region's voice."));
+            Assert.Equal(2, m_alerts.Count());
+            Assert.Equal("Voice connector Recorder NPC attached — an NPC (recording / automated voice) is present in this region's voice.", m_alerts[0]);
+            Assert.Equal("Voice connector Recorder NPC detached — its NPC has left this region's voice.", m_alerts[1]);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Registrar_CallsAttachOnSuccess_AndDetachOnTeardown()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceConnectorRecord r = new VoiceConnectorRecord("Recorder", true, "Recorder", "NPC",
                 new Vector3(1, 2, 3), VoiceConnectorScope.Estate, false, "Operator");
             UUID npc = UUID.Random();
@@ -83,16 +80,16 @@ namespace osWebRtcVoice.Tests
                 VoiceConnectorRegistrar.Register(r, 1, _ => npc,
                     id => new VoiceViewerSession(null, UUID.Random(), id),
                     (id, room) => { }, id => { }, null, m_disclosure);
-                Assert.That(m_alerts, Has.Count.EqualTo(1));
-                Assert.That(m_alerts[0], Does.Contain("attached"));
+                Assert.Single(m_alerts);
+                Assert.Contains("attached", m_alerts[0]);
 
                 VoiceConnectorRegistrar.Unregister(r, id => { }, null, m_disclosure);
-                Assert.That(m_alerts, Has.Count.EqualTo(2));
-                Assert.That(m_alerts[1], Does.Contain("detached"));
+                Assert.Equal(2, m_alerts.Count());
+                Assert.Contains("detached", m_alerts[1]);
 
                 // A second (idempotent) teardown of the now-inactive record stays silent.
                 VoiceConnectorRegistrar.Unregister(r, id => { }, null, m_disclosure);
-                Assert.That(m_alerts, Has.Count.EqualTo(2));
+                Assert.Equal(2, m_alerts.Count());
             }
             finally
             {
@@ -101,58 +98,68 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Registrar_NpcFailure_NoAttachAlert()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceConnectorRecord r = new VoiceConnectorRecord("Recorder", true, "Recorder", "NPC",
                 new Vector3(1, 2, 3), VoiceConnectorScope.Estate, false, "Operator");
             VoiceConnectorRegistrar.Register(r, 1, _ => UUID.Zero,
                 id => new VoiceViewerSession(null, UUID.Random(), id),
                 (id, room) => { }, id => { }, null, m_disclosure);
-            Assert.That(m_alerts, Is.Empty, "an inactive record is never announced as attached");
+            {
+                var assertedValue = m_alerts;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "an inactive record is never announced as attached");
+            }
         }
 
         // ---- Entry notice
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EntryNotice_OncePerLoginSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID agent = UUID.Random();
             UUID session = UUID.Random();
             List<VoiceConnectorRecord> attached = new List<VoiceConnectorRecord> { Recording(), Voiced() };
 
             m_disclosure.OnMakeRoot(agent, session, attached);
-            Assert.That(m_notices, Has.Count.EqualTo(1));
-            Assert.That(m_notices[0].Agent, Is.EqualTo(agent));
-            Assert.That(m_notices[0].Message, Does.Contain("Recorder NPC (recording)"));
-            Assert.That(m_notices[0].Message, Does.Contain("Speaker NPC (voiced)"));
+            Assert.Single(m_notices);
+            Assert.Equal(agent, m_notices[0].Agent);
+            Assert.Contains("Recorder NPC (recording)", m_notices[0].Message);
+            Assert.Contains("Speaker NPC (voiced)", m_notices[0].Message);
 
             // Same login session again (teleport out and back, another root transition): silent.
             m_disclosure.OnMakeRoot(agent, session, attached);
-            Assert.That(m_notices, Has.Count.EqualTo(1), "not twice for one login session");
+            {
+                var assertedValue = m_notices;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "not twice for one login session");
+            }
 
             // A relog is a new SessionId: re-armed.
             m_disclosure.OnMakeRoot(agent, UUID.Random(), attached);
-            Assert.That(m_notices, Has.Count.EqualTo(2));
+            Assert.Equal(2, m_notices.Count());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EntryNotice_NothingWhenNoConnectorAttached()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID session = UUID.Random();
             m_disclosure.OnMakeRoot(UUID.Random(), session, new List<VoiceConnectorRecord>());
-            Assert.That(m_notices, Is.Empty);
+            Assert.Empty(m_notices);
             // And the quiet pass did NOT consume the one notice owed to this login session: an attach later
             // still yields the entry notice on the next root transition.
             m_disclosure.OnMakeRoot(UUID.Random(), session, new List<VoiceConnectorRecord> { Recording() });
-            Assert.That(m_notices, Has.Count.EqualTo(1));
+            Assert.Single(m_notices);
         }
 
         // ---- Proximity notice
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ProximityNotice_FirstApproachOnly_PerAgentPerNpc()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceConnectorRecord speaker = Voiced();
             UUID agentA = UUID.Random(); UUID sessionA = UUID.Random();
             UUID agentB = UUID.Random(); UUID sessionB = UUID.Random();
@@ -162,35 +169,49 @@ namespace osWebRtcVoice.Tests
 
             // Out of range: nothing.
             m_disclosure.ProximityTick(new List<(UUID, UUID, Vector3)> { (agentA, sessionA, far) }, voiced);
-            Assert.That(m_chats, Is.Empty);
+            Assert.Empty(m_chats);
 
             // First approach: one chat line, from the NPC, with the proximity-notice text.
             m_disclosure.ProximityTick(new List<(UUID, UUID, Vector3)> { (agentA, sessionA, near) }, voiced);
-            Assert.That(m_chats, Has.Count.EqualTo(1));
-            Assert.That(m_chats[0].NpcId, Is.EqualTo(speaker.NpcId));
-            Assert.That(m_chats[0].Agent, Is.EqualTo(agentA));
-            Assert.That(m_chats[0].Message, Is.EqualTo(
-                "Speaker NPC is an NPC — its voice is automated or remotely operated."));
+            Assert.Single(m_chats);
+            Assert.Equal(speaker.NpcId, m_chats[0].NpcId);
+            Assert.Equal(agentA, m_chats[0].Agent);
+            Assert.Equal("Speaker NPC is an NPC — its voice is automated or remotely operated.", m_chats[0].Message);
 
             // Still in range next tick: not again for the same agent/NPC.
             m_disclosure.ProximityTick(new List<(UUID, UUID, Vector3)> { (agentA, sessionA, near) }, voiced);
-            Assert.That(m_chats, Has.Count.EqualTo(1));
+            Assert.Single(m_chats);
 
             // A different agent approaching: fires for them.
             m_disclosure.ProximityTick(new List<(UUID, UUID, Vector3)>
                 { (agentA, sessionA, near), (agentB, sessionB, near) }, voiced);
-            Assert.That(m_chats, Has.Count.EqualTo(2));
-            Assert.That(m_chats[1].Agent, Is.EqualTo(agentB));
+            Assert.Equal(2, m_chats.Count());
+            Assert.Equal(agentB, m_chats[1].Agent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ProximityNotice_NeverForRecordingOnly()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceConnectorRecord recorder = Recording();
             m_disclosure.ProximityTick(
                 new List<(UUID, UUID, Vector3)> { (UUID.Random(), UUID.Random(), recorder.Position) },
                 new List<VoiceConnectorRecord> { recorder });
-            Assert.That(m_chats, Is.Empty, "MayInject=false has no voice, so no proximity notice");
+            {
+                var assertedValue = m_chats;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "MayInject=false has no voice, so no proximity notice");
+            }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

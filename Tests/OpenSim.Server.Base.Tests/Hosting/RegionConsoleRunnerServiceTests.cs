@@ -52,7 +52,7 @@ public sealed class RegionConsoleRunnerServiceTests
             await svc.StartAsync(cts.Token);
 
             // Give the service a moment — it should be waiting, not prompting.
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
             cts.Cancel();
             await svc.StopAsync(CancellationToken.None);
 
@@ -89,7 +89,7 @@ public sealed class RegionConsoleRunnerServiceTests
             // Signal application started — prompt loop should begin.
             lifetime.FireApplicationStarted();
 
-            bool prompted = await promptSem.WaitAsync(TimeSpan.FromSeconds(5));
+            bool prompted = await promptSem.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             cts.Cancel();
             await svc.StopAsync(CancellationToken.None);

@@ -104,7 +104,7 @@ public class TerrainEditTests : OpenSimTestCase
 
         // the next packet on another thread, as the region's packet jobs run (a Monitor is re-entered by the thread
         // that holds it)
-        Task.Run(() => Modify(c, 40, 40, 40, 40, parcel: -1)).Wait();
+        Task.Run(() => Modify(c, 40, 40, 40, 40, parcel: -1), TestContext.Current.CancellationToken).Wait(TestContext.Current.CancellationToken);
         Assert.True(r.Height(40, 40) > Ground, "the brush did not change the ground after the refused ModifyLand");
     }
 

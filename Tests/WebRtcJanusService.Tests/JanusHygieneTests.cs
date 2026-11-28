@@ -210,23 +210,18 @@ namespace osWebRtcVoice.Tests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => _gateway.Handle(request, ct);
     }
 
-    [TestFixture]
-    public class JanusHygieneTests
-    {
+    public class JanusHygieneTests : IAsyncLifetime
+        {
         private static readonly UUID Region = new UUID("bbbbbbbb-0000-0000-0000-0000000a0060");
         private static readonly UUID Alice = new UUID("aaaaaaaa-1111-1111-1111-0000000a0060");
 
         private FakeJanusGateway _gw;
         private readonly List<JanusSession> _sessions = new List<JanusSession>();
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _gw = new FakeJanusGateway();
         }
-
-        [TearDown]
-        public async Task TearDown()
+        private async Task TearDown()
         {
             foreach (JanusSession s in _sessions)
             {
@@ -267,14 +262,17 @@ namespace osWebRtcVoice.Tests
                 JanusRequestTimeout = TimeSpan.FromMilliseconds(500)
             };
             _sessions.Add(s);
-            Assert.That(await s.CreateSession(), Is.True, "fake create succeeds");
+            Assert.True((await s.CreateSession()), "fake create succeeds");
             return s;
         }
 
         private static async Task<T> Within<T>(Task<T> task, int ms, string what)
         {
             Task done = await Task.WhenAny(task, Task.Delay(ms));
-            Assert.That(done, Is.SameAs(task), what + " did not complete within " + ms + " ms");
+            {
+                var assertedValue = done;
+                TestAssert.WithMessage(() => Assert.Same(task, assertedValue), what + " did not complete within " + ms + " ms");
+            }
             return await task;
         }
 
@@ -283,94 +281,120 @@ namespace osWebRtcVoice.Tests
             var sw = Stopwatch.StartNew();
             while (!condition() && sw.ElapsedMilliseconds < ms)
                 await Task.Delay(10);
-            Assert.That(condition(), Is.True, what);
+            Assert.True(condition(), what);
         }
 
         // ---- service session reconnect ----------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ServiceSession_WhoseLongPollExited_IsReplacedOnTheNextConsoleCall()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService();
             string first = svc.ServiceSessionId;
-            Assert.That(first, Is.Not.Null.And.Not.Empty, "the service session is created at construction");
+            {
+                var assertedValue = first;
+                TestAssert.WithMessage(() =>
+                {
+                    Assert.NotNull(assertedValue);
+                    Assert.NotEmpty(assertedValue);
+                }, "the service session is created at construction");
+            }
 
             _gw.QueueGet(first, HttpStatusCode.NotFound, string.Empty);   // the mixer restarted: the long poll gets 404
             await WaitUntil(() => !svc.ServiceSessionIsConnected, 3000, "the lost long poll marks the service session disconnected");
 
             AudioBridgeResp resp = await Within(svc.ServiceListRoomsAsync(), 5000, "console list rooms");
 
-            Assert.That(resp, Is.Not.Null);
-            Assert.That(resp.isSuccess, Is.True, "the console command succeeds on the fresh session");
-            Assert.That(svc.ServiceSessionId, Is.Not.EqualTo(first), "a fresh Janus session replaced the dead one");
-            Assert.That(svc.ServiceSessionIsConnected, Is.True);
-            Assert.That(_gw.CreateCount, Is.EqualTo(2));
+            Assert.NotNull(resp);
+            Assert.True(resp.isSuccess, "the console command succeeds on the fresh session");
+            {
+                var assertedValue = svc.ServiceSessionId;
+                TestAssert.WithMessage(() => Assert.NotEqual(first, assertedValue), "a fresh Janus session replaced the dead one");
+            }
+            Assert.True(svc.ServiceSessionIsConnected);
+            Assert.Equal(2, _gw.CreateCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ServiceSession_UnknownToTheServer_IsReplacedAfterTheFailedRequest()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService();
             string first = svc.ServiceSessionId;
             _gw.DeadSessions[first] = true;   // restarted mixer, but no disconnect event reached us
 
             AudioBridgeResp resp = await Within(svc.ServiceListRoomsAsync(), 5000, "console list rooms");
 
-            Assert.That(resp?.isSuccess, Is.True, "retried once on a reconnected session");
-            Assert.That(svc.ServiceSessionId, Is.Not.EqualTo(first));
-            Assert.That(_gw.CreateCount, Is.EqualTo(2));
+            Assert.True((resp?.isSuccess), "retried once on a reconnected session");
+            Assert.NotEqual(first, svc.ServiceSessionId);
+            Assert.Equal(2, _gw.CreateCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task HealthyServiceSession_IsReused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService();
             string first = svc.ServiceSessionId;
 
-            Assert.That((await Within(svc.ServiceListRoomsAsync(), 5000, "first list"))?.isSuccess, Is.True);
-            Assert.That((await Within(svc.ServiceListRoomsAsync(), 5000, "second list"))?.isSuccess, Is.True);
+            Assert.True((await Within(svc.ServiceListRoomsAsync(), 5000, "first list"))?.isSuccess);
+            Assert.True((await Within(svc.ServiceListRoomsAsync(), 5000, "second list"))?.isSuccess);
 
-            Assert.That(svc.ServiceSessionId, Is.EqualTo(first));
-            Assert.That(_gw.CreateCount, Is.EqualTo(1), "no reconnect for a live session");
+            Assert.Equal(first, svc.ServiceSessionId);
+            {
+                var assertedValue = _gw.CreateCount;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "no reconnect for a live session");
+            }
         }
 
         // ---- LeaveRoom's answer ------------------------------------------------------------------
 
-        [TestCase("{\"audiobridge\":\"left\",\"room\":900,\"id\":5}", true)]
-        [TestCase("{\"audiobridge\":\"event\",\"error_code\":487,\"error\":\"Not in a room\"}", true)]
-        [TestCase("{\"audiobridge\":\"event\",\"error_code\":485,\"error\":\"No such room\"}", false)]
+        [InlineData("{\"audiobridge\":\"left\",\"room\":900,\"id\":5}",true)]
+        [InlineData("{\"audiobridge\":\"event\",\"error_code\":487,\"error\":\"Not in a room\"}",true)]
+        [InlineData("{\"audiobridge\":\"event\",\"error_code\":485,\"error\":\"No such room\"}",false)]
+        [Theory(Timeout = 60000)]
         public async Task LeaveRoom_ReportsTheMixersAnswer(string pReplyData, bool pExpected)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _gw.LeaveReplyData = pReplyData;
             JanusSession s = await NewSession();
             var bridge = new JanusAudioBridge(s, "janus.plugin.slvoice");
-            Assert.That(await bridge.Activate(new IniConfigSource()), Is.True, "fake attach succeeds");
+            Assert.True((await bridge.Activate(new IniConfigSource())), "fake attach succeeds");
             var room = new JanusRoom(bridge, 900);
 
             bool left = await Within(room.LeaveRoom(new JanusViewerSession(null) { ParticipantId = 5 }), 3000, "leave");
 
-            Assert.That(left, Is.EqualTo(pExpected));
+            Assert.Equal(pExpected, left);
         }
 
         // ---- signalling --------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Signalling_OnAViewerSessionWithNoJanusSession_AnswersAnErrorMap_NotAnNre()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new WebRtcJanusService(NoJanusConfig());
             var vs = (JanusViewerSession)svc.CreateViewerSession(new OSDMap(), Alice, Region);
             var req = new OSDMap { ["candidate"] = new OSDMap { ["completed"] = OSD.FromBoolean(true) } };
 
             OSDMap resp = null;
-            Assert.DoesNotThrow(() => resp = svc.VoiceSignalingRequest(vs, req, Alice, Region));
+            {
+                var assertedValue = () => resp = svc.VoiceSignalingRequest(vs, req, Alice, Region);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
 
-            Assert.That(resp, Is.Not.Null);
-            Assert.That(resp["response"].AsString(), Is.EqualTo("error"));
+            Assert.NotNull(resp);
+            Assert.Equal("error", resp["response"].AsString());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Signalling_SingularCandidate_IsTrickled_NotDropped()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new WebRtcJanusService(NoJanusConfig());
             var vs = new JanusViewerSession(svc) { Session = await NewSession(), AgentId = Alice, RegionId = Region };
             var req = new OSDMap
@@ -385,17 +409,19 @@ namespace osWebRtcVoice.Tests
 
             OSDMap resp = svc.VoiceSignalingRequest(vs, req, Alice, Region);
 
-            Assert.That(_gw.Trickles.Count, Is.EqualTo(1), "one trickle request for the singular candidate (was an empty else)");
-            Assert.That(resp.ContainsKey("response"), Is.False, "the Janus reply, not the error map");
-            Assert.That(_gw.Trickles.TryPeek(out OSDMap sent) && sent.TryGetOSDArray("candidates", out OSDArray one)
-                && one.Count == 1 && ((OSDMap)one[0])["candidate"].AsString().StartsWith("candidate:1 "), Is.True,
-                "the singular candidate is forwarded as a one-element candidates array");
+            {
+                var assertedValue = _gw.Trickles.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one trickle request for the singular candidate (was an empty else)");
+            }
+            Assert.False(resp.ContainsKey("response"), "the Janus reply, not the error map");
+            Assert.True((_gw.Trickles.TryPeek(out OSDMap sent) && sent.TryGetOSDArray("candidates", out OSDArray one) && one.Count == 1 && ((OSDMap)one[0])["candidate"].AsString().StartsWith("candidate:1 ")), "the singular candidate is forwarded as a one-element candidates array");
         }
 
         // TrickleCandidates used to send the end-of-candidates marker, dropping every trickled candidate.
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Signalling_Candidates_AreForwardedToJanus()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new WebRtcJanusService(NoJanusConfig());
             var vs = new JanusViewerSession(svc) { Session = await NewSession(), AgentId = Alice, RegionId = Region };
             var req = new OSDMap
@@ -419,53 +445,74 @@ namespace osWebRtcVoice.Tests
 
             OSDMap resp = svc.VoiceSignalingRequest(vs, req, Alice, Region);
 
-            Assert.That(resp.ContainsKey("response"), Is.False, "the Janus reply, not the error map");
-            Assert.That(_gw.Trickles.Count, Is.EqualTo(1), "one trickle request reached Janus");
-            Assert.That(_gw.Trickles.TryPeek(out OSDMap sent), Is.True);
-            Assert.That(sent.ContainsKey("candidate"), Is.False, "not the end-of-candidates marker");
-            Assert.That(sent.ContainsKey("viewer_session"), Is.False, "no member outside the Janus trickle API");
-            Assert.That(sent.TryGetOSDArray("candidates", out OSDArray forwarded), Is.True, "a candidates array");
-            Assert.That(forwarded.Count, Is.EqualTo(2));
-            Assert.That(((OSDMap)forwarded[0])["candidate"].AsString(), Does.Contain("typ host"));
-            Assert.That(((OSDMap)forwarded[1])["candidate"].AsString(), Does.Contain("typ srflx"));
-            Assert.That(((OSDMap)forwarded[1])["sdpMid"].AsString(), Is.EqualTo("0"));
-            Assert.That(((OSDMap)forwarded[1])["sdpMLineIndex"].AsInteger(), Is.EqualTo(0));
+            Assert.False(resp.ContainsKey("response"), "the Janus reply, not the error map");
+            {
+                var assertedValue = _gw.Trickles.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one trickle request reached Janus");
+            }
+            Assert.True(_gw.Trickles.TryPeek(out OSDMap sent));
+            Assert.False(sent.ContainsKey("candidate"), "not the end-of-candidates marker");
+            Assert.False(sent.ContainsKey("viewer_session"), "no member outside the Janus trickle API");
+            Assert.True(sent.TryGetOSDArray("candidates", out OSDArray forwarded), "a candidates array");
+            Assert.Equal(2, forwarded.Count);
+            Assert.Contains("typ host", ((OSDMap)forwarded[0])["candidate"].AsString());
+            Assert.Contains("typ srflx", ((OSDMap)forwarded[1])["candidate"].AsString());
+            Assert.Equal("0", ((OSDMap)forwarded[1])["sdpMid"].AsString());
+            Assert.Equal(0, ((OSDMap)forwarded[1])["sdpMLineIndex"].AsInteger());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Signalling_Completed_SendsTheEndOfCandidatesMarker()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new WebRtcJanusService(NoJanusConfig());
             var vs = new JanusViewerSession(svc) { Session = await NewSession(), AgentId = Alice, RegionId = Region };
             var req = new OSDMap { ["candidate"] = new OSDMap { ["completed"] = OSD.FromBoolean(true) } };
 
             svc.VoiceSignalingRequest(vs, req, Alice, Region);
 
-            Assert.That(_gw.Trickles.Count, Is.EqualTo(1), "one trickle request reached Janus");
-            Assert.That(_gw.Trickles.TryPeek(out OSDMap sent), Is.True);
-            Assert.That(sent.ContainsKey("candidates"), Is.False, "the marker carries no candidates");
-            Assert.That(sent.TryGetOSDMap("candidate", out OSDMap marker) && marker["completed"].AsBoolean(), Is.True,
-                "{\"candidate\":{\"completed\":true}}");
+            {
+                var assertedValue = _gw.Trickles.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one trickle request reached Janus");
+            }
+            Assert.True(_gw.Trickles.TryPeek(out OSDMap sent));
+            Assert.False(sent.ContainsKey("candidates"), "the marker carries no candidates");
+            Assert.True((sent.TryGetOSDMap("candidate", out OSDMap marker) && marker["completed"].AsBoolean()), "{\"candidate\":{\"completed\":true}}");
         }
 
         // ---- bounded room-create locks -----------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task RoomCreateLocks_IdleEntriesAreEvicted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int room = 777_000_060;
             await JanusAudioBridge.SelectRoomCoalesced(room, () => Task.FromResult(new JanusRoom(null, room)));
             int before = JanusAudioBridge.RoomCreateLockCount;
-            Assert.That(before, Is.GreaterThanOrEqualTo(1), "the select left a gate behind");
+            Assert.True(before >= 1, "the select left a gate behind");
 
             int keptNow = JanusAudioBridge.SweepRoomCreateLocks(Environment.TickCount64, JanusAudioBridge.RoomCreateLockIdle);
-            Assert.That(JanusAudioBridge.RoomCreateLockCount, Is.EqualTo(before - keptNow), "a gate used just now is kept");
+            {
+                var assertedValue = JanusAudioBridge.RoomCreateLockCount;
+                TestAssert.WithMessage(() => Assert.Equal(before - keptNow, assertedValue), "a gate used just now is kept");
+            }
 
             long later = Environment.TickCount64 + (long)TimeSpan.FromMinutes(11).TotalMilliseconds;
             int evicted = JanusAudioBridge.SweepRoomCreateLocks(later, JanusAudioBridge.RoomCreateLockIdle);
 
-            Assert.That(evicted, Is.GreaterThanOrEqualTo(1));
-            Assert.That(JanusAudioBridge.RoomCreateLockCount, Is.LessThan(before), "the idle room's gate is gone");
+            Assert.True(evicted >= 1);
+            Assert.True(JanusAudioBridge.RoomCreateLockCount < before, "the idle room's gate is gone");
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await TearDown();
         }
     }
 }

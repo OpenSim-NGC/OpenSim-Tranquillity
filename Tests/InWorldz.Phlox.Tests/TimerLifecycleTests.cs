@@ -11,7 +11,6 @@ using System.Globalization;
 using InWorldz.Phlox.VM;
 using OpenMetaverse;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 
