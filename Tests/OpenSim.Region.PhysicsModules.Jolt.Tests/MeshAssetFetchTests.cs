@@ -204,10 +204,6 @@ public class MeshAssetFetchTests
     [Fact]
     public void A_ball_resting_on_the_bounding_box_falls_to_the_real_floor_when_the_asset_arrives()
     {
-        KnownFailure.Skip(
-            "Jolt 2.26 update",
-            "the ball remains supported after the bounding-box collider is replaced by the mesh");
-
         var assets = new FakeAssets();
         JoltScene scene = SceneWith(assets, Scratch());
         try

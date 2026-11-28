@@ -331,7 +331,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             if (hook == null || hook.EventHandlerType != typeof(DllImportResolver))
                 throw new JoltNativeException(
                     "Jolt physics: JoltPhysicsSharp has no JoltApi.JoltDllImporterResolver hook, so the module cannot make it " +
-                    "load the checked joltc. The binding is pinned to 2.19.1; a newer one needs this loader updated.");
+                    "load the checked joltc. The binding is pinned to 2.26.0; a different one needs this loader updated.");
             hook.AddEventHandler(null, new DllImportResolver(Resolve));
         }
     }

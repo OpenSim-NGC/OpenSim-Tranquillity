@@ -63,7 +63,7 @@ public class MovedPrimsCarryRidersTests
                         yield return new object[] { rider, up, speed, rate };
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [MemberData(nameof(Cases))]
     public void A_rider_on_a_platform_moved_by_plain_sets_is_carried_with_the_setting_on(string rider, bool up, float speed, double rate)
     {
@@ -78,7 +78,7 @@ public class MovedPrimsCarryRidersTests
 
     // A platform lifted 0.6 m by each set (3 m/s at 0.2 s): with the setting off, a fixed body set 0.6 m up into the cube throws it and
     // it falls. With it on, the first set already carries it (the body takes the step at no more than 3 m/s), as the sets after it do.
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(0.0)]
     [InlineData(45.0)]
     public void A_cube_on_a_platform_lifted_in_big_steps_is_carried_from_the_first_set_with_the_setting_on(double rate)

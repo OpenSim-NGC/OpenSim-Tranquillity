@@ -133,7 +133,7 @@ public class AvatarStandUpSetOutTests
     // its own velocity would take it (AvatarReportedSpeedTests.SetOut).
     private static bool SetOut(CharacterStepTrace t) => t.Placed && t.Displacement.Length() > t.Asked.Length() * t.Seconds + 0.01f;
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Theory]
     [MemberData(nameof(StandCases))]
     public void After_standing_up_the_avatar_never_moves_up_faster_than_a_tenth_of_a_metre_a_second(double physicsHz, string where)
     {
