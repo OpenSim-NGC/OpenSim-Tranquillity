@@ -22,7 +22,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class PeerCtlBatchSplitterTests
     {
         private const int Limit = PeerCtlBatchSplitter.MixerMaxRequestBytes;
@@ -77,9 +76,10 @@ namespace osWebRtcVoice.Tests
 
         // ---- the size reference -------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void CompactBytes_CountsTheJsonTheMixerMeasures()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var map = new OSDMap
             {
                 ["request"] = OSD.FromString("peer_ctl_batch"),
@@ -88,46 +88,51 @@ namespace osWebRtcVoice.Tests
                 ["e"] = new OSDMap()
             };
             // {"request":"peer_ctl_batch","n":-12,"a":["x\"y",true],"e":{}}
-            Assert.That(PeerCtlBatchSplitter.CompactBytes(map), Is.EqualTo(61));
+            Assert.Equal(61, PeerCtlBatchSplitter.CompactBytes(map));
         }
 
         // ---- a request that fits is not cut ---------------------------------------------------------
 
-        [TestCase(VisOp.Replace)]
-        [TestCase(VisOp.Add)]
-        [TestCase(VisOp.Remove)]
+        [InlineData(VisOp.Replace)]
+        [InlineData(VisOp.Add)]
+        [InlineData(VisOp.Remove)]
+        [Theory(Timeout = 60000)]
         public void Split_ARequestThatFits_IsOnePartHoldingTheMapsItWasGiven(VisOp op)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var excl = Column(8, 5);
             var mute = Column(8, 2);
 
             IReadOnlyList<PeerCtlBatchPart> parts = PeerCtlBatchSplitter.Split(op, excl, mute, Room, armed: true);
 
-            Assert.That(parts.Count, Is.EqualTo(1));
-            Assert.That(parts[0].Excl, Is.SameAs(excl));
-            Assert.That(parts[0].Mute, Is.SameAs(mute));
+            Assert.Single(parts);
+            Assert.Same(excl, parts[0].Excl);
+            Assert.Same(mute, parts[0].Mute);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Split_NothingToSend_IsOneEmptyPart()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IReadOnlyList<PeerCtlBatchPart> parts = PeerCtlBatchSplitter.Split(VisOp.Replace,
                 new Dictionary<UUID, IReadOnlyCollection<UUID>>(), null, Room, armed: false);
 
-            Assert.That(parts.Count, Is.EqualTo(1));
-            Assert.That(parts[0].Excl, Is.Empty);
+            Assert.Single(parts);
+            Assert.Empty(parts[0].Excl);
         }
 
         // ---- the boundary ------------------------------------------------------------------------------
 
         // Without arming the model is exact, so a request of exactly the limit is one part and a limit one byte smaller cuts it.
-        [TestCase(VisOp.Replace, false)]
-        [TestCase(VisOp.Replace, true)]
-        [TestCase(VisOp.Add, false)]
-        [TestCase(VisOp.Add, true)]
-        [TestCase(VisOp.Remove, true)]
+        [InlineData(VisOp.Replace,false)]
+        [InlineData(VisOp.Replace,true)]
+        [InlineData(VisOp.Add,false)]
+        [InlineData(VisOp.Add,true)]
+        [InlineData(VisOp.Remove,true)]
+        [Theory(Timeout = 60000)]
         public void Split_ARequestOfExactlyTheLimit_IsNotCut_AndOneByteLessIs(VisOp op, bool withMute)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var excl = Column(40, 30);
             var mute = withMute ? Column(40, 7, firstId: 1) : null;
             int exact = Size(op, excl, mute);
@@ -135,27 +140,34 @@ namespace osWebRtcVoice.Tests
             IReadOnlyList<PeerCtlBatchPart> whole = PeerCtlBatchSplitter.Split(op, excl, mute, Room, armed: false, limit: exact);
             IReadOnlyList<PeerCtlBatchPart> cut = PeerCtlBatchSplitter.Split(op, excl, mute, Room, armed: false, limit: exact - 1);
 
-            Assert.That(whole.Count, Is.EqualTo(1), "a request of exactly the limit is accepted by the mixer");
-            Assert.That(cut.Count, Is.GreaterThan(1));
+            {
+                var assertedValue = whole.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "a request of exactly the limit is accepted by the mixer");
+            }
+            Assert.True(cut.Count > 1);
             foreach (PeerCtlBatchPart p in cut)
-                Assert.That(PeerCtlBatchSplitter.CompactBytes(Build(op, p, false)), Is.LessThanOrEqualTo(exact - 1));
+                Assert.True(PeerCtlBatchSplitter.CompactBytes(Build(op, p, false)) <= exact - 1);
         }
 
         // At the real limit: the most listeners with a full column of 109 that fit are one part, and one more listener is two.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Split_AtTheMixersLimit_TheLastListenerThatFitsIsTheBoundary()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             int fits = 0;
             while (Size(VisOp.Replace, Fill(fits + 1), null) <= Limit)
                 fits++;
-            Assert.That(fits, Is.InRange(10, 20), "about 4.3 KB for each listener");
+            {
+                var assertedValue = fits;
+                TestAssert.WithMessage(() => Assert.InRange(assertedValue, 10, 20), "about 4.3 KB for each listener");
+            }
 
             // 109 sources need 110 distinct avatars in the room
-            Assert.That(PeerCtlBatchSplitter.Split(VisOp.Replace, Fill(fits), null, Room, false).Count, Is.EqualTo(1));
+            Assert.Single(PeerCtlBatchSplitter.Split(VisOp.Replace, Fill(fits), null, Room, false));
             IReadOnlyList<PeerCtlBatchPart> over = PeerCtlBatchSplitter.Split(VisOp.Replace, Fill(fits + 1), null, Room, false);
-            Assert.That(over.Count, Is.EqualTo(2));
-            Assert.That(over[0].Excl.Count, Is.EqualTo(fits));
-            Assert.That(over[1].Excl.Count, Is.EqualTo(1));
+            Assert.Equal(2, over.Count);
+            Assert.Equal(fits, over[0].Excl.Count);
+            Assert.Single(over[1].Excl);
         }
 
         // `listeners` listeners, each excluding the 109 others of a room of 110.
@@ -189,36 +201,41 @@ namespace osWebRtcVoice.Tests
             return d;
         }
 
-        [TestCase(VisOp.Replace, false)]
-        [TestCase(VisOp.Replace, true)]
-        [TestCase(VisOp.Add, true)]
-        [TestCase(VisOp.Remove, false)]
+        [InlineData(VisOp.Replace,false)]
+        [InlineData(VisOp.Replace,true)]
+        [InlineData(VisOp.Add,true)]
+        [InlineData(VisOp.Remove,false)]
+        [Theory(Timeout = 60000)]
         public void Split_ARoomOf110WhereEveryoneExcludesEveryone_IsPartsThatFitAndCoverEveryListenerOnce(VisOp op, bool armed)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var excl = Everyone();
-            Assert.That(Size(op, excl, null), Is.GreaterThan(Limit * 7), "the request this guards against is about 472 KB");
+            Assert.True(Size(op, excl, null) > Limit * 7, "the request this guards against is about 472 KB");
 
             IReadOnlyList<PeerCtlBatchPart> parts = PeerCtlBatchSplitter.Split(op, excl, null, Room, armed);
 
             AssertParts(op, parts, excl, null, armed);
         }
 
-        [TestCase(VisOp.Replace, false)]
-        [TestCase(VisOp.Replace, true)]
-        [TestCase(VisOp.Add, true)]
+        [InlineData(VisOp.Replace,false)]
+        [InlineData(VisOp.Replace,true)]
+        [InlineData(VisOp.Add,true)]
+        [Theory(Timeout = 60000)]
         public void Split_ARoomOf110WhereEveryoneMutesEveryone_IsPartsThatFitAndCoverEveryListenerOnce(VisOp op, bool armed)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var mute = Everyone();
 
             IReadOnlyList<PeerCtlBatchPart> parts = PeerCtlBatchSplitter.Split(op, new Dictionary<UUID, IReadOnlyCollection<UUID>>(), mute, Room, armed);
 
-            Assert.That(parts.Count, Is.GreaterThan(1));
+            Assert.True(parts.Count > 1);
             AssertParts(op, parts, new Dictionary<UUID, IReadOnlyCollection<UUID>>(), mute, armed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Split_AListenerKeepsItsExclAndItsMuteInTheSamePart()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // 110 listeners; 55 of the sources in each column are excluded, 54 are muted (disjoint, as the matrix builds them)
             var excl = new Dictionary<UUID, IReadOnlyCollection<UUID>>();
             var mute = new Dictionary<UUID, IReadOnlyCollection<UUID>>();
@@ -230,15 +247,19 @@ namespace osWebRtcVoice.Tests
 
             IReadOnlyList<PeerCtlBatchPart> parts = PeerCtlBatchSplitter.Split(VisOp.Replace, excl, mute, Room, armed: true);
 
-            Assert.That(parts.Count, Is.GreaterThan(1));
+            Assert.True(parts.Count > 1);
             foreach (PeerCtlBatchPart p in parts)
-                Assert.That(p.Mute.Keys, Is.EquivalentTo(p.Excl.Keys), "one part holds both columns of each listener it names");
+                {
+                    var assertedValue = p.Mute.Keys;
+                    TestAssert.WithMessage(() => Assert.Equivalent(p.Excl.Keys, assertedValue, strict: true), "one part holds both columns of each listener it names");
+                }
             AssertParts(VisOp.Replace, parts, excl, mute, armed: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Split_AListenerWithOnlyAMuteColumnIsKept_AndAnAddPartWithoutMutesHasNoMuteKey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var excl = Everyone(60);                  // 60 listeners with excl columns, the early parts
             var mute = new Dictionary<UUID, IReadOnlyCollection<UUID>>
             {
@@ -247,16 +268,20 @@ namespace osWebRtcVoice.Tests
 
             IReadOnlyList<PeerCtlBatchPart> parts = PeerCtlBatchSplitter.Split(VisOp.Add, excl, mute, Room, armed: false);
 
-            Assert.That(parts.Count, Is.GreaterThan(1));
-            Assert.That(parts[0].Mute, Is.Null, "no listener in the first part has a mute column");
-            Assert.That(parts[parts.Count - 1].Mute.Keys, Is.EquivalentTo(new[] { Id(9000) }));
-            Assert.That(PeerCtlBatchSerializer.BuildRequest(VisOp.Add, parts[0].Excl, parts[0].Mute).ContainsKey("mute"), Is.False);
+            Assert.True(parts.Count > 1);
+            {
+                var assertedValue = parts[0].Mute;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no listener in the first part has a mute column");
+            }
+            Assert.Equivalent(new[] { Id(9000) }, parts[parts.Count - 1].Mute.Keys, strict: true);
+            Assert.False(PeerCtlBatchSerializer.BuildRequest(VisOp.Add, parts[0].Excl, parts[0].Mute).ContainsKey("mute"));
             AssertParts(VisOp.Add, parts, excl, mute, armed: false);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Split_AnEmptyColumnIsKeptWithItsKey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // a replace that clears 200 listeners is 200 keys with empty arrays, which is a clear, not nothing
             var excl = new Dictionary<UUID, IReadOnlyCollection<UUID>>();
             for (int i = 0; i < 2000; i++)
@@ -264,9 +289,9 @@ namespace osWebRtcVoice.Tests
 
             IReadOnlyList<PeerCtlBatchPart> parts = PeerCtlBatchSplitter.Split(VisOp.Replace, excl, null, Room, armed: true);
 
-            Assert.That(parts.Count, Is.GreaterThan(1));
+            Assert.True(parts.Count > 1);
             AssertParts(VisOp.Replace, parts, excl, null, armed: true);
-            Assert.That(parts.Sum(p => p.Excl.Count), Is.EqualTo(2000));
+            Assert.Equal(2000, parts.Sum(p => p.Excl.Count));
         }
 
         // Every listener in exactly one part with the same columns, in the order given, every part within the limit.
@@ -277,21 +302,27 @@ namespace osWebRtcVoice.Tests
             var seenMute = new List<UUID>();
             foreach (PeerCtlBatchPart p in parts)
             {
-                Assert.That(PeerCtlBatchSplitter.CompactBytes(Build(op, p, armed)), Is.LessThanOrEqualTo(Limit));
+                Assert.True(PeerCtlBatchSplitter.CompactBytes(Build(op, p, armed)) <= Limit);
                 foreach (var kv in p.Excl)
                 {
                     seenExcl.Add(kv.Key);
-                    Assert.That(kv.Value, Is.SameAs(excl[kv.Key]));
+                    Assert.Same(excl[kv.Key], kv.Value);
                 }
                 if (p.Mute != null)
                     foreach (var kv in p.Mute)
                     {
                         seenMute.Add(kv.Key);
-                        Assert.That(kv.Value, Is.SameAs(mute[kv.Key]));
+                        Assert.Same(mute[kv.Key], kv.Value);
                     }
             }
-            Assert.That(seenExcl, Is.EqualTo(excl.Keys.ToList()), "every excl listener once, in order");
-            Assert.That(seenMute, Is.EqualTo((mute?.Keys ?? Enumerable.Empty<UUID>()).ToList()), "every mute listener once, in order");
+            {
+                var assertedValue = seenExcl;
+                TestAssert.WithMessage(() => Assert.Equal(excl.Keys.ToList(), assertedValue), "every excl listener once, in order");
+            }
+            {
+                var assertedValue = seenMute;
+                TestAssert.WithMessage(() => Assert.Equal((mute?.Keys ?? Enumerable.Empty<UUID>()).ToList(), assertedValue), "every mute listener once, in order");
+            }
             if (armed)
                 return;   // the splitter allows the arming fields at their longest; the reference here uses real ones
             // the parts are as few as they can be: joining any two neighbours would be over the limit
@@ -305,8 +336,7 @@ namespace osWebRtcVoice.Tests
                 foreach (var kv in next.Excl) { e[kv.Key] = kv.Value; break; }
                 if (next.Mute != null) foreach (var kv in next.Mute) { (m ??= new Dictionary<UUID, IReadOnlyCollection<UUID>>())[kv.Key] = kv.Value; break; }
                 var joined = new PeerCtlBatchPart(e, m);
-                Assert.That(PeerCtlBatchSplitter.CompactBytes(Build(op, joined, armed)), Is.GreaterThan(Limit),
-                    "part " + i + " could have taken the next listener");
+                Assert.True(PeerCtlBatchSplitter.CompactBytes(Build(op, joined, armed)) > Limit, "part " + i + " could have taken the next listener");
             }
         }
     }

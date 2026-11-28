@@ -12,7 +12,6 @@ using OpenSim.Region.ClientStack.LindenCaps.AIS;
 using OpenSim.Region.OptionalModules.Avatar.ServerSideBaking;
 using OpenSim.Services.Interfaces;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 

@@ -14,7 +14,6 @@ using OpenSim.Framework;
 using OpenSim.Region.OptionalModules.Avatar.ServerSideBaking;
 using OpenSimNGC.Appearance.Baking;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 

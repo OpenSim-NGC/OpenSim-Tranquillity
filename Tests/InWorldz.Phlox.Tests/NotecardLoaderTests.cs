@@ -12,7 +12,6 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using OpenMetaverse;
 using Xunit;
-using Xunit.Abstractions;
 using static InWorldz.Phlox.Tests.InventoryGivesRig;
 
 namespace InWorldz.Phlox.Tests;

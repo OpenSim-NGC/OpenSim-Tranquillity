@@ -5,7 +5,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -19,7 +19,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// as the item has them and takes every other bit from the viewer, as the UDP item update keeps all but the low byte.
 /// So editing a script's properties in inventory neither wipes nor sets an engine choice.
 /// </summary>
-[TestFixture]
 public class AisItemFlagsKeepScriptChoiceTests
 {
     private static InventoryItemBase Script(uint flags) => new()
@@ -33,7 +32,7 @@ public class AisItemFlagsKeepScriptChoiceTests
 
     private static readonly uint Chosen = ScriptEngineChoices.WithChoice(ScriptCompileTargets.LslOnLuauFlag, ScriptEngineChoices.Phlox);
 
-    [Test]
+    [Fact]
     public void APatchEchoingTheFlagsTheViewerWasToldKeepsTheChoice()
     {
         InventoryItemBase item = Script(Chosen | 0x100u);
@@ -41,27 +40,27 @@ public class AisItemFlagsKeepScriptChoiceTests
 
         AisMutation.ApplyToItem(new OSDMap { ["flags"] = (int)told, ["desc"] = "new description" }, item);
 
-        Assert.That(item.Flags, Is.EqualTo(Chosen | 0x100u));
-        Assert.That(ScriptEngineChoices.FromFlags(item.Flags), Is.EqualTo(ScriptEngineChoices.Phlox));
+        Assert.Equal(Chosen | 0x100u, item.Flags);
+        Assert.Equal(ScriptEngineChoices.Phlox, ScriptEngineChoices.FromFlags(item.Flags));
     }
 
-    [Test]
+    [Fact]
     public void APatchChangesTheOtherBits()
     {
         InventoryItemBase item = Script(Chosen | 0x100u);
 
         AisMutation.ApplyToItem(new OSDMap { ["flags"] = 0x40000000 }, item);
 
-        Assert.That(item.Flags, Is.EqualTo(Chosen | 0x40000000u));
+        Assert.Equal(Chosen | 0x40000000u, item.Flags);
     }
 
-    [Test]
+    [Fact]
     public void APatchCannotSetTheRegionsBits()
     {
         InventoryItemBase item = Script(0u);
 
         AisMutation.ApplyToItem(new OSDMap { ["flags"] = (int)ScriptEngineChoices.WithChoice(ScriptCompileTargets.LslOnLuauFlag, ScriptEngineChoices.YEngine) }, item);
 
-        Assert.That(item.Flags, Is.EqualTo(0u));
+        Assert.Equal(0u, item.Flags);
     }
 }

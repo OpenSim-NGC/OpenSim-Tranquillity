@@ -23,7 +23,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class PeerCtlBatchPartitionerTests
     {
         private const int EstateRoom = 9000;
@@ -62,9 +61,10 @@ namespace osWebRtcVoice.Tests
 
         // ---- partitioning across rooms ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_SplitsListenersByTheirOwnRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Listeners 1 and 2 in room 100; listener 3 in room 200. Sources co-located so nothing
             // is filtered - this test is about the split alone.
             var excl = Excl((1, new[] { 2 }), (2, new[] { 1 }), (3, new[] { 4 }));
@@ -72,20 +72,21 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(p.RoomCount, Is.EqualTo(2));
-            Assert.That(p.Rooms[100].Count, Is.EqualTo(2));
-            Assert.That(p.Rooms[200].Count, Is.EqualTo(1));
-            Assert.That(p.Rooms[100].ContainsKey(Id(3)), Is.False, "listener 3 belongs to room 200 only");
-            Assert.That(Column(p, 200, 3), Is.EquivalentTo(new[] { Id(4) }));
-            Assert.That(p.FallbackListeners, Is.Zero);
-            Assert.That(p.FallbackSources, Is.Zero);
+            Assert.Equal(2, p.RoomCount);
+            Assert.Equal(2, p.Rooms[100].Count);
+            Assert.Single(p.Rooms[200]);
+            Assert.False(p.Rooms[100].ContainsKey(Id(3)), "listener 3 belongs to room 200 only");
+            Assert.Equivalent(new[] { Id(4) }, Column(p, 200, 3), strict: true);
+            Assert.Equal(0, p.FallbackListeners);
+            Assert.Equal(0, p.FallbackSources);
         }
 
         // ---- same-room source filtering ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_KeepsOnlySourcesInTheListenersRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Listener 1 (room 100) excludes sources 2 (room 100) and 3 (room 200). The cross-room
             // source is inert at the mixer, so it must not travel.
             var excl = Excl((1, new[] { 2, 3 }));
@@ -93,13 +94,17 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(p.RoomCount, Is.EqualTo(1), "only listener 1 is a listener, so only its room is addressed");
-            Assert.That(Column(p, 100, 1), Is.EquivalentTo(new[] { Id(2) }));
+            {
+                var assertedValue = p.RoomCount;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "only listener 1 is a listener, so only its room is addressed");
+            }
+            Assert.Equivalent(new[] { Id(2) }, Column(p, 100, 1), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_ListenerWhoseColumnFiltersEmpty_KeepsItsKey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Every source is in another room. The key must SURVIVE with an empty column: on a
             // Replace that empty array is the meaningful "clear this listener", and dropping the
             // key would silently skip the clear.
@@ -108,15 +113,16 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(p.Rooms[100].ContainsKey(Id(1)), Is.True);
-            Assert.That(Column(p, 100, 1).Count, Is.Zero);
+            Assert.True(p.Rooms[100].ContainsKey(Id(1)));
+            Assert.Empty(Column(p, 100, 1));
         }
 
         // ---- listener with no record ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_ListenerTheResolverCannotPlace_IsOmittedAndCounted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The resolver answers the agent's record, so a null means the agent has no record. An agent
             // with no record is NOT addressed at the estate number because that is the default - it is
             // left out, and counted.
@@ -125,17 +131,24 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(p.Rooms.ContainsKey(EstateRoom), Is.False, "nothing is addressed at the estate number");
-            Assert.That(p.Rooms[100].ContainsKey(Id(5)), Is.False, "and the unplaced listener is nowhere else either");
-            Assert.That(p.FallbackListeners, Is.EqualTo(1), "it is counted, so the state is loud rather than silent");
-            Assert.That(p.FallbackSources, Is.Zero, "every source here has a record");
+            Assert.False(p.Rooms.ContainsKey(EstateRoom), "nothing is addressed at the estate number");
+            Assert.False(p.Rooms[100].ContainsKey(Id(5)), "and the unplaced listener is nowhere else either");
+            {
+                var assertedValue = p.FallbackListeners;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "it is counted, so the state is loud rather than silent");
+            }
+            {
+                var assertedValue = p.FallbackSources;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "every source here has a record");
+            }
         }
 
         // ---- source with no record ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_SourceTheResolverCannotPlace_IsFilteredOutOfEveryColumn_AndCounted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // A source with no record is in no room, so it survives in no column. A source whose record is
             // the estate room is kept for listeners recorded there - that is the case below, where
             // listener 7 and source 9 both have the estate room.
@@ -144,22 +157,32 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(Column(p, EstateRoom, 7).Count, Is.Zero, "the unplaced source is in nobody's column");
-            Assert.That(Column(p, 100, 1).Count, Is.Zero);
-            Assert.That(p.FallbackSources, Is.EqualTo(1), "counted once");
-            Assert.That(p.FallbackListeners, Is.Zero, "listener 7's estate room is RECORDED, not a guess");
+            {
+                var assertedValue = Column(p, EstateRoom, 7).Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the unplaced source is in nobody's column");
+            }
+            Assert.Empty(Column(p, 100, 1));
+            {
+                var assertedValue = p.FallbackSources;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "counted once");
+            }
+            {
+                var assertedValue = p.FallbackListeners;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "listener 7's estate room is RECORDED, not a guess");
+            }
 
             // The same shape with source 9 recorded in the estate room: kept for 7, filtered for 1.
             PeerCtlBatchPartition placed = PeerCtlBatchPartitioner.Partition(
                 excl, Resolver((1, 100), (7, EstateRoom), (9, EstateRoom)), EstateRoom);
-            Assert.That(Column(placed, EstateRoom, 7), Is.EquivalentTo(new[] { Id(9) }));
-            Assert.That(Column(placed, 100, 1).Count, Is.Zero);
-            Assert.That(placed.FallbackSources, Is.Zero);
+            Assert.Equivalent(new[] { Id(9) }, Column(placed, EstateRoom, 7), strict: true);
+            Assert.Empty(Column(placed, 100, 1));
+            Assert.Equal(0, placed.FallbackSources);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_CountsEachRoleSeparately_ForAnAgentThatIsBoth()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Agent 5 has no record and appears as a listener AND as a source. The counters are
             // per-role, so it reads once in each - not once overall, and not twice in one.
             var excl = Excl((5, new[] { 1 }), (1, new[] { 5 }));
@@ -167,13 +190,14 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(p.FallbackListeners, Is.EqualTo(1));
-            Assert.That(p.FallbackSources, Is.EqualTo(1));
+            Assert.Equal(1, p.FallbackListeners);
+            Assert.Equal(1, p.FallbackSources);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_CountsDistinctSources_NotOccurrences()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The unrecorded source 9 is named in three columns. It is ONE agent missing a record;
             // counting occurrences would scale the counter with column fan-out and make "reads zero
             // on a fully upgraded deployment" the only interpretable reading it has.
@@ -182,28 +206,30 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(p.FallbackSources, Is.EqualTo(1));
+            Assert.Equal(1, p.FallbackSources);
         }
 
         // ---- empty map ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_EmptyMap_YieldsNoRoomsAndNoFallbacks()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(
                 new Dictionary<UUID, IReadOnlyCollection<UUID>>(), Resolver(), EstateRoom);
 
-            Assert.That(p.RoomCount, Is.Zero);
-            Assert.That(p.Rooms.Count, Is.Zero);
-            Assert.That(p.FallbackListeners, Is.Zero);
-            Assert.That(p.FallbackSources, Is.Zero);
+            Assert.Equal(0, p.RoomCount);
+            Assert.Empty(p.Rooms);
+            Assert.Equal(0, p.FallbackListeners);
+            Assert.Equal(0, p.FallbackSources);
         }
 
         // ---- single-room fast path ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_SingleRoom_ReturnsOneBucket_WithTheInputMapItself()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Everyone in room 100: no column can lose a source, so the input map IS the answer and
             // is handed back uncopied.
             var excl = Excl((1, new[] { 2, 3 }), (2, new[] { 1 }));
@@ -211,13 +237,17 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(p.RoomCount, Is.EqualTo(1));
-            Assert.That(p.Rooms[100], Is.SameAs(excl), "fast path must not copy");
+            Assert.Equal(1, p.RoomCount);
+            {
+                var assertedValue = p.Rooms[100];
+                TestAssert.WithMessage(() => Assert.Same(excl, assertedValue), "fast path must not copy");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_NobodyCanBePlaced_SendsNothingAtAll_AndCountsEveryone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // With no record for anyone there is nothing to address: sending one estate-room batch carrying
             // everybody would send live policy to a room that may not exist. The counters carry the whole
             // population so the state is impossible to miss.
@@ -225,14 +255,21 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, Resolver(), EstateRoom);
 
-            Assert.That(p.RoomCount, Is.Zero, "no room is addressed");
-            Assert.That(p.FallbackListeners, Is.EqualTo(2));
-            Assert.That(p.FallbackSources, Is.EqualTo(3), "sources 1, 2 and 3, counted once each");
+            {
+                var assertedValue = p.RoomCount;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no room is addressed");
+            }
+            Assert.Equal(2, p.FallbackListeners);
+            {
+                var assertedValue = p.FallbackSources;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "sources 1, 2 and 3, counted once each");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_NullResolver_SendsNothing_AndShouts()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // An unwired sink must not throw on the send path. It sends NOTHING rather than sending
             // everything to a guessed room, and both counters shout. Until the service assigns the resolver there is
             // no honest address for anyone.
@@ -240,46 +277,58 @@ namespace osWebRtcVoice.Tests
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, null, EstateRoom);
 
-            Assert.That(p.RoomCount, Is.Zero);
-            Assert.That(p.FallbackListeners, Is.EqualTo(1));
-            Assert.That(p.FallbackSources, Is.EqualTo(1));
+            Assert.Equal(0, p.RoomCount);
+            Assert.Equal(1, p.FallbackListeners);
+            Assert.Equal(1, p.FallbackSources);
         }
 
         // ---- guards and non-mutation ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_NullExcl_Throws()
         {
-            Assert.That(() => PeerCtlBatchPartitioner.Partition(null, Resolver(), EstateRoom),
-                Throws.TypeOf<ArgumentNullException>());
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            {
+                var assertedValue = () => PeerCtlBatchPartitioner.Partition(null, Resolver(), EstateRoom);
+                Assert.Throws<ArgumentNullException>(() =>
+                {
+                    assertedValue();
+                });
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_NullColumn_ReadsAsAnEmptyColumn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var excl = new Dictionary<UUID, IReadOnlyCollection<UUID>> { [Id(1)] = null, [Id(2)] = new List<UUID> { Id(1) } };
             var roomOf = Resolver((1, 100), (2, 200));
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(Column(p, 100, 1).Count, Is.Zero);
+            Assert.Empty(Column(p, 100, 1));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_DoesNotMutateTheInput()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var excl = Excl((1, new[] { 2, 3 }));
             var roomOf = Resolver((1, 100), (2, 100), (3, 200));
 
             PeerCtlBatchPartitioner.Partition(excl, roomOf, EstateRoom);
 
-            Assert.That(excl.Count, Is.EqualTo(1));
-            Assert.That(excl[Id(1)], Is.EquivalentTo(new[] { Id(2), Id(3) }), "the caller's column is untouched");
+            Assert.Single(excl);
+            {
+                var assertedValue = excl[Id(1)];
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { Id(2), Id(3) }, assertedValue, strict: true), "the caller's column is untouched");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Partition_ResultColumnsAreWhatTheSerializerAccepts()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The contract with: each per-room map goes straight into BuildRequest, which stays
             // room-agnostic - the sink stamps the room key alongside.
             var excl = Excl((1, new[] { 2, 3 }));
@@ -290,8 +339,8 @@ namespace osWebRtcVoice.Tests
             foreach (KeyValuePair<int, IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>>> room in p.Rooms)
             {
                 var body = PeerCtlBatchSerializer.BuildRequest(VisOp.Replace, room.Value);
-                Assert.That(body["request"].AsString(), Is.EqualTo("peer_ctl_batch"));
-                Assert.That(body.ContainsKey("room"), Is.False);
+                Assert.Equal("peer_ctl_batch", body["request"].AsString());
+                Assert.False(body.ContainsKey("room"));
             }
         }
     }

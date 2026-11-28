@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -23,7 +23,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// PurgeDescendents and CopyLibraryCategory over HTTP. A purge cannot be rolled back, so the interesting test is
 /// what a partial purge reports; a copy is additive, so the interesting tests are structure and the tid quirk.
 /// </summary>
-[TestFixture]
 public class AisPurgeCopyHttpTests
 {
     private const string Cap = "/CAP/0a1b2c3d-0000-4000-8000-000000000000";
@@ -126,7 +125,7 @@ public class AisPurgeCopyHttpTests
 
     // ------------------------------------------------------------------ purge
 
-    [Test]
+    [Fact]
     public void purging_a_folder_removes_everything_inside_and_keeps_the_folder()
     {
         var b = Inventory();
@@ -134,49 +133,46 @@ public class AisPurgeCopyHttpTests
 
         var (status, body) = Purge(b, $"/category/{Trash}/children");
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(b.Folders.ContainsKey(Trash), Is.True, "the folder itself survives a purge");
-        Assert.That(b.Folders.ContainsKey(TrashSub), Is.False, "the subfolder is gone");
-        Assert.That(b.Items.ContainsKey(TrashItem), Is.False);
-        Assert.That(b.Items.ContainsKey(TrashSubItem), Is.False, "and so is the item nested inside it");
+        Assert.Equal(200, status);
+        Assert.True(b.Folders.ContainsKey(Trash), "the folder itself survives a purge");
+        Assert.False(b.Folders.ContainsKey(TrashSub), "the subfolder is gone");
+        Assert.False(b.Items.ContainsKey(TrashItem));
+        Assert.False(b.Items.ContainsKey(TrashSubItem), "and so is the item nested inside it");
 
         // the deltas must be enumerated: nothing in the viewer sweeps a purged folder's children for us
-        Assert.That(Ids(body, "_categories_removed"), Is.EquivalentTo(new[] { TrashSub }),
-            "the DIRECT subfolder is named; its own children are implied by its removal");
-        Assert.That(Ids(body, "_removed_items"), Is.EquivalentTo(new[] { TrashItem }),
-            "the nested item is NOT enumerated: removing its parent folder purges it locally");
-        Assert.That(((OSDMap)body["_updated_category_versions"])[Trash.ToString()].AsInteger(),
-            Is.EqualTo(b.Folders[Trash].Version));
-        Assert.That(b.Folders[Trash].Version, Is.GreaterThan(before));
+        Assert.Equivalent(new[] { TrashSub }, Ids(body, "_categories_removed"), true);
+        Assert.Equivalent(new[] { TrashItem }, Ids(body, "_removed_items"), true);
+        Assert.Equal(b.Folders[Trash].Version, ((OSDMap)body["_updated_category_versions"])[Trash.ToString()].AsInteger());
+        Assert.True(b.Folders[Trash].Version > before);
     }
 
-    [Test]
+    [Fact]
     public void purging_trash_is_the_real_caller_and_needs_no_special_case()
     {
         // Empty Trash: LLInventoryModel::emptyFolderType -> purge_descendents_of (llinventorymodel.cpp:4125-4131)
         var b = Inventory();
-        Assert.That(AisHandler.IsProtected(b.Folders[Trash]), Is.True, "Trash is a protected type");
+        Assert.True(AisHandler.IsProtected(b.Folders[Trash]), "Trash is a protected type");
 
         var (status, _) = Purge(b, $"/category/{Trash}/children");
 
-        Assert.That(status, Is.EqualTo(200), "yet purging it is exactly what the operation is for");
-        Assert.That(b.Items.Values.Any(i => i.Folder == Trash), Is.False);
+        Assert.Equal(200, status);
+        Assert.DoesNotContain(b.Items.Values, i => i.Folder == Trash);
     }
 
-    [Test]
+    [Fact]
     public void purging_an_already_empty_folder_succeeds_and_reports_nothing_removed()
     {
         var b = Inventory();
         var (status, body) = Purge(b, $"/category/{Empty}/children");
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(body.ContainsKey("_categories_removed"), Is.False);
-        Assert.That(body.ContainsKey("_removed_items"), Is.False);
-        Assert.That(body.ContainsKey("_updated_category_versions"), Is.True, "the folder's version is still reported");
-        Assert.That(b.Folders.ContainsKey(Empty), Is.True);
+        Assert.Equal(200, status);
+        Assert.False(body.ContainsKey("_categories_removed"));
+        Assert.False(body.ContainsKey("_removed_items"));
+        Assert.True(body.ContainsKey("_updated_category_versions"), "the folder's version is still reported");
+        Assert.True(b.Folders.ContainsKey(Empty));
     }
 
-    [Test]
+    [Fact]
     public void a_partial_purge_reports_the_survivors_and_does_not_claim_success()
     {
         // a purge is destructive by intent: there is nothing to roll back to, so the contract is to say what
@@ -191,24 +187,23 @@ public class AisPurgeCopyHttpTests
 
         var (status, body) = Purge(b, $"/category/{Trash}/children");
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.InternalServerError));
-        Assert.That(body["message"].AsString(), Does.Contain(TrashSub.ToString()),
-            "the survivor must be named in the error");
-        Assert.That(b.Folders.ContainsKey(TrashSub), Is.True, "and it really is still there");
-        Assert.That(b.Items.ContainsKey(TrashItem), Is.False, "while the item that could be removed was removed");
+        Assert.Equal((int)HttpStatusCode.InternalServerError, status);
+        Assert.Contains(TrashSub.ToString(), body["message"].AsString());
+        Assert.True(b.Folders.ContainsKey(TrashSub), "and it really is still there");
+        Assert.False(b.Items.ContainsKey(TrashItem), "while the item that could be removed was removed");
     }
 
-    [Test]
+    [Fact]
     public void purging_an_unknown_category_is_404()
     {
         var (status, body) = Purge(Inventory(), $"/category/{UUID.Random()}/children");
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
-        Assert.That(body["error_code"].AsInteger(), Is.EqualTo(404));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
+        Assert.Equal(404, body["error_code"].AsInteger());
     }
 
     // ------------------------------------------------------------------ copy
 
-    [Test]
+    [Fact]
     public void copying_a_library_folder_preserves_its_structure_at_the_destination()
     {
         var lib = Library();
@@ -216,25 +211,24 @@ public class AisPurgeCopyHttpTests
 
         var (status, body) = Copy(lib, dest, $"/category/{LibOutfit}?tid={UUID.Random()}", Clothing.ToString());
 
-        Assert.That(status, Is.EqualTo(200));
+        Assert.Equal(200, status);
         var categories = Ids(body, "_created_categories");
         var items = Ids(body, "_created_items");
-        Assert.That(categories.Count, Is.EqualTo(2), "the outfit folder and its subfolder");
-        Assert.That(items.Count, Is.EqualTo(2), "the shirt and the shoes");
+        Assert.Equal(2, categories.Count);
+        Assert.Equal(2, items.Count);
 
         var copiedOutfit = dest.Folders.Values.Single(f => f.ParentID == Clothing && f.Name == "Casual Outfit");
         var copiedSub = dest.Folders.Values.Single(f => f.ParentID == copiedOutfit.ID);
-        Assert.That(copiedSub.Name, Is.EqualTo("Accessories"), "the nesting is preserved");
-        Assert.That(dest.Items.Values.Single(i => i.Folder == copiedOutfit.ID).Name, Is.EqualTo("Library Shirt"));
-        Assert.That(dest.Items.Values.Single(i => i.Folder == copiedSub.ID).Name, Is.EqualTo("Library Shoes"));
+        Assert.Equal("Accessories", copiedSub.Name);
+        Assert.Equal("Library Shirt", dest.Items.Values.Single(i => i.Folder == copiedOutfit.ID).Name);
+        Assert.Equal("Library Shoes", dest.Items.Values.Single(i => i.Folder == copiedSub.ID).Name);
 
         // everything created belongs to the agent, not to the library owner
-        Assert.That(dest.Items.Values.Where(i => i.Folder == copiedOutfit.ID).All(i => i.Owner == Agent), Is.True);
-        Assert.That(((OSDMap)body["_updated_category_versions"])[Clothing.ToString()].AsInteger(),
-            Is.EqualTo(dest.Folders[Clothing].Version));
+        Assert.True(dest.Items.Values.Where(i => i.Folder == copiedOutfit.ID).All(i => i.Owner == Agent));
+        Assert.Equal(dest.Folders[Clothing].Version, ((OSDMap)body["_updated_category_versions"])[Clothing.ToString()].AsInteger());
     }
 
-    [Test]
+    [Fact]
     public void a_copied_library_item_keeps_the_source_permissions()
     {
         // Scene.Inventory.cs:1053-1064 - the library branch passes the source's own masks through, unlike the
@@ -245,15 +239,15 @@ public class AisPurgeCopyHttpTests
         Copy(lib, dest, $"/category/{LibOutfit}?tid={UUID.Random()}", Clothing.ToString());
 
         var copiedShirt = dest.Items.Values.Single(i => i.Name == "Library Shirt");
-        Assert.That(copiedShirt.BasePermissions, Is.EqualTo(0x7ffffff0u));
-        Assert.That(copiedShirt.CurrentPermissions, Is.EqualTo(0x7ffffff0u), "not degraded to NextPermissions");
-        Assert.That(copiedShirt.NextPermissions, Is.EqualTo(0x00008000u));
-        Assert.That(copiedShirt.EveryOnePermissions, Is.EqualTo(0x00004000u));
-        Assert.That(copiedShirt.AssetID, Is.EqualTo(lib.Items[LibShirt].AssetID), "the asset is shared, not duplicated");
-        Assert.That(copiedShirt.CreatorId, Is.EqualTo(lib.Items[LibShirt].CreatorId), "the creator is preserved");
+        Assert.Equal(0x7ffffff0u, copiedShirt.BasePermissions);
+        Assert.Equal(0x7ffffff0u, copiedShirt.CurrentPermissions);
+        Assert.Equal(0x00008000u, copiedShirt.NextPermissions);
+        Assert.Equal(0x00004000u, copiedShirt.EveryOnePermissions);
+        Assert.Equal(lib.Items[LibShirt].AssetID, copiedShirt.AssetID);
+        Assert.Equal(lib.Items[LibShirt].CreatorId, copiedShirt.CreatorId);
     }
 
-    [Test]
+    [Fact]
     public void the_depth_zero_tid_form_copies_the_folder_without_its_subfolders()
     {
         // llaisapi.cpp:275-278 appends ",depth=0" to the tid VALUE rather than adding a query parameter
@@ -263,14 +257,14 @@ public class AisPurgeCopyHttpTests
 
         var (status, body) = Copy(lib, dest, $"/category/{LibOutfit}?tid={tid},depth=0", Clothing.ToString());
 
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(Ids(body, "_created_categories").Count, Is.EqualTo(1), "only the outfit folder, no Accessories");
-        Assert.That(Ids(body, "_created_items").Count, Is.EqualTo(1), "and only the item directly inside it");
-        Assert.That(dest.Folders.Values.Any(f => f.Name == "Accessories"), Is.False);
-        Assert.That(body["tid"].AsUUID(), Is.EqualTo(tid), "the tid is echoed with the suffix stripped");
+        Assert.Equal(200, status);
+        Assert.Single(Ids(body, "_created_categories"));
+        Assert.Single(Ids(body, "_created_items"));
+        Assert.DoesNotContain(dest.Folders.Values, f => f.Name == "Accessories");
+        Assert.Equal(tid, body["tid"].AsUUID());
     }
 
-    [Test]
+    [Fact]
     public void copying_a_source_that_is_not_in_the_library_is_404()
     {
         var lib = Library();
@@ -279,22 +273,22 @@ public class AisPurgeCopyHttpTests
         // Clothing exists in the AGENT's inventory but not in the library
         var (status, body) = Copy(lib, dest, $"/category/{Clothing}?tid={UUID.Random()}", Clothing.ToString());
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.InternalServerError));
-        Assert.That(body["message"].AsString(), Does.Contain("no library category"));
-        Assert.That(dest.Folders.Values.Any(f => f.Name == "Casual Outfit"), Is.False, "nothing was copied");
+        Assert.Equal((int)HttpStatusCode.InternalServerError, status);
+        Assert.Contains("no library category", body["message"].AsString());
+        Assert.DoesNotContain(dest.Folders.Values, f => f.Name == "Casual Outfit");
     }
 
-    [Test]
+    [Fact]
     public void a_copy_without_a_destination_header_is_400_and_an_unknown_destination_is_404()
     {
         var lib = Library();
         var dest = Inventory();
 
         var (noHeader, _) = Copy(lib, dest, $"/category/{LibOutfit}?tid={UUID.Random()}", null);
-        Assert.That(noHeader, Is.EqualTo((int)HttpStatusCode.BadRequest));
+        Assert.Equal((int)HttpStatusCode.BadRequest, noHeader);
 
         var (unknown, _) = Copy(lib, dest, $"/category/{LibOutfit}?tid={UUID.Random()}", UUID.Random().ToString());
-        Assert.That(unknown, Is.EqualTo((int)HttpStatusCode.NotFound));
+        Assert.Equal((int)HttpStatusCode.NotFound, unknown);
     }
 
     /// <summary>
@@ -303,20 +297,20 @@ public class AisPurgeCopyHttpTests
     /// deleting and retyping a folder rather than adding children to it — the same reconciliation as slam and
     /// purge. This documents the choice so it cannot change silently.
     /// </summary>
-    [Test]
+    [Fact]
     public void copying_into_a_protected_system_folder_is_allowed()
     {
         var lib = Library();
         var dest = Inventory();
-        Assert.That(AisHandler.IsProtected(dest.Folders[Clothing]), Is.True, "Clothing is a protected type");
+        Assert.True(AisHandler.IsProtected(dest.Folders[Clothing]), "Clothing is a protected type");
 
         var (status, _) = Copy(lib, dest, $"/category/{LibOutfit}?tid={UUID.Random()}", Clothing.ToString());
 
-        Assert.That(status, Is.EqualTo(200), "yet it is the natural destination for a library copy");
-        Assert.That(dest.Folders.Values.Any(f => f.ParentID == Clothing && f.Name == "Casual Outfit"), Is.True);
+        Assert.Equal(200, status);
+        Assert.Contains(dest.Folders.Values, f => f.ParentID == Clothing && f.Name == "Casual Outfit");
     }
 
-    [Test]
+    [Fact]
     public void a_copy_that_fails_part_way_keeps_what_it_made_and_says_how_much()
     {
         var lib = Library();
@@ -326,9 +320,8 @@ public class AisPurgeCopyHttpTests
 
         var (status, body) = Copy(lib, dest, $"/category/{LibOutfit}?tid={UUID.Random()}", Clothing.ToString());
 
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.InternalServerError));
-        Assert.That(body["message"].AsString(), Does.Contain("were created before the failure"));
-        Assert.That(dest.Items.Values.Any(i => i.Name == "Library Shirt"), Is.True,
-            "a copy is additive: what was made stays, and nothing pre-existing was at risk");
+        Assert.Equal((int)HttpStatusCode.InternalServerError, status);
+        Assert.Contains("were created before the failure", body["message"].AsString());
+        Assert.True(dest.Items.Values.Any(i => i.Name == "Library Shirt"), "a copy is additive: what was made stays, and nothing pre-existing was at risk");
     }
 }

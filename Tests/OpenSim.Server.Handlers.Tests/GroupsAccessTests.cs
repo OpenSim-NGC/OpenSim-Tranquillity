@@ -78,9 +78,9 @@ public class GroupsAccessTests
     public void WithAKeyRobustAnswersOnlyCallersThatSendIt()
     {
         var (group, owner) = NewGroup();
-        var handler = new GroupsServicePostHandler(Service, null, Key);
+        var handler = new GroupsServicePostHandler(Service, null!, Key);
 
-        Assert.Equal(403, GetGroup(handler, group, owner, null).Status);
+        Assert.Equal(403, GetGroup(handler, group, owner, null!).Status);
         Assert.Equal(403, GetGroup(handler, group, owner, "not the key").Status);
         Assert.Equal(403, GetGroup(handler, group, owner, Key + "x").Status);
 
@@ -93,8 +93,8 @@ public class GroupsAccessTests
     public void WithoutAKeyRobustAnswersAsBefore()
     {
         var (group, owner) = NewGroup();
-        var handler = new GroupsServicePostHandler(Service, null);
-        var (status, body) = GetGroup(handler, group, owner, null);
+        var handler = new GroupsServicePostHandler(Service, null!);
+        var (status, body) = GetGroup(handler, group, owner, null!);
         Assert.Equal(200, status);
         Assert.Contains(group.ToString(), body);
     }
@@ -126,12 +126,13 @@ public class GroupsAccessTests
         {
             HttpListenerContext ctx = listener.GetContext();
             lock (seen)
-                seen.Add(ctx.Request.Headers[GroupsSecretKey.Header]);
+                seen.Add(ctx.Request.Headers[GroupsSecretKey.Header]
+                    ?? throw new InvalidOperationException($"Request is missing {GroupsSecretKey.Header}."));
             byte[] reply = Encoding.UTF8.GetBytes("<?xml version=\"1.0\"?><ServerResponse><RESULT>NULL</RESULT><REASON>none</REASON></ServerResponse>");
             ctx.Response.ContentType = "text/xml";
             ctx.Response.OutputStream.Write(reply);
             ctx.Response.Close();
-        });
+        }, Xunit.TestContext.Current.CancellationToken);
 
         var config = new IniConfigSource();
         IConfig groups = config.AddConfig("Groups");
@@ -140,7 +141,7 @@ public class GroupsAccessTests
         var connector = new GroupsServiceRemoteConnector(config);
         connector.GetGroupRecord(UUID.Random().ToString(), UUID.Random(), string.Empty);
 
-        Assert.True(served.Wait(TimeSpan.FromSeconds(10)), "the region sent no request");
+        Assert.True(served.Wait(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken), "the region sent no request");
         Assert.Equal(new[] { Key }, seen);
     }
 
