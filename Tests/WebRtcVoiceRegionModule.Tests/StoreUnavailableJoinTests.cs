@@ -14,7 +14,7 @@
  */
 using System.Collections.Generic;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Scenes;
@@ -24,7 +24,6 @@ using static osWebRtcVoice.Tests.CrossProcessHarness;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class StoreUnavailableJoinTests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
@@ -115,8 +114,8 @@ namespace osWebRtcVoice.Tests
         private static (string Room, string Token) OpenGroup(Rig r)
         {
             OSDMap call = new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(Group) };
-            Assert.That(GroupVoiceChatSession.TryHandleCall(call, Alice, r.Policy, r.Store, Region, out ChatSessionOutcome o), Is.True);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
+            Assert.True(GroupVoiceChatSession.TryHandleCall(call, Alice, r.Policy, r.Store, Region, out ChatSessionOutcome o));
+            Assert.Equal(HttpStatusCode.OK, o.Status);
             OSDMap creds = (OSDMap)o.Body["voice_credentials"];
             return (creds["channel_uri"].AsString(), creds["channel_credentials"].AsString());
         }
@@ -125,149 +124,164 @@ namespace osWebRtcVoice.Tests
         private static (UUID Id, string Room, string Token) OpenConference(Rig r)
         {
             SessionOutcome start = r.Store.StartAdhoc(Alice, TempId, Region, new List<UUID> { Bob });
-            Assert.That(start.Ok, Is.True);
+            Assert.True(start.Ok);
             UUID id = start.Session.SessionId;
             OSDMap call = new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(id) };
-            Assert.That(AdhocVoiceChatSession.TryHandleCall(call, Alice, r.Store, Region, true, out ChatSessionOutcome o), Is.True);
+            Assert.True(AdhocVoiceChatSession.TryHandleCall(call, Alice, r.Store, Region, true, out ChatSessionOutcome o));
             OSDMap creds = (OSDMap)o.Body["voice_credentials"];
             return (id, creds["channel_uri"].AsString(), creds["channel_credentials"].AsString());
         }
 
         // ---- the chat session request ------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupCall_WhileTheServiceIsUnreachable_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             r.Service.Up = false;
-            Assert.That(Chat(r, Alice, "call", Group), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Chat(r, Alice, "call", Group));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupCall_WhenTheServiceDropsBetweenStartAndSeat_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             OpenGroup(r);
             r.Service.DownOnly = "accept";
-            Assert.That(Chat(r, Bob, "call", Group), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Chat(r, Bob, "call", Group));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupAcceptInvitation_WhileTheServiceIsUnreachable_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             OpenGroup(r);
             r.Service.Up = false;
-            Assert.That(Chat(r, Bob, "accept invitation", Group), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Chat(r, Bob, "accept invitation", Group));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceStart_WhileTheServiceIsUnreachable_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             r.Service.Up = false;
-            Assert.That(Chat(r, Alice, "start conference", TempId, Bob), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Chat(r, Alice, "start conference", TempId, Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceCall_WhileTheServiceIsUnreachable_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (UUID id, _, _) = OpenConference(r);
             r.Service.Up = false;
-            Assert.That(Chat(r, Alice, "call", id), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Chat(r, Alice, "call", id));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceCall_WhenTheServiceDropsBeforeTheSeat_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (UUID id, _, _) = OpenConference(r);
             r.Service.DownOnly = "accept";
-            Assert.That(Chat(r, Bob, "call", id), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Chat(r, Bob, "call", id));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceAcceptInvitation_WhileTheServiceIsUnreachable_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (UUID id, _, _) = OpenConference(r);
             r.Service.Up = false;
-            Assert.That(Chat(r, Bob, "accept invitation", id), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Chat(r, Bob, "accept invitation", id));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceInvite_WhileTheServiceIsUnreachable_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (UUID id, _, _) = OpenConference(r);
             r.Service.Up = false;
-            Assert.That(Chat(r, Alice, "invite", id, Bob), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Chat(r, Alice, "invite", id, Bob));
         }
 
         // ---- the voice provision -----------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupProvision_WhileTheServiceIsUnreachable_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (string room, string token) = OpenGroup(r);
             r.Service.Up = false;
-            Assert.That(Provision(r, Alice, room, token), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Provision(r, Alice, room, token));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupProvision_WhenTheServiceDropsBeforeTheSeat_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (string room, string token) = OpenGroup(r);
             r.Service.DownOnly = "accept";
-            Assert.That(Provision(r, Alice, room, token), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Provision(r, Alice, room, token));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceProvision_WhileTheServiceIsUnreachable_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (_, string room, string token) = OpenConference(r);
             r.Service.Up = false;
-            Assert.That(Provision(r, Alice, room, token), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Provision(r, Alice, room, token));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceProvision_WhenTheServiceDropsBeforeTheSeat_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (_, string room, string token) = OpenConference(r);
             r.Service.DownOnly = "accept";
-            Assert.That(Provision(r, Alice, room, token), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Provision(r, Alice, room, token));
         }
 
         // ---- every other refusal keeps its code --------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupCallWithoutThePowers_StillAnswers403_WithTheServiceUp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig(powers: 0UL);
-            Assert.That(Chat(r, Alice, "call", Group), Is.EqualTo((int)HttpStatusCode.Forbidden));
+            Assert.Equal((int)HttpStatusCode.Forbidden, Chat(r, Alice, "call", Group));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupProvisionWithAWrongToken_StillAnswers403_WithTheServiceUp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (string room, _) = OpenGroup(r);
-            Assert.That(Provision(r, Alice, room, "not-the-token"), Is.EqualTo((int)HttpStatusCode.Forbidden));
+            Assert.Equal((int)HttpStatusCode.Forbidden, Provision(r, Alice, room, "not-the-token"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceProvisionForSomeoneNotInvited_StillAnswers403_WithTheServiceUp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             (_, string room, string token) = OpenConference(r);
             UUID stranger = new UUID("33333333-3333-3333-3333-333333333333");
             r.Process.AddRoot(stranger);
-            Assert.That(Provision(r, stranger, room, token), Is.EqualTo((int)HttpStatusCode.Forbidden));
+            Assert.Equal((int)HttpStatusCode.Forbidden, Provision(r, stranger, room, token));
         }
     }
 }

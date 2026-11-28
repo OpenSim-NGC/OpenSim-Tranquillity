@@ -145,8 +145,10 @@ public class UserAccountDisplayNameColumnTests
     public void PostgresMigrationAddsTheColumnWithItsQuotedName(string column)
     {
         var assembly = typeof(PGSQLUserAccountData).Assembly;
-        string name = assembly.GetManifestResourceNames().Single(n => n.EndsWith(".UserAccount.migrations"));
-        using Stream stream = assembly.GetManifestResourceStream(name);
+        string name = assembly.GetManifestResourceNames().SingleOrDefault(n => n.EndsWith(".UserAccount.migrations"))
+            ?? throw new InvalidOperationException("UserAccount migrations resource was not found.");
+        using Stream stream = assembly.GetManifestResourceStream(name)
+            ?? throw new InvalidOperationException($"Migration resource {name} was not found.");
         using StreamReader reader = new(stream);
         string migrations = reader.ReadToEnd();
 

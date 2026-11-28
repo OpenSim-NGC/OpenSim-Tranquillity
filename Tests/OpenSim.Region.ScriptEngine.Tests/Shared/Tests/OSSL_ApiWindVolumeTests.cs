@@ -26,16 +26,22 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     {
         private class StoreWind : DispatchProxy
         {
-            public IWindVolumeStore Store;
+            public IWindVolumeStore? Store;
             public readonly List<(string Plugin, string Param, float Value)> ParamSets = new();
 
-            protected override object Invoke(MethodInfo targetMethod, object[] args)
+            protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
             {
+                ArgumentNullException.ThrowIfNull(targetMethod);
+                ArgumentNullException.ThrowIfNull(args);
                 if (targetMethod.Name == "get_WindVolumes") return Store;
-                if (targetMethod.Name == "WindParamSet")
-                    lock (ParamSets) ParamSets.Add(((string)args[0], (string)args[1], (float)args[2]));
+                if (targetMethod.Name == "WindParamSet" && args.Length == 3
+                    && args[0] is string plugin && args[1] is string param && args[2] is float value)
+                    lock (ParamSets) ParamSets.Add((plugin, param, value));
                 var rt = targetMethod.ReturnType;
-                return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);
+                if (rt == typeof(void) || !rt.IsValueType)
+                    return null;
+                return Activator.CreateInstance(rt)
+                    ?? throw new InvalidOperationException($"Could not create a default value for {rt}.");
             }
         }
 
@@ -45,6 +51,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         private SceneObjectGroup m_group;
         private OSSL_Api m_api;
         private StoreWind m_wind;
+        private IWindVolumeStore Store
+            => m_wind.Store ?? throw new InvalidOperationException("Wind volume store is not available in this test.");
 
         private void Setup(bool weatherOn, bool manager, bool god = false, bool withStore = true)
         {
@@ -98,7 +106,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             Assert.Equal(0, (int)m_api.osWindVolumeRemove(handle));
             Assert.Equal(0, m_api.osWindVolumes().Length);
-            Assert.Equal(0, m_wind.Store.Count);
+            Assert.Equal(0, Store.Count);
         }
 
         [Fact]
@@ -116,12 +124,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Setup(weatherOn: true, manager: false);
 
             Assert.Equal(WindVolumeError.NotAllowed, (int)m_api.osWindVolumeCreate(Rules()));
-            Assert.Equal(0, m_wind.Store.Count);
+            Assert.Equal(0, Store.Count);
 
-            int existing = m_wind.Store.Create(m_group.UUID, UUID.Random(), Spec());
+            int existing = Store.Create(m_group.UUID, UUID.Random(), Spec());
             Assert.Equal(WindVolumeError.NotAllowed, (int)m_api.osWindVolumeRemove(existing));
             Assert.Equal(0, m_api.osWindVolumes().Length);
-            Assert.Equal(1, m_wind.Store.Count);
+            Assert.Equal(1, Store.Count);
         }
 
         [Fact]
@@ -133,7 +141,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Assert.Equal(WindVolumeError.Disabled, (int)m_api.osWindVolumeCreate(Rules()));
             Assert.Equal(WindVolumeError.Disabled, (int)m_api.osWindVolumeRemove(1));
             Assert.Equal(0, m_api.osWindVolumes().Length);
-            Assert.Equal(0, m_wind.Store.Count);
+            Assert.Equal(0, Store.Count);
         }
 
         [Fact]
@@ -151,7 +159,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 (LSL_Types.LSLInteger)WindVolumeRules.WV_VELOCITY, new LSL_Types.Vector3(-3, 4, 1),
                 (LSL_Types.LSLInteger)WindVolumeRules.WV_LIFETIME, (LSL_Types.LSLInteger)90));
 
-            WindVolume v = Assert.Single(m_wind.Store.List(UUID.Zero));
+            WindVolume v = Assert.Single(Store.List(UUID.Zero));
             Assert.Equal(handle, v.Id);
             Assert.Equal(m_group.UUID, v.CreatorObject);
             Assert.Equal(m_owner, v.Owner);
@@ -172,7 +180,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Assert.Equal(WindVolumeError.InvalidParameter, (int)m_api.osWindVolumeCreate(new LSL_Types.list()));
             Assert.Equal(WindVolumeError.TooLarge, (int)m_api.osWindVolumeCreate(Rules(radius: 129f)));
             Assert.Equal(WindVolumeError.LifetimeTooLong, (int)m_api.osWindVolumeCreate(Rules(lifetime: 3601f)));
-            Assert.Equal(0, m_wind.Store.Count);
+            Assert.Equal(0, Store.Count);
         }
 
         [Fact]

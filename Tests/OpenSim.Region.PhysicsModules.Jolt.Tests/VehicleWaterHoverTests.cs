@@ -11,7 +11,6 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.Jolt.Vehicles;
 using Xunit;
-using Xunit.Abstractions;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using SharedVehicle = OpenSim.Region.PhysicsModules.SharedBase.Vehicle;
 

@@ -22,20 +22,15 @@ using osWebRtcVoice.Tests.StockJanus;
 namespace osWebRtcVoice.Tests
 {
     // The assembly-wide 10 s backstop is too short for a session with a real gateway and a real peer.
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-    [TestFixture, NUnit.Framework.Timeout(240000)]
-#pragma warning restore CS0618
-    public class StockJanusNonSpatialTests
-    {
+    public class StockJanusNonSpatialTests(RawJanus janus) : IAsyncLifetime, IClassFixture<RawJanus>
+        {
         private static readonly UUID Alice = new UUID("a11ce000-0000-4000-8000-000000000001");
         private static readonly UUID Bob = new UUID("b0b00000-0000-4000-8000-000000000002");
         private static readonly UUID Group = new UUID("9a0a0000-0000-4000-8000-0000000000aa");
         private static readonly TimeSpan Settle = TimeSpan.FromSeconds(10);
 
-        private readonly RawJanus _janus = new();
-
-        [OneTimeSetUp]
-        public void RequireGateway() => StockJanusEnvironment.IgnoreUnlessConfigured();
+        private readonly RawJanus _janus = janus;
+        private void RequireGateway() => StockJanusEnvironment.IgnoreUnlessConfigured();
 
         private static (string Channel, string Token) CredentialsOf(CapAnswer a)
         {
@@ -58,35 +53,48 @@ namespace osWebRtcVoice.Tests
         // ---- avatar-to-avatar -------------------------------------------------------------------
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task A2A_CallRoomCreateJoinLeave()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create((voice, _) => voice.Set("A2AVoiceEnabled", "true"));
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
             UUID session = A2ACalls.ComputeSessionId(Alice, Bob);
 
             CapAnswer start = await region.ChatSessionAsync(Alice, ChatBody("start p2p voice", session, OSD.FromUUID(Bob)));
-            Assert.That(start.Status, Is.EqualTo((int)HttpStatusCode.OK), "start p2p voice");
+            {
+                var assertedValue = start.Status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "start p2p voice");
+            }
             CapAnswer call = await region.ChatSessionAsync(Alice, ChatBody("call", session));
-            Assert.That(call.Status, Is.EqualTo((int)HttpStatusCode.OK), "caller's call: " + call.Body);
-            Assert.That(region.Queue.Sent.Exists(s => s.To == Bob), Is.True, "the callee was sent an invitation");
+            {
+                var assertedValue = call.Status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "caller's call: " + call.Body);
+            }
+            Assert.True(region.Queue.Sent.Exists(s => s.To == Bob), "the callee was sent an invitation");
             CapAnswer bobCall = await region.ChatSessionAsync(Bob, ChatBody("call", session));
-            Assert.That(bobCall.Status, Is.EqualTo((int)HttpStatusCode.OK), "callee's call: " + bobCall.Body);
+            {
+                var assertedValue = bobCall.Status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "callee's call: " + bobCall.Body);
+            }
 
             (string channel, string aliceToken) = CredentialsOf(call);
             (_, string bobToken) = CredentialsOf(bobCall);
             using Joined a = await region.JoinAsync(Alice, o => StockRegion.MultiagentBody(o, channel, aliceToken));
-            Assert.That(a.Answer.Provisioned, Is.True, "caller joined: " + a.Answer.Body);
+            Assert.True(a.Answer.Provisioned, "caller joined: " + a.Answer.Body);
             using Joined b = await region.JoinAsync(Bob, o => StockRegion.MultiagentBody(o, channel, bobToken));
-            Assert.That(b.Answer.Provisioned, Is.True, "callee joined: " + b.Answer.Body);
+            Assert.True(b.Answer.Provisioned, "callee joined: " + b.Answer.Body);
 
-            Assert.That(b.Answer.Room, Is.EqualTo(a.Answer.Room), "both parties are in one room");
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+            {
+                var assertedValue = b.Answer.Room;
+                TestAssert.WithMessage(() => Assert.Equal(a.Answer.Room, assertedValue), "both parties are in one room");
+            }
+            Assert.True(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle));
             await region.LogoutAsync(a);
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 1, Settle), Is.True, "caller left");
+            Assert.True((await _janus.WaitForParticipantsAsync(a.Answer.Room, 1, Settle)), "caller left");
             await region.LogoutAsync(b);
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle), Is.True, "callee left");
+            Assert.True((await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle)), "callee left");
         }
 
         // Two region modules, each over its own scene and its own stock-Janus service, stand in for two region-server
@@ -126,9 +134,10 @@ namespace osWebRtcVoice.Tests
         }
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task A2A_CrossProcess_CallerAndCalleeJoinOneRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using StockRegion one = CrossProcessRegion();
             using StockRegion two = CrossProcessRegion();
             one.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
@@ -137,42 +146,55 @@ namespace osWebRtcVoice.Tests
             SetOnline(two, Alice, Bob);
             UUID session = A2ACalls.ComputeSessionId(Alice, Bob);
 
-            Assert.That((await one.ChatSessionAsync(Alice, ChatBody("start p2p voice", session, OSD.FromUUID(Bob)))).Status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, (await one.ChatSessionAsync(Alice, ChatBody("start p2p voice", session, OSD.FromUUID(Bob)))).Status);
             CapAnswer call = await one.ChatSessionAsync(Alice, ChatBody("call", session));
-            Assert.That(call.Status, Is.EqualTo((int)HttpStatusCode.OK), "caller's call: " + call.Body);
+            {
+                var assertedValue = call.Status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "caller's call: " + call.Body);
+            }
             (string channel, string token) = CredentialsOf(call);
-            Assert.That(one.Queue.Sent.Exists(s => s.To == Bob), Is.False, "Bob is not in the caller's process");
+            Assert.False(one.Queue.Sent.Exists(s => s.To == Bob), "Bob is not in the caller's process");
 
             List<OpenSim.Framework.GridInstantMessage> rings = TakeCarriers(one);
-            Assert.That(rings, Has.Count.EqualTo(1), "one ring, signed, for the process where Bob is");
+            {
+                var assertedValue = rings;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "one ring, signed, for the process where Bob is");
+            }
             two.Scene.EventManager.TriggerIncomingInstantMessage(rings[0]);
             var invitation = two.Queue.Sent.Find(s => s.To == Bob && s.Name == "ChatterBoxInvitation");
-            Assert.That(invitation.Body, Is.Not.Null, "the callee's process delivered the invitation");
-            Assert.That(((OSDMap)((OSDMap)invitation.Body)["voice"])["channel_credentials"].AsString(), Is.EqualTo(token));
+            {
+                var assertedValue = invitation.Body;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the callee's process delivered the invitation");
+            }
+            Assert.Equal(token, ((OSDMap)((OSDMap)invitation.Body)["voice"])["channel_credentials"].AsString());
 
             using Joined a = await one.JoinAsync(Alice, o => StockRegion.MultiagentBody(o, channel, token));
-            Assert.That(a.Answer.Provisioned, Is.True, "caller joined: " + a.Answer.Body);
+            Assert.True(a.Answer.Provisioned, "caller joined: " + a.Answer.Body);
             using Joined b = await two.JoinAsync(Bob, o => StockRegion.MultiagentBody(o, channel, token));
-            Assert.That(b.Answer.Provisioned, Is.True, "the callee's accept was admitted in its own process: " + b.Answer.Body);
+            Assert.True(b.Answer.Provisioned, "the callee's accept was admitted in its own process: " + b.Answer.Body);
 
-            Assert.That(b.Answer.Room, Is.EqualTo(a.Answer.Room), "both parties, joined through two services, are in one room");
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+            {
+                var assertedValue = b.Answer.Room;
+                TestAssert.WithMessage(() => Assert.Equal(a.Answer.Room, assertedValue), "both parties, joined through two services, are in one room");
+            }
+            Assert.True(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle));
 
             // The callee joining reaches the caller's process as a signed join carrier.
             List<OpenSim.Framework.GridInstantMessage> joins = TakeCarriers(two);
-            Assert.That(joins, Has.Count.EqualTo(1));
+            Assert.Single(joins);
             one.Scene.EventManager.TriggerIncomingInstantMessage(joins[0]);
 
             await two.LogoutAsync(b);
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 1, Settle), Is.True, "the callee left the room");
+            Assert.True((await _janus.WaitForParticipantsAsync(a.Answer.Room, 1, Settle)), "the callee left the room");
             await one.LogoutAsync(a);
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle), Is.True, "the caller left the room");
+            Assert.True((await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle)), "the caller left the room");
         }
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task A2A_AStrangerWithTheRightChannelIsRefused_AndNoRoomIsCreated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create((voice, _) => voice.Set("A2AVoiceEnabled", "true"));
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
@@ -187,14 +209,18 @@ namespace osWebRtcVoice.Tests
             using var peer = await AiortcPeer.StartAsync();
             CapAnswer refused = await region.ProvisionAsync(mallory, StockRegion.MultiagentBody(peer.Offer, channel, token));
 
-            Assert.That(refused.Status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(await _janus.RoomsAsync(), Is.EquivalentTo(before), "the refusal never reached the gateway");
+            Assert.Equal((int)HttpStatusCode.Forbidden, refused.Status);
+            {
+                var assertedValue = await _janus.RoomsAsync();
+                TestAssert.WithMessage(() => Assert.Equivalent(before, assertedValue, strict: true), "the refusal never reached the gateway");
+            }
         }
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task A2A_Audio_BothPartiesHearEachOther()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StockJanusEnvironment.IgnoreUnlessPeerAvailable();
             using var region = StockRegion.Create((voice, _) => voice.Set("A2AVoiceEnabled", "true"));
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
@@ -208,14 +234,14 @@ namespace osWebRtcVoice.Tests
 
             using Joined a = await region.JoinAsync(Alice, o => StockRegion.MultiagentBody(o, channel, aliceToken), 440);
             using Joined b = await region.JoinAsync(Bob, o => StockRegion.MultiagentBody(o, channel, bobToken), 880);
-            await Task.Delay(1500);
+            await Task.Delay(1500, TestContext.Current.CancellationToken);
             List<Measurement> ma = await a.Peer.MeasureWindowsAsync(6, 0.5, 440, 880);
             List<Measurement> mb = await b.Peer.MeasureWindowsAsync(6, 0.5, 440, 880);
-            TestContext.Out.WriteLine("A2A caller heard: " + Measurement.Describe(ma, 440, 880));
-            TestContext.Out.WriteLine("A2A callee heard: " + Measurement.Describe(mb, 440, 880));
+            TestContext.Current.TestOutputHelper.WriteLine("A2A caller heard: " + Measurement.Describe(ma, 440, 880));
+            TestContext.Current.TestOutputHelper.WriteLine("A2A callee heard: " + Measurement.Describe(mb, 440, 880));
 
-            Assert.That(Measurement.MedianShare(ma, 880), Is.GreaterThan(0.8), "the caller hears the callee");
-            Assert.That(Measurement.MedianShare(mb, 440), Is.GreaterThan(0.8), "the callee hears the caller");
+            Assert.True(Measurement.MedianShare(ma, 880) > 0.8, "the caller hears the callee");
+            Assert.True(Measurement.MedianShare(mb, 440) > 0.8, "the callee hears the caller");
             await region.LogoutAsync(a);
             await region.LogoutAsync(b);
         }
@@ -243,9 +269,10 @@ namespace osWebRtcVoice.Tests
         }
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task Group_CallRoomCreateJoinLeave()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create((voice, _) => voice.Set("GroupVoiceEnabled", "true"));
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
@@ -259,21 +286,30 @@ namespace osWebRtcVoice.Tests
 
             using Joined a = await region.JoinAsync(Alice, o => StockRegion.MultiagentBody(o, channel, aliceToken));
             using Joined b = await region.JoinAsync(Bob, o => StockRegion.MultiagentBody(o, channel, bobToken));
-            Assert.That(a.Answer.Provisioned, Is.True, "first member joined: " + a.Answer.Body);
-            Assert.That(b.Answer.Provisioned, Is.True, "second member joined: " + b.Answer.Body);
-            Assert.That(b.Answer.Room, Is.EqualTo(a.Answer.Room), "one group room");
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
-            Assert.That(engine.Store.Get(Group).SeatsHeld, Is.EqualTo(2), "the engine holds both seats");
+            Assert.True(a.Answer.Provisioned, "first member joined: " + a.Answer.Body);
+            Assert.True(b.Answer.Provisioned, "second member joined: " + b.Answer.Body);
+            {
+                var assertedValue = b.Answer.Room;
+                TestAssert.WithMessage(() => Assert.Equal(a.Answer.Room, assertedValue), "one group room");
+            }
+            Assert.True(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle));
+            {
+                var assertedValue = engine.Store.Get(Group).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the engine holds both seats");
+            }
 
             await region.LogoutAsync(a);
             await region.LogoutAsync(b);
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle), Is.True);
-            Assert.That(engine.Store.Get(Group).SeatsHeld, Is.EqualTo(0), "the seats are released");
+            Assert.True(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle));
+            {
+                var assertedValue = engine.Store.Get(Group).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the seats are released");
+            }
 
             static CapAnswer Credentials(UUID agent, GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, UUID r)
             {
                 var call = new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(Group) };
-                Assert.That(GroupVoiceChatSession.TryHandleCall(call, agent, p, e, r, out ChatSessionOutcome o), Is.True);
+                Assert.True(GroupVoiceChatSession.TryHandleCall(call, agent, p, e, r, out ChatSessionOutcome o));
                 return new CapAnswer { Status = (int)o.Status, Body = o.Body };
             }
         }
@@ -281,9 +317,10 @@ namespace osWebRtcVoice.Tests
         // ---- ad-hoc conference ------------------------------------------------------------------
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task Adhoc_ConferenceRoomCreateJoinLeave()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create((voice, _) => voice.Set("AdhocVoiceEnabled", "true"));
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
@@ -297,129 +334,173 @@ namespace osWebRtcVoice.Tests
                 ["params"] = new OSDArray { OSD.FromUUID(Bob) },
                 ["alt_params"] = new OSDMap { ["voice_server_type"] = OSD.FromString("webrtc") },
             };
-            Assert.That(AdhocVoiceChatSession.TryHandleStartConference(start, Alice, engine, regionId, true, out ChatSessionOutcome started), Is.True);
+            Assert.True(AdhocVoiceChatSession.TryHandleStartConference(start, Alice, engine, regionId, true, out ChatSessionOutcome started));
             UUID conference = started.Reply.SessionId;
 
             var callBody = new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(conference) };
-            Assert.That(AdhocVoiceChatSession.TryHandleCall(callBody, Alice, engine, regionId, true, out ChatSessionOutcome aliceCall), Is.True);
-            Assert.That(AdhocVoiceChatSession.TryHandleCall(callBody, Bob, engine, regionId, true, out ChatSessionOutcome bobCall), Is.True);
+            Assert.True(AdhocVoiceChatSession.TryHandleCall(callBody, Alice, engine, regionId, true, out ChatSessionOutcome aliceCall));
+            Assert.True(AdhocVoiceChatSession.TryHandleCall(callBody, Bob, engine, regionId, true, out ChatSessionOutcome bobCall));
             (string channel, string aliceToken) = CredentialsOf(new CapAnswer { Body = aliceCall.Body });
             (_, string bobToken) = CredentialsOf(new CapAnswer { Body = bobCall.Body });
 
             using Joined a = await region.JoinAsync(Alice, o => StockRegion.MultiagentBody(o, channel, aliceToken));
             using Joined b = await region.JoinAsync(Bob, o => StockRegion.MultiagentBody(o, channel, bobToken));
-            Assert.That(a.Answer.Provisioned, Is.True, "conference creator joined: " + a.Answer.Body);
-            Assert.That(b.Answer.Provisioned, Is.True, "invitee joined: " + b.Answer.Body);
-            Assert.That(b.Answer.Room, Is.EqualTo(a.Answer.Room), "one conference room");
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+            Assert.True(a.Answer.Provisioned, "conference creator joined: " + a.Answer.Body);
+            Assert.True(b.Answer.Provisioned, "invitee joined: " + b.Answer.Body);
+            {
+                var assertedValue = b.Answer.Room;
+                TestAssert.WithMessage(() => Assert.Equal(a.Answer.Room, assertedValue), "one conference room");
+            }
+            Assert.True(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle));
 
             await region.LogoutAsync(a);
             await region.LogoutAsync(b);
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle), Is.True);
+            Assert.True(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle));
         }
 
         // ---- every switch off ------------------------------------------------------------------
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task EverySwitchOff_NonSpatialRequestsAreAnsweredAsBeforeTheFeatures()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create();   // no switch set: the shipped defaults
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
             List<int> before = await _janus.RoomsAsync();
             UUID session = A2ACalls.ComputeSessionId(Alice, Bob);
 
-            Assert.That((await region.ChatSessionAsync(Alice, ChatBody("call", session))).Status,
-                Is.EqualTo((int)HttpStatusCode.BadRequest), "call: unhandled method");
-            Assert.That((await region.ChatSessionAsync(Alice, ChatBody("start conference", UUID.Random()))).Status,
-                Is.EqualTo((int)HttpStatusCode.OK), "start conference: acknowledged, nothing started");
-            Assert.That((await region.ChatSessionAsync(Alice, ChatBody("decline invitation", session))).Status,
-                Is.EqualTo((int)HttpStatusCode.OK), "decline invitation");
-            Assert.That(region.Queue.StartReplies, Is.Empty, "no session reply was sent to a viewer");
+            {
+                var assertedValue = (await region.ChatSessionAsync(Alice, ChatBody("call", session))).Status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.BadRequest, assertedValue), "call: unhandled method");
+            }
+            {
+                var assertedValue = (await region.ChatSessionAsync(Alice, ChatBody("start conference", UUID.Random()))).Status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "start conference: acknowledged, nothing started");
+            }
+            {
+                var assertedValue = (await region.ChatSessionAsync(Alice, ChatBody("decline invitation", session))).Status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "decline invitation");
+            }
+            {
+                var assertedValue = region.Queue.StartReplies;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no session reply was sent to a viewer");
+            }
 
             // No chat session was started, so nothing reached the gateway so far.
-            Assert.That(await _janus.RoomsAsync(), Is.EquivalentTo(before), "no room was created on the gateway");
+            {
+                var assertedValue = await _janus.RoomsAsync();
+                TestAssert.WithMessage(() => Assert.Equivalent(before, assertedValue, strict: true), "no room was created on the gateway");
+            }
 
             // A multiagent provision is served as upstream/develop serves it (see EverySwitchOff_TheAnswersAreTheShippedDefaults).
             using Joined multiagent = await region.JoinAsync(Alice, o => StockRegion.MultiagentBody(o, session.ToString(), "credentials"), waitConnected: false);
-            Assert.That(multiagent.Answer.Status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(multiagent.Answer.Provisioned, Is.True, "served, as develop serves it: " + multiagent.Answer.Body);
+            Assert.Equal((int)HttpStatusCode.OK, multiagent.Answer.Status);
+            Assert.True(multiagent.Answer.Provisioned, "served, as develop serves it: " + multiagent.Answer.Body);
             await region.LogoutAsync(multiagent);
 
             // A spatial provision is unaffected by the switches being off.
             using Joined spatial = await region.JoinAsync(Alice, o => StockRegion.LocalBody(o), waitConnected: false);
-            Assert.That(spatial.Answer.Provisioned, Is.True, "spatial voice works with every optional switch off: " + spatial.Answer.Body);
+            Assert.True(spatial.Answer.Provisioned, "spatial voice works with every optional switch off: " + spatial.Answer.Body);
             await region.LogoutAsync(spatial);
         }
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task EverySwitchOff_TheAnswersAreTheShippedDefaults()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var region = StockRegion.Create();
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
 
             List<ProbeRow> rows = await DefaultsProbe.RunAsync(region, Alice, _janus);
 
-            foreach (ProbeRow row in rows) TestContext.Out.WriteLine(row);
+            foreach (ProbeRow row in rows) TestContext.Current.TestOutputHelper.WriteLine(row.ToString());
             ProbeRow Row(string name) => rows.Find(r => r.Name == name);
             // With no call feature on, these answer as upstream/develop does (with its
             // two start-up fixes): a multiagent provision is served, a provision with no channel_type gets an empty 200.
             foreach (string served in new[] { "provision multiagent, unknown session", "provision multiagent, group-style channel" })
             {
-                Assert.That(Row(served).Status, Is.EqualTo((int)HttpStatusCode.OK), served);
-                Assert.That(Row(served).Provisioned, Is.True, served + ": joined a room");
+                {
+                    var assertedValue = Row(served).Status;
+                    TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), served);
+                }
+                Assert.True(Row(served).Provisioned, served + ": joined a room");
             }
-            Assert.That(Row("provision with no channel_type").Status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(Row("provision with no channel_type").Provisioned, Is.False);
-            Assert.That(Row("provision with no channel_type").NewRooms, Is.EqualTo(0), "empty answer, no room");
+            Assert.Equal((int)HttpStatusCode.OK, Row("provision with no channel_type").Status);
+            Assert.False(Row("provision with no channel_type").Provisioned);
+            {
+                var assertedValue = Row("provision with no channel_type").NewRooms;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "empty answer, no room");
+            }
             // A channel_type the module issues no room for is refused before it reaches the voice service. Upstream
             // develop passes it on, the service throws and the request answers 500.
-            Assert.That(Row("provision channel_type=group").Status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(Row("provision channel_type=group").NewRooms, Is.EqualTo(0), "no room");
-            Assert.That(Row("logout, unknown viewer session").Response, Is.EqualTo("closed"));
-            Assert.That(Row("chat session: call").Status, Is.EqualTo((int)HttpStatusCode.BadRequest));
-            Assert.That(Row("chat session: start conference").Status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(Row("chat session: decline invitation").Status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(Row("chat session: fetch history").Status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(Row("chat session: unknown method").Status, Is.EqualTo((int)HttpStatusCode.BadRequest));
+            Assert.Equal((int)HttpStatusCode.Forbidden, Row("provision channel_type=group").Status);
+            {
+                var assertedValue = Row("provision channel_type=group").NewRooms;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no room");
+            }
+            Assert.Equal("closed", Row("logout, unknown viewer session").Response);
+            Assert.Equal((int)HttpStatusCode.BadRequest, Row("chat session: call").Status);
+            Assert.Equal((int)HttpStatusCode.OK, Row("chat session: start conference").Status);
+            Assert.Equal((int)HttpStatusCode.OK, Row("chat session: decline invitation").Status);
+            Assert.Equal((int)HttpStatusCode.OK, Row("chat session: fetch history").Status);
+            Assert.Equal((int)HttpStatusCode.BadRequest, Row("chat session: unknown method").Status);
         }
 
         // ---- recovery --------------------------------------------------------------------------
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task GatewayRestartMidSession_TheServiceHealsAndNewProvisionsWork()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StockJanusEnvironment.IgnoreUnlessRestartable();
             using var region = StockRegion.Create();
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
             using Joined a = await region.JoinAsync(Alice, o => StockRegion.LocalBody(o));
-            Assert.That(a.Answer.Provisioned, Is.True);
+            Assert.True(a.Answer.Provisioned);
             var service = region.GetPrivate<IWebRtcVoiceService>(region.Service, "m_spatialVoiceService") as WebRtcJanusService;
-            Assert.That(service, Is.Not.Null);
-            Assert.That((await service.ServiceListRoomsAsync())?.isSuccess, Is.True, "the service session works before the restart");
+            Assert.NotNull(service);
+            Assert.True(((await service.ServiceListRoomsAsync())?.isSuccess), "the service session works before the restart");
             string sessionBefore = service.ServiceSessionId;
 
             await DockerControl.RestartGatewayAsync(_janus);
 
             AudioBridgeResp rooms = await service.ServiceListRoomsAsync();
-            Assert.That(rooms?.isSuccess, Is.True, "the service session reconnects by itself after a gateway restart");
-            Assert.That(service.ServiceSessionId, Is.Not.EqualTo(sessionBefore), "on a new Janus session");
+            Assert.True((rooms?.isSuccess), "the service session reconnects by itself after a gateway restart");
+            {
+                var assertedValue = service.ServiceSessionId;
+                TestAssert.WithMessage(() => Assert.NotEqual(sessionBefore, assertedValue), "on a new Janus session");
+            }
 
             // The restart dropped Alice's media and her Janus session; the region is told by her viewer, which re-provisions.
             CapAnswer closed = await region.LogoutAsync(a);
-            Assert.That(closed.Status, Is.EqualTo((int)HttpStatusCode.OK), "logout of the dead session does not fail the request");
+            {
+                var assertedValue = closed.Status;
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "logout of the dead session does not fail the request");
+            }
             using Joined again = await region.JoinAsync(Alice, o => StockRegion.LocalBody(o));
-            Assert.That(again.Answer.Provisioned, Is.True, "a fresh provision after the restart: " + again.Answer.Body);
+            Assert.True(again.Answer.Provisioned, "a fresh provision after the restart: " + again.Answer.Body);
             using Joined bob = await region.JoinAsync(Bob, o => StockRegion.LocalBody(o));
-            Assert.That(bob.Answer.Provisioned, Is.True, "a second agent after the restart: " + bob.Answer.Body);
-            Assert.That(bob.Answer.Room, Is.EqualTo(again.Answer.Room));
-            Assert.That(await _janus.WaitForParticipantsAsync(again.Answer.Room, 2, Settle), Is.True);
+            Assert.True(bob.Answer.Provisioned, "a second agent after the restart: " + bob.Answer.Body);
+            Assert.Equal(again.Answer.Room, bob.Answer.Room);
+            Assert.True(await _janus.WaitForParticipantsAsync(again.Answer.Room, 2, Settle));
             await region.LogoutAsync(again);
             await region.LogoutAsync(bob);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            RequireGateway();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

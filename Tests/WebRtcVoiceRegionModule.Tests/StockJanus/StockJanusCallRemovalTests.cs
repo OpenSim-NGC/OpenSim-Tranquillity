@@ -16,7 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
@@ -26,11 +26,8 @@ using osWebRtcVoice.Tests.StockJanus;
 namespace osWebRtcVoice.Tests
 {
     // The assembly-wide 10 s backstop is too short for a session with a real gateway and real peers.
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-    [TestFixture, NUnit.Framework.Timeout(300000)]
-#pragma warning restore CS0618
-    public class StockJanusCallRemovalTests
-    {
+    public class StockJanusCallRemovalTests(RawJanus janus) : IAsyncLifetime, IClassFixture<RawJanus>
+        {
         private static readonly UUID Officer = new UUID("a11ce000-0000-4000-8000-000000000001");
         private static readonly UUID Member = new UUID("b0b00000-0000-4000-8000-000000000002");
         private static readonly UUID Late = new UUID("c0de0000-0000-4000-8000-000000000003");
@@ -38,10 +35,8 @@ namespace osWebRtcVoice.Tests
         private static readonly TimeSpan Settle = TimeSpan.FromSeconds(15);
         private const double OfficerHz = 440, MemberHz = 880, LateHz = 1320;
 
-        private readonly RawJanus _janus = new();
-
-        [OneTimeSetUp]
-        public void RequireGateway() => StockJanusEnvironment.IgnoreUnlessConfigured();
+        private readonly RawJanus _janus = janus;
+        private void RequireGateway() => StockJanusEnvironment.IgnoreUnlessConfigured();
 
         private static StockRegion NewRegion()
         {
@@ -73,11 +68,14 @@ namespace osWebRtcVoice.Tests
         private static async Task<(Joined Peer, string Channel, string Token)> JoinCall(StockRegion region, UUID agent, double hz)
         {
             CapAnswer call = await region.ChatSessionAsync(agent, Chat("call"));
-            Assert.That(call.Status, Is.EqualTo(200), "call: " + call.Body);
+            {
+                var assertedValue = call.Status;
+                TestAssert.WithMessage(() => Assert.Equal(200, assertedValue), "call: " + call.Body);
+            }
             var creds = (OSDMap)call.Body["voice_credentials"];
             string channel = creds["channel_uri"].AsString(), token = creds["channel_credentials"].AsString();
             Joined j = await region.JoinAsync(agent, o => StockRegion.MultiagentBody(o, channel, token), hz);
-            Assert.That(j.Answer.Provisioned, Is.True, "joined: " + j.Answer.Body);
+            Assert.True(j.Answer.Provisioned, "joined: " + j.Answer.Body);
             return (j, channel, token);
         }
 
@@ -85,14 +83,15 @@ namespace osWebRtcVoice.Tests
         {
             await Task.Delay(1000);   // let the mix settle after a change
             List<Measurement> m = await listener.Peer.MeasureWindowsAsync(4, 0.5, hz);
-            TestContext.Out.WriteLine($"{listener.Agent} heard: " + Measurement.Describe(m, hz));
+            TestContext.Current.TestOutputHelper.WriteLine($"{listener.Agent} heard: " + Measurement.Describe(m, hz));
             return m;
         }
 
         [NeedsPlugin(JanusPluginKind.Any)]
-        [Test]
+        [Fact(Timeout = 300000)]
         public async Task ARemovedMembersMediaLeavesTheRoom_TheyAreRefusedBack_AndTheCallEndingEndsTheRemoval()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StockJanusEnvironment.IgnoreUnlessPeerAvailable();
             using StockRegion region = NewRegion();
             (Joined officer, _, _) = await JoinCall(region, Officer, OfficerHz);
@@ -101,37 +100,62 @@ namespace osWebRtcVoice.Tests
             using (officer) using (member) using (late)
             {
                 int room = officer.Answer.Room;
-                Assert.That(await _janus.WaitForParticipantsAsync(room, 3, Settle), Is.True, "three participants in the room");
-                await Task.Delay(1500);
+                Assert.True((await _janus.WaitForParticipantsAsync(room, 3, Settle)), "three participants in the room");
+                await Task.Delay(1500, TestContext.Current.CancellationToken);
                 List<Measurement> before = await Hear(officer, MemberHz, LateHz);
-                Assert.That(Measurement.MedianShare(before, MemberHz), Is.GreaterThan(0.2), "precondition: the member is heard");
+                Assert.True(Measurement.MedianShare(before, MemberHz) > 0.2, "precondition: the member is heard");
 
                 WebRtcVoiceRegionModule.CallRemovalResult removed = region.Region.RemoveFromCall(Group, Officer, Member, "opt-in test");
 
-                Assert.That(removed.Ok && removed.Changed, Is.True, removed.Decision);
-                Assert.That(await _janus.WaitForParticipantsAsync(room, 2, Settle), Is.True, "the gateway holds two participants now");
+                Assert.True((removed.Ok && removed.Changed), removed.Decision);
+                Assert.True((await _janus.WaitForParticipantsAsync(room, 2, Settle)), "the gateway holds two participants now");
                 List<Measurement> after = await Hear(officer, MemberHz, LateHz);
-                Assert.That(Measurement.MedianShare(after, MemberHz), Is.LessThan(0.05), "the removed member is no longer heard");
-                Assert.That(Measurement.MedianShare(after, LateHz), Is.GreaterThan(0.5), "the others still are");
-                Assert.That(region.Queue.Closes, Has.Some.Matches<(UUID To, UUID Session, string Reason)>(
-                    c => c.To == Member && c.Session == Group && c.Reason == "close_on_no_ability"), "their viewer was told to close the call");
+                Assert.True(Measurement.MedianShare(after, MemberHz) < 0.05, "the removed member is no longer heard");
+                Assert.True(Measurement.MedianShare(after, LateHz) > 0.5, "the others still are");
+                {
+                    var assertedValue = region.Queue.Closes;
+                    TestAssert.WithMessage(() => Assert.Contains<(UUID To, UUID Session, string Reason)>(assertedValue, c => c.To == Member && c.Session == Group && c.Reason == "close_on_no_ability"), "their viewer was told to close the call");
+                }
 
                 // The viewer that keeps trying: every provision, and the call itself, is refused.
                 for (int i = 0; i < 20; i++)
                 {
                     CapAnswer again = await region.ProvisionAsync(Member, StockRegion.MultiagentBody(member.Peer.Offer, channel, token));
-                    Assert.That(again.Status, Is.EqualTo(403), $"retry {i}");
+                    {
+                        var assertedValue = again.Status;
+                        TestAssert.WithMessage(() => Assert.Equal(403, assertedValue), $"retry {i}");
+                    }
                 }
-                Assert.That((await region.ChatSessionAsync(Member, Chat("call"))).Status, Is.EqualTo(403), "a new call");
-                Assert.That(await _janus.ParticipantCountAsync(room), Is.EqualTo(2), "and none of it put them back in the room");
+                {
+                    var assertedValue = (await region.ChatSessionAsync(Member, Chat("call"))).Status;
+                    TestAssert.WithMessage(() => Assert.Equal(403, assertedValue), "a new call");
+                }
+                {
+                    var assertedValue = await _janus.ParticipantCountAsync(room);
+                    TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "and none of it put them back in the room");
+                }
 
                 // The call ends when the last seat goes; the removal goes with it.
                 await region.LogoutAsync(officer);
                 await region.LogoutAsync(late);
-                Assert.That(await _janus.WaitForParticipantsAsync(room, 0, Settle), Is.True, "the room is empty");
-                await Task.Delay(6000);   // past the viewer-retry cache (RefusalCacheSeconds, 5)
-                Assert.That((await region.ChatSessionAsync(Member, Chat("call"))).Status, Is.EqualTo(200), "a new call is allowed once the call has ended");
+                Assert.True((await _janus.WaitForParticipantsAsync(room, 0, Settle)), "the room is empty");
+                await Task.Delay(6000, TestContext.Current.CancellationToken);   // past the viewer-retry cache (RefusalCacheSeconds, 5)
+                {
+                    var assertedValue = (await region.ChatSessionAsync(Member, Chat("call"))).Status;
+                    TestAssert.WithMessage(() => Assert.Equal(200, assertedValue), "a new call is allowed once the call has ended");
+                }
             }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            RequireGateway();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

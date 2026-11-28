@@ -102,7 +102,8 @@ public class GroupNoticeFanOutTests : OpenSimTestCase
             fromAgentID = SenderId.Guid, toAgentID = GroupId.Guid, fromAgentName = "Sender",
             dialog = (byte)InstantMessageDialog.GroupNotice, message = "Subject|body", binaryBucket = new byte[] { 0 },
         };
-        typeof(V2Groups.GroupsModule).GetMethod("OnInstantMessage", BindingFlags.Instance | BindingFlags.NonPublic)
+        (typeof(V2Groups.GroupsModule).GetMethod("OnInstantMessage", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(V2Groups.GroupsModule).FullName, "OnInstantMessage"))
             .Invoke(gm, new object[] { sender.ControllingClient, notice });
 
         lock (received)

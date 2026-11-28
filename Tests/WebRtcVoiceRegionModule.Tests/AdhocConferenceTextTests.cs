@@ -17,7 +17,7 @@
  */
 using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -29,7 +29,6 @@ using osWebRtcVoice.NonSpatial;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class AdhocConferenceTextTests
     {
         private const string Grid = "example-grid";
@@ -90,234 +89,262 @@ namespace osWebRtcVoice.Tests
 
         // ---- ring / text discrimination, BOTH DIRECTIONS -----------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BothDirections_TheRingParserRejectsText_AndTheTextParserRejectsARing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDMap ringBody = new OSDMap { ["session_id"] = OSD.FromUUID(UUID.Random()) };
             GridInstantMessage ring = GroupVoiceRingTransport.Build(Bob, Alice, "Alice", UUID.Random(), Region, ringBody);
             GridInstantMessage text = AdhocTextTransport.Build(Bob, Alice, "Alice", UUID.Random(), Region, "hello");
 
             // The two are indistinguishable on the fields the carrier is chosen by -- which is the
             // whole reason a magic is needed.
-            Assert.That(ring.dialog, Is.EqualTo(text.dialog), "both are SessionSend");
-            Assert.That(ring.fromGroup, Is.EqualTo(text.fromGroup), "both are fromGroup=false");
+            {
+                var assertedValue = ring.dialog;
+                TestAssert.WithMessage(() => Assert.Equal(text.dialog, assertedValue), "both are SessionSend");
+            }
+            {
+                var assertedValue = ring.fromGroup;
+                TestAssert.WithMessage(() => Assert.Equal(text.fromGroup, assertedValue), "both are fromGroup=false");
+            }
 
             // A ring is not text.
-            Assert.That(AdhocTextTransport.TryParse(ring, out _, out _, out _, out _, out _), Is.False,
-                "a group voice ring must never be delivered to a viewer as a chat line");
+            Assert.False(AdhocTextTransport.TryParse(ring, out _, out _, out _, out _, out _), "a group voice ring must never be delivered to a viewer as a chat line");
 
             // Text is not a ring -- and this is asserted against the LIVE, DEPLOYED parser, unchanged.
-            Assert.That(GroupVoiceRingTransport.TryParse(text, out _, out _, out _), Is.False,
-                "the deployed ring parser already rejects LGVTEXT1 with no change to it");
+            Assert.False(GroupVoiceRingTransport.TryParse(text, out _, out _, out _), "the deployed ring parser already rejects LGVTEXT1 with no change to it");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EachParserStillClaimsItsOwn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID session = UUID.Random();
             OSDMap ringBody = new OSDMap { ["session_id"] = OSD.FromUUID(session) };
             GridInstantMessage ring = GroupVoiceRingTransport.Build(Bob, Alice, "Alice", session, Region, ringBody);
             GridInstantMessage text = AdhocTextTransport.Build(Bob, Alice, "Alice", session, Region, "hello there");
 
-            Assert.That(GroupVoiceRingTransport.TryParse(ring, out UUID rt, out UUID rg, out OSDMap rb), Is.True);
-            Assert.That(rt, Is.EqualTo(Bob));
-            Assert.That(rg, Is.EqualTo(session));
-            Assert.That(rb, Is.Not.Null);
+            Assert.True(GroupVoiceRingTransport.TryParse(ring, out UUID rt, out UUID rg, out OSDMap rb));
+            Assert.Equal(Bob, rt);
+            Assert.Equal(session, rg);
+            Assert.NotNull(rb);
 
-            Assert.That(AdhocTextTransport.TryParse(text, out UUID tt, out UUID ts, out string msg,
-                                                    out string from, out _), Is.True);
-            Assert.That(tt, Is.EqualTo(Bob));
-            Assert.That(ts, Is.EqualTo(session));
-            Assert.That(msg, Is.EqualTo("hello there"));
-            Assert.That(from, Is.EqualTo("Alice"));
+            Assert.True(AdhocTextTransport.TryParse(text, out UUID tt, out UUID ts, out string msg,
+                                                    out string from, out _));
+            Assert.Equal(Bob, tt);
+            Assert.Equal(session, ts);
+            Assert.Equal("hello there", msg);
+            Assert.Equal("Alice", from);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheTwoMagicsAreDistinct_AndTextNeverStoresOffline()
         {
-            Assert.That(AdhocTextTransport.BucketMagic, Is.Not.EqualTo(GroupVoiceRingTransport.BucketMagic));
-            Assert.That(AdhocTextTransport.BucketMagic.StartsWith(GroupVoiceRingTransport.BucketMagic, StringComparison.Ordinal), Is.False);
-            Assert.That(GroupVoiceRingTransport.BucketMagic.StartsWith(AdhocTextTransport.BucketMagic, StringComparison.Ordinal), Is.False);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.NotEqual(GroupVoiceRingTransport.BucketMagic, AdhocTextTransport.BucketMagic);
+            Assert.False(AdhocTextTransport.BucketMagic.StartsWith(GroupVoiceRingTransport.BucketMagic, StringComparison.Ordinal));
+            Assert.False(GroupVoiceRingTransport.BucketMagic.StartsWith(AdhocTextTransport.BucketMagic, StringComparison.Ordinal));
             // stated at the source as well as relied on in the two offline allowlists
-            Assert.That(AdhocTextTransport.Build(Bob, Alice, "Alice", UUID.Random(), Region, "x").offline,
-                Is.EqualTo(0), "a conference line must never be stored and replayed at next login");
+            {
+                var assertedValue = AdhocTextTransport.Build(Bob, Alice, "Alice", UUID.Random(), Region, "x").offline;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "a conference line must never be stored and replayed at next login");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void GarbageAndForeignBucketsAreNotOurs()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             GridInstantMessage m = AdhocTextTransport.Build(Bob, Alice, "Alice", UUID.Random(), Region, "hi");
             m.binaryBucket = System.Text.Encoding.UTF8.GetBytes("LGVTEXT1{not json");
-            Assert.That(AdhocTextTransport.TryParse(m, out _, out _, out _, out _, out _), Is.False);
+            Assert.False(AdhocTextTransport.TryParse(m, out _, out _, out _, out _, out _));
 
             m.binaryBucket = System.Text.Encoding.UTF8.GetBytes("SOMETHINGELSE{}");
-            Assert.That(AdhocTextTransport.TryParse(m, out _, out _, out _, out _, out _), Is.False);
+            Assert.False(AdhocTextTransport.TryParse(m, out _, out _, out _, out _, out _));
 
             m.binaryBucket = null;
-            Assert.That(AdhocTextTransport.TryParse(m, out _, out _, out _, out _, out _), Is.False);
+            Assert.False(AdhocTextTransport.TryParse(m, out _, out _, out _, out _, out _));
 
             GridInstantMessage grouped = AdhocTextTransport.Build(Bob, Alice, "Alice", UUID.Random(), Region, "hi");
             grouped.fromGroup = true;
-            Assert.That(AdhocTextTransport.TryParse(grouped, out _, out _, out _, out _, out _), Is.False,
-                "fromGroup=true is group chat's combination, never ours");
+            Assert.False(AdhocTextTransport.TryParse(grouped, out _, out _, out _, out _, out _), "fromGroup=true is group chat's combination, never ours");
         }
 
         // ---- fan-out, membership, no echo ---------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EveryOtherSeatHolderReceivesTheLine()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, session, Alice, "hello all",
-                                                 out AdhocTextPlan plan, out string decision), Is.True);
-            Assert.That(decision, Is.EqualTo(AdhocTextSession.DecisionDelivered));
-            Assert.That(plan.Recipients, Is.EquivalentTo(new[] { Bob, Carol }));
+            Assert.True(AdhocTextSession.TryPlan(e, true, session, Alice, "hello all",
+                                                 out AdhocTextPlan plan, out string decision));
+            Assert.Equal(AdhocTextSession.DecisionDelivered, decision);
+            Assert.Equivalent(new[] { Bob, Carol }, plan.Recipients, strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheSenderNeverReceivesTheirOwnMessageBack()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
             foreach (UUID speaker in new[] { Alice, Bob, Carol })
             {
-                Assert.That(AdhocTextSession.TryPlan(e, true, session, speaker, "mine",
-                                                     out AdhocTextPlan plan, out _), Is.True);
-                Assert.That(plan.Recipients, Does.Not.Contain(speaker),
-                    "no echo -- the viewer already rendered what it sent");
-                Assert.That(plan.Recipients.Count, Is.EqualTo(2));
+                Assert.True(AdhocTextSession.TryPlan(e, true, session, speaker, "mine",
+                                                     out AdhocTextPlan plan, out _));
+                {
+                    var assertedValue = plan.Recipients;
+                    TestAssert.WithMessage(() => Assert.DoesNotContain(speaker, assertedValue), "no echo -- the viewer already rendered what it sent");
+                }
+                Assert.Equal(2, plan.Recipients.Count);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ANonMemberIsRefusedAndTheRefusalIsGreppable()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, session, Stranger, "let me in",
-                                                 out AdhocTextPlan plan, out string decision), Is.True,
-                "it IS our session, so this is a refusal and not a pass-through");
-            Assert.That(plan, Is.Null);
-            Assert.That(decision, Is.EqualTo(AdhocTextSession.DecisionNotMember));
-            Assert.That(AdhocTextSession.Line(Stranger, session, decision),
-                Does.Contain("[ADHOC TEXT]").And.Contain("adhoc-text-refused-not-member"));
+            Assert.True(AdhocTextSession.TryPlan(e, true, session, Stranger, "let me in", out AdhocTextPlan plan, out string decision), "it IS our session, so this is a refusal and not a pass-through");
+            Assert.Null(plan);
+            Assert.Equal(AdhocTextSession.DecisionNotMember, decision);
+            {
+                var assertedValue = AdhocTextSession.Line(Stranger, session, decision);
+                Assert.Contains("[ADHOC TEXT]", assertedValue);
+                Assert.Contains("adhoc-text-refused-not-member", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnInviteeWhoNeverAcceptedCannotType_AndNeitherCanSomeoneWhoLeft()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             SessionOutcome start = e.StartAdhoc(Alice, UUID.Random(), Region, new List<UUID> { Bob, Carol });
             UUID session = start.Session.SessionId;
             e.Accept(session, Bob, Region, "vs-bob");
             // Carol is Invited only -- rung, never answered.
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, session, Carol, "hi", out AdhocTextPlan p1, out string d1), Is.True);
-            Assert.That(p1, Is.Null);
-            Assert.That(d1, Is.EqualTo(AdhocTextSession.DecisionNotMember),
-                "an invitation is not a write capability");
+            Assert.True(AdhocTextSession.TryPlan(e, true, session, Carol, "hi", out AdhocTextPlan p1, out string d1));
+            Assert.Null(p1);
+            {
+                var assertedValue = d1;
+                TestAssert.WithMessage(() => Assert.Equal(AdhocTextSession.DecisionNotMember, assertedValue), "an invitation is not a write capability");
+            }
 
             e.Depart(session, Bob, DepartureReason.ChatLeave);
-            Assert.That(AdhocTextSession.TryPlan(e, true, session, Bob, "still here?", out AdhocTextPlan p2, out string d2), Is.True);
-            Assert.That(p2, Is.Null);
-            Assert.That(d2, Is.EqualTo(AdhocTextSession.DecisionNotMember));
+            Assert.True(AdhocTextSession.TryPlan(e, true, session, Bob, "still here?", out AdhocTextPlan p2, out string d2));
+            Assert.Null(p2);
+            Assert.Equal(AdhocTextSession.DecisionNotMember, d2);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupOrUnknownSessionIsNotOurs_SoGroupTextIsUntouched()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             UUID group = UUID.Random();
             e.Start(NonSpatialSessionType.Group, Alice, group, UUID.Zero, Region);
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, group, Alice, "group line",
-                                                 out _, out _), Is.False,
-                "a GROUP id must fall straight through to GroupsMessagingModule");
-            Assert.That(AdhocTextSession.TryPlan(e, true, UUID.Random(), Alice, "nowhere",
-                                                 out _, out _), Is.False);
+            Assert.False(AdhocTextSession.TryPlan(e, true, group, Alice, "group line", out _, out _), "a GROUP id must fall straight through to GroupsMessagingModule");
+            Assert.False(AdhocTextSession.TryPlan(e, true, UUID.Random(), Alice, "nowhere",
+                                                 out _, out _));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceOfOneHasNobodyToTellButIsStillOurs()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             SessionOutcome start = e.StartAdhoc(Alice, UUID.Random(), Region, new List<UUID>());
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, start.Session.SessionId, Alice, "anyone?",
-                                                 out AdhocTextPlan plan, out string decision), Is.True);
-            Assert.That(decision, Is.EqualTo(AdhocTextSession.DecisionNoRecipients));
-            Assert.That(plan.Recipients, Is.Empty);
+            Assert.True(AdhocTextSession.TryPlan(e, true, start.Session.SessionId, Alice, "anyone?",
+                                                 out AdhocTextPlan plan, out string decision));
+            Assert.Equal(AdhocTextSession.DecisionNoRecipients, decision);
+            Assert.Empty(plan.Recipients);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnEmptyLineIsRefusedRatherThanFannedOut()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, session, Alice, "", out AdhocTextPlan plan, out string decision), Is.True);
-            Assert.That(plan, Is.Null);
-            Assert.That(decision, Is.EqualTo(AdhocTextSession.DecisionEmpty));
+            Assert.True(AdhocTextSession.TryPlan(e, true, session, Alice, "", out AdhocTextPlan plan, out string decision));
+            Assert.Null(plan);
+            Assert.Equal(AdhocTextSession.DecisionEmpty, decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheFlagOffRefusesInsteadOfDelivering()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
-            Assert.That(AdhocTextSession.TryPlan(e, false, session, Alice, "hi", out AdhocTextPlan plan, out string decision), Is.True);
-            Assert.That(plan, Is.Null);
-            Assert.That(decision, Is.EqualTo(AdhocTextSession.DecisionDisabled));
+            Assert.True(AdhocTextSession.TryPlan(e, false, session, Alice, "hi", out AdhocTextPlan plan, out string decision));
+            Assert.Null(plan);
+            Assert.Equal(AdhocTextSession.DecisionDisabled, decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheViewerMessageCarriesTheSessionAndNotTheCarrierMagic()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID session = UUID.Random();
             GridInstantMessage m = AdhocTextSession.BuildForViewer(Bob, Alice, "Alice Bazar", session, Region, "hello");
 
-            Assert.That(m.dialog, Is.EqualTo(AdhocTextSession.DialogSessionSend));
-            Assert.That(new UUID(m.imSessionID), Is.EqualTo(session), "the viewer keys its panel off this");
-            Assert.That(new UUID(m.toAgentID), Is.EqualTo(Bob));
-            Assert.That(m.message, Is.EqualTo("hello"));
-            Assert.That(m.fromGroup, Is.False);
-            Assert.That(m.offline, Is.EqualTo(0));
+            Assert.Equal(AdhocTextSession.DialogSessionSend, m.dialog);
+            {
+                var assertedValue = new UUID(m.imSessionID);
+                TestAssert.WithMessage(() => Assert.Equal(session, assertedValue), "the viewer keys its panel off this");
+            }
+            Assert.Equal(Bob, new UUID(m.toAgentID));
+            Assert.Equal("hello", m.message);
+            Assert.False(m.fromGroup);
+            Assert.Equal(0, m.offline);
             string bucket = System.Text.Encoding.UTF8.GetString(m.binaryBucket).TrimEnd('\0');
-            Assert.That(bucket, Is.EqualTo(AdhocTextSession.DefaultSessionName),
-                "the session name, as the group path puts its group name there -- never the carrier magic");
-            Assert.That(bucket, Does.Not.Contain(AdhocTextTransport.BucketMagic));
+            {
+                var assertedValue = bucket;
+                TestAssert.WithMessage(() => Assert.Equal(AdhocTextSession.DefaultSessionName, assertedValue), "the session name, as the group path puts its group name there -- never the carrier magic");
+            }
+            Assert.DoesNotContain(AdhocTextTransport.BucketMagic, bucket);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCrossInstanceRoundTripPreservesTheLine()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID session = UUID.Random();
             GridInstantMessage carried = AdhocTextTransport.Build(Carol, Alice, "Alice Bazar", session, Region,
                                                                   "cross the host", "Conference");
-            Assert.That(AdhocTextTransport.TryParse(carried, out UUID target, out UUID sid, out string msg,
-                                                    out string from, out string name), Is.True);
-            Assert.That(target, Is.EqualTo(Carol));
-            Assert.That(sid, Is.EqualTo(session));
-            Assert.That(msg, Is.EqualTo("cross the host"));
-            Assert.That(from, Is.EqualTo("Alice Bazar"));
-            Assert.That(name, Is.EqualTo("Conference"));
+            Assert.True(AdhocTextTransport.TryParse(carried, out UUID target, out UUID sid, out string msg,
+                                                    out string from, out string name));
+            Assert.Equal(Carol, target);
+            Assert.Equal(session, sid);
+            Assert.Equal("cross the host", msg);
+            Assert.Equal("Alice Bazar", from);
+            Assert.Equal("Conference", name);
 
             // and what the far side then hands the viewer is the same line, with no magic on it
             GridInstantMessage rebuilt = AdhocTextSession.BuildForViewer(target, Alice, from, sid, Region, msg, name);
-            Assert.That(rebuilt.message, Is.EqualTo(carried.message));
-            Assert.That(new UUID(rebuilt.imSessionID), Is.EqualTo(new UUID(carried.imSessionID)));
+            Assert.Equal(carried.message, rebuilt.message);
+            Assert.Equal(new UUID(carried.imSessionID), new UUID(rebuilt.imSessionID));
         }
 
         // ---- the roster --------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AJoinerGetsTheWholeRoomAndTheRoomGetsTheJoiner()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             SessionOutcome start = e.StartAdhoc(Alice, UUID.Random(), Region, new List<UUID> { Bob, Carol });
             UUID session = start.Session.SessionId;
@@ -332,33 +359,45 @@ namespace osWebRtcVoice.Tests
 
             List<string> lines = AdhocConferenceRoster.SendJoin(new[] { scene }, e.Store.Get(session), Carol, _ => q);
 
-            Assert.That(q.Sent.Count, Is.EqualTo(3), "the joiner, plus one send per other seat holder");
+            {
+                var assertedValue = q.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "the joiner, plus one send per other seat holder");
+            }
 
             var toCarol = q.Sent.Find(s => s.ToAgent == Carol);
-            Assert.That(toCarol.Updates.Count, Is.EqualTo(3),
-                "the joiner's panel gets the WHOLE roster at once, its own entry included");
-            Assert.That(toCarol.SessionId, Is.EqualTo(session));
+            {
+                var assertedValue = toCarol.Updates.Count;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "the joiner's panel gets the WHOLE roster at once, its own entry included");
+            }
+            Assert.Equal(session, toCarol.SessionId);
 
             foreach (UUID other in new[] { Alice, Bob })
             {
                 var sent = q.Sent.Find(s => s.ToAgent == other);
-                Assert.That(sent.Updates.Count, Is.EqualTo(1), "everybody else gets just the new name");
-                Assert.That(sent.Updates[0].agentID, Is.EqualTo(Carol));
-                Assert.That(sent.Updates[0].enterOrLeave, Is.True, "ENTER");
+                {
+                    var assertedValue = sent.Updates.Count;
+                    TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "everybody else gets just the new name");
+                }
+                Assert.Equal(Carol, sent.Updates[0].agentID);
+                Assert.True(sent.Updates[0].enterOrLeave, "ENTER");
             }
 
             foreach (var sent in q.Sent)
                 foreach (GroupChatListAgentUpdateData u in sent.Updates)
-                    Assert.That(u.canVoice, Is.True,
-                        "cv:true by construction -- the 1-arg ctor's FALSE default is known to hang a call up");
+                    Assert.True(u.canVoice, "cv:true by construction -- the 1-arg ctor's FALSE default is known to hang a call up");
 
-            Assert.That(lines, Has.Count.EqualTo(3));
-            Assert.That(lines[0], Does.Contain("[ADHOC ROSTER]").And.Contain("transition=ENTER"));
+            Assert.Equal(3, lines.Count());
+            {
+                var assertedValue = lines[0];
+                Assert.Contains("[ADHOC ROSTER]", assertedValue);
+                Assert.Contains("transition=ENTER", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADepartureTellsEveryRemainingMemberAndNotTheDepartedOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
@@ -372,21 +411,29 @@ namespace osWebRtcVoice.Tests
             e.Depart(session, Bob, DepartureReason.VoiceTeardown);
             List<string> lines = AdhocConferenceRoster.SendLeave(new[] { scene }, e.Store.Get(session), Bob, _ => q);
 
-            Assert.That(q.Sent.Count, Is.EqualTo(2), "Alice and Carol -- never Bob");
-            Assert.That(q.Sent.Exists(s => s.ToAgent == Bob), Is.False);
+            {
+                var assertedValue = q.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "Alice and Carol -- never Bob");
+            }
+            Assert.False(q.Sent.Exists(s => s.ToAgent == Bob));
             foreach (var sent in q.Sent)
             {
-                Assert.That(sent.Updates.Count, Is.EqualTo(1));
-                Assert.That(sent.Updates[0].agentID, Is.EqualTo(Bob));
-                Assert.That(sent.Updates[0].enterOrLeave, Is.False, "LEAVE");
+                Assert.Single(sent.Updates);
+                Assert.Equal(Bob, sent.Updates[0].agentID);
+                Assert.False(sent.Updates[0].enterOrLeave, "LEAVE");
             }
-            Assert.That(lines, Has.Count.EqualTo(2));
-            Assert.That(lines[0], Does.Contain("transition=LEAVE").And.Contain($"about={Bob}"));
+            Assert.Equal(2, lines.Count());
+            {
+                var assertedValue = lines[0];
+                Assert.Contains("transition=LEAVE", assertedValue);
+                Assert.Contains($"about={Bob}", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheRosterIsTheSeatListAndNothingElse()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             SessionOutcome start = e.StartAdhoc(Alice, UUID.Random(), Region, new List<UUID> { Bob, Carol });
             UUID session = start.Session.SessionId;
@@ -394,17 +441,21 @@ namespace osWebRtcVoice.Tests
             // Carol invited, never accepted; Stranger never involved at all.
 
             List<UUID> seats = AdhocConferenceRoster.SeatHolders(e.Store.Get(session));
-            Assert.That(seats, Is.EquivalentTo(new[] { Alice, Bob }));
-            Assert.That(seats, Does.Not.Contain(Carol), "Invited holds no seat, so it is not on the roster");
-            Assert.That(seats, Does.Not.Contain(Stranger));
+            Assert.Equivalent(new[] { Alice, Bob }, seats, strict: true);
+            {
+                var assertedValue = seats;
+                TestAssert.WithMessage(() => Assert.DoesNotContain(Carol, assertedValue), "Invited holds no seat, so it is not on the roster");
+            }
+            Assert.DoesNotContain(Stranger, seats);
 
             e.Decline(session, Carol);
-            Assert.That(AdhocConferenceRoster.SeatHolders(e.Store.Get(session)), Is.EquivalentTo(new[] { Alice, Bob }));
+            Assert.Equivalent(new[] { Alice, Bob }, AdhocConferenceRoster.SeatHolders(e.Store.Get(session)), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupSessionIsNeverGivenAConferenceRoster()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             UUID group = UUID.Random();
             SessionOutcome g = e.Start(NonSpatialSessionType.Group, Alice, group, UUID.Zero, Region);
@@ -413,24 +464,33 @@ namespace osWebRtcVoice.Tests
             SceneHelpers.AddScenePresence(scene, Alice);
             var q = new CapturingQueue();
 
-            Assert.That(AdhocConferenceRoster.SendJoin(new[] { scene }, g.Session, Alice, _ => q), Is.Empty);
-            Assert.That(AdhocConferenceRoster.SendLeave(new[] { scene }, g.Session, Alice, _ => q), Is.Empty);
-            Assert.That(q.Sent, Is.Empty, "group chat's roster is GroupsMessagingModule's job, not ours");
+            Assert.Empty(AdhocConferenceRoster.SendJoin(new[] { scene }, g.Session, Alice, _ => q));
+            Assert.Empty(AdhocConferenceRoster.SendLeave(new[] { scene }, g.Session, Alice, _ => q));
+            {
+                var assertedValue = q.Sent;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "group chat's roster is GroupsMessagingModule's job, not ours");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnUnreachableMemberIsLoggedRatherThanLost()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
             // no scenes at all: nobody is reachable on this instance
             List<string> lines = AdhocConferenceRoster.SendJoin(Array.Empty<Scene>(), e.Store.Get(session), Carol);
 
-            Assert.That(lines, Has.Count.EqualTo(3), "one line per intended recipient, reachable or not");
+            {
+                var assertedValue = lines;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue.Count()), "one line per intended recipient, reachable or not");
+            }
             foreach (string l in lines)
-                Assert.That(l, Does.Contain(A2AAgentListDelivery.DecisionNoPresence),
-                    "their roster arrives from THEIR instance; this one says plainly that it could not send");
+                {
+                    var assertedValue = l;
+                    TestAssert.WithMessage(() => Assert.Contains(A2AAgentListDelivery.DecisionNoPresence, assertedValue), "their roster arrives from THEIR instance; this one says plainly that it could not send");
+                }
         }
     }
 }

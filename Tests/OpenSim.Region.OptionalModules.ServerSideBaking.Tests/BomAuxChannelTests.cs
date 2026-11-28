@@ -12,7 +12,6 @@ using OpenSim.Region.OptionalModules.Avatar.ServerSideBaking;
 using OpenSim.Services.Interfaces;
 using OpenSimNGC.Appearance.Baking;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
@@ -122,7 +121,7 @@ public class BomAuxChannelTests
         {
             var (assets, wearables, _) = Outfit(slot);
             var inputs = BakeOrchestrator.Resolve(wearables, null, assets, compositor, 64);
-            var results = new SkiaBakeBackend(compositor) { Quality = 0.5 }.Bake(inputs.Request);
+            var results = new SkiaBakeBackend(compositor) { Quality = 0.5 }.Bake(inputs.Request, TestContext.Current.CancellationToken);
             var produced = results.Select(r => r.Channel).ToHashSet();
 
             Assert.Contains(channel, produced);
@@ -139,7 +138,7 @@ public class BomAuxChannelTests
         Assert.Equal(5, painted.Count);
 
         var inputs = BakeOrchestrator.Resolve(wearables, null, assets, compositor, 64);
-        var results = new SkiaBakeBackend(compositor) { Quality = 0.5 }.Bake(inputs.Request);
+        var results = new SkiaBakeBackend(compositor) { Quality = 0.5 }.Bake(inputs.Request, TestContext.Current.CancellationToken);
 
         foreach (var (channel, _, _) in Aux)
         {
