@@ -32,7 +32,6 @@ using OpenSim.Tests.Common;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class StockModerationTests
     {
         private static readonly UUID Owner = new UUID("a11ce000-0000-4000-8000-000000000001");
@@ -125,22 +124,24 @@ namespace osWebRtcVoice.Tests
             m.Invoke(_module, new object[] { agent, _scene });
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M1_AMuteIsAppliedToTheParticipant_AndAnswers200()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new FakeMuteService();
             Build(svc);
             Avatar(Bob, InWest);
 
             int status = Moderate(Owner, "mute", Bob);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(svc.Calls, Is.EqualTo(new[] { (Bob, true) }));
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.Equal(new[] { (Bob, true) }, svc.Calls);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M2_AnUnmuteLiftsIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new FakeMuteService();
             Build(svc);
             Avatar(Bob, InWest);
@@ -148,50 +149,60 @@ namespace osWebRtcVoice.Tests
 
             int status = Moderate(Owner, "unmute", Bob);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(svc.Calls.Last(), Is.EqualTo((Bob, false)));
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.Equal((Bob, false), svc.Calls.Last());
             JoinedSpatialRoom(Bob);
-            Assert.That(svc.Calls.Count, Is.EqualTo(2), "and a later join is not muted");
+            {
+                var assertedValue = svc.Calls.Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "and a later join is not muted");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M3_APluginThatCannotMute_GetsA501_AndNothingIsRecorded()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new FakeMuteService { Answer = ParticipantMuteResult.Unsupported };
             Build(svc);
             Avatar(Bob, InWest);
 
             int status = Moderate(Owner, "mute", Bob);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotImplemented));
+            Assert.Equal((int)HttpStatusCode.NotImplemented, status);
             svc.Answer = ParticipantMuteResult.Applied;
             svc.Calls.Clear();
             JoinedSpatialRoom(Bob);
-            Assert.That(svc.Calls, Is.Empty, "the refused mute was not recorded, so a join is not muted");
+            {
+                var assertedValue = svc.Calls;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the refused mute was not recorded, so a join is not muted");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M4_AVoiceServiceWithNoParticipantMute_GetsA501()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Build(new PlainService());
             Avatar(Bob, InWest);
 
-            Assert.That(Moderate(Owner, "mute", Bob), Is.EqualTo((int)HttpStatusCode.NotImplemented));
+            Assert.Equal((int)HttpStatusCode.NotImplemented, Moderate(Owner, "mute", Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M5_AGatewayThatCannotBeAsked_GetsA503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new FakeMuteService { Answer = ParticipantMuteResult.Failed };
             Build(svc);
             Avatar(Bob, InWest);
 
-            Assert.That(Moderate(Owner, "mute", Bob), Is.EqualTo((int)HttpStatusCode.ServiceUnavailable));
+            Assert.Equal((int)HttpStatusCode.ServiceUnavailable, Moderate(Owner, "mute", Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M6_MuteAll_MutesWhoeverIsOnTheParcel_ButNotTheModerator_NorOtherParcels()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new FakeMuteService();
             Build(svc);
             Avatar(Bob, InWest);
@@ -200,34 +211,49 @@ namespace osWebRtcVoice.Tests
 
             int status = Moderate(Owner, "mute_all");
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, status);
             var muted = svc.Calls.Where(c => c.Muted).Select(c => c.Agent).ToList();
-            Assert.That(muted, Is.EquivalentTo(new[] { Bob, Carol }));
-            Assert.That(svc.Calls.Select(c => c.Agent), Does.Not.Contain(Owner).And.Not.Contain(Dave));
+            Assert.Equivalent(new[] { Bob, Carol }, muted, strict: true);
+            {
+                var assertedValue = svc.Calls.Select(c => c.Agent);
+                Assert.DoesNotContain(Owner, assertedValue);
+                Assert.DoesNotContain(Dave, assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M7_MuteAll_HoldsWithNobodyInTheRoom_AndAppliesToWhoeverJoinsLater()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new FakeMuteService();
             Build(svc);
 
-            Assert.That(Moderate(Owner, "mute_all"), Is.EqualTo((int)HttpStatusCode.OK), "nobody else is here");
+            {
+                var assertedValue = Moderate(Owner, "mute_all");
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "nobody else is here");
+            }
             Avatar(Bob, InWest);
             JoinedSpatialRoom(Bob);
 
-            Assert.That(svc.Calls, Is.EqualTo(new[] { (Bob, true) }));
+            Assert.Equal(new[] { (Bob, true) }, svc.Calls);
 
             Moderate(Owner, "unmute_all");
-            Assert.That(svc.Calls.Last(), Is.EqualTo((Bob, false)), "unmute_all lifts it for the one who is there");
+            {
+                var assertedValue = svc.Calls.Last();
+                TestAssert.WithMessage(() => Assert.Equal((Bob, false), assertedValue), "unmute_all lifts it for the one who is there");
+            }
             svc.Calls.Clear();
             JoinedSpatialRoom(Bob);
-            Assert.That(svc.Calls, Is.Empty, "and a later join is not muted");
+            {
+                var assertedValue = svc.Calls;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "and a later join is not muted");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M8_ANonModerator_IsRefused_AndNothingIsMuted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new FakeMuteService();
             Build(svc);
             Avatar(Bob, InWest);
@@ -235,34 +261,42 @@ namespace osWebRtcVoice.Tests
 
             int status = Moderate(Bob, "mute", Carol);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(svc.Calls, Is.Empty);
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            Assert.Empty(svc.Calls);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M9_NotOnTheStockPlugin_WithNoFeeder_TheAnswerIsStillA501()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new FakeMuteService();
             Build(svc, stock: false);
             Avatar(Bob, InWest);
 
-            Assert.That(Moderate(Owner, "mute", Bob), Is.EqualTo((int)HttpStatusCode.NotImplemented));
-            Assert.That(svc.Calls, Is.Empty, "the participant mute is for the stock plugin only");
+            Assert.Equal((int)HttpStatusCode.NotImplemented, Moderate(Owner, "mute", Bob));
+            {
+                var assertedValue = svc.Calls;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the participant mute is for the stock plugin only");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void M10_AnAgentNotInVoiceYet_IsRecorded_AndMutedWhenItJoins()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var svc = new FakeMuteService { Answer = ParticipantMuteResult.NotInRoom };
             Build(svc);
             Avatar(Bob, InWest);
 
-            Assert.That(Moderate(Owner, "mute", Bob), Is.EqualTo((int)HttpStatusCode.OK), "nothing to mute yet is not a failure");
+            {
+                var assertedValue = Moderate(Owner, "mute", Bob);
+                TestAssert.WithMessage(() => Assert.Equal((int)HttpStatusCode.OK, assertedValue), "nothing to mute yet is not a failure");
+            }
             svc.Calls.Clear();
             svc.Answer = ParticipantMuteResult.Applied;
             JoinedSpatialRoom(Bob);
 
-            Assert.That(svc.Calls, Is.EqualTo(new[] { (Bob, true) }));
+            Assert.Equal(new[] { (Bob, true) }, svc.Calls);
         }
     }
 }

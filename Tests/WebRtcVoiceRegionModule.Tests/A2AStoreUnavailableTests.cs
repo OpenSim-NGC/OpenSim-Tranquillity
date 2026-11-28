@@ -12,7 +12,7 @@
  */
 using System;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice.NonSpatial;
@@ -20,7 +20,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class A2AStoreUnavailableTests
     {
         private static readonly UUID CallId = A2ACalls.ComputeSessionId(Alice, Bob);
@@ -53,55 +52,66 @@ namespace osWebRtcVoice.Tests
             => ChatSessionRequestLogic.Decide(Call(sessionId), agent, r.Calls);
 
         private static void Record(Rig r)
-            => Assert.That(r.Calls.Record(Alice, Bob, RegionA, out _), Is.Not.Null);
+            => Assert.NotNull(r.Calls.Record(Alice, Bob, RegionA, out _));
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallWhileTheStoreIsUp_StillGetsItsCredential()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             Record(r);
 
             ChatSessionOutcome o = CallAs(r, Alice, CallId);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
+            Assert.Equal(HttpStatusCode.OK, o.Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallForASessionTheStoreSaysDoesNotExist_Answers404()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
 
             ChatSessionOutcome o = CallAs(r, Alice, CallId);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.NotFound), "the store answered: there is no such call");
-            Assert.That(r.Breaker.State, Is.EqualTo(BreakerState.Closed), "and an answer is not a failure");
+            {
+                var assertedValue = o.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.NotFound, assertedValue), "the store answered: there is no such call");
+            }
+            {
+                var assertedValue = r.Breaker.State;
+                TestAssert.WithMessage(() => Assert.Equal(BreakerState.Closed, assertedValue), "and an answer is not a failure");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallForAnEndedSession_Answers404()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             Record(r);
             r.Calls.Decline(CallId, Bob, out _);
 
-            Assert.That(CallAs(r, Alice, CallId).Status, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.Equal(HttpStatusCode.NotFound, CallAs(r, Alice, CallId).Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallWhileTheStoreGivesNoAnswer_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             Record(r);
             r.Service.Up = false;
 
             ChatSessionOutcome o = CallAs(r, Alice, CallId);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, o.Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallWhileTheStoreTimesOutOrRefusesTheConnection_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             Record(r);
             r.Service.Up = false;
@@ -109,62 +119,70 @@ namespace osWebRtcVoice.Tests
 
             ChatSessionOutcome o = CallAs(r, Alice, CallId);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, o.Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallWhileTheBreakerIsOpen_Answers503_WithoutTouchingTheStore()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             Record(r);
             r.Service.Up = false;
             CallAs(r, Alice, CallId);                               // the failure that opens it
-            Assert.That(r.Breaker.State, Is.EqualTo(BreakerState.Open));
+            Assert.Equal(BreakerState.Open, r.Breaker.State);
             r.Service.Up = true;                                    // back, but the breaker has not tried yet
             int before = r.Service.Calls;
 
             ChatSessionOutcome o = CallAs(r, Alice, CallId);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
-            Assert.That(r.Service.Calls, Is.EqualTo(before), "refused at once, without a request");
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, o.Status);
+            {
+                var assertedValue = r.Service.Calls;
+                TestAssert.WithMessage(() => Assert.Equal(before, assertedValue), "refused at once, without a request");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheStoreGoingDownBetweenTheLookAndTheCredential_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             Record(r);
             r.Service.DownOnly = "issuetoken";
 
-            Assert.That(CallAs(r, Alice, CallId).Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, CallAs(r, Alice, CallId).Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStrangersCallWhileTheStoreIsDown_Answers503_NotAGuessAtForbidden()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             Record(r);
             r.Service.Up = false;
 
-            Assert.That(CallAs(r, Carol, CallId).Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, CallAs(r, Carol, CallId).Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStrangersCallWhileTheStoreIsUp_StillAnswers403()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Rig r = NewRig();
             Record(r);
 
-            Assert.That(CallAs(r, Carol, CallId).Status, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.Equal(HttpStatusCode.Forbidden, CallAs(r, Carol, CallId).Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallInProcessIsNeverUnavailable()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine engine = NewEngine();
             A2ACalls calls = new A2ACalls(() => engine);
 
-            Assert.That(ChatSessionRequestLogic.Decide(Call(CallId), Alice, calls).Status, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.Equal(HttpStatusCode.NotFound, ChatSessionRequestLogic.Decide(Call(CallId), Alice, calls).Status);
         }
     }
 }

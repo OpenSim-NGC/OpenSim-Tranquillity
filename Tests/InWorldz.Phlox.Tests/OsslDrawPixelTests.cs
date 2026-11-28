@@ -17,7 +17,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Tests.Common;
 using SkiaSharp;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

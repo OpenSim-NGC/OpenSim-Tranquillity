@@ -44,11 +44,6 @@ namespace OpenSim.Framework.Tests
 
         public AgentCircuitManagerTests()
         {
-            Setup();
-        }
-
-        public void Setup()
-        {
             AgentId1 = UUID.Random();
             AgentId2 = UUID.Random();
             circuitcode1 = (uint) rnd.Next((int)uint.MinValue, int.MaxValue);
@@ -141,7 +136,7 @@ namespace OpenSim.Framework.Tests
             agentCircuitManager.RemoveCircuit(circuitcode2);
 
             AgentCircuitData agent = agentCircuitManager.GetAgentCircuitData(circuitcode2);
-            Assert.Equal(null, agent);
+            Assert.Null(agent);
 
         }
 

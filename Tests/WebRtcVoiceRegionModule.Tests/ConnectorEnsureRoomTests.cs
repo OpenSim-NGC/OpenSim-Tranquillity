@@ -23,10 +23,8 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
-    public class ConnectorEnsureRoomTests
-    {
+    public class ConnectorEnsureRoomTests : IAsyncLifetime
+        {
         private sealed class Capture : ILoggerProvider, ILogger
         {
             public readonly List<(LogLevel Level, string Text)> Lines = new();
@@ -60,16 +58,12 @@ namespace osWebRtcVoice.Tests
 
         private Capture m_log;
         private LogCapture m_logging;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             m_log = new Capture();
             m_logging = new LogCapture(m_log, LogLevel.Trace);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             m_logging.Dispose();
             m_log.Dispose();
@@ -103,37 +97,51 @@ namespace osWebRtcVoice.Tests
             return (module, scene, service);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheServiceCannotMakeTheRoom_OneWarningIsWritten_AndTheComputedRoomIsStillReturned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (VoiceConnectorModule module, Scene scene, EnsureOnlyService service) = Module(null);
             int expected = ParcelRoom(scene);
 
             int room = ResolveAndEnsure(module, Record());
 
-            Assert.That(room, Is.EqualTo(expected));
-            Assert.That(service.Asked, Has.Count.EqualTo(1));
+            Assert.Equal(expected, room);
+            Assert.Single(service.Asked);
             lock (m_log.Lines)
             {
                 var warned = m_log.Lines.Where(l => l.Level == LogLevel.Warning && l.Text.Contains("could not ensure mixer room")).ToList();
-                Assert.That(warned, Has.Count.EqualTo(1));
-                Assert.That(warned[0].Text, Does.Contain(expected.ToString()));
+                Assert.Single(warned);
+                Assert.Contains(expected.ToString(), warned[0].Text);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheServiceMakesTheRoom_NothingIsWarned_AndTheServiceWasAskedForTheParcelsRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (VoiceConnectorModule module, Scene scene, EnsureOnlyService service) = Module(123456);
 
             int room = ResolveAndEnsure(module, Record());
 
-            Assert.That(room, Is.EqualTo(ParcelRoom(scene)));
+            Assert.Equal(ParcelRoom(scene), room);
             LandData land = scene.LandChannel.GetLandObject(Record().Position.X, Record().Position.Y).LandData;
             int parcel = ConnectorRoomResolver.IsEstateChannel(land) ? JanusAudioBridge.REGION_ROOM_ID : land.LocalID;
-            Assert.That(service.Asked, Is.EqualTo(new[] { (scene.RegionInfo.RegionID, parcel) }));
+            Assert.Equal(new[] { (scene.RegionInfo.RegionID, parcel) }, service.Asked);
             lock (m_log.Lines)
-                Assert.That(m_log.Lines.Where(l => l.Level >= LogLevel.Warning), Is.Empty);
+                Assert.DoesNotContain(m_log.Lines, l => l.Level >= LogLevel.Warning);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

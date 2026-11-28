@@ -17,7 +17,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class LandBanTests
     {
         private const int Now = 1_000_000;
@@ -36,65 +35,73 @@ namespace osWebRtcVoice.Tests
             return ld;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void PermanentBan_WithUseBanList_IsBanned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             LandData ld = LandBannedWith(expires: 0);
-            Assert.That(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now), Is.True);
+            Assert.True(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void LiveTimedBan_IsBanned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             LandData ld = LandBannedWith(expires: Now + 100);
-            Assert.That(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now), Is.True);
+            Assert.True(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ExpiredTimedBan_IsNotBanned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             LandData ld = LandBannedWith(expires: Now - 100);
-            Assert.That(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now), Is.False);
+            Assert.False(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BanEntry_ButUseBanListFlagOff_IsNotBanned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             LandData ld = LandBannedWith(expires: 0);
             ld.Flags &= ~(uint)ParcelFlags.UseBanList;   // clear the gate
-            Assert.That(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now), Is.False);
+            Assert.False(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void NonBannedAvatar_IsNotBanned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             LandData ld = LandBannedWith(expires: 0);
-            Assert.That(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Other, Now), Is.False);
+            Assert.False(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Other, Now));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Administrator_IsExempt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             LandData ld = LandBannedWith(expires: 0);
             Func<UUID, bool> isAdmin = a => a.Equals(Banned);
-            Assert.That(LandBan.IsBanned(ld, isAdmin, NoEmOrOwner, Banned, Now), Is.False);
+            Assert.False(LandBan.IsBanned(ld, isAdmin, NoEmOrOwner, Banned, Now));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EstateManagerOrOwner_IsExempt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             LandData ld = LandBannedWith(expires: 0);
             Func<UUID, bool> isEmOrOwner = a => a.Equals(Banned);
-            Assert.That(LandBan.IsBanned(ld, NoAdmin, isEmOrOwner, Banned, Now), Is.False);
+            Assert.False(LandBan.IsBanned(ld, NoAdmin, isEmOrOwner, Banned, Now));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParcelOwner_IsExempt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var ld = new LandData { OwnerID = Banned };   // the banned id also owns the parcel
             ld.Flags |= (uint)ParcelFlags.UseBanList;
             ld.ParcelAccessList.Add(new LandAccessEntry { AgentID = Banned, Flags = AccessList.Ban, Expires = 0 });
-            Assert.That(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now), Is.False);
+            Assert.False(LandBan.IsBanned(ld, NoAdmin, NoEmOrOwner, Banned, Now));
         }
     }
 }

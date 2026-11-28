@@ -23,7 +23,6 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class JanusAdminClientTests
     {
         // Literal response bodies captured from the 0.7.0-debug run.
@@ -55,131 +54,157 @@ namespace osWebRtcVoice.Tests
         }
 
         // ---- Envelope shape (must match the proven-working literal) --------------------------
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildEnvelope_MatchesProvenWorkingShape_AdminSecretInBody_NestedRequest()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string json = JanusAdminClient.BuildEnvelope(
                 "janus.plugin.slvoice", "sekret", SamplePeerCtlBatch(), "tX");
 
             var env = OSDParser.DeserializeJson(json) as OSDMap;
-            Assert.That(env, Is.Not.Null, "envelope is a JSON object");
-            Assert.That(env["janus"].AsString(), Is.EqualTo("message_plugin"));
-            Assert.That(env["admin_secret"].AsString(), Is.EqualTo("sekret"), "admin_secret is in the BODY");
-            Assert.That(env.ContainsKey("apisecret"), Is.False, "apisecret must NOT be present (Admin API 403s it)");
-            Assert.That(env["plugin"].AsString(), Is.EqualTo("janus.plugin.slvoice"));
-            Assert.That(env["transaction"].AsString(), Is.EqualTo("tX"));
+            {
+                var assertedValue = env;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "envelope is a JSON object");
+            }
+            Assert.Equal("message_plugin", env["janus"].AsString());
+            {
+                var assertedValue = env["admin_secret"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal("sekret", assertedValue), "admin_secret is in the BODY");
+            }
+            Assert.False(env.ContainsKey("apisecret"), "apisecret must NOT be present (Admin API 403s it)");
+            Assert.Equal("janus.plugin.slvoice", env["plugin"].AsString());
+            Assert.Equal("tX", env["transaction"].AsString());
 
             var req = env["request"] as OSDMap;
-            Assert.That(req, Is.Not.Null, "request is a nested object");
-            Assert.That(req["request"].AsString(), Is.EqualTo("peer_ctl_batch"));
-            Assert.That(req["op"].AsString(), Is.EqualTo("add"));
-            Assert.That(req["room"].AsInteger(), Is.EqualTo(999111));
-            Assert.That((req["excl"] as OSDMap), Is.Not.Null, "excl is carried through");
+            {
+                var assertedValue = req;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "request is a nested object");
+            }
+            Assert.Equal("peer_ctl_batch", req["request"].AsString());
+            Assert.Equal("add", req["op"].AsString());
+            Assert.Equal(999111, req["room"].AsInteger());
+            {
+                var assertedValue = (req["excl"] as OSDMap);
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "excl is carried through");
+            }
         }
 
         // ---- Interpret mapping for each observed response class ------------------------------
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Interpret_Success_Applied_IsOk()
         {
-            Assert.That(JanusAdminClient.Interpret(HttpStatusCode.OK, SuccessApplied),
-                Is.EqualTo(AdminSendResult.Ok));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(AdminSendResult.Ok, JanusAdminClient.Interpret(HttpStatusCode.OK, SuccessApplied));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Interpret_Success_SlvoiceError_IsOk_TheCeiling()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The plugin-level "slvoice":"error" (malformed) rides inside janus:"success",
             // so the transport sees Ok — exactly the ceiling: Ok != applied.
-            Assert.That(JanusAdminClient.Interpret(HttpStatusCode.OK, SuccessSlvoiceError),
-                Is.EqualTo(AdminSendResult.Ok));
+            Assert.Equal(AdminSendResult.Ok, JanusAdminClient.Interpret(HttpStatusCode.OK, SuccessSlvoiceError));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Interpret_403MissingSecret_IsProtocolError()
         {
-            Assert.That(JanusAdminClient.Interpret(HttpStatusCode.OK, Error403MissingSecret),
-                Is.EqualTo(AdminSendResult.ProtocolError));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(AdminSendResult.ProtocolError, JanusAdminClient.Interpret(HttpStatusCode.OK, Error403MissingSecret));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Interpret_403ApiSecret_IsProtocolError()
         {
-            Assert.That(JanusAdminClient.Interpret(HttpStatusCode.OK, Error403ApiSecret),
-                Is.EqualTo(AdminSendResult.ProtocolError));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(AdminSendResult.ProtocolError, JanusAdminClient.Interpret(HttpStatusCode.OK, Error403ApiSecret));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Interpret_Non2xx_IsTransportError()
         {
-            Assert.That(JanusAdminClient.Interpret(HttpStatusCode.ServiceUnavailable, ""),
-                Is.EqualTo(AdminSendResult.TransportError), "503 -> TransportError");
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            {
+                var assertedValue = JanusAdminClient.Interpret(HttpStatusCode.ServiceUnavailable, "");
+                TestAssert.WithMessage(() => Assert.Equal(AdminSendResult.TransportError, assertedValue), "503 -> TransportError");
+            }
             // A non-2xx maps to TransportError regardless of body (e.g. if a proxy returned 403).
-            Assert.That(JanusAdminClient.Interpret(HttpStatusCode.Forbidden, Error403MissingSecret),
-                Is.EqualTo(AdminSendResult.TransportError), "HTTP 403 status -> TransportError per spec");
+            {
+                var assertedValue = JanusAdminClient.Interpret(HttpStatusCode.Forbidden, Error403MissingSecret);
+                TestAssert.WithMessage(() => Assert.Equal(AdminSendResult.TransportError, assertedValue), "HTTP 403 status -> TransportError per spec");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Interpret_Uninterpretable2xx_IsProtocolError()
         {
-            Assert.That(JanusAdminClient.Interpret(HttpStatusCode.OK, "not json at all"),
-                Is.EqualTo(AdminSendResult.ProtocolError));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(AdminSendResult.ProtocolError, JanusAdminClient.Interpret(HttpStatusCode.OK, "not json at all"));
         }
 
         // ---- SendWithTimeoutAsync (HTTP abstracted; never blocks) ----------------------------
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendWithTimeout_FastSuccess_IsOk()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             AdminSendResult r = await JanusAdminClient.SendWithTimeoutAsync(
                 _ => Task.FromResult((HttpStatusCode.OK, SuccessApplied)),
                 TimeSpan.FromSeconds(1));
-            Assert.That(r, Is.EqualTo(AdminSendResult.Ok));
+            Assert.Equal(AdminSendResult.Ok, r);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendWithTimeout_SendThrows_IsTransportError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             AdminSendResult r = await JanusAdminClient.SendWithTimeoutAsync(
                 async _ => { await Task.Yield(); throw new HttpRequestException("connection refused"); },
                 TimeSpan.FromSeconds(1));
-            Assert.That(r, Is.EqualTo(AdminSendResult.TransportError));
+            Assert.Equal(AdminSendResult.TransportError, r);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task SendWithTimeout_HungSend_ReturnsTransportError_DoesNotBlock()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var sw = System.Diagnostics.Stopwatch.StartNew();
             AdminSendResult r = await JanusAdminClient.SendWithTimeoutAsync(
                 async ct => { await Task.Delay(TimeSpan.FromSeconds(30), ct); return (HttpStatusCode.OK, "{}"); },
                 TimeSpan.FromMilliseconds(50));
             sw.Stop();
-            Assert.That(r, Is.EqualTo(AdminSendResult.TransportError), "timeout -> TransportError");
-            Assert.That(sw.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)),
-                "returned on the ~50ms deadline, not after the 30s hang");
+            {
+                var assertedValue = r;
+                TestAssert.WithMessage(() => Assert.Equal(AdminSendResult.TransportError, assertedValue), "timeout -> TransportError");
+            }
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5), "returned on the ~50ms deadline, not after the 30s hang");
         }
 
         // ---- absolute HttpClient.Timeout backstop -------------------------------------
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ComputeClientTimeout_IsFourTimesTheAdminTimeout()
         {
-            Assert.That(JanusAdminClient.ComputeClientTimeout(TimeSpan.FromSeconds(5)),
-                Is.EqualTo(TimeSpan.FromSeconds(20)));
-            Assert.That(JanusAdminClient.ComputeClientTimeout(TimeSpan.FromMilliseconds(250)),
-                Is.EqualTo(TimeSpan.FromMilliseconds(1000)));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(TimeSpan.FromSeconds(20), JanusAdminClient.ComputeClientTimeout(TimeSpan.FromSeconds(5)));
+            Assert.Equal(TimeSpan.FromMilliseconds(1000), JanusAdminClient.ComputeClientTimeout(TimeSpan.FromMilliseconds(250)));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ComputeClientTimeout_NonPositive_FallsBackTo20s()
         {
-            Assert.That(JanusAdminClient.ComputeClientTimeout(TimeSpan.Zero), Is.EqualTo(TimeSpan.FromSeconds(20)));
-            Assert.That(JanusAdminClient.ComputeClientTimeout(TimeSpan.FromSeconds(-1)), Is.EqualTo(TimeSpan.FromSeconds(20)));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(TimeSpan.FromSeconds(20), JanusAdminClient.ComputeClientTimeout(TimeSpan.Zero));
+            Assert.Equal(TimeSpan.FromSeconds(20), JanusAdminClient.ComputeClientTimeout(TimeSpan.FromSeconds(-1)));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Ctor_SetsAbsoluteTimeoutOnItsOwnHttpClient()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using var client = new JanusAdminClient("http://localhost/voiceAdmin", "secret", TimeSpan.FromSeconds(5));
-            Assert.That(client.ClientTimeout, Is.EqualTo(TimeSpan.FromSeconds(20)),
-                "JanusAdminClient's own HttpClient must carry the 4x backstop timeout (not JanusSession's shared client)");
+            {
+                var assertedValue = client.ClientTimeout;
+                TestAssert.WithMessage(() => Assert.Equal(TimeSpan.FromSeconds(20), assertedValue), "JanusAdminClient's own HttpClient must carry the 4x backstop timeout (not JanusSession's shared client)");
+            }
         }
     }
 }

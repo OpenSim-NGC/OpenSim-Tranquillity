@@ -34,12 +34,12 @@ public sealed class GridServiceHostLifecycleTests
 
         using IHost host = BuildHost(runtime, serverBase, coordinator);
 
-        await host.StartAsync();
+        await host.StartAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, runtime.InitializeCalls);
         Assert.Equal(0, runtime.StopCalls);
 
-        await host.StopAsync();
+        await host.StopAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, runtime.StopCalls);
         Assert.Equal(1, serverBase.RegisterCommonCommandsCalls);
@@ -56,7 +56,7 @@ public sealed class GridServiceHostLifecycleTests
 
         using IHost host = BuildHost(runtime, new FakeServerBase(), new FakeStartupFailureCoordinator());
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class GridServiceHostLifecycleTests
 
         using IHost host = BuildHost(runtime, serverBase, coordinator);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => host.StartAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal(1, coordinator.ThrowFatalCalls);
         Assert.Contains("Fatal error while registering startup components.", coordinator.LastFatalMessage);

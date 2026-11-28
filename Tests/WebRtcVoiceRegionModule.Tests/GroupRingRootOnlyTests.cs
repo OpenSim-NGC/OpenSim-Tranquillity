@@ -15,7 +15,7 @@
  */
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -28,7 +28,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class GroupRingRootOnlyTests
     {
         private const string Grid = "example-grid";
@@ -142,32 +141,40 @@ namespace osWebRtcVoice.Tests
         private static void Ring(WebRtcVoiceRegionModule mod, NonSpatialVoiceSession session)
             => Invoke(mod, "RingGroupMembers", session, Alice, "Test User", "Test Group");
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MemberWithOnlyAChildPresenceHere_IsNotRungLocally_AndIsRungThroughTheCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session) = Calling(x => x.AddChild(Bob));
 
             Ring(mod, session);
 
-            Assert.That(p.Queue.Enqueued, Does.Not.Contain(Bob), "the accept would go to a process that knows nothing of the call");
+            {
+                var assertedValue = p.Queue.Enqueued;
+                TestAssert.WithMessage(() => Assert.DoesNotContain(Bob, assertedValue), "the accept would go to a process that knows nothing of the call");
+            }
             GridInstantMessage sent = p.Transfer.Sent.SingleOrDefault();
-            Assert.That(sent, Is.Not.Null, "one carrier ring, to the process that holds Bob's root presence");
-            Assert.That(GroupVoiceRingTransport.TryParse(sent, out UUID target, out UUID group, out _), Is.True);
-            Assert.That(target, Is.EqualTo(Bob));
-            Assert.That(group, Is.EqualTo(Group));
+            {
+                var assertedValue = sent;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "one carrier ring, to the process that holds Bob's root presence");
+            }
+            Assert.True(GroupVoiceRingTransport.TryParse(sent, out UUID target, out UUID group, out _));
+            Assert.Equal(Bob, target);
+            Assert.Equal(Group, group);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCarrierRing_IsSentToRootOnly_SoAChildPresenceHereIsNotHandedTheCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Without the flag the transfer module delivers a message for an agent who is only a child presence in this
             // process to that agent's viewer as an instant message, and it never reaches the process where they are root.
             var (mod, p, session) = Calling(x => x.AddChild(Bob));
 
             Ring(mod, session);
 
-            Assert.That(p.Transfer.Sent, Has.Count.EqualTo(1));
-            Assert.That(p.Transfer.SentRootOnly, Is.EqualTo(new[] { true }));
+            Assert.Single(p.Transfer.Sent);
+            Assert.Equal(new[] { true }, p.Transfer.SentRootOnly);
         }
 
         // A busy region server: forty avatars here, twelve of them in the group, and thirty-five more members of the
@@ -190,55 +197,84 @@ namespace osWebRtcVoice.Tests
             return (mod, p, session, counts, local, remote);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARing_TakesMembershipFromTheRosterItAlreadyFetches_NotFromTheGroupsServiceForEveryAvatar()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session, counts, local, remote) = Busy();
 
             Ring(mod, session);
 
-            Assert.That(counts.Groups.RosterCalls, Is.EqualTo(1), "one roster for the whole ring");
-            Assert.That(counts.IsMember, Is.EqualTo(0), "no membership lookup for any of the forty avatars");
-            Assert.That(counts.Powers, Is.EqualTo(0), "and no powers lookup");
-            Assert.That(p.Queue.Enqueued, Is.EquivalentTo(local), "the twelve members here are rung, and no one else here");
-            Assert.That(p.Transfer.Sent.Count, Is.EqualTo(remote.Count), "and each of the thirty-five elsewhere gets a carrier");
+            {
+                var assertedValue = counts.Groups.RosterCalls;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one roster for the whole ring");
+            }
+            {
+                var assertedValue = counts.IsMember;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no membership lookup for any of the forty avatars");
+            }
+            {
+                var assertedValue = counts.Powers;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "and no powers lookup");
+            }
+            {
+                var assertedValue = p.Queue.Enqueued;
+                TestAssert.WithMessage(() => Assert.Equivalent(local, assertedValue, strict: true), "the twelve members here are rung, and no one else here");
+            }
+            {
+                var assertedValue = p.Transfer.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(remote.Count, assertedValue), "and each of the thirty-five elsewhere gets a carrier");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARing_AsksThePresenceServiceOnce_ForTheWholeRemoteRoster()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session, _, _, remote) = Busy();
 
             Ring(mod, session);
 
-            Assert.That(p.Presence.GetAgentsCalls, Is.EqualTo(1), "one call, not one for each remote member");
-            Assert.That(p.Presence.AgentsAsked, Is.EqualTo(remote.Count));
+            {
+                var assertedValue = p.Presence.GetAgentsCalls;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one call, not one for each remote member");
+            }
+            Assert.Equal(remote.Count, p.Presence.AgentsAsked);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARing_StillRingsOnlyTheMembersThePresenceServiceReportsOnline()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session, _, _, _) = Busy(remoteOnline: 20);
 
             Ring(mod, session);
 
-            Assert.That(p.Transfer.Sent.Count, Is.EqualTo(20), "fifteen of the thirty-five are offline and are not rung");
+            {
+                var assertedValue = p.Transfer.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(20, assertedValue), "fifteen of the thirty-five are offline and are not rung");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WithoutARoster_TheLocalWalkAsksTheGroupsServiceAsItDid()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session, counts, local, _) = Busy(noRoster: true);
 
             Ring(mod, session);
 
-            Assert.That(counts.IsMember, Is.GreaterThanOrEqualTo(39), "every avatar here is asked about");
-            Assert.That(p.Queue.Enqueued, Is.EquivalentTo(local), "and the members here are rung");
+            Assert.True(counts.IsMember >= 39, "every avatar here is asked about");
+            {
+                var assertedValue = p.Queue.Enqueued;
+                TestAssert.WithMessage(() => Assert.Equivalent(local, assertedValue, strict: true), "and the members here are rung");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RootAgents_ListsRootPresencesOnly()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Process p = new Process();
             UUID root = UUID.Random();
             UUID child = UUID.Random();
@@ -247,38 +283,41 @@ namespace osWebRtcVoice.Tests
 
             List<UUID> roots = osWebRtcVoice.NonSpatial.GroupVoiceInvite.RootAgents(new[] { p.Scene });
 
-            Assert.That(roots, Does.Contain(root));
-            Assert.That(roots, Does.Not.Contain(child));
+            Assert.Contains(root, roots);
+            Assert.DoesNotContain(child, roots);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MemberWithARootPresenceHere_IsRungLocally_AndNothingIsCarried()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session) = Calling(x => x.AddRoot(Bob));
 
             Ring(mod, session);
 
-            Assert.That(p.Queue.Enqueued, Is.EqualTo(new[] { Bob }));
-            Assert.That(p.Transfer.Sent, Is.Empty);
+            Assert.Equal(new[] { Bob }, p.Queue.Enqueued);
+            Assert.Empty(p.Transfer.Sent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void MemberWithNoPresenceHere_IsRungThroughTheCarrier()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, p, session) = Calling(_ => { });
 
             Ring(mod, session);
 
-            Assert.That(p.Queue.Enqueued, Is.Empty);
+            Assert.Empty(p.Queue.Enqueued);
             GridInstantMessage sent = p.Transfer.Sent.SingleOrDefault();
-            Assert.That(sent, Is.Not.Null);
-            Assert.That(GroupVoiceRingTransport.TryParse(sent, out UUID target, out _, out _), Is.True);
-            Assert.That(target, Is.EqualTo(Bob));
+            Assert.NotNull(sent);
+            Assert.True(GroupVoiceRingTransport.TryParse(sent, out UUID target, out _, out _));
+            Assert.Equal(Bob, target);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingArrivingForAMemberWhoseRootIsNotHere_IsNotDeliveredToTheirChildPresence()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The receiving side of the same rule: a carrier that reaches a process where the member is
             // only a child presence adopts nothing visible and rings nobody.
             var (callMod, callProc, session) = Calling(x => x.AddChild(Bob));
@@ -303,7 +342,7 @@ namespace osWebRtcVoice.Tests
 
             Invoke(farMod, "OnIncomingGroupRing", carried);
 
-            Assert.That(far.Queue.Enqueued, Is.Empty);
+            Assert.Empty(far.Queue.Enqueued);
         }
     }
 }
