@@ -15,7 +15,7 @@
  */
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -27,7 +27,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class AdhocTextGridModeTests
     {
         private const string Secret = "0123456789abcdef0123456789abcdef-example";
@@ -81,7 +80,7 @@ namespace osWebRtcVoice.Tests
             }
 
             SessionOutcome start = one.Sessions.StartAdhoc(Alice, UUID.Random(), RegionA, invitees.ToList());
-            Assert.That(start.Ok, Is.True, start.Decision);
+            Assert.True(start.Ok, start.Decision);
             Invoke(one.Module, "RingAdhocMembers", start.Session, Alice, "Test User", null);
             foreach (GridInstantMessage ring in one.Process.Transfer.Sent.ToList())
                 Invoke(two.Module, "OnIncomingGroupRing", ring);
@@ -109,37 +108,43 @@ namespace osWebRtcVoice.Tests
             return carried;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheStartersLine_ReachesAMemberWhoAcceptedInAnotherProcess_AndNotTheSender()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(Bob);
-            Assert.That(two.Sessions.Accept(session, Bob, RegionB, "vs-bob").Ok, Is.True);
+            Assert.True(two.Sessions.Accept(session, Bob, RegionB, "vs-bob").Ok);
 
             Type(one, Alice, session, "hello from the first process");
             List<GridInstantMessage> carried = Carry(one, two);
 
-            Assert.That(carried, Has.Count.EqualTo(1));
-            Assert.That(two.HeardBy(Bob).Select(m => m.message), Is.EqualTo(new[] { "hello from the first process" }));
-            Assert.That(one.HeardBy(Alice), Is.Empty, "the sender is never sent their own line back");
+            Assert.Single(carried);
+            Assert.Equal(new[] { "hello from the first process" }, two.HeardBy(Bob).Select(m => m.message));
+            {
+                var assertedValue = one.HeardBy(Alice);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the sender is never sent their own line back");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMembersLine_ReachesTheStarterInTheOtherProcess()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(Bob);
             two.Sessions.Accept(session, Bob, RegionB, "vs-bob");
 
             Type(two, Bob, session, "hello from the second process");
             List<GridInstantMessage> carried = Carry(two, one);
 
-            Assert.That(carried, Has.Count.EqualTo(1));
-            Assert.That(one.HeardBy(Alice).Select(m => m.message), Is.EqualTo(new[] { "hello from the second process" }));
-            Assert.That(two.HeardBy(Bob), Is.Empty);
+            Assert.Single(carried);
+            Assert.Equal(new[] { "hello from the second process" }, one.HeardBy(Alice).Select(m => m.message));
+            Assert.Empty(two.HeardBy(Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMemberWhoDeclined_AndOneWhoNeverAnswered_AreNotWrittenTo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(Bob, Carol);
             UUID dave = UUID.Random();
             two.Sessions.Accept(session, Bob, RegionB, "vs-bob");
@@ -150,15 +155,18 @@ namespace osWebRtcVoice.Tests
             Type(one, Alice, session, "for those who stayed");
             List<GridInstantMessage> carried = Carry(one, two);
 
-            Assert.That(carried.Select(m => new UUID(m.toAgentID)), Is.EqualTo(new[] { Bob }),
-                "the service records who answered, so nothing is carried to a member it records as invited or declined");
-            Assert.That(two.HeardBy(Bob), Has.Count.EqualTo(1));
-            Assert.That(two.HeardBy(Carol), Is.Empty);
+            {
+                var assertedValue = carried.Select(m => new UUID(m.toAgentID));
+                TestAssert.WithMessage(() => Assert.Equal(new[] { Bob }, assertedValue), "the service records who answered, so nothing is carried to a member it records as invited or declined");
+            }
+            Assert.Single(two.HeardBy(Bob));
+            Assert.Empty(two.HeardBy(Carol));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMemberWhoLeftTheChat_DoesNotReceive()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(Bob);
             two.Sessions.Accept(session, Bob, RegionB, "vs-bob");
             two.Sessions.LeaveChat(session, Bob);
@@ -166,12 +174,13 @@ namespace osWebRtcVoice.Tests
             Type(one, Alice, session, "anyone there?");
             Carry(one, two);
 
-            Assert.That(two.HeardBy(Bob), Is.Empty);
+            Assert.Empty(two.HeardBy(Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AReplayedCarrier_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(Bob);
             two.Sessions.Accept(session, Bob, RegionB, "vs-bob");
             Type(one, Alice, session, "once only");
@@ -179,12 +188,13 @@ namespace osWebRtcVoice.Tests
 
             Invoke(two.Module, "OnIncomingConferenceText", carried);
 
-            Assert.That(two.HeardBy(Bob), Has.Count.EqualTo(1));
+            Assert.Single(two.HeardBy(Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALineSignedWithoutTheConferenceKey_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (one, two, session) = Start(Bob);
             two.Sessions.Accept(session, Bob, RegionB, "vs-bob");
             string roomKey = two.Sessions.Get(session).RoomKey;
@@ -194,7 +204,7 @@ namespace osWebRtcVoice.Tests
                 null, roomKey, new CarrierAuth(Secret));
             Invoke(two.Module, "OnIncomingConferenceText", withoutKey);
 
-            Assert.That(two.HeardBy(Bob), Is.Empty);
+            Assert.Empty(two.HeardBy(Bob));
         }
     }
 }

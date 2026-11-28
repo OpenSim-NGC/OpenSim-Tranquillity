@@ -20,9 +20,8 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    public class CallMuteIdentityTests
-    {
+    public class CallMuteIdentityTests : IAsyncLifetime
+        {
         private const int Room = 4242;
         private static readonly UUID Ann = new UUID("a0000000-0000-4000-8000-00000000000a");
         private static readonly UUID Bea = new UUID("b0000000-0000-4000-8000-00000000000b");
@@ -33,9 +32,7 @@ namespace osWebRtcVoice.Tests
         private List<(long Id, string Display)> _participants;
         private int _failOnNth;
         private int _muteCalls;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _participants = new List<(long, string)>();
             _sent = new ConcurrentQueue<(string Request, long Id)>();
@@ -78,9 +75,10 @@ namespace osWebRtcVoice.Tests
 
         private long[] MutedIds() => _sent.Where(s => s.Request == "mute").Select(s => s.Id).OrderBy(i => i).ToArray();
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TwoParticipantsOfOneAgent_AreBothMuted_AndNobodyElse()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The agent has two viewer sessions in the room, so two participants carry its id. Others share the room,
             // among them a participant whose display is an avatar name rather than an id.
             _participants.Add((101, Ann.ToString()));
@@ -92,62 +90,73 @@ namespace osWebRtcVoice.Tests
 
             ParticipantMuteResult r = svc.SetCallMute(Ann, Room, true);
 
-            Assert.That(r, Is.EqualTo(ParticipantMuteResult.Applied));
-            Assert.That(MutedIds(), Is.EqualTo(new long[] { 101, 103 }), "every participant of the agent, and no other");
+            Assert.Equal(ParticipantMuteResult.Applied, r);
+            {
+                var assertedValue = MutedIds();
+                TestAssert.WithMessage(() => Assert.Equal(new long[] { 101, 103 }, assertedValue), "every participant of the agent, and no other");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheOtherSameNamedParticipant_IsLeftHeard()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Two different agents who share an avatar name join under their own ids, so the names never meet.
             _participants.Add((201, Ann.ToString()));
             _participants.Add((202, Bea.ToString()));
             WebRtcJanusService svc = NewService();
 
-            Assert.That(svc.SetCallMute(Bea, Room, true), Is.EqualTo(ParticipantMuteResult.Applied));
+            Assert.Equal(ParticipantMuteResult.Applied, svc.SetCallMute(Bea, Room, true));
 
-            Assert.That(MutedIds(), Is.EqualTo(new long[] { 202 }));
+            Assert.Equal(new long[] { 202 }, MutedIds());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AParticipantJoinedThroughAnotherRegionServer_IsFoundByItsAgentId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Nothing in this process joined anyone: the room is all this service has to go on.
             _participants.Add((301, Cal.ToString().ToUpperInvariant()));   // the same id, written in capitals
             _participants.Add((302, Bea.ToString()));
             _participants.Add((303, Ann.ToString()));
             WebRtcJanusService svc = NewService();
 
-            Assert.That(svc.SetCallMute(Cal, Room, true), Is.EqualTo(ParticipantMuteResult.Applied));
+            Assert.Equal(ParticipantMuteResult.Applied, svc.SetCallMute(Cal, Room, true));
 
-            Assert.That(MutedIds(), Is.EqualTo(new long[] { 301 }));
+            Assert.Equal(new long[] { 301 }, MutedIds());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnAgentWithNoParticipant_IsNotInTheRoom_AndNothingIsSent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _participants.Add((401, Ann.ToString()));
             _participants.Add((402, "not-an-id"));
             WebRtcJanusService svc = NewService();
 
-            Assert.That(svc.SetCallMute(Bea, Room, true), Is.EqualTo(ParticipantMuteResult.NotInRoom));
-            Assert.That(_sent, Is.Empty, "no request names a participant that is not the agent's");
+            Assert.Equal(ParticipantMuteResult.NotInRoom, svc.SetCallMute(Bea, Room, true));
+            {
+                var assertedValue = _sent;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no request names a participant that is not the agent's");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADisplayThatOnlyContainsTheId_IsNotTheAgent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _participants.Add((501, Ann + " (guest)"));
             _participants.Add((502, "x" + Ann));
             WebRtcJanusService svc = NewService();
 
-            Assert.That(svc.SetCallMute(Ann, Room, true), Is.EqualTo(ParticipantMuteResult.NotInRoom));
-            Assert.That(_sent, Is.Empty);
+            Assert.Equal(ParticipantMuteResult.NotInRoom, svc.SetCallMute(Ann, Room, true));
+            Assert.Empty(_sent);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheAgentsOtherParticipant_IsNotLeftMuted_WhenOneCannotBeMuted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _participants.Add((601, Ann.ToString()));
             _participants.Add((602, Ann.ToString()));
             _failOnNth = 2;
@@ -155,33 +164,52 @@ namespace osWebRtcVoice.Tests
 
             ParticipantMuteResult r = svc.SetCallMute(Ann, Room, true);
 
-            Assert.That(r, Is.EqualTo(ParticipantMuteResult.Failed), "a partial mute is not reported as done");
+            {
+                var assertedValue = r;
+                TestAssert.WithMessage(() => Assert.Equal(ParticipantMuteResult.Failed, assertedValue), "a partial mute is not reported as done");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnUnmute_ReachesEveryParticipantOfTheAgent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _participants.Add((701, Ann.ToString()));
             _participants.Add((702, Ann.ToString()));
             _participants.Add((703, Bea.ToString()));
             WebRtcJanusService svc = NewService();
 
-            Assert.That(svc.SetCallMute(Ann, Room, false), Is.EqualTo(ParticipantMuteResult.Applied));
+            Assert.Equal(ParticipantMuteResult.Applied, svc.SetCallMute(Ann, Room, false));
 
-            Assert.That(_sent.Select(s => s.Request).Distinct(), Is.EqualTo(new[] { "unmute" }));
-            Assert.That(_sent.Select(s => s.Id).OrderBy(i => i), Is.EqualTo(new long[] { 701, 702 }));
+            Assert.Equal(new[] { "unmute" }, _sent.Select(s => s.Request).Distinct());
+            Assert.Equal(new long[] { 701, 702 }, _sent.Select(s => s.Id).OrderBy(i => i));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void HasCallParticipant_IsTrueOnlyForAnAgentThatHasOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _participants.Add((801, Ann.ToString()));
             _participants.Add((802, "Test User"));
             WebRtcJanusService svc = NewService();
 
-            Assert.That(svc.HasCallParticipant(Ann, Room), Is.True);
-            Assert.That(svc.HasCallParticipant(Bea, Room), Is.False);
-            Assert.That(_sent, Is.Empty, "asking does not mute anyone");
+            Assert.True(svc.HasCallParticipant(Ann, Room));
+            Assert.False(svc.HasCallParticipant(Bea, Room));
+            {
+                var assertedValue = _sent;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "asking does not mute anyone");
+            }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

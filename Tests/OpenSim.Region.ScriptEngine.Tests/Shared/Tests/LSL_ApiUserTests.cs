@@ -108,11 +108,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 lock (m_engine.PostedEvents)
                 {
-                    if (m_engine.PostedEvents.TryGetValue(itemId, out List<EventParams> events) && events.Count > 0)
+                    if (m_engine.PostedEvents.TryGetValue(itemId, out List<EventParams>? events) && events is { Count: > 0 })
                     {
                         Assert.Single(events);
                         Assert.Equal("dataserver", events[0].EventName);
-                        int answer = int.Parse(events[0].Params[1].ToString());
+                        string response = events[0].Params[1].ToString()
+                            ?? throw new InvalidOperationException("Dataserver response was null.");
+                        int answer = int.Parse(response);
                         m_engine.PostedEvents.Clear();
                         return answer;
                     }

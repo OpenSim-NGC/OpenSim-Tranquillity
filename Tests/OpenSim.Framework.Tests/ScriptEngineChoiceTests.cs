@@ -36,7 +36,7 @@ public class ScriptEngineChoiceTests
     [InlineData("XEngine", 0)]
     [InlineData("", 0)]
     [InlineData(null, 0)]
-    public void AnEngineIsFoundByItsNameOrAlias(string name, int expected)
+    public void AnEngineIsFoundByItsNameOrAlias(string? name, int expected)
     {
         Assert.Equal(expected, ScriptEngineChoices.CodeFor(name));
     }
@@ -94,7 +94,7 @@ public class ScriptEngineChoiceTests
     [InlineData("mono", false, null)]
     [InlineData("luau", false, null)]
     [InlineData(null, false, null)]
-    public void AnEngineTargetIsReadFromTheSave(string value, bool isEngine, string name)
+    public void AnEngineTargetIsReadFromTheSave(string? value, bool isEngine, string? name)
     {
         Assert.Equal(isEngine, ScriptEngineChoices.IsEngineTarget(value));
         Assert.Equal(name, ScriptEngineChoices.EngineNameOf(value));

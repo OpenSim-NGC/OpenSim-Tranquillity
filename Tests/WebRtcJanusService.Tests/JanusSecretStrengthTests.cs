@@ -25,10 +25,8 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]
-    public class JanusSecretStrengthTests
-    {
+    public class JanusSecretStrengthTests : IAsyncLifetime
+        {
         private static string Secret(int length) => new string('k', length);
 
         private sealed class Capture : ILoggerProvider, ILogger
@@ -53,16 +51,12 @@ namespace osWebRtcVoice.Tests
 
         private Capture _log;
         private LogCapture _logging;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             _logging.Dispose();
             _log.Dispose();
@@ -95,15 +89,20 @@ namespace osWebRtcVoice.Tests
             string all = string.Join("\n", _log.Snapshot().Select(l => l.Text));
             foreach (string v in values)
                 if (!string.IsNullOrEmpty(v))
-                    Assert.That(all, Does.Not.Contain(v), "a secret's value must never be logged");
+                    {
+                        var assertedValue = all;
+                        TestAssert.WithMessage(() => Assert.DoesNotContain(v, assertedValue), "a secret's value must never be logged");
+                    }
         }
 
-        [TestCase("APIToken", 31, true)]
-        [TestCase("APIToken", 32, false)]
-        [TestCase("AdminAPIToken", 31, true)]
-        [TestCase("AdminAPIToken", 32, false)]
+        [InlineData("APIToken",31,true)]
+        [InlineData("APIToken",32,false)]
+        [InlineData("AdminAPIToken",31,true)]
+        [InlineData("AdminAPIToken",32,false)]
+        [Theory(Timeout = 60000)]
         public void AShortJanusSecretWarnsAtTheBoundary(string key, int length, bool warns)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string api = key == "APIToken" ? Secret(length) : Secret(40);
             string admin = key == "AdminAPIToken" ? Secret(length) : Secret(40);
 
@@ -112,32 +111,49 @@ namespace osWebRtcVoice.Tests
             var hits = StrengthLines(key);
             if (warns)
             {
-                Assert.That(hits, Has.Count.EqualTo(1), "one warning that names " + key);
-                Assert.That(hits[0].Level, Is.EqualTo(LogLevel.Warning), "a warning, not a refusal: the key already exists");
-                Assert.That(hits[0].Text, Does.Not.Contain(length.ToString()), "the secret's length is not given away");
+                {
+                    var assertedValue = hits;
+                    TestAssert.WithMessage(() => Assert.Single(assertedValue), "one warning that names " + key);
+                }
+                {
+                    var assertedValue = hits[0].Level;
+                    TestAssert.WithMessage(() => Assert.Equal(LogLevel.Warning, assertedValue), "a warning, not a refusal: the key already exists");
+                }
+                {
+                    var assertedValue = hits[0].Text;
+                    TestAssert.WithMessage(() => Assert.DoesNotContain(length.ToString(), assertedValue), "the secret's length is not given away");
+                }
             }
             else
             {
-                Assert.That(hits, Is.Empty, "a 32-character secret meets the rule");
+                {
+                    var assertedValue = hits;
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a 32-character secret meets the rule");
+                }
             }
-            Assert.That(_log.Snapshot().Any(l => l.Text.EndsWith(" Enabled") && l.Level == LogLevel.Information), Is.True,
-                "a short existing secret does not stop the service starting");
+            Assert.True(_log.Snapshot().Any(l => l.Text.EndsWith(" Enabled") && l.Level == LogLevel.Information), "a short existing secret does not stop the service starting");
             AssertNothingSecretLogged(api, admin);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnEmptyJanusSecretKeepsItsExistingMissingFieldsError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StartService(string.Empty, Secret(40));
 
-            Assert.That(StrengthLines("APIToken"), Is.Empty, "empty is not reported as short");
-            Assert.That(_log.Snapshot().Any(l => l.Level == LogLevel.Error && l.Text.Contains("missing required fields")), Is.True);
+            {
+                var assertedValue = StrengthLines("APIToken");
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "empty is not reported as short");
+            }
+            Assert.Contains(_log.Snapshot(), l => l.Level == LogLevel.Error && l.Text.Contains("missing required fields"));
         }
 
-        [TestCase(31, false)]
-        [TestCase(32, true)]
+        [InlineData(31,false)]
+        [InlineData(32,true)]
+        [Theory(Timeout = 60000)]
         public void TheJoinCapabilitySecretIsRefusedUnder32Characters(int length, bool accepted)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string secret = Secret(length);
 
             StartService(Secret(40), Secret(40), joinCapEnabled: true, joinCapSecret: secret);
@@ -148,33 +164,59 @@ namespace osWebRtcVoice.Tests
                                            && l.Text.Contains("shorter than 32 characters")).ToList();
             if (accepted)
             {
-                Assert.That(enabledLine, Is.True, "a 32-character secret enables the capability");
-                Assert.That(refused, Is.Empty);
+                Assert.True(enabledLine, "a 32-character secret enables the capability");
+                Assert.Empty(refused);
             }
             else
             {
-                Assert.That(enabledLine, Is.False, "a short secret must not switch the capability on");
-                Assert.That(refused, Has.Count.EqualTo(1), "one error that names JoinCapabilitySecret");
-                Assert.That(refused[0].Text, Does.Not.Contain(length.ToString()), "the secret's length is not given away");
+                Assert.False(enabledLine, "a short secret must not switch the capability on");
+                {
+                    var assertedValue = refused;
+                    TestAssert.WithMessage(() => Assert.Single(assertedValue), "one error that names JoinCapabilitySecret");
+                }
+                {
+                    var assertedValue = refused[0].Text;
+                    TestAssert.WithMessage(() => Assert.DoesNotContain(length.ToString(), assertedValue), "the secret's length is not given away");
+                }
             }
             AssertNothingSecretLogged(secret);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnEmptyJoinCapabilitySecretKeepsItsExistingError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StartService(Secret(40), Secret(40), joinCapEnabled: true, joinCapSecret: string.Empty);
 
-            Assert.That(StrengthLines("JoinCapabilitySecret"), Is.Empty, "empty is not reported as short");
-            Assert.That(_log.Snapshot().Any(l => l.Level == LogLevel.Error && l.Text.Contains("JoinCapabilitySecret is empty")), Is.True);
+            {
+                var assertedValue = StrengthLines("JoinCapabilitySecret");
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "empty is not reported as short");
+            }
+            Assert.Contains(_log.Snapshot(), l => l.Level == LogLevel.Error && l.Text.Contains("JoinCapabilitySecret is empty"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AShortJoinCapabilitySecretIsIgnoredWhileTheCapabilityIsOff()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StartService(Secret(40), Secret(40), joinCapEnabled: false, joinCapSecret: Secret(8));
 
-            Assert.That(StrengthLines("JoinCapabilitySecret"), Is.Empty, "the knob is off, so the secret is not used or judged");
+            {
+                var assertedValue = StrengthLines("JoinCapabilitySecret");
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the knob is off, so the secret is not used or judged");
+            }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }
