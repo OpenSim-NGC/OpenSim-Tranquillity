@@ -69,8 +69,9 @@ public class FriendsService : FriendsServiceBase, IFriendsService
         {
             FriendInfo i = new FriendInfo();
 
-            if (!Util.ParseUniversalUserIdentifier(i.Friend, out UUID friendID))
-                continue; // junk entry
+            // The principal is a uuid or a Hypergrid "uuid;url;name" id; any other row is junk.
+            if (!Util.ParseUniversalUserIdentifier(d.PrincipalID, out i.PrincipalID))
+                continue;
             i.Friend = d.Friend;
             i.MyFlags = Convert.ToInt32(d.Data["Flags"]);
             i.TheirFlags = Convert.ToInt32(d.Data["TheirFlags"]);

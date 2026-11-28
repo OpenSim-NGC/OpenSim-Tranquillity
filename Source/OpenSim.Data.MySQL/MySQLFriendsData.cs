@@ -67,12 +67,19 @@ public class MySqlFriendsData : MySQLGenericTableHandler<FriendsData>, IFriendsD
         }
     }
 
+    /// <summary>
+    /// The friendships of every principal whose id starts with <paramref name="principalID"/>, compared as text, so
+    /// a uuid also finds its Hypergrid "uuid;url;name" rows. An empty id names nobody and finds nothing.
+    /// </summary>
     public FriendsData[] GetFriends(string principalID)
     {
+        if (string.IsNullOrEmpty(principalID))
+            return Array.Empty<FriendsData>();
+
         using (MySqlCommand cmd = new MySqlCommand())
         {
-            cmd.CommandText = String.Format("select a.*,case when b.Flags is null then -1 else b.Flags end as TheirFlags from {0} as a left join {0} as b on a.PrincipalID = b.Friend and a.Friend = b.PrincipalID where a.PrincipalID LIKE ?PrincipalID", m_Realm);
-            cmd.Parameters.AddWithValue("?PrincipalID", principalID.ToString() + '%');
+            cmd.CommandText = String.Format("select a.*,case when b.Flags is null then -1 else b.Flags end as TheirFlags from {0} as a left join {0} as b on a.PrincipalID = b.Friend and a.Friend = b.PrincipalID where a.PrincipalID LIKE ?PrincipalID ESCAPE '" + SqlLike.Escape + "'", m_Realm);
+            cmd.Parameters.AddWithValue("?PrincipalID", SqlLike.PrefixPattern(principalID));
 
             return DoQuery(cmd);
         }
