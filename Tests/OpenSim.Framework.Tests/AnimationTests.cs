@@ -41,11 +41,6 @@ namespace OpenSim.Framework.Tests
 
         public AnimationTests()
         {
-            Setup();
-        }
-
-        public void Setup()
-        {
             animUUID1 = UUID.Random();
             animUUID2 = UUID.Random();
             objUUID1 = UUID.Random();

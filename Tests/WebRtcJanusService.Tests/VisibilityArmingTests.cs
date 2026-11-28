@@ -30,7 +30,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VisibilityArmingTests
     {
         private const int RoomAB = 1001;
@@ -196,37 +195,51 @@ namespace osWebRtcVoice.Tests
 
         // ---- arming --------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task FirstTick_ArmsEveryListener_IncludingAnEmptyColumn()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             await rig.Tick();
 
             List<OSDMap> sent = rig.T.Batches();
-            Assert.That(sent.Select(b => b["room"].AsInteger()).OrderBy(x => x), Is.EqualTo(new[] { RoomAB, RoomD }));
+            Assert.Equal(new[] { RoomAB, RoomD }, sent.Select(b => b["room"].AsInteger()).OrderBy(x => x));
             OSDMap ab = ForRoom(sent, RoomAB), d = ForRoom(sent, RoomD);
-            Assert.That(ab["op"].AsString(), Is.EqualTo("replace"));
-            Assert.That(Keys(ab["excl"]), Is.EquivalentTo(new[] { A.ToString(), B.ToString() }));
-            Assert.That(Keys(ab["mute"]), Is.EquivalentTo(new[] { A.ToString(), B.ToString() }), "the mute column is armed too, empty");
-            Assert.That(d["op"].AsString(), Is.EqualTo("replace"));
-            Assert.That(((OSDArray)Path(d, "excl", D.ToString())).Count, Is.EqualTo(0), "D's empty exclusion column is armed");
-            Assert.That(((OSDArray)Path(d, "mute", D.ToString())).Count, Is.EqualTo(0), "D's empty mute column is armed");
+            Assert.Equal("replace", ab["op"].AsString());
+            Assert.Equivalent(new[] { A.ToString(), B.ToString() }, Keys(ab["excl"]), strict: true);
+            {
+                var assertedValue = Keys(ab["mute"]);
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { A.ToString(), B.ToString() }, assertedValue, strict: true), "the mute column is armed too, empty");
+            }
+            Assert.Equal("replace", d["op"].AsString());
+            {
+                var assertedValue = ((OSDArray)Path(d, "excl", D.ToString())).Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "D's empty exclusion column is armed");
+            }
+            {
+                var assertedValue = ((OSDArray)Path(d, "mute", D.ToString())).Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "D's empty mute column is armed");
+            }
             foreach (OSDMap b in sent)
             {
-                Assert.That(b["room_epoch"].AsString(), Is.EqualTo(rig.Auth.EpochString));
-                Assert.That(b["policy_generation"].AsInteger(), Is.EqualTo(1));
-                Assert.That(b.ContainsKey("base"), Is.False, "replace is absolute: no base");
+                Assert.Equal(rig.Auth.EpochString, b["room_epoch"].AsString());
+                Assert.Equal(1, b["policy_generation"].AsInteger());
+                Assert.False(b.ContainsKey("base"), "replace is absolute: no base");
             }
-            Assert.That(rig.Auth.IsArmed(RoomAB, A) && rig.Auth.IsArmed(RoomAB, B) && rig.Auth.IsArmed(RoomD, D), Is.True);
+            Assert.True(rig.Auth.IsArmed(RoomAB, A) && rig.Auth.IsArmed(RoomAB, B) && rig.Auth.IsArmed(RoomD, D));
 
             rig.T.Clear();
             await rig.Tick();
-            Assert.That(rig.T.Batches(), Is.Empty, "a quiet tick after arming sends nothing");
+            {
+                var assertedValue = rig.T.Batches();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a quiet tick after arming sends nothing");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ANewListenerWithEmptyColumns_IsArmedOnTheNextTick()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             await rig.Tick();
             rig.T.Clear();
@@ -234,15 +247,19 @@ namespace osWebRtcVoice.Tests
             await rig.Tick();
 
             OSDMap only = rig.T.Batches().Single();
-            Assert.That((only["room"].AsInteger(), only["op"].AsString()), Is.EqualTo((RoomD, "replace")));
-            Assert.That(Keys(only["excl"]), Is.EquivalentTo(new[] { E.ToString() }));
-            Assert.That(only["policy_generation"].AsInteger(), Is.EqualTo(2), "the room's second batch");
-            Assert.That(rig.Auth.ListenerGeneration(RoomD, E), Is.EqualTo(2u));
+            Assert.Equal((RoomD, "replace"), (only["room"].AsInteger(), only["op"].AsString()));
+            Assert.Equivalent(new[] { E.ToString() }, Keys(only["excl"]), strict: true);
+            {
+                var assertedValue = only["policy_generation"].AsInteger();
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the room's second batch");
+            }
+            Assert.Equal(2u, rig.Auth.ListenerGeneration(RoomD, E));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ADelta_CarriesBaseGenerations_AndAdvancesThem()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             await rig.Tick();
             rig.T.Clear();
@@ -250,42 +267,48 @@ namespace osWebRtcVoice.Tests
             await rig.Tick();
 
             OSDMap remove = rig.T.Batches().Single();
-            Assert.That((remove["op"].AsString(), remove["room"].AsInteger()), Is.EqualTo(("remove", RoomAB)));
-            Assert.That(remove["policy_generation"].AsInteger(), Is.EqualTo(2));
-            Assert.That(Path(remove, "base", A.ToString()).AsInteger(), Is.EqualTo(1));
-            Assert.That(Path(remove, "base", B.ToString()).AsInteger(), Is.EqualTo(1));
-            Assert.That(rig.Auth.ListenerGeneration(RoomAB, A), Is.EqualTo(2u));
-            Assert.That(rig.Auth.ListenerGeneration(RoomD, D), Is.EqualTo(1u), "D was not named: unchanged");
+            Assert.Equal(("remove", RoomAB), (remove["op"].AsString(), remove["room"].AsInteger()));
+            Assert.Equal(2, remove["policy_generation"].AsInteger());
+            Assert.Equal(1, Path(remove, "base", A.ToString()).AsInteger());
+            Assert.Equal(1, Path(remove, "base", B.ToString()).AsInteger());
+            Assert.Equal(2u, rig.Auth.ListenerGeneration(RoomAB, A));
+            {
+                var assertedValue = rig.Auth.ListenerGeneration(RoomD, D);
+                TestAssert.WithMessage(() => Assert.Equal(1u, assertedValue), "D was not named: unchanged");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ProvisioningAnArmedListener_ArmsItAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             await rig.Tick();
             rig.T.Clear();
             rig.Sender.OnListenerProvisioned(D);
             await rig.Tick();
             OSDMap only = rig.T.Batches().Single();
-            Assert.That((only["op"].AsString(), only["room"].AsInteger()), Is.EqualTo(("replace", RoomD)));
-            Assert.That(rig.Auth.ListenerGeneration(RoomD, D), Is.EqualTo(2u));
+            Assert.Equal(("replace", RoomD), (only["op"].AsString(), only["room"].AsInteger()));
+            Assert.Equal(2u, rig.Auth.ListenerGeneration(RoomD, D));
         }
 
         // ---- epochs ----------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void NewEpoch_IsSixteenHexDigits_AndStrictlyIncreasing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             ulong first = VisAuthority.NewEpoch(1_789_000_000_000, 65535);
             ulong second = VisAuthority.NewEpoch(1_789_000_000_000, 0);   // same millisecond, lower random bits
-            Assert.That(second, Is.GreaterThan(first));
-            Assert.That(Regex.IsMatch(VisAuthority.FormatEpoch(first), "^[0-9a-f]{16}$"), Is.True);
-            Assert.That(VisAuthority.NewEpoch(), Is.GreaterThan(second));
+            Assert.True(second > first);
+            Assert.Matches("^[0-9a-f]{16}$", VisAuthority.FormatEpoch(first));
+            Assert.True(VisAuthority.NewEpoch() > second);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ARestartedFeeder_SendsANewGreaterEpoch_AndGenerationsRestart()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var before = new Rig();
             await before.Tick();
             await before.Tick();
@@ -294,48 +317,56 @@ namespace osWebRtcVoice.Tests
             var after = new Rig();   // the service builds a new authority on every StartLoop
             await after.Tick();
             OSDMap first = after.T.Batches().First();
-            Assert.That(first["room_epoch"].AsString(), Is.Not.EqualTo(oldEpoch));
-            Assert.That(Convert.ToUInt64(first["room_epoch"].AsString(), 16), Is.GreaterThan(Convert.ToUInt64(oldEpoch, 16)));
-            Assert.That(first["policy_generation"].AsInteger(), Is.EqualTo(1));
+            Assert.NotEqual(oldEpoch, first["room_epoch"].AsString());
+            Assert.True(Convert.ToUInt64(first["room_epoch"].AsString(), 16) > Convert.ToUInt64(oldEpoch, 16));
+            Assert.Equal(1, first["policy_generation"].AsInteger());
         }
 
         // ---- heartbeat -------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task NoHeartbeat_UntilTheMixerAdvertisesVisProtocol2()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             await rig.Tick();   // an old mixer: applied replies without vis_protocol
             rig.Clock += 5000;
             await rig.Heartbeat();
-            Assert.That(rig.T.Heartbeats(), Is.Empty);
-            Assert.That(rig.Auth.HeartbeatCapable, Is.False);
+            Assert.Empty(rig.T.Heartbeats());
+            Assert.False(rig.Auth.HeartbeatCapable);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Heartbeat_EverySecond_ListingEveryListenerWithItsGeneration()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise();
             await rig.Tick();
-            Assert.That(rig.Auth.HeartbeatCapable, Is.True);
+            Assert.True(rig.Auth.HeartbeatCapable);
 
             await rig.Heartbeat();
-            Assert.That(rig.T.Heartbeats().Count, Is.EqualTo(1));
+            Assert.Single(rig.T.Heartbeats());
             rig.Clock += 1000;
             await rig.Heartbeat();
-            Assert.That(rig.T.Heartbeats().Count, Is.EqualTo(2), "the caller's next beat sends");
+            {
+                var assertedValue = rig.T.Heartbeats().Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the caller's next beat sends");
+            }
 
             OSDMap hb = rig.T.Heartbeats()[1];
-            Assert.That(hb["room_epoch"].AsString(), Is.EqualTo(rig.Auth.EpochString));
-            Assert.That(hb["interval_ms"].AsInteger(), Is.EqualTo(1000));
-            Assert.That(hb.ContainsKey("state"), Is.False);
+            Assert.Equal(rig.Auth.EpochString, hb["room_epoch"].AsString());
+            Assert.Equal(1000, hb["interval_ms"].AsInteger());
+            Assert.False(hb.ContainsKey("state"));
             OSDMap rooms = (OSDMap)hb["rooms"];
-            Assert.That(rooms.Keys, Is.EquivalentTo(new[] { RoomAB.ToString(), RoomD.ToString() }));
-            Assert.That(Path(rooms, RoomAB.ToString(), "policy_generation").AsInteger(), Is.EqualTo(1));
-            Assert.That(Path(rooms, RoomAB.ToString(), "listeners", A.ToString()).AsInteger(), Is.EqualTo(1));
-            Assert.That(Path(rooms, RoomAB.ToString(), "listeners", B.ToString()).AsInteger(), Is.EqualTo(1));
-            Assert.That(Path(rooms, RoomD.ToString(), "listeners", D.ToString()).AsInteger(), Is.EqualTo(1), "the empty-column listener is listed");
+            Assert.Equivalent(new[] { RoomAB.ToString(), RoomD.ToString() }, rooms.Keys, strict: true);
+            Assert.Equal(1, Path(rooms, RoomAB.ToString(), "policy_generation").AsInteger());
+            Assert.Equal(1, Path(rooms, RoomAB.ToString(), "listeners", A.ToString()).AsInteger());
+            Assert.Equal(1, Path(rooms, RoomAB.ToString(), "listeners", B.ToString()).AsInteger());
+            {
+                var assertedValue = Path(rooms, RoomD.ToString(), "listeners", D.ToString()).AsInteger();
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the empty-column listener is listed");
+            }
         }
 
         /// The CALLER owns the cadence. The sender does not throttle itself to HeartbeatIntervalMs measured
@@ -343,15 +374,16 @@ namespace osWebRtcVoice.Tests
         /// a timer callback landing a hair under the interval was refused, and the next arrived a whole period
         /// later. A throttled sender measured 0.88 heartbeats/s against an intended 1.0, worst gap 1987 ms
         /// -- one skipped beat. Two owners of one cadence is the same fault the feeder must avoid.
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Heartbeat_DoesNotThrottleItself_TheCallerOwnsTheCadence()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise();
             await rig.Tick();
 
             await rig.Heartbeat();
-            Assert.That(rig.T.Heartbeats().Count, Is.EqualTo(1));
+            Assert.Single(rig.T.Heartbeats());
 
             // Four calls inside one interval: with the old gate this sent nothing, because each was "too soon".
             for (int i = 0; i < 4; i++)
@@ -359,21 +391,27 @@ namespace osWebRtcVoice.Tests
                 rig.Clock += 100;
                 await rig.Heartbeat();
             }
-            Assert.That(rig.T.Heartbeats().Count, Is.EqualTo(5),
-                "every call sends: how often to beat is the timer's business, not this method's");
+            {
+                var assertedValue = rig.T.Heartbeats().Count;
+                TestAssert.WithMessage(() => Assert.Equal(5, assertedValue), "every call sends: how often to beat is the timer's business, not this method's");
+            }
 
             // And the clock not moving at all must not stop it either - that was the exact shape of the drift,
             // a callback arriving fractionally early being dropped entirely.
             await rig.Heartbeat();
-            Assert.That(rig.T.Heartbeats().Count, Is.EqualTo(6), "a beat with no elapsed time still sends");
+            {
+                var assertedValue = rig.T.Heartbeats().Count;
+                TestAssert.WithMessage(() => Assert.Equal(6, assertedValue), "a beat with no elapsed time still sends");
+            }
         }
 
         /// The as_of field is the highest generation the mixer APPLIED in the room when the heartbeat was built,
         /// not the highest allocated. A batch stamped but not yet answered, a transport failure, and a stale_epoch refusal
         /// all leave it where it was.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Heartbeat_AsOf_IsTheHighestAppliedGeneration_NotTheHighestAllocated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var auth = new VisAuthority(VisAuthority.NewEpoch(), "asof", () => 10_000);
             var named = new List<UUID> { A };
             var population = new[] { A };
@@ -381,30 +419,49 @@ namespace osWebRtcVoice.Tests
             int AsOf() => Path(auth.BuildHeartbeat(population, room, false), "rooms", RoomAB.ToString(), "as_of").AsInteger();
             int Allocated() => Path(auth.BuildHeartbeat(population, room, false), "rooms", RoomAB.ToString(), "policy_generation").AsInteger();
 
-            Assert.That(AsOf(), Is.EqualTo(0), "nothing applied yet");
+            {
+                var assertedValue = AsOf();
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "nothing applied yet");
+            }
             uint g1 = auth.NextGeneration(RoomAB);
-            Assert.That((Allocated(), AsOf()), Is.EqualTo((1, 0)), "stamped, still in flight: allocated 1, applied 0");
+            {
+                var assertedValue = (Allocated(), AsOf());
+                TestAssert.WithMessage(() => Assert.Equal((1, 0), assertedValue), "stamped, still in flight: allocated 1, applied 0");
+            }
             auth.OnBatchOutcome(RoomAB, VisOp.Replace, g1, named, true, default);
-            Assert.That(AsOf(), Is.EqualTo(1), "applied: as_of 1");
+            {
+                var assertedValue = AsOf();
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "applied: as_of 1");
+            }
 
             uint g2 = auth.NextGeneration(RoomAB);
             auth.OnBatchOutcome(RoomAB, VisOp.Replace, g2, named, false, default);
-            Assert.That((Allocated(), AsOf()), Is.EqualTo((2, 1)), "a transport failure applied nothing");
+            {
+                var assertedValue = (Allocated(), AsOf());
+                TestAssert.WithMessage(() => Assert.Equal((2, 1), assertedValue), "a transport failure applied nothing");
+            }
             uint g3 = auth.NextGeneration(RoomAB);
             auth.OnBatchOutcome(RoomAB, VisOp.Replace, g3, named, true,
                 new JanusPeerCtlBatchSink.SlvoiceReply { Present = true, Status = "error", StatusField = "stale_epoch" });
-            Assert.That(AsOf(), Is.EqualTo(1), "a stale_epoch refusal applied nothing");
+            {
+                var assertedValue = AsOf();
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "a stale_epoch refusal applied nothing");
+            }
             uint g4 = auth.NextGeneration(RoomAB);
             auth.OnBatchOutcome(RoomAB, VisOp.Replace, g4, named, true,
                 new JanusPeerCtlBatchSink.SlvoiceReply { Present = true, Status = "applied" });
-            Assert.That((Allocated(), AsOf()), Is.EqualTo((4, 4)));
+            Assert.Equal((4, 4), (Allocated(), AsOf()));
             auth.OnBatchOutcome(RoomAB, VisOp.Replace, g2, named, true, default);   // a late answer for an older batch
-            Assert.That(AsOf(), Is.EqualTo(4), "as_of never goes backwards");
+            {
+                var assertedValue = AsOf();
+                TestAssert.WithMessage(() => Assert.Equal(4, assertedValue), "as_of never goes backwards");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Heartbeat_IsNotStarvedByABatchInFlight()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise();
             await rig.Tick();
@@ -416,58 +473,67 @@ namespace osWebRtcVoice.Tests
             Task stuck = rig.Sender.PumpAsync(rig.Feed.Tick(rig.World));   // a batch now hangs in flight
             rig.Clock += 1000;
             await rig.Heartbeat();
-            Assert.That(rig.T.Heartbeats().Count, Is.EqualTo(2), "the heartbeat has its own single-flight");
+            {
+                var assertedValue = rig.T.Heartbeats().Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "the heartbeat has its own single-flight");
+            }
             rig.T.HoldBatches.SetResult(true);
             await stuck;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task StoppingHeartbeat_SaysStopping_AtOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise();
             await rig.Tick();
             await rig.Heartbeat();
             await rig.Sender.PumpHeartbeatAsync(stopping: true);   // no interval wait
             OSDMap last = rig.T.Heartbeats().Last();
-            Assert.That(last["state"].AsString(), Is.EqualTo("stopping"));
+            Assert.Equal("stopping", last["state"].AsString());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ADepartedListener_GetsNoEmptyReplace_AndIsOmittedFromTheHeartbeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise();
             await rig.Tick();
             rig.T.Clear();
             rig.World.Agents.RemoveAll(a => a.Id == B);
             await rig.Tick();
-            Assert.That(rig.T.Batches().Where(b => b["op"].AsString() == "replace"), Is.Empty,
-                "an empty replace for B would ARM it");
+            {
+                var assertedValue = rig.T.Batches().Where(b => b["op"].AsString() == "replace");
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "an empty replace for B would ARM it");
+            }
             rig.Clock += 1000;
             await rig.Heartbeat();
             OSDMap listeners = (OSDMap)Path(rig.T.Heartbeats().Last(), "rooms", RoomAB.ToString(), "listeners");
-            Assert.That(listeners.ContainsKey(B.ToString()), Is.False);
-            Assert.That(listeners.ContainsKey(A.ToString()), Is.True);
+            Assert.False(listeners.ContainsKey(B.ToString()));
+            Assert.True(listeners.ContainsKey(A.ToString()));
         }
 
         // ---- the reply decision table -----------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Reply_FirstMixerInstance_IsRecorded_WithoutRearming()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise("m1");
             await rig.Tick();
             rig.T.Clear();
             await rig.Tick();
-            Assert.That(rig.Auth.MixerInstance, Is.EqualTo("m1"));
-            Assert.That(rig.T.Batches(), Is.Empty);
+            Assert.Equal("m1", rig.Auth.MixerInstance);
+            Assert.Empty(rig.T.Batches());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Reply_MixerInstanceChanged_RearmsEveryListenerInEveryRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise("m1");
             await rig.Tick();
@@ -475,40 +541,42 @@ namespace osWebRtcVoice.Tests
             rig.T.Response = r => r["request"].AsString() == "peer_ctl_heartbeat" ? HeartbeatResponse("m2") : Applied(r, 2, "m2");
             rig.Clock += 1000;
             await rig.Heartbeat();   // the mixer restarted
-            Assert.That(rig.Auth.MixerInstance, Is.EqualTo("m2"));
-            Assert.That(rig.Auth.IsArmed(RoomAB, A), Is.False, "nothing is trusted after a restart");
+            Assert.Equal("m2", rig.Auth.MixerInstance);
+            Assert.False(rig.Auth.IsArmed(RoomAB, A), "nothing is trusted after a restart");
 
             rig.T.Clear();
             await rig.Tick();
             List<OSDMap> sent = rig.T.Batches();
-            Assert.That(sent.All(b => b["op"].AsString() == "replace"), Is.True);
-            Assert.That(Keys(ForRoom(sent, RoomAB)["excl"]), Is.EquivalentTo(new[] { A.ToString(), B.ToString() }));
-            Assert.That(Keys(ForRoom(sent, RoomD)["excl"]), Is.EquivalentTo(new[] { D.ToString() }));
-            Assert.That(rig.Auth.IsArmed(RoomAB, A) && rig.Auth.IsArmed(RoomD, D), Is.True);
+            Assert.True(sent.All(b => b["op"].AsString() == "replace"));
+            Assert.Equivalent(new[] { A.ToString(), B.ToString() }, Keys(ForRoom(sent, RoomAB)["excl"]), strict: true);
+            Assert.Equivalent(new[] { D.ToString() }, Keys(ForRoom(sent, RoomD)["excl"]), strict: true);
+            Assert.True(rig.Auth.IsArmed(RoomAB, A) && rig.Auth.IsArmed(RoomD, D));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Reply_StaleListeners_RearmsExactlyThoseListeners()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             await rig.Tick();
             rig.T.Response = r => r["op"].AsString() == "remove" ? Applied(r, stale: new[] { A }) : null;
             rig.World.BanAOnP = false;
             await rig.Tick();   // the mixer says A's base did not match
-            Assert.That(rig.Auth.IsArmed(RoomAB, A), Is.False);
-            Assert.That(rig.Auth.IsArmed(RoomAB, B), Is.True);
+            Assert.False(rig.Auth.IsArmed(RoomAB, A));
+            Assert.True(rig.Auth.IsArmed(RoomAB, B));
 
             rig.T.Response = _ => null;
             rig.T.Clear();
             await rig.Tick();
             OSDMap only = rig.T.Batches().Single();
-            Assert.That((only["op"].AsString(), only["room"].AsInteger()), Is.EqualTo(("replace", RoomAB)));
-            Assert.That(Keys(only["excl"]), Is.EquivalentTo(new[] { A.ToString() }));
+            Assert.Equal(("replace", RoomAB), (only["op"].AsString(), only["room"].AsInteger()));
+            Assert.Equivalent(new[] { A.ToString() }, Keys(only["excl"]), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Reply_UnarmedListenersInAHeartbeat_RearmsExactlyThoseListeners()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise();
             await rig.Tick();
@@ -516,13 +584,13 @@ namespace osWebRtcVoice.Tests
                 ? HeartbeatResponse("m1", (RoomAB, "ok", null, null), (RoomD, "ok", new[] { D }, null))
                 : Applied(r, 2, "m1");
             await rig.Heartbeat();
-            Assert.That(rig.Auth.IsArmed(RoomD, D), Is.False);
+            Assert.False(rig.Auth.IsArmed(RoomD, D));
 
             rig.T.Clear();
             await rig.Tick();
             OSDMap only = rig.T.Batches().Single();
-            Assert.That((only["op"].AsString(), only["room"].AsInteger()), Is.EqualTo(("replace", RoomD)));
-            Assert.That(Keys(only["excl"]), Is.EquivalentTo(new[] { D.ToString() }));
+            Assert.Equal(("replace", RoomD), (only["op"].AsString(), only["room"].AsInteger()));
+            Assert.Equivalent(new[] { D.ToString() }, Keys(only["excl"]), strict: true);
         }
 
         /// The reply is LOST after the mixer applied the batch — the admin send times out,
@@ -530,9 +598,10 @@ namespace osWebRtcVoice.Tests
         /// heartbeat built from here on is outdated at the mixer, and would be ignored forever if nothing repaired it.
         /// The transport error makes the sender unsynced, so the next tick is a resync replace,
         /// and once that is answered as_of is at or above what the mixer applied.
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task ALostReplyAfterTheMixerApplied_IsRepairedByTheNextTicksResyncReplace()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise();
             int mixerApplied = 0;
@@ -551,10 +620,16 @@ namespace osWebRtcVoice.Tests
 
             int AsOf() => Path(rig.Auth.BuildHeartbeat(new[] { A, B }, a => RoomAB, false),
                 "rooms", RoomAB.ToString(), "as_of").AsInteger();
-            Assert.That(mixerApplied, Is.EqualTo(1), "the mixer applied generation 1");
-            Assert.That(AsOf(), Is.EqualTo(0), "the sim never saw the reply, so it believes nothing was applied");
-            Assert.That(AsOf(), Is.LessThan(mixerApplied), "every heartbeat built now is outdated at the mixer");
-            Assert.That(rig.Auth.IsArmed(RoomAB, A), Is.False, "and A is not armed as far as the sim knows");
+            {
+                var assertedValue = mixerApplied;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the mixer applied generation 1");
+            }
+            {
+                var assertedValue = AsOf();
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the sim never saw the reply, so it believes nothing was applied");
+            }
+            Assert.True(AsOf() < mixerApplied, "every heartbeat built now is outdated at the mixer");
+            Assert.False(rig.Auth.IsArmed(RoomAB, A), "and A is not armed as far as the sim knows");
 
             rig.T.Clear();
             dropReply = false;
@@ -563,62 +638,71 @@ namespace osWebRtcVoice.Tests
 
             List<OSDMap> resync = rig.T.Batches();
             OSDMap ab = ForRoom(resync, RoomAB);
-            Assert.That(ab["op"].AsString(), Is.EqualTo("replace"), "trigger 3: the next tick re-arms with a replace");
-            Assert.That(Keys(ab["excl"]), Is.EquivalentTo(new[] { A.ToString(), B.ToString() }),
-                "the whole population of that room, empty columns included");
-            Assert.That(ab["policy_generation"].AsInteger(), Is.GreaterThan(appliedBeforeResync),
-                "at a generation above the one the mixer already holds");
-            Assert.That(AsOf(), Is.GreaterThanOrEqualTo(mixerApplied),
-                "after the resync succeeds the sim's as_of is at or above what the mixer applied, so heartbeats are evaluated again");
-            Assert.That(AsOf(), Is.EqualTo(ab["policy_generation"].AsInteger()));
-            Assert.That(rig.Auth.IsArmed(RoomAB, A) && rig.Auth.IsArmed(RoomAB, B), Is.True);
+            {
+                var assertedValue = ab["op"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal("replace", assertedValue), "trigger 3: the next tick re-arms with a replace");
+            }
+            {
+                var assertedValue = Keys(ab["excl"]);
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { A.ToString(), B.ToString() }, assertedValue, strict: true), "the whole population of that room, empty columns included");
+            }
+            Assert.True(ab["policy_generation"].AsInteger() > appliedBeforeResync, "at a generation above the one the mixer already holds");
+            Assert.True(AsOf() >= mixerApplied, "after the resync succeeds the sim's as_of is at or above what the mixer applied, so heartbeats are evaluated again");
+            Assert.Equal(ab["policy_generation"].AsInteger(), AsOf());
+            Assert.True(rig.Auth.IsArmed(RoomAB, A) && rig.Auth.IsArmed(RoomAB, B));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Reply_UnknownRoom_BacksOff_RetriesAfterTheInterval_AndAProvisionRetriesAtOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.T.Response = r => r["room"].AsInteger() == RoomD
                 ? new OSDMap { ["slvoice"] = OSD.FromString("error"), ["reason"] = OSD.FromString("unknown_room") }
                 : null;
             await rig.Tick();   // t = 10250; D's room does not exist at the mixer
-            Assert.That(rig.Auth.IsArmed(RoomD, D), Is.False);
+            Assert.False(rig.Auth.IsArmed(RoomD, D));
 
             rig.T.Clear();
             await rig.Tick();   // 10500
             await rig.Tick();   // 10750
             await rig.Tick();   // 11000
-            Assert.That(rig.T.Batches(), Is.Empty, "no retry storm inside the backoff");
+            {
+                var assertedValue = rig.T.Batches();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no retry storm inside the backoff");
+            }
             await rig.Tick();   // 11250: the backoff has passed
-            Assert.That(rig.T.Batches().Single()["room"].AsInteger(), Is.EqualTo(RoomD));
+            Assert.Equal(RoomD, rig.T.Batches().Single()["room"].AsInteger());
 
             rig.T.Clear();
             rig.Sender.OnListenerProvisioned(D);   // the provision creates the room
             rig.T.Response = _ => null;
             await rig.Tick();   // 11500, still inside the new backoff
-            Assert.That(rig.T.Batches().Single()["room"].AsInteger(), Is.EqualTo(RoomD));
-            Assert.That(rig.Auth.IsArmed(RoomD, D), Is.True);
+            Assert.Equal(RoomD, rig.T.Batches().Single()["room"].AsInteger());
+            Assert.True(rig.Auth.IsArmed(RoomD, D));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Reply_StaleEpoch_BacksOffLikeAnUnknownRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.T.Response = r => r["room"].AsInteger() == RoomAB ? new OSDMap
             {
                 ["slvoice"] = OSD.FromString("applied"), ["status"] = OSD.FromString("stale_epoch"), ["room"] = r["room"],
             } : null;
             await rig.Tick();
-            Assert.That(rig.Auth.IsArmed(RoomAB, A), Is.False);
-            Assert.That(rig.Auth.IsArmed(RoomD, D), Is.True);
+            Assert.False(rig.Auth.IsArmed(RoomAB, A));
+            Assert.True(rig.Auth.IsArmed(RoomD, D));
             rig.T.Clear();
             await rig.Tick();
-            Assert.That(rig.T.Batches(), Is.Empty);
+            Assert.Empty(rig.T.Batches());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Reply_TransportError_ResnapshotsAndArmsEveryone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.T.Result = r => r["room"].AsInteger() == RoomD ? AdminSendResult.TransportError : AdminSendResult.Ok;
             await rig.Tick();
@@ -626,13 +710,14 @@ namespace osWebRtcVoice.Tests
             rig.T.Clear();
             await rig.Tick();
             List<OSDMap> sent = rig.T.Batches();
-            Assert.That(Keys(ForRoom(sent, RoomAB)["excl"]), Is.EquivalentTo(new[] { A.ToString(), B.ToString() }));
-            Assert.That(Keys(ForRoom(sent, RoomD)["excl"]), Is.EquivalentTo(new[] { D.ToString() }));
+            Assert.Equivalent(new[] { A.ToString(), B.ToString() }, Keys(ForRoom(sent, RoomAB)["excl"]), strict: true);
+            Assert.Equivalent(new[] { D.ToString() }, Keys(ForRoom(sent, RoomD)["excl"]), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Reply_HeartbeatAnsweredAsAnUnknownRequest_StopsHeartbeats()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.Advertise();
             await rig.Tick();
@@ -640,70 +725,75 @@ namespace osWebRtcVoice.Tests
                 ? new OSDMap { ["slvoice"] = OSD.FromString("error"), ["reason"] = OSD.FromString("unknown_request") }
                 : Applied(r);
             await rig.Heartbeat();
-            Assert.That(rig.Auth.HeartbeatCapable, Is.False);
+            Assert.False(rig.Auth.HeartbeatCapable);
             rig.Clock += 1000;
             await rig.Heartbeat();
-            Assert.That(rig.T.Heartbeats().Count, Is.EqualTo(1));
+            Assert.Single(rig.T.Heartbeats());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task Reply_Malformed_IsNotArmed_AndRetriedAfterTheBackoff()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var rig = new Rig();
             rig.T.Response = r => r["room"].AsInteger() == RoomD ? new OSDMap { ["room"] = r["room"] } : null;   // no slvoice
             await rig.Tick();
-            Assert.That(rig.Auth.IsArmed(RoomD, D), Is.False);
+            Assert.False(rig.Auth.IsArmed(RoomD, D));
             rig.T.Response = _ => null;
             rig.T.Clear();
             await rig.Tick(1000);
-            Assert.That(rig.T.Batches().Single()["room"].AsInteger(), Is.EqualTo(RoomD));
+            Assert.Equal(RoomD, rig.T.Batches().Single()["room"].AsInteger());
         }
         // ---- the heartbeat reports the feeder's age; the MIXER judges it ----
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildHeartbeat_WithNoFeedAgeSource_OmitsTheField()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var auth = new VisAuthority(0x0000018f3a2b4c5dUL, "R");
             OSDMap body = auth.BuildHeartbeat(new[] { A }, a => RoomAB, false);
             // A pre-V1b sim sends no feed_age_ms, and the mixer reads absent as live. Anything else here would
             // change behaviour for every sim that has not opted in.
-            Assert.That(body.ContainsKey("feed_age_ms"), Is.False, "feed_age_ms must be absent when nothing supplies it");
+            Assert.False(body.ContainsKey("feed_age_ms"), "feed_age_ms must be absent when nothing supplies it");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildHeartbeat_ReportsTheFeedAge_AtBuildTime()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var auth = new VisAuthority(0x0000018f3a2b4c5dUL, "R");
             long age = 37;
             auth.FeedAgeMs = () => age;
-            Assert.That(auth.BuildHeartbeat(new[] { A }, a => RoomAB, false)["feed_age_ms"].AsInteger(), Is.EqualTo(37));
+            Assert.Equal(37, auth.BuildHeartbeat(new[] { A }, a => RoomAB, false)["feed_age_ms"].AsInteger());
             // The age is read when the BODY is built, not when the source was attached: a heartbeat must describe
             // the matrix it is actually carrying.
             age = 12345;
-            Assert.That(auth.BuildHeartbeat(new[] { A }, a => RoomAB, false)["feed_age_ms"].AsInteger(), Is.EqualTo(12345));
+            Assert.Equal(12345, auth.BuildHeartbeat(new[] { A }, a => RoomAB, false)["feed_age_ms"].AsInteger());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildHeartbeat_OmitsAnUnreadableOrNegativeFeedAge()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var auth = new VisAuthority(0x0000018f3a2b4c5dUL, "R");
             auth.FeedAgeMs = () => -1;
-            Assert.That(auth.BuildHeartbeat(new[] { A }, a => RoomAB, false).ContainsKey("feed_age_ms"), Is.False,
-                "a negative age is malformed: omit it rather than let a bad clock silence the grid");
+            Assert.False(auth.BuildHeartbeat(new[] { A }, a => RoomAB, false).ContainsKey("feed_age_ms"), "a negative age is malformed: omit it rather than let a bad clock silence the grid");
             auth.FeedAgeMs = () => throw new InvalidOperationException("feeder gone");
-            Assert.That(auth.BuildHeartbeat(new[] { A }, a => RoomAB, false).ContainsKey("feed_age_ms"), Is.False,
-                "a throwing source must not take the heartbeat down with it");
+            Assert.False(auth.BuildHeartbeat(new[] { A }, a => RoomAB, false).ContainsKey("feed_age_ms"), "a throwing source must not take the heartbeat down with it");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BuildHeartbeat_StillReportsTheAgeOnAStoppingBody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var auth = new VisAuthority(0x0000018f3a2b4c5dUL, "R");
             auth.FeedAgeMs = () => 99;
             OSDMap body = auth.BuildHeartbeat(new[] { A }, a => RoomAB, true);
-            Assert.That(body["state"].AsString(), Is.EqualTo("stopping"));
-            Assert.That(body["feed_age_ms"].AsInteger(), Is.EqualTo(99),
-                "the mixer honours a stopping heartbeat at any age, but the age is still the truth we owe it");
+            Assert.Equal("stopping", body["state"].AsString());
+            {
+                var assertedValue = body["feed_age_ms"].AsInteger();
+                TestAssert.WithMessage(() => Assert.Equal(99, assertedValue), "the mixer honours a stopping heartbeat at any age, but the age is still the truth we owe it");
+            }
         }
 
     }

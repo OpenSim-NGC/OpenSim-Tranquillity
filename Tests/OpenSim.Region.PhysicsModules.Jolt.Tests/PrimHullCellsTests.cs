@@ -13,7 +13,6 @@ using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using OpenSim.Region.PhysicsModules.Meshing;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Xunit;
-using Xunit.Abstractions;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.MeshShapesTodayTests;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.PrimHullProbeTests;
 using SVector3 = System.Numerics.Vector3;
@@ -49,7 +48,7 @@ public class PrimHullCellsTests
         Assert.True(mesher.TryGetPrimProfileRings(spec.Name, pbs, s, Lod, out PrimProfileRings rings), spec.Name);
         IMesh mesh = mesher.CreateMesh(spec.Name, pbs, s, Lod, false, false, false);
         Assert.NotNull(mesh);
-        return (rings, PrimHullCells.MeshVolume(mesh.getVertexListAsFloat(), mesh.getIndexListAsInt()));
+        return (rings, PrimHullCells.MeshVolume(mesh.getVertexListAsFloatLocked(), mesh.getIndexListAsIntLocked()));
     }
 
     private static Spec Named(string name) => Shapes().Single(s => s.Name == name);
@@ -442,7 +441,7 @@ public class PrimHullCellsTests
                 IMesh mesh = mesher.CreateMesh(spec.Name, pbs, Vector3.One, Lod, false, false, false);
                 if (mesh == null)
                     continue;
-                double meshVolume = PrimHullCells.MeshVolume(mesh.getVertexListAsFloat(), mesh.getIndexListAsInt());
+                double meshVolume = PrimHullCells.MeshVolume(mesh.getVertexListAsFloatLocked(), mesh.getIndexListAsIntLocked());
                 total++;
 
                 // the count alone, without cooking anything

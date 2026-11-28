@@ -30,10 +30,8 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
-    public class VoiceLogNoiseTests
-    {
+    public class VoiceLogNoiseTests : IAsyncLifetime
+        {
         private const int RoomAB = 1001;
         private const int RoomD = 1002;
 
@@ -85,16 +83,12 @@ namespace osWebRtcVoice.Tests
 
         private Capture _log;
         private LogCapture _logging;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             _logging.Dispose();
             _log.Dispose();
@@ -240,9 +234,10 @@ namespace osWebRtcVoice.Tests
             public PeerCtlSendStats LastSendStats => default;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AFailingEmit_IsOneErrorAMinute_WithTheCountOfTheOnesHeldBack()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             long clock = 10_000;
             var world = new World();
             world.Agents.Add(new AgentView(A, false, Vector3.Zero, ParcelQ, false));
@@ -255,37 +250,47 @@ namespace osWebRtcVoice.Tests
                 clock += 250;
                 await sender.PumpAsync(feed.Tick(world));
             }
-            Assert.That(_log.Where(LogLevel.Error, "emit failed"), Has.Count.EqualTo(1),
-                "twenty failing ticks in five seconds write one error line");
+            {
+                var assertedValue = _log.Where(LogLevel.Error, "emit failed");
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "twenty failing ticks in five seconds write one error line");
+            }
 
             clock += 61_000;
             await sender.PumpAsync(feed.Tick(world));
             List<string> errors = _log.Where(LogLevel.Error, "emit failed");
-            Assert.That(errors, Has.Count.EqualTo(2), "the next minute writes one more");
-            Assert.That(errors[1], Does.Contain("19 more"), "and says how many it stands for");
+            {
+                var assertedValue = errors;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue.Count()), "the next minute writes one more");
+            }
+            {
+                var assertedValue = errors[1];
+                TestAssert.WithMessage(() => Assert.Contains("19 more", assertedValue), "and says how many it stands for");
+            }
         }
 
         // ---- R8: arming replaces, deferred entries and stale reports ----------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AnArmingReplace_IsADebugLine_AndItsCountIsInTheNextSummary()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = new Region();
             await r.Tick();
 
-            Assert.That(_log.AtOrAbove(LogLevel.Information, "arming replace sent"), Is.Empty);
-            Assert.That(_log.Where(LogLevel.Debug, "arming replace sent"), Has.Count.EqualTo(1));
+            Assert.Empty(_log.AtOrAbove(LogLevel.Information, "arming replace sent"));
+            Assert.Single(_log.Where(LogLevel.Debug, "arming replace sent"));
 
             await r.Beat();
             await r.Beat(61_000);
             List<string> summary = _log.Where(LogLevel.Debug, "peer_ctl_heartbeat summary");
-            Assert.That(summary, Has.Count.EqualTo(1));
-            Assert.That(summary[0], Does.Contain("1 arming replace(s) for 3 listener(s)"));
+            Assert.Single(summary);
+            Assert.Contains("1 arming replace(s) for 3 listener(s)", summary[0]);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task EntriesTheMixerDefers_AreADebugLine_AndTheirCountIsInTheNextSummary()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = new Region();
             r.T.Response = req => req["request"].AsString() == "peer_ctl_batch"
                 ? new OSDMap
@@ -299,19 +304,24 @@ namespace osWebRtcVoice.Tests
                 : null;
             await r.Tick();
 
-            Assert.That(_log.AtOrAbove(LogLevel.Information, "mixer deferred"), Is.Empty);
-            Assert.That(_log.Where(LogLevel.Debug, "mixer deferred"), Is.Not.Empty);
+            Assert.Empty(_log.AtOrAbove(LogLevel.Information, "mixer deferred"));
+            Assert.NotEmpty(_log.Where(LogLevel.Debug, "mixer deferred"));
 
             await r.Beat();
             await r.Beat(61_000);
             List<string> summary = _log.Where(LogLevel.Debug, "peer_ctl_heartbeat summary");
-            Assert.That(summary, Has.Count.EqualTo(1));
-            Assert.That(summary[0], Does.Contain("deferred entr(y/ies)").And.Match(@".* [1-9]\d* deferred entr\(y/ies\).*"));
+            Assert.Single(summary);
+            {
+                var assertedValue = summary[0];
+                Assert.Contains("deferred entr(y/ies)", assertedValue);
+                Assert.Matches(@".* [1-9]\d* deferred entr\(y/ies\).*", assertedValue);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AStaleReportFromTheMixer_IsADebugLine_AndItsCountIsInTheNextSummary()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = new Region();
             await r.Tick();
             r.T.Response = req => req["request"].AsString() == "peer_ctl_heartbeat"
@@ -320,37 +330,46 @@ namespace osWebRtcVoice.Tests
             await r.Beat();
             r.T.Response = _ => null;   // the mixer reported A once
 
-            Assert.That(_log.AtOrAbove(LogLevel.Information, "stale/unarmed"), Is.Empty);
-            Assert.That(_log.Where(LogLevel.Debug, "stale/unarmed"), Is.Not.Empty);
+            Assert.Empty(_log.AtOrAbove(LogLevel.Information, "stale/unarmed"));
+            Assert.NotEmpty(_log.Where(LogLevel.Debug, "stale/unarmed"));
 
             await r.Beat(61_000);
             List<string> summary = _log.Where(LogLevel.Debug, "peer_ctl_heartbeat summary");
-            Assert.That(summary, Has.Count.EqualTo(1));
-            Assert.That(summary[0], Does.Contain("mixer reported 1 stale or unarmed listener(s)"));
+            Assert.Single(summary);
+            Assert.Contains("mixer reported 1 stale or unarmed listener(s)", summary[0]);
         }
 
         // ---- the heartbeat summary of an idle region ---------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task AnIdleRegion_WritesNoSummary_JustOneLineWhenItGoesIdleAndOneWhenItWakes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = new Region(withAgents: false);
             r.MixerAdvertises();
 
             for (int i = 0; i < 4; i++)
                 await r.Beat(61_000);   // four minutes with no rooms and no listeners
-            Assert.That(_log.Any("peer_ctl_heartbeat summary"), Is.Empty, "no summary while idle");
-            Assert.That(_log.Where(LogLevel.Debug, "went idle"), Has.Count.EqualTo(1));
+            {
+                var assertedValue = _log.Any("peer_ctl_heartbeat summary");
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no summary while idle");
+            }
+            Assert.Single(_log.Where(LogLevel.Debug, "went idle"));
 
             r.AddAgents();
             await r.Tick();
             await r.Beat();
-            Assert.That(_log.Where(LogLevel.Debug, "woke"), Has.Count.EqualTo(1));
-            Assert.That(_log.Where(LogLevel.Debug, "went idle"), Has.Count.EqualTo(1), "still just the one");
+            Assert.Single(_log.Where(LogLevel.Debug, "woke"));
+            {
+                var assertedValue = _log.Where(LogLevel.Debug, "went idle");
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "still just the one");
+            }
 
             await r.Beat(61_000);
-            Assert.That(_log.Where(LogLevel.Debug, "peer_ctl_heartbeat summary"), Has.Count.EqualTo(1),
-                "a region that has someone in it writes its summary as before");
+            {
+                var assertedValue = _log.Where(LogLevel.Debug, "peer_ctl_heartbeat summary");
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "a region that has someone in it writes its summary as before");
+            }
         }
 
         // ---- the unknown_room pair on a first join into a room the mixer removed -----------------------
@@ -365,9 +384,10 @@ namespace osWebRtcVoice.Tests
                 ["mixer_instance"] = OSD.FromString("m1"),
             };
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheFirstUnknownRoom_AfterTheRoomEmptied_IsDebugInTheSenderAndTheSink_AndTheSecondIsAWarning()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = new Region();
             await r.Tick();                       // the room answers: everyone is armed
             r.World.Agents.Clear();               // everyone leaves; the mixer removes the empty rooms after its grace period
@@ -379,19 +399,24 @@ namespace osWebRtcVoice.Tests
             r.AddAgents();                        // the first avatar to come back is addressed before it provisions
             await r.Tick(1500);
 
-            Assert.That(_log.AtOrAbove(LogLevel.Warning, "unknown_room"), Is.Empty,
-                "a room that emptied and was removed is expected to be missing once");
-            Assert.That(_log.AtOrAbove(LogLevel.Warning, "inner-reply anomaly"), Is.Empty);
-            Assert.That(_log.Where(LogLevel.Debug, "unknown_room"), Is.Not.Empty);
+            {
+                var assertedValue = _log.AtOrAbove(LogLevel.Warning, "unknown_room");
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a room that emptied and was removed is expected to be missing once");
+            }
+            Assert.Empty(_log.AtOrAbove(LogLevel.Warning, "inner-reply anomaly"));
+            Assert.NotEmpty(_log.Where(LogLevel.Debug, "unknown_room"));
 
             await r.Tick(2500);                   // still missing at the retry
-            Assert.That(_log.AtOrAbove(LogLevel.Warning, "unknown_room"), Is.Not.Empty,
-                "a room that is still missing after the retry is a warning");
+            {
+                var assertedValue = _log.AtOrAbove(LogLevel.Warning, "unknown_room");
+                TestAssert.WithMessage(() => Assert.NotEmpty(assertedValue), "a room that is still missing after the retry is a warning");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task UnknownRoom_ForARoomThatStillHasListeners_IsStillAWarning()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var r = new Region();
             await r.Tick();                       // armed
             _log.Lines.Clear();
@@ -400,44 +425,63 @@ namespace osWebRtcVoice.Tests
             r.Auth.RequestArm(A);                 // the mixer lost a room that has listeners in it
             await r.Tick(1500);
 
-            Assert.That(_log.AtOrAbove(LogLevel.Warning, "unknown_room"), Is.Not.Empty);
+            Assert.NotEmpty(_log.AtOrAbove(LogLevel.Warning, "unknown_room"));
         }
 
         // ---- the heartbeat interval is a setting --------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheHeartbeatInterval_DefaultsToOneSecond_SoNothingChanges()
         {
-            Assert.That(VisAuthority.DefaultHeartbeatIntervalMs, Is.EqualTo(1000));
-            Assert.That(new VisAuthority(1UL, "r").HeartbeatIntervalMs, Is.EqualTo(1000));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(1000, VisAuthority.DefaultHeartbeatIntervalMs);
+            Assert.Equal(1000, new VisAuthority(1UL, "r").HeartbeatIntervalMs);
             IConfig cfg = new IniConfigSource().AddConfig("WebRtcVoice");
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityHeartbeatMs(cfg), Is.EqualTo(1000));
+            Assert.Equal(1000, WebRtcVoiceRegionModule.ReadVisibilityHeartbeatMs(cfg));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheHeartbeatInterval_CanBeLengthened_AndTheHeartbeatSaysSo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfig cfg = new IniConfigSource().AddConfig("WebRtcVoice");
             cfg.Set("VisibilityHeartbeatMs", "2500");
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityHeartbeatMs(cfg), Is.EqualTo(2500));
+            Assert.Equal(2500, WebRtcVoiceRegionModule.ReadVisibilityHeartbeatMs(cfg));
 
             var a = new VisAuthority(1UL, "r", () => 0, 2500);
-            Assert.That(a.HeartbeatIntervalMs, Is.EqualTo(2500));
+            Assert.Equal(2500, a.HeartbeatIntervalMs);
             OSDMap body = a.BuildHeartbeat(Array.Empty<UUID>(), _ => null, stopping: false);
-            Assert.That(body["interval_ms"].AsInteger(), Is.EqualTo(2500), "the mixer is told the interval it should expect");
+            {
+                var assertedValue = body["interval_ms"].AsInteger();
+                TestAssert.WithMessage(() => Assert.Equal(2500, assertedValue), "the mixer is told the interval it should expect");
+            }
         }
 
-        [TestCase("100")]
-        [TestCase("4001")]
-        [TestCase("0")]
-        [TestCase("-5")]
+        [InlineData("100")]
+        [InlineData("4001")]
+        [InlineData("0")]
+        [InlineData("-5")]
+        [Theory(Timeout = 60000)]
         public void AnIntervalOutsideTheSafeRange_IsRefusedWithAWarning_AndTheDefaultIsUsed(string value)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfig cfg = new IniConfigSource().AddConfig("WebRtcVoice");
             cfg.Set("VisibilityHeartbeatMs", value);
 
-            Assert.That(WebRtcVoiceRegionModule.ReadVisibilityHeartbeatMs(cfg, LoggerProvider.CreateLogger("test")), Is.EqualTo(1000));
-            Assert.That(_log.Where(LogLevel.Warning, "VisibilityHeartbeatMs"), Has.Count.EqualTo(1));
+            Assert.Equal(1000, WebRtcVoiceRegionModule.ReadVisibilityHeartbeatMs(cfg, LoggerProvider.CreateLogger("test")));
+            Assert.Single(_log.Where(LogLevel.Warning, "VisibilityHeartbeatMs"));
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

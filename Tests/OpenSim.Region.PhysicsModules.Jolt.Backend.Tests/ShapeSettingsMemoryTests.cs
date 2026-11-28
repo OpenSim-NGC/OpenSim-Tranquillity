@@ -11,7 +11,6 @@ using System.Numerics;
 using System.Reflection;
 using OpenSim.Region.PhysicsModules.Jolt.Backend;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
@@ -124,7 +123,7 @@ public class ShapeSettingsMemoryTests
         var parts = new List<string>();
         foreach (string kind in Kinds)
             parts.Add(string.Create(CultureInfo.InvariantCulture, $"{kind}_kb={Run(kind, Cooks, Cooks) / 1024}"));
-        Console.WriteLine("SHAPE-SETTINGS-MEMORY " + string.Join(" ", parts));
+        _out.WriteLine("SHAPE-SETTINGS-MEMORY " + string.Join(" ", parts));
     }
 
 #if DEBUG
