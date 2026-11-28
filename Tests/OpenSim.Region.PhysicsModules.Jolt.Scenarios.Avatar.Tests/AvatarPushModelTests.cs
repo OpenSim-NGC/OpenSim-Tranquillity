@@ -237,7 +237,7 @@ public class AvatarPushModelTests
         return (top, after, avatarTop);
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(0.5f)]
     [InlineData(2f)]
     public void An_avatar_running_into_a_physical_cube_pushes_it_harder_than_one_walking(float side)

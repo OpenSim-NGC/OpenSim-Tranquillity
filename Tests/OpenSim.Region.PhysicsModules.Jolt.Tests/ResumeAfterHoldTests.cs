@@ -176,10 +176,6 @@ public class ResumeAfterHoldTests
     [Fact]
     public void Under_InWorldz_a_box_that_would_end_inside_another_body_stays_where_it_was_held()
     {
-        KnownFailure.Skip(
-            "Jolt 2.26 update",
-            "ReleaseHold now moves a held InWorldz box into a body at the interpolated destination");
-
         JoltScene scene = NewScene("InWorldz", 0f);
         try
         {

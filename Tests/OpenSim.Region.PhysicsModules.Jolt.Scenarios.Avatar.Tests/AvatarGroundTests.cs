@@ -130,7 +130,7 @@ public class AvatarGroundTests
 
     // ------------------------------------------------------------------ the flags
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(0f)]
     [InlineData(45f)]
     public void Standing_on_the_terrain_reads_as_ground_and_reports_land(float physicsRate)
