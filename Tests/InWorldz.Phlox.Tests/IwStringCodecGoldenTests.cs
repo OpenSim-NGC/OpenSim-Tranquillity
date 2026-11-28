@@ -18,7 +18,6 @@ using InWorldz.Phlox.VM;
 using OpenMetaverse;
 using Phlox.ScriptEngine;
 using Xunit;
-using Xunit.Abstractions;
 using Clock = InWorldz.Phlox.Util.Clock;
 
 namespace InWorldz.Phlox.Tests;

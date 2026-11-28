@@ -13,7 +13,7 @@
  */
 using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -22,7 +22,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class RingVerificationTests
     {
         private sealed class Grid
@@ -40,7 +39,7 @@ namespace osWebRtcVoice.Tests
             g.Sender = VoiceSessionServiceTests.NewRegion(g.Service);
             g.Receiver = VoiceSessionServiceTests.NewRegion(g.Service);
             SessionOutcome started = g.Sender.StartAdhoc(Alice, UUID.Random(), RegionA, new List<UUID> { Bob });
-            Assert.That(started.Ok, Is.True, started.Decision);
+            Assert.True(started.Ok, started.Decision);
             g.SessionId = started.Session.SessionId;
             g.Token = g.Sender.IssueToken(g.SessionId, Alice);
             if (markBob) g.Sender.MarkInvited(g.SessionId, new[] { Bob });
@@ -51,141 +50,160 @@ namespace osWebRtcVoice.Tests
 
         // ---- the service's answer ---------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingTheSenderMarkedIsVerified_AndCarriesTheStoresCredential()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             SessionOutcome o = g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc);
 
-            Assert.That(o.Ok, Is.True, o.Decision);
-            Assert.That(o.Decision, Is.EqualTo("ring-verified"));
-            Assert.That(o.Session.Token, Is.EqualTo(g.Token), "an invited target is given the credential");
+            Assert.True(o.Ok, o.Decision);
+            Assert.Equal("ring-verified", o.Decision);
+            {
+                var assertedValue = o.Session.Token;
+                TestAssert.WithMessage(() => Assert.Equal(g.Token, assertedValue), "an invited target is given the credential");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingForASessionThatDoesNotExist_IsRefused_AndNothingIsCreated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             SessionOutcome o = g.Receiver.VerifyRing(UUID.Random(), Bob, Alice, NonSpatialSessionType.Adhoc);
 
-            Assert.That(o.Ok, Is.False);
-            Assert.That(o.Decision, Is.EqualTo(SessionOutcome.NoSuchSession));
-            Assert.That(g.Service.SessionCount, Is.EqualTo(1), "only the conference that was started");
+            Assert.False(o.Ok);
+            Assert.Equal(SessionOutcome.NoSuchSession, o.Decision);
+            {
+                var assertedValue = g.Service.SessionCount;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "only the conference that was started");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingForATargetNobodyInvited_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             SessionOutcome o = g.Receiver.VerifyRing(g.SessionId, Carol, Alice, NonSpatialSessionType.Adhoc);
 
-            Assert.That(o.Ok, Is.False);
-            Assert.That(o.Decision, Is.EqualTo("refused-target-not-invited"));
+            Assert.False(o.Ok);
+            Assert.Equal("refused-target-not-invited", o.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingBeforeTheSenderMarkedTheTarget_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid(markBob: false);
 
-            Assert.That(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Decision, Is.EqualTo("refused-target-not-invited"));
+            Assert.Equal("refused-target-not-invited", g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AReplayedRing_IsRefused_AfterTheFirstUsesItUp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
-            Assert.That(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok, Is.True);
+            Assert.True(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok);
             SessionOutcome again = g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc);
 
-            Assert.That(again.Ok, Is.False);
-            Assert.That(again.Decision, Is.EqualTo("refused-ring-used"));
+            Assert.False(again.Ok);
+            Assert.Equal("refused-ring-used", again.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ANewInvitationEntitlesTheTargetToOneMoreRing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
-            Assert.That(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok, Is.True);
+            Assert.True(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok);
             g.Receiver.Decline(g.SessionId, Bob);                      // a mis-click; a later invite rings again
             g.Sender.MarkInvited(g.SessionId, new[] { Bob });
 
-            Assert.That(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok, Is.True);
-            Assert.That(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok, Is.False, "and only one");
+            Assert.True(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok);
+            Assert.False(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok, "and only one");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingNamingACallerWhoHoldsNoSeat_IsRefused_AndDoesNotUseTheRingUp()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             SessionOutcome forged = g.Receiver.VerifyRing(g.SessionId, Bob, Carol, NonSpatialSessionType.Adhoc);
-            Assert.That(forged.Ok, Is.False);
-            Assert.That(forged.Decision, Is.EqualTo("refused-caller-not-seated"));
+            Assert.False(forged.Ok);
+            Assert.Equal("refused-caller-not-seated", forged.Decision);
 
-            Assert.That(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok, Is.True, "the genuine ring still arrives");
+            Assert.True(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok, "the genuine ring still arrives");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingOfTheWrongType_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
-            Assert.That(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Group).Decision, Is.EqualTo("refused-session-type-mismatch"));
+            Assert.Equal("refused-session-type-mismatch", g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Group).Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARingForACallBetweenTwoPeople_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             g.Sender.Start(NonSpatialSessionType.P2P, Alice, Carol, A2ACalls.ComputeSessionId(Alice, Carol), RegionA);
             UUID call = A2ACalls.ComputeSessionId(Alice, Carol);
             g.Sender.MarkInvited(call, new[] { Carol });
 
-            Assert.That(g.Receiver.VerifyRing(call, Carol, Alice, NonSpatialSessionType.Group).Ok, Is.False);
-            Assert.That(g.Receiver.VerifyRing(call, Carol, Alice, NonSpatialSessionType.Adhoc).Ok, Is.False);
+            Assert.False(g.Receiver.VerifyRing(call, Carol, Alice, NonSpatialSessionType.Group).Ok);
+            Assert.False(g.Receiver.VerifyRing(call, Carol, Alice, NonSpatialSessionType.Adhoc).Ok);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnEndedSessionsRing_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             g.Sender.Depart(g.SessionId, Alice, DepartureReason.VoiceTeardown);
             g.Service.Sweep();
 
-            Assert.That(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok, Is.False);
+            Assert.False(g.Receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc).Ok);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheStoreCannotBeReached_TheRingIsRefusedAsUnavailable_NotAdopted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             GridStoreResilienceTests.FlakyService flaky = new GridStoreResilienceTests.FlakyService(g.Service) { Up = false };
             GridNonSpatialSessions receiver = VoiceSessionServiceTests.NewRegion(flaky);
 
             SessionOutcome o = receiver.VerifyRing(g.SessionId, Bob, Alice, NonSpatialSessionType.Adhoc);
 
-            Assert.That(o.Ok, Is.False);
-            Assert.That(o.Decision, Is.EqualTo(SessionOutcome.StoreUnavailable));
+            Assert.False(o.Ok);
+            Assert.Equal(SessionOutcome.StoreUnavailable, o.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AServiceRefusesARingOfATypeItDoesNotKnow()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
-            Assert.That(g.Service.VerifyRing(g.SessionId, Bob, Alice, 99).Decision, Is.EqualTo("refused-bad-request"));
+            Assert.Equal("refused-bad-request", g.Service.VerifyRing(g.SessionId, Bob, Alice, 99).Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheInProcessEngine_StillAdoptsRatherThanVerifies()
         {
-            Assert.That(NewEngine().StoreVerifiesRings, Is.False);
-            Assert.That(VoiceSessionServiceTests.NewRegion(VoiceSessionServiceTests.NewService()).StoreVerifiesRings, Is.True);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(NewEngine().StoreVerifiesRings);
+            Assert.True(VoiceSessionServiceTests.NewRegion(VoiceSessionServiceTests.NewService()).StoreVerifiesRings);
         }
 
         // ---- the receiving region ---------------------------------------------------------------------
@@ -199,92 +217,99 @@ namespace osWebRtcVoice.Tests
         private static RingIntake Offer(GridInstantMessage im, CarrierAuth auth, INonSpatialSessions store)
             => CarrierIntake.AcceptRing(im, auth, store, groupUsable: true, groupCap: 50, adhocEnabled: true);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGenuineRing_NeedsNoCarrierSecret_WhenTheStoreVerifiesRings()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             RingIntake r = Offer(Ring(g, Bob, Body(g)), CarrierAuth.Off(), g.Receiver);
 
-            Assert.That(r.Claimed, Is.True);
-            Assert.That(r.Ok, Is.True, r.Decision);
-            Assert.That(r.Reason, Is.Null);
-            Assert.That(r.Target, Is.EqualTo(Bob));
+            Assert.True(r.Claimed);
+            Assert.True(r.Ok, r.Decision);
+            Assert.Null(r.Reason);
+            Assert.Equal(Bob, r.Target);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheInvitationTheViewerSeesCarriesTheStoresCredential_NotTheWiresOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             GridInstantMessage forgedCredential = Ring(g, Bob, Body(g, credential: "a-credential-the-forger-made-up"));
 
             RingIntake r = Offer(forgedCredential, CarrierAuth.Off(), g.Receiver);
 
-            Assert.That(r.Ok, Is.True);
+            Assert.True(r.Ok);
             GroupVoiceRingTransport.ReadBody(r.Body, out _, out _, out string credential, out _);
-            Assert.That(credential, Is.EqualTo(g.Token));
+            Assert.Equal(g.Token, credential);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AForgedRingForASessionThatDoesNotExist_IsDropped_AndCreatesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             GridInstantMessage im = GroupVoiceRingTransport.Build(Bob, Alice, "Test User", UUID.Random(), RegionA, Body(g), null);
 
             RingIntake r = Offer(im, CarrierAuth.Off(), g.Receiver);
 
-            Assert.That(r.Claimed, Is.True);
-            Assert.That(r.Ok, Is.False);
-            Assert.That(g.Service.SessionCount, Is.EqualTo(1));
+            Assert.True(r.Claimed);
+            Assert.False(r.Ok);
+            Assert.Equal(1, g.Service.SessionCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AForgedRingForARealSessionAndAnUninvitedTarget_IsDropped()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             RingIntake r = Offer(Ring(g, Carol, Body(g)), CarrierAuth.Off(), g.Receiver);
 
-            Assert.That(r.Ok, Is.False);
-            Assert.That(r.Decision, Is.EqualTo("refused-target-not-invited"));
+            Assert.False(r.Ok);
+            Assert.Equal("refused-target-not-invited", r.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AReplayedRing_IsDroppedTheSecondTime()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             GridInstantMessage im = Ring(g, Bob, Body(g));
 
-            Assert.That(Offer(im, CarrierAuth.Off(), g.Receiver).Ok, Is.True);
+            Assert.True(Offer(im, CarrierAuth.Off(), g.Receiver).Ok);
             RingIntake second = Offer(im, CarrierAuth.Off(), g.Receiver);
 
-            Assert.That(second.Ok, Is.False);
-            Assert.That(second.Decision, Is.EqualTo("refused-ring-used"));
+            Assert.False(second.Ok);
+            Assert.Equal("refused-ring-used", second.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARegionWithACarrierSecret_StillRequiresTheMac_EvenWhenTheStoreVerifies()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             CarrierAuth configured = new CarrierAuth(new string('s', CarrierAuth.MinSecretLength));
 
             RingIntake r = Offer(Ring(g, Bob, Body(g)), configured, g.Receiver);
 
-            Assert.That(r.Ok, Is.False);
-            Assert.That(r.Reason, Is.EqualTo(CarrierAuth.MissingMac));
+            Assert.False(r.Ok);
+            Assert.Equal(CarrierAuth.MissingMac, r.Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStoreThatCannotBeReached_DropsTheRing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             GridNonSpatialSessions receiver = VoiceSessionServiceTests.NewRegion(
                 new GridStoreResilienceTests.FlakyService(g.Service) { Up = false });
 
             RingIntake r = Offer(Ring(g, Bob, Body(g)), CarrierAuth.Off(), receiver);
 
-            Assert.That(r.Ok, Is.False);
-            Assert.That(r.Decision, Is.EqualTo(SessionOutcome.StoreUnavailable));
+            Assert.False(r.Ok);
+            Assert.Equal(SessionOutcome.StoreUnavailable, r.Decision);
         }
     }
 }

@@ -13,7 +13,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice.NonSpatial;
@@ -21,7 +21,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialRequestRateTests
     {
         // Session caps wide open so only the rate limit is in play.
@@ -48,91 +47,100 @@ namespace osWebRtcVoice.Tests
             ["params"] = new OSDArray { OSD.FromUUID(Carol) },
         };
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheDefaultsAreABurstOfFiveRefilledEveryTenSeconds()
         {
-            Assert.That(NonSpatialLimits.DefaultConferenceRequestBurst, Is.EqualTo(5));
-            Assert.That(NonSpatialLimits.DefaultConferenceRequestRefillSeconds, Is.EqualTo(10));
-            Assert.That(NonSpatialLimits.Default.ConferenceRequestBurst, Is.EqualTo(5));
-            Assert.That(NonSpatialLimits.Default.ConferenceRequestRefillSeconds, Is.EqualTo(10));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(5, NonSpatialLimits.DefaultConferenceRequestBurst);
+            Assert.Equal(10, NonSpatialLimits.DefaultConferenceRequestRefillSeconds);
+            Assert.Equal(5, NonSpatialLimits.Default.ConferenceRequestBurst);
+            Assert.Equal(10, NonSpatialLimits.Default.ConferenceRequestRefillSeconds);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheBurstPassesAndTheNextRequestIsRefused_ThenOneTokenReturnsPerRefillInterval()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, limits: Limits());
 
             for (int i = 0; i < 5; i++)
-                Assert.That(e.TryTakeConferenceRequest(Alice), Is.True, "request " + (i + 1));
-            Assert.That(e.TryTakeConferenceRequest(Alice), Is.False, "the sixth in the same instant");
+                Assert.True(e.TryTakeConferenceRequest(Alice), "request " + (i + 1));
+            Assert.False(e.TryTakeConferenceRequest(Alice), "the sixth in the same instant");
 
             clock.Now = clock.Now.AddSeconds(9);
-            Assert.That(e.TryTakeConferenceRequest(Alice), Is.False, "nine seconds is not a refill");
+            Assert.False(e.TryTakeConferenceRequest(Alice), "nine seconds is not a refill");
             clock.Now = clock.Now.AddSeconds(1);
-            Assert.That(e.TryTakeConferenceRequest(Alice), Is.True, "ten seconds returns one token");
-            Assert.That(e.TryTakeConferenceRequest(Alice), Is.False);
+            Assert.True(e.TryTakeConferenceRequest(Alice), "ten seconds returns one token");
+            Assert.False(e.TryTakeConferenceRequest(Alice));
 
             clock.Now = clock.Now.AddMinutes(10);
             for (int i = 0; i < 5; i++)
-                Assert.That(e.TryTakeConferenceRequest(Alice), Is.True, "the bucket refills to the burst and no further");
-            Assert.That(e.TryTakeConferenceRequest(Alice), Is.False);
+                Assert.True(e.TryTakeConferenceRequest(Alice), "the bucket refills to the burst and no further");
+            Assert.False(e.TryTakeConferenceRequest(Alice));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EachAgentHasItsOwnBucket()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine(limits: Limits(burst: 1));
 
-            Assert.That(e.TryTakeConferenceRequest(Alice), Is.True);
-            Assert.That(e.TryTakeConferenceRequest(Alice), Is.False);
-            Assert.That(e.TryTakeConferenceRequest(Bob), Is.True);
+            Assert.True(e.TryTakeConferenceRequest(Alice));
+            Assert.False(e.TryTakeConferenceRequest(Alice));
+            Assert.True(e.TryTakeConferenceRequest(Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StartAndInviteDrawFromTheSameBucket()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine(limits: Limits());
             UUID conference = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
 
             for (int i = 0; i < 3; i++)
-                Assert.That(AdhocVoiceChatSession.TryHandleStartConference(StartBody(), Alice, e, RegionA, true,
-                    out ChatSessionOutcome started), Is.True);
+                Assert.True(AdhocVoiceChatSession.TryHandleStartConference(StartBody(), Alice, e, RegionA, true,
+                    out ChatSessionOutcome started));
             for (int i = 0; i < 2; i++)
             {
-                Assert.That(AdhocVoiceChatSession.TryHandleInvite(InviteBody(conference), Alice, e, true,
-                    out ChatSessionOutcome invited, out _), Is.True);
-                Assert.That(invited.Status, Is.EqualTo(HttpStatusCode.OK), "invite " + (i + 1));
+                Assert.True(AdhocVoiceChatSession.TryHandleInvite(InviteBody(conference), Alice, e, true,
+                    out ChatSessionOutcome invited, out _));
+                {
+                    var assertedValue = invited.Status;
+                    TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.OK, assertedValue), "invite " + (i + 1));
+                }
             }
 
             // Five tokens are spent: the sixth request is refused whichever kind it is.
             AdhocVoiceChatSession.TryHandleInvite(InviteBody(conference), Alice, e, true, out ChatSessionOutcome refusedInvite, out List<UUID> rung);
-            Assert.That(refusedInvite.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(refusedInvite.Instrument, Does.Contain("decision=adhoc-refused-" + SessionOutcome.RateLimited));
-            Assert.That(rung, Is.Empty);
+            Assert.Equal(HttpStatusCode.Forbidden, refusedInvite.Status);
+            Assert.Contains("decision=adhoc-refused-" + SessionOutcome.RateLimited, refusedInvite.Instrument);
+            Assert.Empty(rung);
 
             AdhocVoiceChatSession.TryHandleStartConference(StartBody(), Alice, e, RegionA, true, out ChatSessionOutcome refusedStart);
-            Assert.That(refusedStart.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(refusedStart.Reply, Is.Null);
-            Assert.That(refusedStart.Instrument, Does.Contain("decision=adhoc-refused-" + SessionOutcome.RateLimited));
+            Assert.Equal(HttpStatusCode.Forbidden, refusedStart.Status);
+            Assert.Null(refusedStart.Reply);
+            Assert.Contains("decision=adhoc-refused-" + SessionOutcome.RateLimited, refusedStart.Instrument);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusedStartCreatesNoSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine(limits: Limits(burst: 1));
             AdhocVoiceChatSession.TryHandleStartConference(StartBody(), Alice, e, RegionA, true, out _);
             int before = e.Store.All().Count;
 
             AdhocVoiceChatSession.TryHandleStartConference(StartBody(), Alice, e, RegionA, true, out ChatSessionOutcome refused);
 
-            Assert.That(refused.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(e.Store.All().Count, Is.EqualTo(before));
+            Assert.Equal(HttpStatusCode.Forbidden, refused.Status);
+            Assert.Equal(before, e.Store.All().Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusalIsWarnedAtMostOncePerAgentPerMinute_WithCountsOnly()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NewEngine(limits: Limits(burst: 1));
             List<string> lines = new();
             e.LimitRefused += (agent, decision, detail) => lines.Add(decision + " " + detail);
@@ -140,36 +148,41 @@ namespace osWebRtcVoice.Tests
 
             for (int i = 0; i < 10; i++) e.TryTakeConferenceRequest(Alice);
 
-            Assert.That(lines, Has.Count.EqualTo(1));
-            Assert.That(lines[0], Does.StartWith(SessionOutcome.RateLimited));
+            Assert.Single(lines);
+            Assert.StartsWith(SessionOutcome.RateLimited, lines[0]);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheMaintenancePassDropsTheBucketsOfAgentsUnseenForTenMinutes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = new FakeClock();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, limits: Limits());
             NonSpatialMaintenance m = new NonSpatialMaintenance(e, _ => { }, (_, _) => { });
             e.TryTakeConferenceRequest(Alice);
             clock.Now = clock.Now.AddMinutes(9);
             e.TryTakeConferenceRequest(Bob);
-            Assert.That(e.RequestLimiter.TrackedAgents, Is.EqualTo(2));
+            Assert.Equal(2, e.RequestLimiter.TrackedAgents);
 
             clock.Now = clock.Now.AddMinutes(2);   // Alice 11 minutes ago, Bob 2
             m.RunOnce();
 
-            Assert.That(e.RequestLimiter.TrackedAgents, Is.EqualTo(1), "only Bob is still tracked");
-            Assert.That(e.TryTakeConferenceRequest(Alice), Is.True, "and Alice starts again with a full bucket");
+            {
+                var assertedValue = e.RequestLimiter.TrackedAgents;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "only Bob is still tracked");
+            }
+            Assert.True(e.TryTakeConferenceRequest(Alice), "and Alice starts again with a full bucket");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADroppedBucketIsNeverMoreGenerousThanAKeptOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Dropping the state of an agent unseen for ten minutes is only safe because a bucket left
             // alone for the refill-to-full time is full anyway: forgetting it changes nothing.
             double fullAfterSeconds = NonSpatialLimits.DefaultConferenceRequestBurst
                                       * NonSpatialLimits.DefaultConferenceRequestRefillSeconds;
-            Assert.That(fullAfterSeconds, Is.LessThan(NonSpatialVoiceSessionEngine.TransientStateMaxAge.TotalSeconds));
+            Assert.True(fullAfterSeconds < NonSpatialVoiceSessionEngine.TransientStateMaxAge.TotalSeconds);
         }
     }
 }

@@ -10,7 +10,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 using Xunit;
-using Xunit.Abstractions;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.MeshShapesTodayTests;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;

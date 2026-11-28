@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
@@ -25,7 +25,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 /// real divergence — links kept out of <c>items</c>, the depth shapes, a subset naming a child that is not there,
 /// an empty COF, an unknown id — not just the happy paths.
 /// </summary>
-[TestFixture]
 public class AisFetchRoutesHttpTests
 {
     private const string Cap = "/CAP/0a1b2c3d-0000-4000-8000-000000000000";
@@ -92,9 +91,9 @@ public class AisFetchRoutesHttpTests
         var request = new FetchTestRequest("GET", Cap + path);
         var response = new TestOSHttpResponse();
         handler.Handle(request, response);
-        Assert.That(response.ContentType, Is.EqualTo("application/llsd+xml"), $"GET {path}");
+        Assert.Equal("application/llsd+xml", response.ContentType);
         var body = OSDParser.DeserializeLLSDXml(response.RawBuffer);
-        Assert.That(body, Is.InstanceOf<OSDMap>(), "the viewer forces 500 on a non-map body (llaisapi.cpp:882-885)");
+        Assert.True(body is OSDMap, "the viewer forces 500 on a non-map body (llaisapi.cpp:882-885)");
         return (response.StatusCode, (OSDMap)body);
     }
 
@@ -103,72 +102,72 @@ public class AisFetchRoutesHttpTests
 
     // ------------------------------------------------------------------ GET /item/{id}
 
-    [Test]
+    [Fact]
     public void item_route_returns_an_item_and_a_link_route_returns_a_link()
     {
         var b = Inventory();
 
         var (status, item) = Get(b, $"/item/{Shirt}");
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(item["item_id"].AsUUID(), Is.EqualTo(Shirt));
-        Assert.That(item["parent_id"].AsUUID(), Is.EqualTo(Clothing));
-        Assert.That(item.ContainsKey("linked_id"), Is.False, "a real item must not carry linked_id: that would select parseLink (§1c)");
-        Assert.That(item["permissions"], Is.InstanceOf<OSDMap>());
-        Assert.That(item["sale_info"], Is.InstanceOf<OSDMap>());
+        Assert.Equal(200, status);
+        Assert.Equal(Shirt, item["item_id"].AsUUID());
+        Assert.Equal(Clothing, item["parent_id"].AsUUID());
+        Assert.False(item.ContainsKey("linked_id"), "a real item must not carry linked_id: that would select parseLink (§1c)");
+        Assert.IsAssignableFrom<OSDMap>(item["permissions"]);
+        Assert.IsAssignableFrom<OSDMap>(item["sale_info"]);
 
         var (linkStatus, link) = Get(b, $"/item/{LinkToShirt}");
-        Assert.That(linkStatus, Is.EqualTo(200));
-        Assert.That(link["linked_id"].AsUUID(), Is.EqualTo(Shirt), "a link carries the target id (§1d)");
-        Assert.That(link["item_id"].AsUUID(), Is.EqualTo(LinkToShirt));
-        Assert.That(link.ContainsKey("permissions"), Is.False, "the viewer overwrites a link's permissions with defaults (llaisapi.cpp:1278-1283)");
+        Assert.Equal(200, linkStatus);
+        Assert.Equal(Shirt, link["linked_id"].AsUUID());
+        Assert.Equal(LinkToShirt, link["item_id"].AsUUID());
+        Assert.False(link.ContainsKey("permissions"), "the viewer overwrites a link's permissions with defaults (llaisapi.cpp:1278-1283)");
     }
 
-    [Test]
+    [Fact]
     public void an_unknown_item_id_is_404_with_the_error_body_shape()
     {
         var (status, body) = Get(Inventory(), $"/item/{UUID.Random()}");
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
         AssertErrorBody(body, 404);
     }
 
     // ------------------------------------------------------------------ GET /category/{id}/children
 
-    [Test]
+    [Fact]
     public void children_at_depth_0_expands_the_folder_only()
     {
         var (status, cat) = Get(Inventory(), $"/category/{Clothing}/children?depth=0");
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(cat["category_id"].AsUUID(), Is.EqualTo(Clothing));
-        Assert.That(cat["parent_id"].AsUUID(), Is.EqualTo(Root));
-        Assert.That(cat["version"].AsInteger(), Is.EqualTo(7), "the folder's version, read fresh (T4)");
+        Assert.Equal(200, status);
+        Assert.Equal(Clothing, cat["category_id"].AsUUID());
+        Assert.Equal(Root, cat["parent_id"].AsUUID());
+        Assert.Equal(7, cat["version"].AsInteger());
 
-        Assert.That(Coll(cat, "items").Count, Is.EqualTo(2));
-        Assert.That(Coll(cat, "links").Count, Is.EqualTo(0));
+        Assert.Equal(2, Coll(cat, "items").Count);
+        Assert.Empty(Coll(cat, "links"));
         var categories = Coll(cat, "categories");
-        Assert.That(categories.Count, Is.EqualTo(1));
+        Assert.True(categories.Count == 1);
         var child = (OSDMap)categories[Outfits.ToString()];
-        Assert.That(child.ContainsKey("_embedded"), Is.False, "at depth 0 a child category is a stub, not expanded");
+        Assert.False(child.ContainsKey("_embedded"), "at depth 0 a child category is a stub, not expanded");
     }
 
-    [Test]
+    [Fact]
     public void children_at_depth_1_and_2_expand_one_and_two_generations()
     {
         var b = Inventory();
 
         var (_, d1) = Get(b, $"/category/{Clothing}/children?depth=1");
         var outfits1 = (OSDMap)Coll(d1, "categories")[Outfits.ToString()];
-        Assert.That(outfits1.ContainsKey("_embedded"), Is.True, "depth 1 expands the child");
+        Assert.True(outfits1.ContainsKey("_embedded"), "depth 1 expands the child");
         var party1 = (OSDMap)Coll(outfits1, "categories")[Party.ToString()];
-        Assert.That(party1.ContainsKey("_embedded"), Is.False, "depth 1 stops at the grandchild");
+        Assert.False(party1.ContainsKey("_embedded"), "depth 1 stops at the grandchild");
 
         var (_, d2) = Get(b, $"/category/{Clothing}/children?depth=2");
         var outfits2 = (OSDMap)Coll(d2, "categories")[Outfits.ToString()];
         var party2 = (OSDMap)Coll(outfits2, "categories")[Party.ToString()];
-        Assert.That(party2.ContainsKey("_embedded"), Is.True, "depth 2 expands the grandchild");
-        Assert.That(Coll(party2, "categories").Count, Is.EqualTo(0));
+        Assert.True(party2.ContainsKey("_embedded"), "depth 2 expands the grandchild");
+        Assert.Empty(Coll(party2, "categories"));
     }
 
-    [Test]
+    [Fact]
     public void an_expanded_category_always_carries_all_three_collections()
     {
         // spec §1c: the viewer knows a folder's descendent count only from all three, and versions it only then
@@ -177,85 +176,82 @@ public class AisFetchRoutesHttpTests
         {
             if (!c.ContainsKey("_embedded")) return;
             var e = Embedded(c);
-            Assert.That(e.ContainsKey("categories"), Is.True, $"{c["name"].AsString()}: categories");
-            Assert.That(e.ContainsKey("items"), Is.True, $"{c["name"].AsString()}: items");
-            Assert.That(e.ContainsKey("links"), Is.True, $"{c["name"].AsString()}: links");
+            Assert.True(e.ContainsKey("categories"), $"{c["name"].AsString()}: categories");
+            Assert.True(e.ContainsKey("items"), $"{c["name"].AsString()}: items");
+            Assert.True(e.ContainsKey("links"), $"{c["name"].AsString()}: links");
             foreach (var child in ((OSDMap)e["categories"]).Values) AssertAllThree((OSDMap)child);
         }
         AssertAllThree(cat);
     }
 
-    [Test]
+    [Fact]
     public void an_unknown_category_id_is_404_with_the_error_body_shape()
     {
         var (status, body) = Get(Inventory(), $"/category/{UUID.Random()}/children?depth=1");
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
         AssertErrorBody(body, 404);
     }
 
     // ------------------------------------------------------------------ subset
 
-    [Test]
+    [Fact]
     public void a_subset_returns_only_the_named_children_and_skips_one_that_does_not_exist()
     {
         var absent = UUID.Random();
         var (status, cat) = Get(Inventory(), $"/category/{Clothing}/children?depth=1&children={Shirt},{absent},{Outfits}");
-        Assert.That(status, Is.EqualTo(200), "a named child that is gone does not fail the request");
+        Assert.Equal(200, status);
 
-        Assert.That(Coll(cat, "items").Keys, Is.EquivalentTo(new[] { Shirt.ToString() }), "Pants was not asked for");
-        Assert.That(Coll(cat, "categories").Keys, Is.EquivalentTo(new[] { Outfits.ToString() }));
-        Assert.That(Coll(cat, "items").ContainsKey(absent.ToString()), Is.False);
-        Assert.That(Coll(cat, "categories").ContainsKey(absent.ToString()), Is.False);
+        Assert.Equivalent(new[] { Shirt.ToString() }, Coll(cat, "items").Keys, true);
+        Assert.Equivalent(new[] { Outfits.ToString() }, Coll(cat, "categories").Keys, true);
+        Assert.False(Coll(cat, "items").ContainsKey(absent.ToString()));
+        Assert.False(Coll(cat, "categories").ContainsKey(absent.ToString()));
     }
 
     // ------------------------------------------------------------------ categories
 
-    [Test]
+    [Fact]
     public void the_categories_route_returns_sub_folders_only_and_no_sibling_collections()
     {
         var (status, cat) = Get(Inventory(), $"/category/{Clothing}/categories?depth=1");
-        Assert.That(status, Is.EqualTo(200));
+        Assert.Equal(200, status);
         var e = Embedded(cat);
-        Assert.That(((OSDMap)e["categories"]).Keys, Is.EquivalentTo(new[] { Outfits.ToString() }));
-        Assert.That(e.ContainsKey("items"), Is.False,
-            "a partial view must not carry empty siblings: the viewer would read a descendent count of 1 and version a folder it has not seen (§1c)");
-        Assert.That(e.ContainsKey("links"), Is.False);
+        Assert.Equivalent(new[] { Outfits.ToString() }, ((OSDMap)e["categories"]).Keys, true);
+        Assert.False(e.ContainsKey("items"), "a partial view must not carry empty siblings: the viewer would read a descendent count of 1 and version a folder it has not seen (§1c)");
+        Assert.False(e.ContainsKey("links"));
     }
 
     // ------------------------------------------------------------------ links
 
-    [Test]
+    [Fact]
     public void links_are_their_own_collection_and_items_carries_the_link_targets()
     {
         // the COF's links point at items that live in Clothing, not in the COF
         var (status, cat) = Get(Inventory(), $"/category/{Cof}/links");
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(cat["category_id"].AsUUID(), Is.EqualTo(Cof));
+        Assert.Equal(200, status);
+        Assert.Equal(Cof, cat["category_id"].AsUUID());
 
         var links = Coll(cat, "links");
-        Assert.That(links.Keys, Is.EquivalentTo(new[] { LinkToShirt.ToString(), LinkToPants.ToString() }),
-            "keyed by the link's own id, not the target's");
-        Assert.That(((OSDMap)links[LinkToShirt.ToString()])["linked_id"].AsUUID(), Is.EqualTo(Shirt));
+        Assert.Equivalent(new[] { LinkToShirt.ToString(), LinkToPants.ToString() }, links.Keys, true);
+        Assert.Equal(Shirt, ((OSDMap)links[LinkToShirt.ToString()])["linked_id"].AsUUID());
 
         var items = Coll(cat, "items");
-        Assert.That(items.Keys, Is.EquivalentTo(new[] { Shirt.ToString(), Pants.ToString() }),
-            "items carries the link TARGETS — the real items the links resolve to (FetchInvDescHandler.cs:429), never the links");
+        Assert.Equivalent(new[] { Shirt.ToString(), Pants.ToString() }, items.Keys, true);
         foreach (var value in items.Values)
-            Assert.That(((OSDMap)value).ContainsKey("linked_id"), Is.False, "a link must never appear in the items collection (risk A-R4)");
+            Assert.False(((OSDMap)value).ContainsKey("linked_id"), "a link must never appear in the items collection (risk A-R4)");
     }
 
-    [Test]
+    [Fact]
     public void the_cof_alias_resolves_to_the_current_outfit_folder()
     {
         var b = Inventory();
         var (status, cat) = Get(b, "/category/current/links");
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(cat["category_id"].AsUUID(), Is.EqualTo(Cof), "'current' resolved by folder type (T2)");
-        Assert.That(b.Calls, Does.Contain("GetInventorySkeleton"), "resolved deterministically over the skeleton (A7)");
-        Assert.That(Coll(cat, "links").Count, Is.EqualTo(2));
+        Assert.Equal(200, status);
+        Assert.Equal(Cof, cat["category_id"].AsUUID());
+        Assert.Contains("GetInventorySkeleton", b.Calls);
+        Assert.Equal(2, Coll(cat, "links").Count);
     }
 
-    [Test]
+    [Fact]
     public void an_empty_cof_returns_an_empty_links_collection_not_an_error()
     {
         var b = Inventory();
@@ -263,59 +259,59 @@ public class AisFetchRoutesHttpTests
         b.Items.Remove(LinkToPants);
 
         var (status, cat) = Get(b, "/category/current/links");
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(cat["category_id"].AsUUID(), Is.EqualTo(Cof));
-        Assert.That(Coll(cat, "links").Count, Is.EqualTo(0), "an empty outfit is an empty links map, so the viewer can count 0 descendents");
-        Assert.That(Coll(cat, "items").Count, Is.EqualTo(0));
+        Assert.Equal(200, status);
+        Assert.Equal(Cof, cat["category_id"].AsUUID());
+        Assert.Empty(Coll(cat, "links"));
+        Assert.Empty(Coll(cat, "items"));
     }
 
-    [Test]
+    [Fact]
     public void an_agent_with_no_cof_at_all_is_404()
     {
         var b = Inventory();
         b.CurrentOutfitId = UUID.Zero;
         b.Folders.Remove(Cof);
         var (status, body) = Get(b, "/category/current/links");
-        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
+        Assert.Equal((int)HttpStatusCode.NotFound, status);
         AssertErrorBody(body, 404);
     }
 
     // ------------------------------------------------------------------ orphans
 
-    [Test]
+    [Fact]
     public void the_orphans_route_lists_folders_whose_parent_is_gone()
     {
         var b = Inventory();
         var (status, body) = Get(b, "/orphans");
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(body.ContainsKey("category_id"), Is.False, "no top-level object, so the viewer parses _embedded straight (§1c)");
-        Assert.That(((OSDMap)Embedded(body)["categories"]).Count, Is.EqualTo(0));
+        Assert.Equal(200, status);
+        Assert.False(body.ContainsKey("category_id"), "no top-level object, so the viewer parses _embedded straight (§1c)");
+        Assert.Empty((OSDMap)Embedded(body)["categories"]);
 
         b.Folders.Remove(Outfits);
         var (_, withOrphan) = Get(b, "/orphans");
-        Assert.That(((OSDMap)Embedded(withOrphan)["categories"]).Keys, Is.EquivalentTo(new[] { Party.ToString() }));
+        Assert.Equivalent(new[] { Party.ToString() }, ((OSDMap)Embedded(withOrphan)["categories"]).Keys, true);
     }
 
     // ------------------------------------------------------------------ tid, library, config
 
-    [Test]
+    [Fact]
     public void tid_is_echoed_when_the_request_carries_one()
     {
         var tid = UUID.Random();
         var (_, cat) = Get(Inventory(), $"/category/{Clothing}/children?depth=0&tid={tid}");
-        Assert.That(cat["tid"].AsUUID(), Is.EqualTo(tid));
+        Assert.Equal(tid, cat["tid"].AsUUID());
 
         var (_, noTid) = Get(Inventory(), $"/category/{Clothing}/children?depth=0");
-        Assert.That(noTid.ContainsKey("tid"), Is.False, "nothing is invented when the request had no tid");
+        Assert.False(noTid.ContainsKey("tid"), "nothing is invented when the request had no tid");
     }
 
-    [Test]
+    [Fact]
     public void the_library_cap_serves_the_same_reads_and_refuses_every_mutation_with_405()
     {
         var b = Inventory();
         var (status, cat) = Get(b, $"/category/{Clothing}/children?depth=0", AisMode.Library);
-        Assert.That(status, Is.EqualTo(200), "reads are identical on the library cap");
-        Assert.That(cat["category_id"].AsUUID(), Is.EqualTo(Clothing));
+        Assert.Equal(200, status);
+        Assert.Equal(Clothing, cat["category_id"].AsUUID());
 
         foreach (var (verb, path) in new (string, string)[]
         {
@@ -327,7 +323,7 @@ public class AisFetchRoutesHttpTests
             var handler = new AisHandler(Cap, Agent, b, AisMode.Library);
             var response = new TestOSHttpResponse();
             handler.Handle(new FetchTestRequest(verb, Cap + path), response);
-            Assert.That(response.StatusCode, Is.EqualTo((int)HttpStatusCode.MethodNotAllowed), $"{verb} {path} on the library");
+            Assert.Equal((int)HttpStatusCode.MethodNotAllowed, response.StatusCode);
             var body = (OSDMap)OSDParser.DeserializeLLSDXml(response.RawBuffer);
             AssertErrorBody(body, 405);
         }
@@ -338,22 +334,22 @@ public class AisFetchRoutesHttpTests
     /// resolves independently for each region - a grid-wide flip is unacceptable under risk A-R1, because
     /// turning AIS on hands the LL viewer's whole inventory path to it with no fallback.
     /// </summary>
-    [Test]
+    [Fact]
     public void the_flag_defaults_off_and_resolves_per_region()
     {
-        Assert.That(AISv3Module.CapName, Is.EqualTo("InventoryAPIv3"));
-        Assert.That(AISv3Module.LibraryCapName, Is.EqualTo("LibraryAPIv3"));
+        Assert.Equal("InventoryAPIv3", AISv3Module.CapName);
+        Assert.Equal("LibraryAPIv3", AISv3Module.LibraryCapName);
 
         var module = new AISv3Module();
         module.Initialise(new Nini.Config.IniConfigSource());
-        Assert.That(module.Enabled, Is.False, "[AIS] Enabled defaults to false (A-D4, risk A-R1)");
-        Assert.DoesNotThrow(() => module.RegionLoaded(null), "a null scene is ignored, not dereferenced");
+        Assert.False(module.Enabled, "[AIS] Enabled defaults to false (A-D4, risk A-R1)");
+        Assert.True(Record.Exception(() => module.RegionLoaded(null)) is null, "a null scene is ignored, not dereferenced");
 
         var source = new Nini.Config.IniConfigSource();
         source.AddConfig("AIS").Set("Enabled", "true");
         var enabled = new AISv3Module();
         enabled.Initialise(source);
-        Assert.That(enabled.Enabled, Is.True);
+        Assert.True(enabled.Enabled);
     }
 
     /// <summary>
@@ -361,7 +357,7 @@ public class AisFetchRoutesHttpTests
     /// (a [&lt;Region Name&gt;] section, as AutoBackupModule.cs:400-406 reads it). Resolution is static and takes a
     /// plain config source, so it is provable without building a Scene.
     /// </summary>
-    [Test]
+    [Fact]
     public void one_region_can_be_enabled_without_affecting_the_others()
     {
         var sceneConfig = new Nini.Config.IniConfigSource();
@@ -369,33 +365,29 @@ public class AisFetchRoutesHttpTests
         sceneConfig.AddConfig("Ebony").Set("AIS_Enabled", "true");
         sceneConfig.AddConfig("Transylvania").Set("SomethingElse", "1");
 
-        Assert.That(AISv3Module.ResolveEnabled(false, sceneConfig, "Ebony"), Is.True,
-            "the named region opts in");
-        Assert.That(AISv3Module.ResolveEnabled(false, sceneConfig, "Transylvania"), Is.False,
-            "a region with its own section but no AIS_Enabled key stays on the grid default");
-        Assert.That(AISv3Module.ResolveEnabled(false, sceneConfig, "Elm"), Is.False,
-            "a region with no section at all stays on the grid default");
+        Assert.True(AISv3Module.ResolveEnabled(false, sceneConfig, "Ebony"), "the named region opts in");
+        Assert.False(AISv3Module.ResolveEnabled(false, sceneConfig, "Transylvania"), "a region with its own section but no AIS_Enabled key stays on the grid default");
+        Assert.False(AISv3Module.ResolveEnabled(false, sceneConfig, "Elm"), "a region with no section at all stays on the grid default");
 
         // and the override works downwards too: a grid that is on can exempt one region
         var optOut = new Nini.Config.IniConfigSource();
         optOut.AddConfig("Elm").Set("AIS_Enabled", "false");
-        Assert.That(AISv3Module.ResolveEnabled(true, optOut, "Elm"), Is.False);
-        Assert.That(AISv3Module.ResolveEnabled(true, optOut, "Ebony"), Is.True);
+        Assert.False(AISv3Module.ResolveEnabled(true, optOut, "Elm"));
+        Assert.True(AISv3Module.ResolveEnabled(true, optOut, "Ebony"));
 
-        Assert.That(AISv3Module.ResolveEnabled(false, null, "Ebony"), Is.False,
-            "no scene config at all falls back to the grid default");
+        Assert.False(AISv3Module.ResolveEnabled(false, null, "Ebony"), "no scene config at all falls back to the grid default");
     }
     // ------------------------------------------------------------------ shared assertions
 
     /// <summary>Spec §1f: an error body is a flat map that the viewer's update parser finds nothing to apply in.</summary>
     private static void AssertErrorBody(OSDMap body, int code)
     {
-        Assert.That(body["error_code"].AsInteger(), Is.EqualTo(code));
-        Assert.That(body.ContainsKey("message"), Is.True);
-        Assert.That(body.ContainsKey("parent_id"), Is.False);
-        Assert.That(body.ContainsKey("item_id"), Is.False);
-        Assert.That(body.ContainsKey("category_id"), Is.False);
-        Assert.That(body.ContainsKey("_embedded"), Is.False);
+        Assert.Equal(code, body["error_code"].AsInteger());
+        Assert.True(body.ContainsKey("message"));
+        Assert.False(body.ContainsKey("parent_id"));
+        Assert.False(body.ContainsKey("item_id"));
+        Assert.False(body.ContainsKey("category_id"));
+        Assert.False(body.ContainsKey("_embedded"));
     }
 
     // ------------------------------------------------------------------ conformance with the A0 fixtures
@@ -413,27 +405,27 @@ public class AisFetchRoutesHttpTests
     /// and integers are what this tree already sends, LLSDInventoryItem.cs:33-68), and no <c>last_owner_id</c>
     /// in <c>permissions</c> for the same reason.
     /// </summary>
-    [Test]
+    [Fact]
     public void live_envelopes_match_the_golden_fixture_key_sets()
     {
         var b = Inventory();
 
         var (_, item) = Get(b, $"/item/{Shirt}");
         var itemFixture = LoadFixture("item-fetch.xml");
-        Assert.That(item.Keys, Is.EquivalentTo(itemFixture.Keys), "item envelope");
-        Assert.That(((OSDMap)item["permissions"]).Keys, Is.EquivalentTo(((OSDMap)itemFixture["permissions"]).Keys), "permissions");
-        Assert.That(((OSDMap)item["sale_info"]).Keys, Is.EquivalentTo(((OSDMap)itemFixture["sale_info"]).Keys), "sale_info");
+        Assert.Equivalent(itemFixture.Keys, item.Keys, true);
+        Assert.Equivalent(((OSDMap)itemFixture["permissions"]).Keys, ((OSDMap)item["permissions"]).Keys, true);
+        Assert.Equivalent(((OSDMap)itemFixture["sale_info"]).Keys, ((OSDMap)item["sale_info"]).Keys, true);
         foreach (var key in itemFixture.Keys)
-            Assert.That(item[key].Type, Is.EqualTo(itemFixture[key].Type), $"item.{key} LLSD type");
+            Assert.Equal(itemFixture[key].Type, item[key].Type);
 
         var (_, cat) = Get(b, $"/category/{Clothing}/children?depth=1");
         var catFixture = LoadFixture("category-fetch.xml");
-        Assert.That(cat.Keys, Is.EquivalentTo(catFixture.Keys), "category envelope");
-        Assert.That(Embedded(cat).Keys, Is.EquivalentTo(Embedded(catFixture).Keys), "_embedded collections");
+        Assert.Equivalent(catFixture.Keys, cat.Keys, true);
+        Assert.Equivalent(Embedded(catFixture).Keys, Embedded(cat).Keys, true);
 
         var (_, link) = Get(b, $"/item/{LinkToShirt}");
         var linkFixture = (OSDMap)((OSDMap)Coll(catFixture, "links")).Values.First();
-        Assert.That(link.Keys, Is.EquivalentTo(linkFixture.Keys), "link envelope");
+        Assert.Equivalent(linkFixture.Keys, link.Keys, true);
     }
 
     /// <summary>
@@ -443,7 +435,7 @@ public class AisFetchRoutesHttpTests
     /// known (llaisapi.cpp:1380-1407), so our deepest expanded generation lands on exactly 0 - the last value
     /// that still counts. A requested depth above the viewer own ceiling of 50 is clamped.
     /// </summary>
-    [Test]
+    [Fact]
     public void the_depth_contract_matches_the_viewers_parse()
     {
         var b = Inventory();
@@ -451,31 +443,30 @@ public class AisFetchRoutesHttpTests
         // the two depths the viewer actually sends (llinventorymodelbackgroundfetch.cpp:937, :994 with
         // llaisapi.cpp:463-474): 0 for a plain fetch, 50 for a recursive one
         var (_, d0) = Get(b, $"/category/{Clothing}/children?depth=0");
-        Assert.That(((OSDMap)Coll(d0, "categories")[Outfits.ToString()]).ContainsKey("_embedded"), Is.False,
-            "depth 0 versions the requested folder only; every child must be a stub so the viewer re-queues it");
+        Assert.False(((OSDMap)Coll(d0, "categories")[Outfits.ToString()]).ContainsKey("_embedded"), "depth 0 versions the requested folder only; every child must be a stub so the viewer re-queues it");
 
         var (_, d50) = Get(b, $"/category/{Clothing}/children?depth=50");
         var outfits = (OSDMap)Coll(d50, "categories")[Outfits.ToString()];
         var party = (OSDMap)Coll(outfits, "categories")[Party.ToString()];
-        Assert.That(party.ContainsKey("_embedded"), Is.True, "a recursive fetch expands the whole tree");
+        Assert.True(party.ContainsKey("_embedded"), "a recursive fetch expands the whole tree");
 
         // every expanded category carries all three collections AND a version, or the viewer cannot count its
         // descendents and will never version it (llaisapi.cpp:1466-1482, risk A-R3)
         void AssertExpandedAreCountable(OSDMap c)
         {
             if (!c.ContainsKey("_embedded")) return;
-            Assert.That(c.ContainsKey("version"), Is.True, c["name"].AsString());
+            Assert.True(c.ContainsKey("version"), c["name"].AsString());
             var e = Embedded(c);
             foreach (var name in new[] { "categories", "items", "links" })
-                Assert.That(e.ContainsKey(name), Is.True, $"{c["name"].AsString()}: {name}");
+                Assert.True(e.ContainsKey(name), $"{c["name"].AsString()}: {name}");
             foreach (var child in ((OSDMap)e["categories"]).Values) AssertExpandedAreCountable((OSDMap)child);
         }
         AssertExpandedAreCountable(d50);
 
         // a depth beyond the viewer ceiling is clamped, not honoured literally
         var (status, clamped) = Get(b, $"/category/{Clothing}/children?depth=100000");
-        Assert.That(status, Is.EqualTo(200));
-        Assert.That(((OSDMap)Coll((OSDMap)Coll(clamped, "categories")[Outfits.ToString()], "categories")[Party.ToString()])
-            .ContainsKey("_embedded"), Is.True, "clamping to 50 still covers any real inventory");
+        Assert.Equal(200, status);
+        Assert.True(((OSDMap)Coll((OSDMap)Coll(clamped, "categories")[Outfits.ToString()], "categories")[Party.ToString()])
+            .ContainsKey("_embedded"), "clamping to 50 still covers any real inventory");
     }
 }

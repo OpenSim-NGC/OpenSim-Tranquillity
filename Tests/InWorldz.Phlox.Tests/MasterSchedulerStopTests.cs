@@ -15,7 +15,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Phlox.ScriptEngine;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

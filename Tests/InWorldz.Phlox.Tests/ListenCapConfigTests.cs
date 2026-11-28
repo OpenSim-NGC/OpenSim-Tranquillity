@@ -10,7 +10,6 @@ using Nini.Config;
 using OpenSim.Region.CoreModules.Scripting.WorldComm;
 using Phlox.ScriptEngine;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

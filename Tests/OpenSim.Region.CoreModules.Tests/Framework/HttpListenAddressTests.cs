@@ -121,7 +121,7 @@ public class HttpListenAddressTests
         using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         string path = Path.GetTempFileName();
         uint port = FreePort();
-        BaseHttpServer server = null;
+        BaseHttpServer? server = null;
         try
         {
             File.WriteAllBytes(path, certificate.Export(X509ContentType.Pkcs12, "listen-test"));
@@ -144,7 +144,7 @@ public class HttpListenAddressTests
         IPAddress before = MainServer.Instance.DefaultListenIPAddress;
         ICommandConsole savedConsole = InstallConsole();
         MainServer.Instance.DefaultListenIPAddress = IPAddress.Loopback;
-        IHttpServer server = null;
+        IHttpServer? server = null;
         try
         {
             server = MainServer.Instance.GetHttpServer(port);
@@ -167,7 +167,7 @@ public class HttpListenAddressTests
         IPAddress before = MainServer.Instance.DefaultListenIPAddress;
         ICommandConsole savedConsole = InstallConsole();
         MainServer.Instance.DefaultListenIPAddress = IPAddress.Any;
-        IHttpServer server = null;
+        IHttpServer? server = null;
         try
         {
             server = MainServer.Instance.GetHttpServer(port, IPAddress.Loopback);
