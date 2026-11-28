@@ -41,7 +41,7 @@ public class LandmarkTeleportTests : OpenSimTestCase
     public void AGoodLandmarkStillTeleports()
     {
         UUID region = UUID.Random();
-        AssetLandmark lm = Request($"Landmark version 2\nregion_id {region}\nlocal_pos 10 20 30\nregion_handle 1099511628032000\n", out bool failed);
+        AssetLandmark? lm = Request($"Landmark version 2\nregion_id {region}\nlocal_pos 10 20 30\nregion_handle 1099511628032000\n", out bool failed);
 
         Assert.False(failed);
         Assert.NotNull(lm);
@@ -49,22 +49,37 @@ public class LandmarkTeleportTests : OpenSimTestCase
         Assert.Equal(new Vector3(10, 20, 30), lm.Position);
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory(
-        "Existing landmark test failure",
-        "malformed landmark requests do not reach the test handler")]
+    [Theory]
+    // No region_handle line: the viewer itself reads only region_id and local_pos.
+    [InlineData("Landmark version 2\nregion_id {0}\nlocal_pos 10 20 30\n")]
+    // A region_handle line cut short.
+    [InlineData("Landmark version 2\nregion_id {0}\nlocal_pos 10 20 30\nregion_handle\n")]
+    [InlineData("Landmark version 2\r\nregion_id {0}\r\nlocal_pos 10 20 30\r\nregion_handle 1099511628032000\r\n")]
+    public void AShortLandmarkStillTeleports(string format)
+    {
+        UUID region = UUID.Random();
+        AssetLandmark? lm = Request(string.Format(format, region), out bool failed);
+
+        Assert.False(failed);
+        Assert.NotNull(lm);
+        Assert.Equal(region, lm.RegionID);
+        Assert.Equal(new Vector3(10, 20, 30), lm.Position);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("not a landmark")]
     [InlineData("Landmark version 2\nregion_id 1234\n")]
     public void ALandmarkThatCannotBeReadFailsTheTeleport(string data)
     {
-        AssetLandmark lm = Request(data, out bool failed);
+        AssetLandmark? lm = Request(data, out bool failed);
 
         Assert.Null(lm);
         Assert.True(failed);
     }
 
     /// <summary>Sends a TeleportLandmarkRequest for a landmark asset holding <paramref name="data"/>.</summary>
-    private static AssetLandmark Request(string data, out bool failed)
+    private static AssetLandmark? Request(string data, out bool failed)
     {
         Scene scene = new SceneHelpers().SetupScene();
         TestLLUDPServer udp = ClientStackHelpers.AddUdpServer(scene);
@@ -87,6 +102,6 @@ public class LandmarkTeleportTests : OpenSimTestCase
 
         failed = udp.PacketsSent.Exists(p => p is TeleportFailedPacket);
         scene.CloseAgent(sp.UUID, true);
-        return requested ?? throw new InvalidOperationException("The teleport landmark request was not handled.");
+        return requested;
     }
 }

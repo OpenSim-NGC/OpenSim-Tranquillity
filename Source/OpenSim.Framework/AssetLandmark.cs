@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Globalization;
 using OpenMetaverse;
 
 namespace OpenSim.Framework;
@@ -45,24 +46,81 @@ public class AssetLandmark : AssetBase
         InternData();
     }
 
+    /// <summary>
+    /// Reads the landmark text, one "key value" pair per line:
+    /// <code>
+    /// Landmark version 2
+    /// region_id &lt;uuid&gt;
+    /// local_pos &lt;x&gt; &lt;y&gt; &lt;z&gt;
+    /// region_handle &lt;handle&gt;
+    /// gatekeeper &lt;url&gt;
+    /// </code>
+    /// Lines are matched by key, not by position or column, so a short line, a missing optional line, extra
+    /// spaces or CRLF line endings do not stop the landmark being read. As in the viewer's
+    /// LLLandmark::constructFromString (indra/llinventory/lllandmark.cpp), region_id and local_pos are required;
+    /// region_handle (written by the simulator) and gatekeeper (written for Hypergrid) are optional.
+    /// </summary>
+    /// <exception cref="FormatException">The data has no valid region_id or local_pos.</exception>
     private void InternData()
     {
-        string temp = Util.UTF8.GetString(Data).Trim();
-        string[] parts = temp.Split('\n');
-        int.TryParse(parts[0].Substring(17, 1), out Version);
-        UUID.TryParse(parts[1].Substring(10, 36), out RegionID);
-        if (parts.Length >= 5)
-            Gatekeeper = parts[4].Replace("gatekeeper ", "");
-        // The position is a vector with spaces as separators ("10.3 32.5 43").
-        // Parse each scalar separately to take into account the system's culture setting.
-        string[] scalars = parts[2].Substring(10, parts[2].Length - 10).Split(' ');
-        if (scalars.Length > 0)
-            System.Single.TryParse(scalars[0], out Position.X);
-        if (scalars.Length > 1)
-            System.Single.TryParse(scalars[1], out Position.Y);
-        if (scalars.Length > 2)
-            System.Single.TryParse(scalars[2], out Position.Z);
+        string temp = Data is null ? string.Empty : Util.UTF8.GetString(Data);
+        bool haveRegion = false;
+        bool havePosition = false;
 
-        ulong.TryParse(parts[3].Substring(14, parts[3].Length - 14), out RegionHandle);
+        foreach (string rawLine in temp.Split('\n'))
+        {
+            string line = rawLine.Trim();
+            int space = line.IndexOfAny(Separators);
+            if (space < 0)
+                continue;
+
+            string key = line.Substring(0, space);
+            string value = line.Substring(space + 1).Trim();
+
+            switch (key)
+            {
+                case "Landmark":
+                    if (value.StartsWith("version", StringComparison.Ordinal))
+                        int.TryParse(value.Substring(7).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out Version);
+                    break;
+
+                case "region_id":
+                    haveRegion = UUID.TryParse(value, out RegionID) && !RegionID.IsZero();
+                    break;
+
+                case "local_pos":
+                    string[] scalars = value.Split(Separators, StringSplitOptions.RemoveEmptyEntries);
+                    havePosition = scalars.Length >= 3
+                        && TryParseScalar(scalars[0], out Position.X)
+                        && TryParseScalar(scalars[1], out Position.Y)
+                        && TryParseScalar(scalars[2], out Position.Z);
+                    break;
+
+                case "region_handle":
+                    ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out RegionHandle);
+                    break;
+
+                case "gatekeeper":
+                    Gatekeeper = value;
+                    break;
+            }
+        }
+
+        if (!haveRegion)
+            throw new FormatException("landmark has no valid region_id");
+        if (!havePosition)
+            throw new FormatException("landmark has no valid local_pos");
+    }
+
+    private static readonly char[] Separators = { ' ', '\t' };
+
+    /// <summary>
+    /// Landmarks are written with the invariant culture ("10.5"). Landmarks written by older servers in the
+    /// server's own culture ("10,5") are still read in that culture.
+    /// </summary>
+    private static bool TryParseScalar(string s, out float value)
+    {
+        return float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
+            || float.TryParse(s, out value);
     }
 }

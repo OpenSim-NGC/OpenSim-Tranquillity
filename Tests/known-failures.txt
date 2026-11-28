@@ -22,8 +22,3 @@ OpenSim.Region.PhysicsModules.Jolt.Harness.Tests :: OpenSim.Region.PhysicsModule
 OpenSim.Region.PhysicsModules.Jolt.Scenarios.Avatar.Tests :: OpenSim.Region.PhysicsModules.Jolt.Tests.FlyingSeatedAndFastLinksetAvatarTests.A_flying_avatar_hit_by_a_box_is_pushed_by_the_rule_for_a_box_and_keeps_flying(physicsHz: 0, kg: 100, speed: 5) # Jolt 2.26: scenario behavior changed
 OpenSim.Region.PhysicsModules.Jolt.Scenarios.Prim.Tests :: OpenSim.Region.PhysicsModules.Jolt.Tests.PrimCellCacheTests.Two_hundred_identical_prims_and_two_hundred_different_ones_against_no_cache # Jolt 2.26: scenario behavior changed
 OpenSim.Region.PhysicsModules.Jolt.Scenarios.Vehicle.Tests :: OpenSim.Region.PhysicsModules.Jolt.Tests.VehicleInWorldzMouselookTurnTests.The_ninety_degree_turn_under_each_behaviour(behaviour: "InWorldz", physicsRate: 45) # Jolt 2.26: scenario behavior changed
-
-# OpenSim.Region.ClientStack.LindenUDP.Tests (unrelated existing landmark failure)
-OpenSim.Region.ClientStack.LindenUDP.Tests :: OpenSim.Region.ClientStack.LindenUDP.Tests.LandmarkTeleportTests.ALandmarkThatCannotBeReadFailsTheTeleport(data: "") # unrelated: malformed request does not reach the test handler
-OpenSim.Region.ClientStack.LindenUDP.Tests :: OpenSim.Region.ClientStack.LindenUDP.Tests.LandmarkTeleportTests.ALandmarkThatCannotBeReadFailsTheTeleport(data: "Landmark version 2\nregion_id 1234\n") # unrelated: malformed request does not reach the test handler
-OpenSim.Region.ClientStack.LindenUDP.Tests :: OpenSim.Region.ClientStack.LindenUDP.Tests.LandmarkTeleportTests.ALandmarkThatCannotBeReadFailsTheTeleport(data: "not a landmark") # unrelated: malformed request does not reach the test handler
