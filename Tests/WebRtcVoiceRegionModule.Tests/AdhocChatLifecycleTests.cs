@@ -21,7 +21,7 @@
  */
 using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -31,7 +31,6 @@ using osWebRtcVoice.NonSpatial;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class AdhocChatLifecycleTests
     {
         private const string Grid = "example-grid";
@@ -67,95 +66,121 @@ namespace osWebRtcVoice.Tests
 
         // ---- the dialog value, measured rather than remembered ---------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SessionDropAndSessionLeaveAreTheSameDialogValue()
         {
-            Assert.That(AdhocChatMembership.DialogSessionLeave, Is.EqualTo(18),
-                "libomv SessionDrop == the viewer's IM_SESSION_LEAVE (llinstantmessage.h:112)");
-            Assert.That((byte)OpenMetaverse.InstantMessageDialog.SessionDrop, Is.EqualTo((byte)18),
-                "asserted against the real enum, not a mirrored constant");
-            Assert.That((byte)OpenMetaverse.InstantMessageDialog.SessionAdd, Is.EqualTo((byte)13),
-                "SessionAdd is IM_SESSION_INVITE, a viewer-side session TYPE the viewer never sends");
-            Assert.That(AdhocChatMembership.DialogSessionAddUnused, Is.EqualTo(13));
-            Assert.That(AdhocChatMembership.DialogSessionLeave, Is.Not.EqualTo(AdhocTextSession.DialogSessionSend));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            {
+                var assertedValue = AdhocChatMembership.DialogSessionLeave;
+                TestAssert.WithMessage(() => Assert.Equal(18, assertedValue), "libomv SessionDrop == the viewer's IM_SESSION_LEAVE (llinstantmessage.h:112)");
+            }
+            {
+                var assertedValue = (byte)OpenMetaverse.InstantMessageDialog.SessionDrop;
+                TestAssert.WithMessage(() => Assert.Equal((byte)18, assertedValue), "asserted against the real enum, not a mirrored constant");
+            }
+            {
+                var assertedValue = (byte)OpenMetaverse.InstantMessageDialog.SessionAdd;
+                TestAssert.WithMessage(() => Assert.Equal((byte)13, assertedValue), "SessionAdd is IM_SESSION_INVITE, a viewer-side session TYPE the viewer never sends");
+            }
+            Assert.Equal(13, AdhocChatMembership.DialogSessionAddUnused);
+            Assert.NotEqual(AdhocTextSession.DialogSessionSend, AdhocChatMembership.DialogSessionLeave);
         }
 
         // ---- lifecycle (1) alone: chat leave never touches voice --------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AChatLeaveRemovesTheMemberFromTheRosterAndKeepsTheirVoiceSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
             int seatsBefore = e.Store.Get(session).SeatsHeld;
 
-            Assert.That(AdhocChatMembership.TryHandleLeave(e, true, session, Bob,
-                            out string decision, out bool stillSeated), Is.True);
+            Assert.True(AdhocChatMembership.TryHandleLeave(e, true, session, Bob,
+                            out string decision, out bool stillSeated));
 
-            Assert.That(decision, Is.EqualTo(AdhocChatMembership.DecisionLeft));
-            Assert.That(stillSeated, Is.True, "the whole point: leaving the chat does not hang up the call");
-            Assert.That(e.Store.Get(session).SeatsHeld, Is.EqualTo(seatsBefore));
-            Assert.That(State(e, session, Bob), Is.EqualTo((false, true, false)));
-            Assert.That(AdhocConferenceRoster.Roster(e.Store.Get(session)), Is.EquivalentTo(new[] { Alice, Carol }));
-            Assert.That(AdhocConferenceRoster.SeatHolders(e.Store.Get(session)),
-                Is.EquivalentTo(new[] { Alice, Bob, Carol }), "the seat list is unchanged");
+            Assert.Equal(AdhocChatMembership.DecisionLeft, decision);
+            Assert.True(stillSeated, "the whole point: leaving the chat does not hang up the call");
+            Assert.Equal(seatsBefore, e.Store.Get(session).SeatsHeld);
+            Assert.Equal((false, true, false), State(e, session, Bob));
+            Assert.Equivalent(new[] { Alice, Carol }, AdhocConferenceRoster.Roster(e.Store.Get(session)), strict: true);
+            {
+                var assertedValue = AdhocConferenceRoster.SeatHolders(e.Store.Get(session));
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { Alice, Bob, Carol }, assertedValue, strict: true), "the seat list is unchanged");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AVoiceTeardownKeepsTheMemberInTheChat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
             e.Depart(session, Bob, DepartureReason.VoiceTeardown);
 
-            Assert.That(State(e, session, Bob), Is.EqualTo((true, false, false)),
-                "still in the chat with voice hung up");
-            Assert.That(AdhocConferenceRoster.Roster(e.Store.Get(session)),
-                Is.EquivalentTo(new[] { Alice, Bob, Carol }), "the panel keeps the name");
-            Assert.That(AdhocConferenceRoster.SeatHolders(e.Store.Get(session)),
-                Is.EquivalentTo(new[] { Alice, Carol }));
+            {
+                var assertedValue = State(e, session, Bob);
+                TestAssert.WithMessage(() => Assert.Equal((true, false, false), assertedValue), "still in the chat with voice hung up");
+            }
+            {
+                var assertedValue = AdhocConferenceRoster.Roster(e.Store.Get(session));
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { Alice, Bob, Carol }, assertedValue, strict: true), "the panel keeps the name");
+            }
+            Assert.Equivalent(new[] { Alice, Carol }, AdhocConferenceRoster.SeatHolders(e.Store.Get(session)), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SomeoneWhoLeftTheChatButKeptTheirSeatCanNoLongerType_AndGetsNoLines()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
             e.LeaveChat(session, Bob);
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, session, Bob, "still here",
-                            out AdhocTextPlan mine, out string d), Is.True);
-            Assert.That(mine, Is.Null);
-            Assert.That(d, Is.EqualTo(AdhocTextSession.DecisionNotMember));
+            Assert.True(AdhocTextSession.TryPlan(e, true, session, Bob, "still here",
+                            out AdhocTextPlan mine, out string d));
+            Assert.Null(mine);
+            Assert.Equal(AdhocTextSession.DecisionNotMember, d);
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, session, Alice, "anyone?",
-                            out AdhocTextPlan theirs, out _), Is.True);
-            Assert.That(theirs.Recipients, Is.EquivalentTo(new[] { Carol }), "Bob left the conversation");
+            Assert.True(AdhocTextSession.TryPlan(e, true, session, Alice, "anyone?",
+                            out AdhocTextPlan theirs, out _));
+            {
+                var assertedValue = theirs.Recipients;
+                TestAssert.WithMessage(() => Assert.Equivalent(new[] { Carol }, assertedValue, strict: true), "Bob left the conversation");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SomeoneWhoHungUpVoiceIsStillInTheConversation()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
             e.Depart(session, Bob, DepartureReason.VoiceTeardown);
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, session, Bob, "can still type",
-                            out AdhocTextPlan mine, out _), Is.True);
-            Assert.That(mine, Is.Not.Null, "hanging up must not silence a member");
-            Assert.That(mine.Recipients, Is.EquivalentTo(new[] { Alice, Carol }));
+            Assert.True(AdhocTextSession.TryPlan(e, true, session, Bob, "can still type",
+                            out AdhocTextPlan mine, out _));
+            {
+                var assertedValue = mine;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "hanging up must not silence a member");
+            }
+            Assert.Equivalent(new[] { Alice, Carol }, mine.Recipients, strict: true);
 
-            Assert.That(AdhocTextSession.TryPlan(e, true, session, Alice, "hi",
-                            out AdhocTextPlan theirs, out _), Is.True);
-            Assert.That(theirs.Recipients, Does.Contain(Bob), "and must not stop them hearing");
+            Assert.True(AdhocTextSession.TryPlan(e, true, session, Alice, "hi",
+                            out AdhocTextPlan theirs, out _));
+            {
+                var assertedValue = theirs.Recipients;
+                TestAssert.WithMessage(() => Assert.Contains(Bob, assertedValue), "and must not stop them hearing");
+            }
         }
 
         // ---- the whole product of the three axes -----------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheEightCombinations()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // (invited, in chat, seated) -- every state an agent can be in, reached by the real
             // transitions rather than by poking the model.
             var e = Engine();
@@ -163,97 +188,108 @@ namespace osWebRtcVoice.Tests
             UUID s = start.Session.SessionId;
 
             // 000 never involved
-            Assert.That(State(e, s, Stranger), Is.EqualTo((false, false, false)));
+            Assert.Equal((false, false, false), State(e, s, Stranger));
 
             // 100 invited, not answered -- holds no seat and is not in the conversation
-            Assert.That(State(e, s, Bob), Is.EqualTo((false, false, true)));
+            Assert.Equal((false, false, true), State(e, s, Bob));
 
             // 011 accepted: in the chat AND seated
             e.Accept(s, Bob, Region, "vs-bob");
-            Assert.That(State(e, s, Bob), Is.EqualTo((true, true, false)));
+            Assert.Equal((true, true, false), State(e, s, Bob));
 
             // 010 hung up voice, still typing  (lifecycle 3 only)
             e.Depart(s, Bob, DepartureReason.VoiceTeardown);
-            Assert.That(State(e, s, Bob), Is.EqualTo((true, false, false)));
+            Assert.Equal((true, false, false), State(e, s, Bob));
 
             // 001 closed the window, still in the call  (lifecycle 1 only)
             e.Accept(s, Bob, Region, "vs-bob");          // back in both
             e.LeaveChat(s, Bob);
-            Assert.That(State(e, s, Bob), Is.EqualTo((false, true, false)));
+            Assert.Equal((false, true, false), State(e, s, Bob));
 
             // 000 again, by the presence backstop -- which ends everything at once
             e.Depart(s, Bob, DepartureReason.PresenceLost);
-            Assert.That(State(e, s, Bob), Is.EqualTo((false, false, false)));
+            Assert.Equal((false, false, false), State(e, s, Bob));
 
             // 100 again: a fresh invite reopens the invitation without granting anything else
             e.Invite(s, Alice, Bob);
-            Assert.That(State(e, s, Bob), Is.EqualTo((false, false, true)));
+            Assert.Equal((false, false, true), State(e, s, Bob));
 
             // declined: no seat, no chat, no outstanding invitation
             e.Decline(s, Bob);
-            Assert.That(State(e, s, Bob), Is.EqualTo((false, false, false)));
-            Assert.That(e.Store.Get(s).Find(Bob).State, Is.EqualTo(MemberState.Declined));
+            Assert.Equal((false, false, false), State(e, s, Bob));
+            Assert.Equal(MemberState.Declined, e.Store.Get(s).Find(Bob).State);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EachLifecycleIsIdempotentAndDoesNotDisturbTheOthers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
-            Assert.That(e.LeaveChat(session, Bob).Decision, Is.EqualTo("chat-left"));
-            Assert.That(e.LeaveChat(session, Bob).Decision, Is.EqualTo("chat-leave-idempotent"));
-            Assert.That(State(e, session, Bob), Is.EqualTo((false, true, false)),
-                "a second leave must not take the seat as a consolation prize");
+            Assert.Equal("chat-left", e.LeaveChat(session, Bob).Decision);
+            Assert.Equal("chat-leave-idempotent", e.LeaveChat(session, Bob).Decision);
+            {
+                var assertedValue = State(e, session, Bob);
+                TestAssert.WithMessage(() => Assert.Equal((false, true, false), assertedValue), "a second leave must not take the seat as a consolation prize");
+            }
 
-            Assert.That(e.Depart(session, Bob, DepartureReason.VoiceTeardown).Ok, Is.True);
-            Assert.That(e.Depart(session, Bob, DepartureReason.VoiceTeardown).Decision, Is.EqualTo("depart-idempotent"));
-            Assert.That(State(e, session, Bob), Is.EqualTo((false, false, false)));
+            Assert.True(e.Depart(session, Bob, DepartureReason.VoiceTeardown).Ok);
+            Assert.Equal("depart-idempotent", e.Depart(session, Bob, DepartureReason.VoiceTeardown).Decision);
+            Assert.Equal((false, false, false), State(e, session, Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void LeavingAConferenceYouAreNotInIsANoOpNotAFailure()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
-            Assert.That(AdhocChatMembership.TryHandleLeave(e, true, session, Stranger,
-                            out string decision, out bool seated), Is.True);
-            Assert.That(decision, Is.EqualTo(AdhocChatMembership.DecisionNotMember));
-            Assert.That(seated, Is.False);
-            Assert.That(AdhocConferenceRoster.Roster(e.Store.Get(session)).Count, Is.EqualTo(3),
-                "nobody else is disturbed");
+            Assert.True(AdhocChatMembership.TryHandleLeave(e, true, session, Stranger,
+                            out string decision, out bool seated));
+            Assert.Equal(AdhocChatMembership.DecisionNotMember, decision);
+            Assert.False(seated);
+            {
+                var assertedValue = AdhocConferenceRoster.Roster(e.Store.Get(session)).Count;
+                TestAssert.WithMessage(() => Assert.Equal(3, assertedValue), "nobody else is disturbed");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupOrP2PLeaveIsNotOurs()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             UUID group = UUID.Random();
             e.Start(NonSpatialSessionType.Group, Alice, group, UUID.Zero, Region);
 
-            Assert.That(AdhocChatMembership.TryHandleLeave(e, true, group, Alice, out _, out _), Is.False,
-                "a group chat leave belongs to GroupsMessagingModule");
-            Assert.That(AdhocChatMembership.TryHandleLeave(e, true, UUID.Random(), Alice, out _, out _), Is.False);
+            Assert.False(AdhocChatMembership.TryHandleLeave(e, true, group, Alice, out _, out _), "a group chat leave belongs to GroupsMessagingModule");
+            Assert.False(AdhocChatMembership.TryHandleLeave(e, true, UUID.Random(), Alice, out _, out _));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheFlagOffRefusesTheLeaveInsteadOfSilentlyApplyingIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
-            Assert.That(AdhocChatMembership.TryHandleLeave(e, false, session, Bob,
-                            out string decision, out _), Is.True);
-            Assert.That(decision, Is.EqualTo(AdhocChatMembership.DecisionDisabled));
-            Assert.That(State(e, session, Bob), Is.EqualTo((true, true, false)), "nothing moved");
+            Assert.True(AdhocChatMembership.TryHandleLeave(e, false, session, Bob,
+                            out string decision, out _));
+            Assert.Equal(AdhocChatMembership.DecisionDisabled, decision);
+            {
+                var assertedValue = State(e, session, Bob);
+                TestAssert.WithMessage(() => Assert.Equal((true, true, false), assertedValue), "nothing moved");
+            }
         }
 
         // ---- the roster follows the chat axis, and the instrument says so -----------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheRosterUpdateOnAChatLeaveReachesEveryoneRemaining()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
 
@@ -266,28 +302,37 @@ namespace osWebRtcVoice.Tests
             e.LeaveChat(session, Bob);
             List<string> lines = AdhocConferenceRoster.SendLeave(new[] { scene }, e.Store.Get(session), Bob, _ => q);
 
-            Assert.That(q.Sent.Count, Is.EqualTo(2), "Alice and Carol");
-            Assert.That(q.Sent.Exists(x => x.ToAgent == Bob), Is.False);
+            {
+                var assertedValue = q.Sent.Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "Alice and Carol");
+            }
+            Assert.False(q.Sent.Exists(x => x.ToAgent == Bob));
             foreach (var sent in q.Sent)
             {
-                Assert.That(sent.Updates[0].agentID, Is.EqualTo(Bob));
-                Assert.That(sent.Updates[0].enterOrLeave, Is.False, "LEAVE");
+                Assert.Equal(Bob, sent.Updates[0].agentID);
+                Assert.False(sent.Updates[0].enterOrLeave, "LEAVE");
             }
-            Assert.That(lines, Has.Count.EqualTo(2));
+            Assert.Equal(2, lines.Count());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheInstrumentLineRecordsThatTheSeatSurvived()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var e = Engine();
             ThreeWay(e, out UUID session);
             AdhocChatMembership.TryHandleLeave(e, true, session, Bob, out string decision, out bool seated);
 
             string line = AdhocChatMembership.Line(Bob, session, decision, seated);
-            Assert.That(line, Does.Contain("[ADHOC CHAT]")
-                                 .And.Contain("adhoc-chat-left")
-                                 .And.Contain("voice_seat=kept"),
-                "the log is where a conflated lifecycle would be visible first");
+            {
+                var assertedValue = line;
+                TestAssert.WithMessage(() =>
+                {
+                    Assert.Contains("[ADHOC CHAT]", assertedValue);
+                    Assert.Contains("adhoc-chat-left", assertedValue);
+                    Assert.Contains("voice_seat=kept", assertedValue);
+                }, "the log is where a conflated lifecycle would be visible first");
+            }
         }
 
         /// <summary>Shared with AdhocConferenceTextTests; kept local so the fixtures stay independent.</summary>

@@ -20,7 +20,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using Nini.Config;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Tests.Common;
@@ -29,7 +29,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VoiceSessionWireTests
     {
         private static readonly UUID GroupId = NonSpatialIdentityTests.Group;
@@ -123,9 +122,10 @@ namespace osWebRtcVoice.Tests
 
         // ---- a region over HTTP ----------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARegionRunsACallThroughTheHandler()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             using TestServer server = new TestServer(NewHandler(service));
             GridNonSpatialSessions region = VoiceSessionServiceTests.NewRegion(NewClient(server));
@@ -135,22 +135,23 @@ namespace osWebRtcVoice.Tests
             string token = region.IssueToken(GroupId, Bob);
             NonSpatialVoiceSession s = region.Get(GroupId, Bob);
 
-            Assert.That(started.Ok, Is.True, started.Decision);
-            Assert.That(started.Created, Is.True);
-            Assert.That(started.StartedRinging, Is.True);
-            Assert.That(joined.Ok, Is.True, joined.Decision);
-            Assert.That(joined.StartedRinging, Is.False);
-            Assert.That(token, Is.Not.Null);
-            Assert.That(s.SeatsHeld, Is.EqualTo(2));
-            Assert.That(s.Find(Bob).ViewerSession, Is.EqualTo("viewer-one"));
-            Assert.That(s.Find(Bob).OriginRegion, Is.EqualTo(RegionB));
-            Assert.That(s.Token, Is.EqualTo(token));
-            Assert.That(service.SessionCount, Is.EqualTo(1));
+            Assert.True(started.Ok, started.Decision);
+            Assert.True(started.Created);
+            Assert.True(started.StartedRinging);
+            Assert.True(joined.Ok, joined.Decision);
+            Assert.False(joined.StartedRinging);
+            Assert.NotNull(token);
+            Assert.Equal(2, s.SeatsHeld);
+            Assert.Equal("viewer-one", s.Find(Bob).ViewerSession);
+            Assert.Equal(RegionB, s.Find(Bob).OriginRegion);
+            Assert.Equal(token, s.Token);
+            Assert.Equal(1, service.SessionCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheCredentialCrossesTheWireOnlyToAMember()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             using TestServer server = new TestServer(NewHandler(service));
             GridNonSpatialSessions region = VoiceSessionServiceTests.NewRegion(NewClient(server));
@@ -158,61 +159,76 @@ namespace osWebRtcVoice.Tests
             string token = region.IssueToken(GroupId, Alice);
             string key = region.Get(GroupId).RoomKey;
 
-            Assert.That(region.Get(GroupId, Alice).Token, Is.EqualTo(token));
-            Assert.That(region.GetByRoomKey(key, Alice).Token, Is.EqualTo(token));
-            Assert.That(region.Get(GroupId).Token, Is.Null.Or.Empty, "no agent named");
-            Assert.That(region.Get(GroupId, Carol).Token, Is.Null.Or.Empty, "not a member");
-            Assert.That(region.GetByRoomKey(key, Carol).Token, Is.Null.Or.Empty, "not a member, by room key");
+            Assert.Equal(token, region.Get(GroupId, Alice).Token);
+            Assert.Equal(token, region.GetByRoomKey(key, Alice).Token);
+            Assert.True(string.IsNullOrEmpty(region.Get(GroupId).Token), "no agent named");
+            Assert.True(string.IsNullOrEmpty(region.Get(GroupId, Carol).Token), "not a member");
+            Assert.True(string.IsNullOrEmpty(region.GetByRoomKey(key, Carol).Token), "not a member, by room key");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AReadNamingAnUnreadableAgentIsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             VoiceSessionPostHandler handler = NewHandler(service);
             VoiceSessionServiceTests.NewRegion(service).Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA);
 
-            Assert.That(handler.Dispatch("get", new Dictionary<string, object> { ["session"] = GroupId.ToString(), ["agent"] = "not-an-id" }), Is.Null);
-            Assert.That(handler.Dispatch("get", new Dictionary<string, object> { ["session"] = GroupId.ToString() }), Is.Not.Null, "naming none is fine");
+            Assert.Null(handler.Dispatch("get", new Dictionary<string, object> { ["session"] = GroupId.ToString(), ["agent"] = "not-an-id" }));
+            {
+                var assertedValue = handler.Dispatch("get", new Dictionary<string, object> { ["session"] = GroupId.ToString() });
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "naming none is fine");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EveryOperationRoundTrips()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             using TestServer server = new TestServer(NewHandler(service));
             GridNonSpatialSessions region = VoiceSessionServiceTests.NewRegion(NewClient(server));
 
             SessionOutcome conf = region.StartAdhoc(Alice, UUID.Random(), RegionA, new List<UUID> { Bob, Carol });
             UUID id = conf.Session.SessionId;
-            Assert.That(conf.Ok, Is.True, conf.Decision);
-            Assert.That(region.CheckInviteCount(id, Alice, new List<UUID> { UUID.Random() }).Ok, Is.True);
+            Assert.True(conf.Ok, conf.Decision);
+            Assert.True(region.CheckInviteCount(id, Alice, new List<UUID> { UUID.Random() }).Ok);
             UUID dave = UUID.Random();
-            Assert.That(region.Invite(id, Alice, dave).Decision, Is.EqualTo("invited"));
-            Assert.That(region.Accept(id, Bob, RegionA).Ok, Is.True);
-            Assert.That(region.MarkPresent(id, Bob, RegionA, "v").Ok, Is.True);
-            Assert.That(region.Decline(id, Carol).Decision, Is.EqualTo("declined"));
-            Assert.That(region.LeaveChat(id, Bob).Decision, Is.EqualTo("chat-left"));
+            Assert.Equal("invited", region.Invite(id, Alice, dave).Decision);
+            Assert.True(region.Accept(id, Bob, RegionA).Ok);
+            Assert.True(region.MarkPresent(id, Bob, RegionA, "v").Ok);
+            Assert.Equal("declined", region.Decline(id, Carol).Decision);
+            Assert.Equal("chat-left", region.LeaveChat(id, Bob).Decision);
             region.MarkInvited(id, new List<UUID> { dave });
-            Assert.That(region.Get(id).WasInvited(dave), Is.True);
-            Assert.That(region.VerifyRing(id, dave, Alice, NonSpatialSessionType.Adhoc).Decision, Is.EqualTo("ring-verified"));
-            Assert.That(region.VerifyRing(id, dave, Alice, NonSpatialSessionType.Adhoc).Decision, Is.EqualTo("refused-ring-used"), "over the wire too");
-            Assert.That(region.CarrierKey(id, Alice), Has.Length.GreaterThanOrEqualTo(CarrierAuth.MinSecretLength), "a seated member is given the key");
-            Assert.That(region.CarrierKey(id, UUID.Random()), Is.Null, "a stranger is not");
-            Assert.That(region.Moderate(id, Alice, ModerationOp.TextMute, Bob, true).Decision, Is.EqualTo("moderation-changed"));
-            Assert.That(region.Get(id).IsTextMuted(Bob), Is.True, "the record crossed the wire");
-            Assert.That(region.TryTakeConferenceRequest(Alice), Is.True);
-            Assert.That(region.DepartByViewerSession(Bob, "v", DepartureReason.VoiceTeardown), Has.Count.EqualTo(1));
-            Assert.That(region.Depart(id, Alice, DepartureReason.VoiceTeardown).Ok, Is.True);
-            Assert.That(region.DepartAll(dave, DepartureReason.PresenceLost), Has.Count.EqualTo(1), "the invited member leaves everything");
-            Assert.That(region.DepartRegion(RegionA), Is.GreaterThanOrEqualTo(0));
-            Assert.That(region.RenewSeats(new List<SeatKey> { new SeatKey(id, Alice) }), Is.True);
-            Assert.That(region.GetByRoomKey(region.Get(id).RoomKey)?.SessionId, Is.EqualTo(id));
+            Assert.True(region.Get(id).WasInvited(dave));
+            Assert.Equal("ring-verified", region.VerifyRing(id, dave, Alice, NonSpatialSessionType.Adhoc).Decision);
+            {
+                var assertedValue = region.VerifyRing(id, dave, Alice, NonSpatialSessionType.Adhoc).Decision;
+                TestAssert.WithMessage(() => Assert.Equal("refused-ring-used", assertedValue), "over the wire too");
+            }
+            Assert.True(region.CarrierKey(id, Alice).Length >= CarrierAuth.MinSecretLength, "a seated member is given the key");
+            {
+                var assertedValue = region.CarrierKey(id, UUID.Random());
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "a stranger is not");
+            }
+            Assert.Equal("moderation-changed", region.Moderate(id, Alice, ModerationOp.TextMute, Bob, true).Decision);
+            Assert.True(region.Get(id).IsTextMuted(Bob), "the record crossed the wire");
+            Assert.True(region.TryTakeConferenceRequest(Alice));
+            Assert.Single(region.DepartByViewerSession(Bob, "v", DepartureReason.VoiceTeardown));
+            Assert.True(region.Depart(id, Alice, DepartureReason.VoiceTeardown).Ok);
+            {
+                var assertedValue = region.DepartAll(dave, DepartureReason.PresenceLost);
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "the invited member leaves everything");
+            }
+            Assert.True(region.DepartRegion(RegionA) >= 0);
+            Assert.True(region.RenewSeats(new List<SeatKey> { new SeatKey(id, Alice) }));
+            Assert.Equal(id, region.GetByRoomKey(region.Get(id).RoomKey)?.SessionId);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARemovalCrossesTheWire_WithItsReasonAndLifetime_AndTheRenewalSaysWhichSeatsWereRemoved()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             using TestServer server = new TestServer(NewHandler(service));
             GridNonSpatialSessions region = VoiceSessionServiceTests.NewRegion(NewClient(server));
@@ -221,21 +237,25 @@ namespace osWebRtcVoice.Tests
 
             SessionOutcome removed = region.Moderate(GroupId, Alice, ModerationOp.Remove, Bob, true, "too loud", TimeSpan.FromMinutes(30));
 
-            Assert.That(removed.Decision, Is.EqualTo("moderation-changed"));
+            Assert.Equal("moderation-changed", removed.Decision);
             CallRemoval r = region.Get(GroupId).RemovalOf(Bob);
-            Assert.That(r.Reason, Is.EqualTo("too loud"));
-            Assert.That(r.By, Is.EqualTo(Alice));
-            Assert.That(r.ExpiresUtc - r.AtUtc, Is.EqualTo(TimeSpan.FromMinutes(30)));
-            Assert.That(region.Get(GroupId).Find(Bob).HoldsSeat, Is.False);
-            Assert.That(region.RenewSeats(new List<SeatKey> { new SeatKey(GroupId, Alice), new SeatKey(GroupId, Bob) },
-                                          out IReadOnlyList<SeatKey> told), Is.True);
-            Assert.That(told, Is.EqualTo(new[] { new SeatKey(GroupId, Bob) }), "only the removed member's seat is named");
-            Assert.That(region.Moderate(GroupId, Alice, ModerationOp.Remove, Bob, false).Decision, Is.EqualTo("moderation-changed"));
+            Assert.Equal("too loud", r.Reason);
+            Assert.Equal(Alice, r.By);
+            Assert.Equal(TimeSpan.FromMinutes(30), r.ExpiresUtc - r.AtUtc);
+            Assert.False(region.Get(GroupId).Find(Bob).HoldsSeat);
+            Assert.True(region.RenewSeats(new List<SeatKey> { new SeatKey(GroupId, Alice), new SeatKey(GroupId, Bob) },
+                                          out IReadOnlyList<SeatKey> told));
+            {
+                var assertedValue = told;
+                TestAssert.WithMessage(() => Assert.Equal(new[] { new SeatKey(GroupId, Bob) }, assertedValue), "only the removed member's seat is named");
+            }
+            Assert.Equal("moderation-changed", region.Moderate(GroupId, Alice, ModerationOp.Remove, Bob, false).Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnOldRegionsModerateRequestIsStillRead_AndAReasonIsBoundedAndCleaned()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             VoiceSessionPostHandler handler = NewHandler(service);
             VoiceSessionServiceTests.NewRegion(service).Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA);
@@ -243,41 +263,49 @@ namespace osWebRtcVoice.Tests
             {
                 ["session"] = GroupId.ToString(), ["by"] = Alice.ToString(), ["target"] = Bob.ToString(), ["op"] = "0", ["on"] = "1",
             };
-            Assert.That(handler.Dispatch("moderate", old)?.Ok, Is.True, "no reason and no minutes: an old region's request");
+            Assert.True((handler.Dispatch("moderate", old)?.Ok), "no reason and no minutes: an old region's request");
 
             Dictionary<string, object> removal = new(old) { ["op"] = "3", ["reason"] = "ab\u0007\ncd" + new string('x', 500),["minutes"] = "99999999" };
             SessionReply r = handler.Dispatch("moderate", removal);
 
-            Assert.That(r.Ok, Is.True);
+            Assert.True(r.Ok);
             CallRemoval stored = SessionWire.FromData(r.Session).RemovalOf(Bob);
-            Assert.That(stored.Reason.Length, Is.LessThanOrEqualTo(200));
-            Assert.That(stored.Reason, Does.StartWith("abcdxxx"), "control characters are dropped");
-            Assert.That(stored.ExpiresUtc - stored.AtUtc, Is.EqualTo(TimeSpan.FromMinutes(VoiceSessionService.MaxRemovalMinutes)), "bounded");
+            Assert.True(stored.Reason.Length <= 200);
+            {
+                var assertedValue = stored.Reason;
+                TestAssert.WithMessage(() => Assert.StartsWith("abcdxxx", assertedValue), "control characters are dropped");
+            }
+            {
+                var assertedValue = stored.ExpiresUtc - stored.AtUtc;
+                TestAssert.WithMessage(() => Assert.Equal(TimeSpan.FromMinutes(VoiceSessionService.MaxRemovalMinutes), assertedValue), "bounded");
+            }
 
             old["minutes"] = "not a number";
             old["op"] = "3";
-            Assert.That(handler.Dispatch("moderate", old)?.Ok, Is.True, "an unreadable lifetime is taken as none");
+            Assert.True((handler.Dispatch("moderate", old)?.Ok), "an unreadable lifetime is taken as none");
         }
 
         // ---- protection ---------------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARegionWithTheWrongPasswordIsRefusedAndNothingChanges()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             using TestServer server = new TestServer(NewHandler(service));
             GridNonSpatialSessions region = VoiceSessionServiceTests.NewRegion(NewClient(server, Config(password: "not-the-service-password-not-the-service")));
 
             SessionOutcome o = region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA);
 
-            Assert.That(o.Ok, Is.False);
-            Assert.That(o.Decision, Is.EqualTo(SessionOutcome.StoreUnavailable));
-            Assert.That(service.SessionCount, Is.EqualTo(0));
+            Assert.False(o.Ok);
+            Assert.Equal(SessionOutcome.StoreUnavailable, o.Decision);
+            Assert.Equal(0, service.SessionCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARequestWithNoCredentialIsRefusedBeforeItIsRead()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             VoiceSessionPostHandler handler = NewHandler(service);
             TestOSHttpResponse response = new TestOSHttpResponse();
@@ -286,24 +314,27 @@ namespace osWebRtcVoice.Tests
             byte[] reply = handler.Handle(VoiceSessionPostHandler.HandlerPath, new MemoryStream(Encoding.UTF8.GetBytes(body)),
                                           new TestOSHttpRequest(), response);
 
-            Assert.That(response.StatusCode, Is.EqualTo((int)HttpStatusCode.Unauthorized));
-            Assert.That(reply, Is.Empty);
-            Assert.That(service.SessionCount, Is.EqualTo(0));
+            Assert.Equal((int)HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.Empty(reply);
+            Assert.Equal(0, service.SessionCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnEmptyConfigurationIsNotAcceptableAuthentication()
         {
-            Assert.That(VoiceSessionServerConnector.CheckAuthConfig(new IniConfigSource()), Is.Not.Null);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.NotNull(VoiceSessionServerConnector.CheckAuthConfig(new IniConfigSource()));
         }
 
-        [TestCase("None", User, Password)]
-        [TestCase("BasicHttpAuthentication", "", Password)]
-        [TestCase("BasicHttpAuthentication", User, "")]
-        [TestCase("BasicHttpAuthentication", User, "short-password")]
-        [TestCase("BasicHttpAuthentication", User, "0123456789abcdef0123456789abcde")]   // 31 characters
+        [InlineData("None",User,Password)]
+        [InlineData("BasicHttpAuthentication","",Password)]
+        [InlineData("BasicHttpAuthentication",User,"")]
+        [InlineData("BasicHttpAuthentication",User,"short-password")]
+        [InlineData("BasicHttpAuthentication",User,"0123456789abcdef0123456789abcde")]   // 31 characters
+        [Theory(Timeout = 60000)]
         public void AnEnabledServiceRefusesToLoadWithoutAcceptableAuthentication(string authType, string user, string password)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IniConfigSource config = new IniConfigSource();
             IConfig c = config.AddConfig(VoiceSessionServerConnector.SectionName);
             c.Set("Enabled", "true");
@@ -311,43 +342,59 @@ namespace osWebRtcVoice.Tests
             c.Set("HttpAuthUsername", user);
             c.Set("HttpAuthPassword", password);
 
-            Assert.That(VoiceSessionServerConnector.CheckAuthConfig(config), Is.Not.Null);
+            Assert.NotNull(VoiceSessionServerConnector.CheckAuthConfig(config));
             Assert.Throws<Exception>(() => new VoiceSessionServerConnector(config, null, VoiceSessionServerConnector.SectionName));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnAcceptablePasswordPassesTheCheck_AndThe32CharacterBoundaryIsInclusive()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IniConfigSource config = Config("0123456789abcdef0123456789abcdef");   // exactly 32
-            Assert.That(VoiceSessionServerConnector.CheckAuthConfig(config), Is.Null);
+            Assert.Null(VoiceSessionServerConnector.CheckAuthConfig(config));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADisabledServiceServesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IniConfigSource none = new IniConfigSource();
-            Assert.DoesNotThrow(() => new VoiceSessionServerConnector(none, null, VoiceSessionServerConnector.SectionName));
+            {
+                var assertedValue = () => new VoiceSessionServerConnector(none, null, VoiceSessionServerConnector.SectionName);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
             IniConfigSource off = new IniConfigSource();
             off.AddConfig(VoiceSessionServerConnector.SectionName).Set("Enabled", "false");
-            Assert.DoesNotThrow(() => new VoiceSessionServerConnector(off, null, VoiceSessionServerConnector.SectionName));
+            {
+                var assertedValue = () => new VoiceSessionServerConnector(off, null, VoiceSessionServerConnector.SectionName);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
         }
 
         // ---- malformed requests change nothing -----------------------------------------------------------
 
-        [TestCase("")]
-        [TestCase("not a form")]
-        [TestCase("type=2&creator=x")]
-        [TestCase("METHOD=nosuchmethod")]
-        [TestCase("METHOD=start")]
-        [TestCase("METHOD=start&type=two&creator=11111111-1111-1111-1111-111111111111&other=x&temp=x&origin=x&cap=0")]
-        [TestCase("METHOD=start&type=2&creator=not-a-uuid&other=99999999-9999-9999-9999-999999999999&temp=99999999-9999-9999-9999-999999999999&origin=99999999-9999-9999-9999-999999999999&cap=0")]
-        [TestCase("METHOD=accept&session=99999999-9999-9999-9999-999999999999")]
-        [TestCase("METHOD=startadhoc&creator=11111111-1111-1111-1111-111111111111&temp=22222222-2222-2222-2222-222222222222&origin=33333333-3333-3333-3333-333333333333&cap=0&invitees=11111111-1111-1111-1111-111111111111,garbage")]
-        [TestCase("METHOD=renewseats&seats=garbage")]
-        [TestCase("METHOD=depart&session=99999999-9999-9999-9999-999999999999&agent=11111111-1111-1111-1111-111111111111&reason=banana")]
-        [TestCase("METHOD=getbyroomkey&roomkey=")]
+        [InlineData("")]
+        [InlineData("not a form")]
+        [InlineData("type=2&creator=x")]
+        [InlineData("METHOD=nosuchmethod")]
+        [InlineData("METHOD=start")]
+        [InlineData("METHOD=start&type=two&creator=11111111-1111-1111-1111-111111111111&other=x&temp=x&origin=x&cap=0")]
+        [InlineData("METHOD=start&type=2&creator=not-a-uuid&other=99999999-9999-9999-9999-999999999999&temp=99999999-9999-9999-9999-999999999999&origin=99999999-9999-9999-9999-999999999999&cap=0")]
+        [InlineData("METHOD=accept&session=99999999-9999-9999-9999-999999999999")]
+        [InlineData("METHOD=startadhoc&creator=11111111-1111-1111-1111-111111111111&temp=22222222-2222-2222-2222-222222222222&origin=33333333-3333-3333-3333-333333333333&cap=0&invitees=11111111-1111-1111-1111-111111111111,garbage")]
+        [InlineData("METHOD=renewseats&seats=garbage")]
+        [InlineData("METHOD=depart&session=99999999-9999-9999-9999-999999999999&agent=11111111-1111-1111-1111-111111111111&reason=banana")]
+        [InlineData("METHOD=getbyroomkey&roomkey=")]
+        [Theory(Timeout = 60000)]
         public void AMalformedRequestIsAFailureAndChangesNothing(string body)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             VoiceSessionPostHandler handler = NewHandler(service);
             TestOSHttpRequest request = new TestOSHttpRequest();
@@ -357,13 +404,17 @@ namespace osWebRtcVoice.Tests
                                           request, new TestOSHttpResponse());
 
             string text = Encoding.UTF8.GetString(reply);
-            Assert.That(text, Does.Contain("Failure"), text);
-            Assert.That(service.SessionCount, Is.EqualTo(0));
+            {
+                var assertedValue = text;
+                TestAssert.WithMessage(() => Assert.Contains("Failure", assertedValue), text);
+            }
+            Assert.Equal(0, service.SessionCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARequestOverTheSizeLimitIsAFailure()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             VoiceSessionPostHandler handler = NewHandler(service);
             TestOSHttpRequest request = new TestOSHttpRequest();
@@ -373,14 +424,15 @@ namespace osWebRtcVoice.Tests
             byte[] reply = handler.Handle(VoiceSessionPostHandler.HandlerPath, new MemoryStream(Encoding.UTF8.GetBytes(body)),
                                           request, new TestOSHttpResponse());
 
-            Assert.That(Encoding.UTF8.GetString(reply), Does.Contain("Failure"));
+            Assert.Contains("Failure", Encoding.UTF8.GetString(reply));
         }
 
         // ---- the service is not reachable ------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WithNothingListening_ARegionIsRefusedCleanly()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             TestServer first = new TestServer(NewHandler(service));
             string uri = first.BaseUri;
@@ -389,18 +441,28 @@ namespace osWebRtcVoice.Tests
             GridNonSpatialSessions region = VoiceSessionServiceTests.NewRegion(client);
 
             SessionOutcome refused = default;
-            Assert.DoesNotThrow(() => refused = region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA));
-            Assert.That(refused.Ok, Is.False);
-            Assert.That(refused.Decision, Is.EqualTo(SessionOutcome.StoreUnavailable));
-            Assert.That(region.Get(GroupId), Is.Null);
-            Assert.That(service.SessionCount, Is.EqualTo(0), "no session anywhere");
+            {
+                var assertedValue = () => refused = region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA);
+                Assert.Null(Record.Exception(() =>
+                {
+                    assertedValue();
+                }));
+            }
+            Assert.False(refused.Ok);
+            Assert.Equal(SessionOutcome.StoreUnavailable, refused.Decision);
+            Assert.Null(region.Get(GroupId));
+            {
+                var assertedValue = service.SessionCount;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "no session anywhere");
+            }
         }
 
         // ---- the wire contract ---------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EveryRequestHasTheDocumentedBody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The names and order of the fields each operation sends. A later move to another web stack, or a
             // service written by someone else, is checked against these bytes.
             UUID s = new UUID("a0000000-0000-4000-8000-000000000001");
@@ -467,25 +529,26 @@ namespace osWebRtcVoice.Tests
             string[] actual;
             lock (server.Bodies)
                 actual = server.Bodies.ToArray();
-            Assert.That(actual, Is.EqualTo(expected));
+            Assert.Equal(expected, actual);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheReplyEnvelopeHasTheDocumentedShape()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             SessionReply reply = new SessionReply { Ok = true, Decision = "found", Text = "t", Flag = true, Count = 2 };
 
-            Assert.That(reply.ToJson(), Is.EqualTo(
-                "{\"Ok\":true,\"Decision\":\"found\",\"Created\":false,\"StartedRinging\":false,\"Session\":null,\"Sessions\":null,\"Text\":\"t\",\"Flag\":true,\"Count\":2}"));
+            Assert.Equal("{\"Ok\":true,\"Decision\":\"found\",\"Created\":false,\"StartedRinging\":false,\"Session\":null,\"Sessions\":null,\"Text\":\"t\",\"Flag\":true,\"Count\":2}", reply.ToJson());
             SessionReply back = SessionReply.FromJson(reply.ToJson());
-            Assert.That(new object[] { back.Ok, back.Decision, back.Text, back.Flag, back.Count }, Is.EqualTo(new object[] { true, "found", "t", true, 2 }));
-            Assert.That(SessionReply.FromJson("not json"), Is.Null);
-            Assert.That(SessionReply.FromJson(""), Is.Null);
+            Assert.Equal(new object[] { true, "found", "t", true, 2 }, new object[] { back.Ok, back.Decision, back.Text, back.Flag, back.Count });
+            Assert.Null(SessionReply.FromJson("not json"));
+            Assert.Null(SessionReply.FromJson(""));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARoundTripThroughTheHandlerOnLoopback_IsReportedAsNumbers()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Not a tight assertion: the figure that matters is the one measured between two hosts. This puts a number
             // on the handler, the authentication and the serialisation alone.
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
@@ -500,17 +563,18 @@ namespace osWebRtcVoice.Tests
             for (int i = 0; i < n; i++)
             {
                 System.Diagnostics.Stopwatch w = System.Diagnostics.Stopwatch.StartNew();
-                Assert.That(region.Get(id), Is.Not.Null);
+                Assert.NotNull(region.Get(id));
                 ms.Add(w.Elapsed.TotalMilliseconds);
             }
             ms.Sort();
-            TestContext.Progress.WriteLine($"[loopback] get x{n}: median {ms[n / 2]:F2} ms, p95 {ms[(int)(n * 0.95)]:F2} ms, max {ms[n - 1]:F2} ms");
-            Assert.That(ms[n / 2], Is.LessThan(250), "a loopback request is nowhere near a quarter of a second");
+            TestContext.Current.TestOutputHelper.WriteLine($"[loopback] get x{n}: median {ms[n / 2]:F2} ms, p95 {ms[(int)(n * 0.95)]:F2} ms, max {ms[n - 1]:F2} ms");
+            Assert.True((ms[n / 2]) < 250, "a loopback request is nowhere near a quarter of a second");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AServiceThatDoesNotAnswerInTime_IsRefusedCleanly_AndTheClientDoesNotWaitForever()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             using TestServer server = new TestServer(NewHandler(service));
             server.Answering.Reset();
@@ -521,21 +585,22 @@ namespace osWebRtcVoice.Tests
             SessionOutcome refused = region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA);
             waited.Stop();
 
-            Assert.That(refused.Ok, Is.False);
-            Assert.That(refused.Decision, Is.EqualTo(SessionOutcome.StoreUnavailable));
-            Assert.That(waited.Elapsed, Is.LessThan(TimeSpan.FromSeconds(8)), "it gave up at its own timeout, not the server's");
-            Assert.That(service.SessionCount, Is.EqualTo(0));
+            Assert.False(refused.Ok);
+            Assert.Equal(SessionOutcome.StoreUnavailable, refused.Decision);
+            Assert.True(waited.Elapsed < TimeSpan.FromSeconds(8), "it gave up at its own timeout, not the server's");
+            Assert.Equal(0, service.SessionCount);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ACallToAServiceThatHasHung_Answers503()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             using TestServer server = new TestServer(NewHandler(service));
             VoiceSessionServicesConnector client = new VoiceSessionServicesConnector(Config(), "WebRtcVoice", server.BaseUri, 1000);
             GridNonSpatialSessions region = VoiceSessionServiceTests.NewRegion(client);
             A2ACalls calls = new A2ACalls(() => region);
-            Assert.That(calls.Record(Alice, Bob, RegionA, out _), Is.Not.Null);
+            Assert.NotNull(calls.Record(Alice, Bob, RegionA, out _));
             server.Answering.Reset();
 
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(new OpenMetaverse.StructuredData.OSDMap
@@ -544,40 +609,49 @@ namespace osWebRtcVoice.Tests
                 ["session-id"] = OpenMetaverse.StructuredData.OSD.FromUUID(A2ACalls.ComputeSessionId(Alice, Bob)),
             }, Alice, calls);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.ServiceUnavailable), "a timeout is not the store saying the call is gone");
+            {
+                var assertedValue = o.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.ServiceUnavailable, assertedValue), "a timeout is not the store saying the call is gone");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AServiceWithNoSuchSession_AnswersTheStartUpCheck()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             using TestServer server = new TestServer(NewHandler(service));
             VoiceSessionServicesConnector client = new VoiceSessionServicesConnector(Config(), "WebRtcVoice", server.BaseUri, 1000);
 
             SessionReply reply = client.Get(UUID.Zero);
 
-            Assert.That(reply, Is.Not.Null, "an answer, even a refusal, means the service is there");
-            Assert.That(reply.Ok, Is.False);
+            {
+                var assertedValue = reply;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "an answer, even a refusal, means the service is there");
+            }
+            Assert.False(reply.Ok);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void NothingAtTheAddress_DoesNotAnswerTheStartUpCheck()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             TestServer first = new TestServer(NewHandler(service));
             string uri = first.BaseUri;
             first.Dispose();
 
-            Assert.That(new VoiceSessionServicesConnector(Config(), "WebRtcVoice", uri, 1000).Get(UUID.Zero), Is.Null);
+            Assert.Null(new VoiceSessionServicesConnector(Config(), "WebRtcVoice", uri, 1000).Get(UUID.Zero));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AWrongPassword_DoesNotAnswerTheStartUpCheck()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = VoiceSessionServiceTests.NewService();
             using TestServer server = new TestServer(NewHandler(service));
 
-            Assert.That(NewClient(server, Config(password: "not-the-service-password-not-the-service")).Get(UUID.Zero), Is.Null);
+            Assert.Null(NewClient(server, Config(password: "not-the-service-password-not-the-service")).Get(UUID.Zero));
         }
     }
 }

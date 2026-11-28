@@ -12,7 +12,7 @@
  */
 using System.Collections.Generic;
 using System.Linq;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using osWebRtcVoice.NonSpatial;
@@ -20,7 +20,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class CarrierKeyTests
     {
         private static readonly UUID Dave = new UUID("44444444-4444-4444-4444-444444444444");
@@ -40,10 +39,10 @@ namespace osWebRtcVoice.Tests
             g.Sender = VoiceSessionServiceTests.NewRegion(g.Service);
             g.Receiver = VoiceSessionServiceTests.NewRegion(g.Service);
             SessionOutcome started = g.Sender.StartAdhoc(Alice, UUID.Random(), RegionA, new List<UUID> { Bob, Carol });
-            Assert.That(started.Ok, Is.True, started.Decision);
+            Assert.True(started.Ok, started.Decision);
             g.SessionId = started.Session.SessionId;
             g.RoomKey = started.Session.RoomKey;
-            Assert.That(g.Receiver.Accept(g.SessionId, Bob, RegionB).Ok, Is.True);
+            Assert.True(g.Receiver.Accept(g.SessionId, Bob, RegionB).Ok);
             return g;
         }
 
@@ -55,172 +54,197 @@ namespace osWebRtcVoice.Tests
 
         // ---- who is given the key ---------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASeatedMemberIsGivenTheConferencesKey_AndItDoesNotChange()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             string first = g.Sender.CarrierKey(g.SessionId, Alice);
             string again = g.Receiver.CarrierKey(g.SessionId, Bob);
 
-            Assert.That(first, Has.Length.GreaterThanOrEqualTo(CarrierAuth.MinSecretLength));
-            Assert.That(again, Is.EqualTo(first), "every member of the conference has the same key");
+            Assert.True(first.Length >= CarrierAuth.MinSecretLength);
+            {
+                var assertedValue = again;
+                TestAssert.WithMessage(() => Assert.Equal(first, assertedValue), "every member of the conference has the same key");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnInviteeWhoHasNotJoined_AStranger_AndAnUnknownSession_AreGivenNone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
-            Assert.That(g.Receiver.CarrierKey(g.SessionId, Carol), Is.Null, "invited, not seated");
-            Assert.That(g.Receiver.CarrierKey(g.SessionId, Dave), Is.Null, "not in the conference");
-            Assert.That(g.Receiver.CarrierKey(UUID.Random(), Alice), Is.Null);
+            {
+                var assertedValue = g.Receiver.CarrierKey(g.SessionId, Carol);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "invited, not seated");
+            }
+            {
+                var assertedValue = g.Receiver.CarrierKey(g.SessionId, Dave);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "not in the conference");
+            }
+            Assert.Null(g.Receiver.CarrierKey(UUID.Random(), Alice));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AGroupSessionHasNoTextKey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             g.Sender.Start(NonSpatialSessionType.Group, Alice, NonSpatialIdentityTests.Group, NonSpatialIdentityTests.Group, RegionA);
 
-            Assert.That(g.Sender.CarrierKey(NonSpatialIdentityTests.Group, Alice), Is.Null);
+            Assert.Null(g.Sender.CarrierKey(NonSpatialIdentityTests.Group, Alice));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TwoConferencesHaveTwoKeys()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             SessionOutcome other = g.Sender.StartAdhoc(Alice, UUID.Random(), RegionA);
 
-            Assert.That(g.Sender.CarrierKey(other.Session.SessionId, Alice), Is.Not.EqualTo(g.Sender.CarrierKey(g.SessionId, Alice)));
+            Assert.NotEqual(g.Sender.CarrierKey(g.SessionId, Alice), g.Sender.CarrierKey(other.Session.SessionId, Alice));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADepartedMemberIsNoLongerGivenTheKey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             g.Receiver.Depart(g.SessionId, Bob, DepartureReason.VoiceTeardown);
             GridNonSpatialSessions fresh = VoiceSessionServiceTests.NewRegion(g.Service);   // a region that has not kept it
 
-            Assert.That(fresh.CarrierKey(g.SessionId, Bob), Is.Null);
+            Assert.Null(fresh.CarrierKey(g.SessionId, Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheKeyIsNeverInACopyOfTheSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             string key = g.Sender.CarrierKey(g.SessionId, Alice);
 
-            Assert.That(g.Service.Get(g.SessionId, Alice).ToJson(), Does.Not.Contain(key));
-            Assert.That(g.Service.Get(g.SessionId, Bob).ToJson(), Does.Not.Contain(key));
+            Assert.DoesNotContain(key, g.Service.Get(g.SessionId, Alice).ToJson());
+            Assert.DoesNotContain(key, g.Service.Get(g.SessionId, Bob).ToJson());
         }
 
         // ---- a line across regions --------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALineSignedWithTheConferencesKey_IsAccepted_WithNoSharedSecret()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             TextIntake t = Receive(Line(g, g.Sender.CarrierKey(g.SessionId, Alice)), g.Receiver);
 
-            Assert.That(t.Ok, Is.True, t.Decision);
-            Assert.That(t.Message, Is.EqualTo("hello"));
-            Assert.That(t.Sender, Is.EqualTo(Alice));
+            Assert.True(t.Ok, t.Decision);
+            Assert.Equal("hello", t.Message);
+            Assert.Equal(Alice, t.Sender);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALineNobodySigned_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             TextIntake t = Receive(Line(g, key: null), g.Receiver);
 
-            Assert.That(t.Ok, Is.False);
-            Assert.That(t.Reason, Is.EqualTo(CarrierAuth.MissingMac));
+            Assert.False(t.Ok);
+            Assert.Equal(CarrierAuth.MissingMac, t.Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALineSignedWithAKeyMadeUp_OrAnotherConferencesKey_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             string other = g.Sender.CarrierKey(g.Sender.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId, Alice);
 
-            Assert.That(Receive(Line(g, new string('f', 64)), g.Receiver).Reason, Is.EqualTo(CarrierAuth.BadMac));
-            Assert.That(Receive(Line(g, other), g.Receiver).Reason, Is.EqualTo(CarrierAuth.BadMac));
+            Assert.Equal(CarrierAuth.BadMac, Receive(Line(g, new string('f', 64)), g.Receiver).Reason);
+            Assert.Equal(CarrierAuth.BadMac, Receive(Line(g, other), g.Receiver).Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALineWhoseTextWasChangedAfterSigning_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             GridInstantMessage im = Line(g, g.Sender.CarrierKey(g.SessionId, Alice), "hello");
             string json = System.Text.Encoding.UTF8.GetString(im.binaryBucket).Replace("hello", "world");
             im.binaryBucket = System.Text.Encoding.UTF8.GetBytes(json);
 
-            Assert.That(Receive(im, g.Receiver).Ok, Is.False);
+            Assert.False(Receive(im, g.Receiver).Ok);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AReplayedLine_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             GridInstantMessage im = Line(g, g.Sender.CarrierKey(g.SessionId, Alice));
             CarrierAuth receiving = CarrierAuth.Off();   // the one the region keeps, which remembers what it has seen
 
-            Assert.That(Receive(im, g.Receiver, receiving).Ok, Is.True);
-            Assert.That(Receive(im, g.Receiver, receiving).Reason, Is.EqualTo(CarrierAuth.Replay));
+            Assert.True(Receive(im, g.Receiver, receiving).Ok);
+            Assert.Equal(CarrierAuth.Replay, Receive(im, g.Receiver, receiving).Reason);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALineForSomeoneWhoIsNotSeated_IsRefusedForWantOfAKey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
             TextIntake t = Receive(Line(g, g.Sender.CarrierKey(g.SessionId, Alice), target: Carol), g.Receiver);
 
-            Assert.That(t.Ok, Is.False);
-            Assert.That(t.Decision, Is.EqualTo(CarrierIntake.DecisionNoCarrierKey));
+            Assert.False(t.Ok);
+            Assert.Equal(CarrierIntake.DecisionNoCarrierKey, t.Decision);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnAgentWhoIsNotInTheConference_HasNoKeyToSignWith()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
 
-            Assert.That(g.Sender.CarrierKey(g.SessionId, Dave), Is.Null);
+            Assert.Null(g.Sender.CarrierKey(g.SessionId, Dave));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARegionThatHasASecret_StillUsesTheConferencesKey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             CarrierAuth configured = new CarrierAuth(new string('s', CarrierAuth.MinSecretLength));
 
             TextIntake t = Receive(Line(g, g.Sender.CarrierKey(g.SessionId, Alice)), g.Receiver, configured);
 
-            Assert.That(t.Ok, Is.True, t.Decision);
+            Assert.True(t.Ok, t.Decision);
         }
 
         // ---- the service is asked once, and may not answer ---------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheServiceIsAskedForTheKeyOnce_NotOnceForEveryLine()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             string key = g.Sender.CarrierKey(g.SessionId, Alice);
             GridStoreResilienceTests.FlakyService flaky = new GridStoreResilienceTests.FlakyService(g.Service);
             GridNonSpatialSessions receiver = VoiceSessionServiceTests.NewRegion(flaky);
 
             for (int i = 0; i < 5; i++)
-                Assert.That(Receive(Line(g, key, "line " + i), receiver).Ok, Is.True);
+                Assert.True(Receive(Line(g, key, "line " + i), receiver).Ok);
 
-            Assert.That(flaky.Delivered.Count(w => w == "carrierkey"), Is.EqualTo(1));
+            Assert.Equal(1, flaky.Delivered.Count(w => w == "carrierkey"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStrangersLines_CostTheServiceOneQuestion_NotOnePerLine()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             GridStoreResilienceTests.FlakyService flaky = new GridStoreResilienceTests.FlakyService(g.Service);
             GridNonSpatialSessions receiver = VoiceSessionServiceTests.NewRegion(flaky);
@@ -228,28 +252,30 @@ namespace osWebRtcVoice.Tests
             for (int i = 0; i < 20; i++)
                 Receive(Line(g, new string('f', 64), target: Dave), receiver);
 
-            Assert.That(flaky.Delivered.Count(w => w == "carrierkey"), Is.EqualTo(1));
+            Assert.Equal(1, flaky.Delivered.Count(w => w == "carrierkey"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheServiceCannotBeReached_ALineIsRefused_AndNothingIsKept()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Grid g = NewGrid();
             string key = g.Sender.CarrierKey(g.SessionId, Alice);
             GridStoreResilienceTests.FlakyService flaky = new GridStoreResilienceTests.FlakyService(g.Service) { Up = false };
             GridNonSpatialSessions receiver = VoiceSessionServiceTests.NewRegion(flaky);
 
-            Assert.That(Receive(Line(g, key), receiver).Decision, Is.EqualTo(CarrierIntake.DecisionNoCarrierKey));
+            Assert.Equal(CarrierIntake.DecisionNoCarrierKey, Receive(Line(g, key), receiver).Decision);
 
             flaky.Up = true;
-            Assert.That(Receive(Line(g, key, "again"), receiver).Ok, Is.True, "and it works as soon as the service answers");
+            Assert.True(Receive(Line(g, key, "again"), receiver).Ok, "and it works as soon as the service answers");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheInProcessEngine_StillUsesTheSharedSecret()
         {
-            Assert.That(NewEngine().StoreIssuesCarrierKeys, Is.False);
-            Assert.That(VoiceSessionServiceTests.NewRegion(VoiceSessionServiceTests.NewService()).StoreIssuesCarrierKeys, Is.True);
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(NewEngine().StoreIssuesCarrierKeys);
+            Assert.True(VoiceSessionServiceTests.NewRegion(VoiceSessionServiceTests.NewService()).StoreIssuesCarrierKeys);
         }
     }
 }

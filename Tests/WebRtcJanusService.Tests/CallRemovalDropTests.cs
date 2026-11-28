@@ -18,9 +18,8 @@ using OpenMetaverse.StructuredData;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    public class CallRemovalDropTests
-    {
+    public class CallRemovalDropTests : IAsyncLifetime
+        {
         private const int Room = 5151;
         private static readonly UUID Ann = new UUID("a0000000-0000-4000-8000-00000000000a");
         private static readonly UUID Bea = new UUID("b0000000-0000-4000-8000-00000000000b");
@@ -30,9 +29,7 @@ namespace osWebRtcVoice.Tests
         private ConcurrentQueue<long> _kicked;
         private List<(long Id, string Display)> _participants;
         private bool _kickFails;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _participants = new List<(long, string)>();
             _requests = new ConcurrentQueue<string>();
@@ -73,9 +70,10 @@ namespace osWebRtcVoice.Tests
             return new WebRtcJanusService(config, () => new FakeJanusHandler(_gw));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnTheStockPlugin_EveryParticipantOfTheAgentIsKicked_AndNobodyElse()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _participants.Add((11, Ann.ToString()));
             _participants.Add((12, Bea.ToString()));
             _participants.Add((13, Ann.ToString()));
@@ -83,46 +81,75 @@ namespace osWebRtcVoice.Tests
 
             int dropped = NewService("janus.plugin.audiobridge").DropCallParticipants(Ann, Room);
 
-            Assert.That(dropped, Is.EqualTo(2));
-            Assert.That(_kicked.OrderBy(i => i), Is.EqualTo(new long[] { 11, 13 }));
+            Assert.Equal(2, dropped);
+            Assert.Equal(new long[] { 11, 13 }, _kicked.OrderBy(i => i));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnTheStockPlugin_AnAgentWithNoParticipant_DropsNothing_AndKicksNobody()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _participants.Add((21, Bea.ToString()));
 
-            Assert.That(NewService("janus.plugin.audiobridge").DropCallParticipants(Ann, Room), Is.EqualTo(0));
-            Assert.That(_kicked, Is.Empty);
+            Assert.Equal(0, NewService("janus.plugin.audiobridge").DropCallParticipants(Ann, Room));
+            Assert.Empty(_kicked);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AKickTheRoomRefuses_IsNotCountedAsDropped()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _participants.Add((31, Ann.ToString()));
             _kickFails = true;
 
-            Assert.That(NewService("janus.plugin.audiobridge").DropCallParticipants(Ann, Room), Is.EqualTo(0));
-            Assert.That(_kicked.Count, Is.EqualTo(1), "it was tried");
+            Assert.Equal(0, NewService("janus.plugin.audiobridge").DropCallParticipants(Ann, Room));
+            {
+                var assertedValue = _kicked.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "it was tried");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnTheMixer_NoKickIsSent_BecauseThePluginHasNone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             _participants.Add((41, Ann.ToString()));
 
             int dropped = NewService("janus.plugin.slvoice").DropCallParticipants(Ann, Room);
 
-            Assert.That(dropped, Is.EqualTo(0), "the server that joined the participant drops it");
-            Assert.That(_requests, Is.Empty, "the room is not even listed");
+            {
+                var assertedValue = dropped;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the server that joined the participant drops it");
+            }
+            {
+                var assertedValue = _requests;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the room is not even listed");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheKickNamesTheWholeParticipantId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string json = new AudioBridgeKickReq(5, 6969906757968657).ToJson();
 
-            Assert.That(json, Does.Contain("\"request\":\"kick\"").And.Contain("\"room\":5").And.Contain("\"id\":6969906757968657"));
+            {
+                var assertedValue = json;
+                Assert.Contains("\"request\":\"kick\"", assertedValue);
+                Assert.Contains("\"room\":5", assertedValue);
+                Assert.Contains("\"id\":6969906757968657", assertedValue);
+            }
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 }

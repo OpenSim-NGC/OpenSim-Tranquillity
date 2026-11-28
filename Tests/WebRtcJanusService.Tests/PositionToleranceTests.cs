@@ -15,106 +15,118 @@ using OpenMetaverse;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class PositionToleranceTests
     {
         private static readonly PositionSettings Defaults = new PositionSettings().Normalised();
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StandingAvatar_GetsTheSpeedFloorAndTheMargin()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             PositionAllowance a = PositionTolerance.For(isChild: false, speedCmS: 0, engineMaxCmS: 100000, Defaults);
-            Assert.That(a.SpeedCmS, Is.EqualTo(800));
-            Assert.That(a.ToleranceCm, Is.EqualTo(500));
+            Assert.Equal(800, a.SpeedCmS);
+            Assert.Equal(500, a.ToleranceCm);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WalkingAvatar_StaysAtTheFloorBecauseTwiceItsSpeedIsBelowIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             double walking = PositionTolerance.SpeedCmS(new Vector3(3.2f, 0, 0), null);
             PositionAllowance a = PositionTolerance.For(false, walking, 100000, Defaults);
-            Assert.That(walking, Is.EqualTo(320).Within(0.5));
-            Assert.That(a.SpeedCmS, Is.EqualTo(800));
+            Assert.InRange(walking, (320) - (0.5), (320) + (0.5));
+            Assert.Equal(800, a.SpeedCmS);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RunningAvatar_GetsTwiceItsMeasuredSpeed()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             double running = PositionTolerance.SpeedCmS(new Vector3(0, 6f, 0), null);
             PositionAllowance a = PositionTolerance.For(false, running, 100000, Defaults);
-            Assert.That(a.SpeedCmS, Is.EqualTo(1200));
-            Assert.That(a.ToleranceCm, Is.EqualTo(500));
+            Assert.Equal(1200, a.SpeedCmS);
+            Assert.Equal(500, a.ToleranceCm);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void FastVehicle_GetsAnAllowanceThatScalesWithItsSpeed()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             double vehicle = PositionTolerance.SpeedCmS(Vector3.Zero, new Vector3(30f, 0, 0));
             PositionAllowance a = PositionTolerance.For(false, vehicle, 100000, Defaults);
-            Assert.That(vehicle, Is.EqualTo(3000).Within(0.5));
-            Assert.That(a.SpeedCmS, Is.EqualTo(6000));
+            Assert.InRange(vehicle, (3000) - (0.5), (3000) + (0.5));
+            Assert.Equal(6000, a.SpeedCmS);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SeatedAvatar_UsesTheFasterOfItsOwnVelocityAndTheSeatsVelocity()
         {
-            Assert.That(PositionTolerance.SpeedCmS(new Vector3(0, 0, 2f), new Vector3(12f, 0, 0)), Is.EqualTo(1200).Within(0.5));
-            Assert.That(PositionTolerance.SpeedCmS(new Vector3(0, 0, 20f), new Vector3(1f, 0, 0)), Is.EqualTo(2000).Within(0.5));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.InRange(PositionTolerance.SpeedCmS(new Vector3(0, 0, 2f), new Vector3(12f, 0, 0)), (1200) - (0.5), (1200) + (0.5));
+            Assert.InRange(PositionTolerance.SpeedCmS(new Vector3(0, 0, 20f), new Vector3(1f, 0, 0)), (2000) - (0.5), (2000) + (0.5));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Allowance_IsCappedAtThePhysicsEnginesMaximum()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             PositionAllowance a = PositionTolerance.For(false, speedCmS: 50000, engineMaxCmS: 4000, Defaults);
-            Assert.That(a.SpeedCmS, Is.EqualTo(4000));
+            Assert.Equal(4000, a.SpeedCmS);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EngineThatDeclaresNoMaximum_FallsBackToTheConfiguredCeiling()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             PositionAllowance a = PositionTolerance.For(false, speedCmS: 90000, engineMaxCmS: 0, Defaults);
-            Assert.That(a.SpeedCmS, Is.EqualTo(PositionSettings.DefaultFallbackSpeedMaxCmS));
+            Assert.Equal(PositionSettings.DefaultFallbackSpeedMaxCmS, a.SpeedCmS);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChildAgentStanding_GetsTheMarginPlusWhatCoreMayLeaveUnreported()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // margin 500 + 10 m of movement before core reports + 2 s at the 800 cm/s floor = 3100 cm.
             PositionAllowance a = PositionTolerance.For(isChild: true, speedCmS: 0, engineMaxCmS: 100000, Defaults);
-            Assert.That(a.SpeedCmS, Is.EqualTo(800));
-            Assert.That(a.ToleranceCm, Is.EqualTo(500 + PositionTolerance.ChildMoveSlackCm + 1600));
+            Assert.Equal(800, a.SpeedCmS);
+            Assert.Equal(500 + PositionTolerance.ChildMoveSlackCm + 1600, a.ToleranceCm);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChildAgentMoving_GetsAWiderToleranceThanOneStanding()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             PositionAllowance still = PositionTolerance.For(true, 0, 100000, Defaults);
             PositionAllowance moving = PositionTolerance.For(true, 1500, 100000, Defaults);
-            Assert.That(moving.SpeedCmS, Is.EqualTo(3000));
-            Assert.That(moving.ToleranceCm, Is.EqualTo(500 + 1000 + 6000));
-            Assert.That(moving.ToleranceCm, Is.GreaterThan(still.ToleranceCm));
+            Assert.Equal(3000, moving.SpeedCmS);
+            Assert.Equal(500 + 1000 + 6000, moving.ToleranceCm);
+            Assert.True(moving.ToleranceCm > still.ToleranceCm);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RootAgent_IsNeverGivenTheChildSlack()
         {
-            Assert.That(PositionTolerance.For(false, 1500, 100000, Defaults).ToleranceCm, Is.EqualTo(Defaults.MarginCm));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(Defaults.MarginCm, PositionTolerance.For(false, 1500, 100000, Defaults).ToleranceCm);
         }
 
-        [TestCase(double.NaN)]
-        [TestCase(-5.0)]
+        [InlineData(double.NaN)]
+        [InlineData(-5.0)]
+        [Theory(Timeout = 60000)]
         public void UnusableSpeed_IsTreatedAsStanding(double speed)
         {
-            Assert.That(PositionTolerance.For(false, speed, 100000, Defaults).SpeedCmS, Is.EqualTo(Defaults.SpeedFloorCmS));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(Defaults.SpeedFloorCmS, PositionTolerance.For(false, speed, 100000, Defaults).SpeedCmS);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ConfiguredMarginAndFloor_AreHonoured()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new PositionSettings { MarginCm = 900, SpeedFloorCmS = 1500 }.Normalised();
             PositionAllowance a = PositionTolerance.For(false, 0, 100000, s);
-            Assert.That(a.SpeedCmS, Is.EqualTo(1500));
-            Assert.That(a.ToleranceCm, Is.EqualTo(900));
+            Assert.Equal(1500, a.SpeedCmS);
+            Assert.Equal(900, a.ToleranceCm);
         }
     }
 }

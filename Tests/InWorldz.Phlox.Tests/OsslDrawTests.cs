@@ -15,7 +15,6 @@ using OpenSim.Region.CoreModules.Scripting.VectorRender;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Tests.Common;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

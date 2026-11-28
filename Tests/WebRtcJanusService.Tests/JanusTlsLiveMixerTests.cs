@@ -29,15 +29,13 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture, Explicit("live scratch mixer; see the file header")]
-    [NonParallelizable]
     public class JanusTlsLiveMixerTests
     {
         private static string Env(string name)
         {
             string value = Environment.GetEnvironmentVariable(name);
             if (string.IsNullOrEmpty(value))
-                Assert.Ignore(name + " is not set");
+                Assert.Skip(name + " is not set");
             return value;
         }
 
@@ -51,28 +49,36 @@ namespace osWebRtcVoice.Tests
             return (created, reply?.ReturnCode);
         }
 
-        [Test]
+        [Fact(Timeout = 60000, Explicit = true)]
         public async Task TheApiAndTheAdminApiAreReachedOverHttpsWhenTheKeyNamesTheCertificate()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string voice = Env("LVM_TLS_VOICE_URL"), admin = Env("LVM_TLS_ADMIN_URL"), ca = Env("LVM_TLS_CA_FILE");
-            Assert.That(voice, Does.StartWith("https://"));
-            Assert.That(admin, Does.StartWith("https://"));
+            Assert.StartsWith("https://", voice);
+            Assert.StartsWith("https://", admin);
 
             var (created, body) = await Reach(voice, admin, ca, Env("LVM_TLS_API_SECRET"), Env("LVM_TLS_ADMIN_SECRET"));
 
-            Assert.That(created, Is.True, "a Janus session was created over https");
-            Assert.That(body, Is.Not.Null, "the admin API answered over https");
+            Assert.True(created, "a Janus session was created over https");
+            {
+                var assertedValue = body;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the admin API answered over https");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000, Explicit = true)]
         public async Task TheMixersCertificateIsRefusedWhenTheKeyIsUnset()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string voice = Env("LVM_TLS_VOICE_URL"), admin = Env("LVM_TLS_ADMIN_URL");
 
             var (created, body) = await Reach(voice, admin, null, Env("LVM_TLS_API_SECRET"), Env("LVM_TLS_ADMIN_SECRET"));
 
-            Assert.That(created, Is.False, "an unknown certificate is not accepted by the session client");
-            Assert.That(body, Is.Null, "nor on the admin API: nothing was received");
+            Assert.False(created, "an unknown certificate is not accepted by the session client");
+            {
+                var assertedValue = body;
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "nor on the admin API: nothing was received");
+            }
         }
     }
 }

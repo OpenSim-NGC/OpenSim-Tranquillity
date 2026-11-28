@@ -30,7 +30,11 @@ public sealed class GoldenFixturesFactAttribute : FactAttribute
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "Source", "OpenSimNGC.Appearance.Baking.Tests", "Golden"));
 
     /// <param name="set">The reference set's directory name, e.g. <c>truly-stock</c>.</param>
-    public GoldenFixturesFactAttribute(string set)
+    public GoldenFixturesFactAttribute(
+        string set,
+        [CallerFilePath] string sourceFilePath = "",
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         Set = set;
         var fixtures = Path.Combine(GoldenDir(), set, "fixtures");

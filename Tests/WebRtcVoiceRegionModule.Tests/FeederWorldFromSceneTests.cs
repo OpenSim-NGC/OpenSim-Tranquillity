@@ -31,7 +31,6 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class FeederWorldFromSceneTests
     {
         private static readonly UUID Owner = new UUID("00000000-0000-0000-0000-0000000000f1");
@@ -57,9 +56,10 @@ namespace osWebRtcVoice.Tests
         // The ban delegate on the adapter's ParcelView reports a real parcel ban (and only for the
         // banned avatar) - reading live LandObject state through the Scene. Covers the §E fix path
         // regardless of the estate TaxFree flag (parity branch or the TaxFree-bypass branch).
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RealScene_ParcelBanDelegate_DetectsBanFromLandObjectState()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = NewSceneWithLand(out LandManagementModule lmm);
             ILandObject parcel = AddWholeRegionParcel(scene, lmm);
             parcel.LandData.Flags |= (uint)ParcelFlags.UseBanList;
@@ -70,16 +70,23 @@ namespace osWebRtcVoice.Tests
             ParcelView byPos = world.GetParcelAt(new Vector3(128, 128, 25));
             ParcelView byId = world.GetParcelByGlobalId(parcel.LandData.GlobalID);
 
-            Assert.That(byPos.GlobalId, Is.EqualTo(parcel.LandData.GlobalID), "GetParcelAt resolves the parcel");
-            Assert.That(byId.GlobalId, Is.EqualTo(parcel.LandData.GlobalID), "GetParcelByGlobalId resolves the parcel");
-            Assert.That(byId.IsBannedFromLand(Banned), Is.True, "ban delegate detects the banned avatar");
-            Assert.That(byId.IsBannedFromLand(Other), Is.False, "non-banned avatar is not flagged");
+            {
+                var assertedValue = byPos.GlobalId;
+                TestAssert.WithMessage(() => Assert.Equal(parcel.LandData.GlobalID, assertedValue), "GetParcelAt resolves the parcel");
+            }
+            {
+                var assertedValue = byId.GlobalId;
+                TestAssert.WithMessage(() => Assert.Equal(parcel.LandData.GlobalID, assertedValue), "GetParcelByGlobalId resolves the parcel");
+            }
+            Assert.True(byId.IsBannedFromLand(Banned), "ban delegate detects the banned avatar");
+            Assert.False(byId.IsBannedFromLand(Other), "non-banned avatar is not flagged");
         }
 
         // ParcelView reflects the SeeAVs and AllowVoiceChat flags read off real LandData.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RealScene_ParcelView_MapsSeeAvsAndVoiceFlag()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = NewSceneWithLand(out LandManagementModule lmm);
             ILandObject parcel = AddWholeRegionParcel(scene, lmm);
             parcel.LandData.SeeAVs = false;
@@ -87,33 +94,35 @@ namespace osWebRtcVoice.Tests
 
             ParcelView pv = new FeederWorldFromScene(scene).GetParcelByGlobalId(parcel.LandData.GlobalID);
 
-            Assert.That(pv.SeeAVs, Is.False, "SeeAVs mapped from LandData");
-            Assert.That(pv.AllowVoiceChat, Is.False, "AllowVoiceChat mapped from LandData.Flags");
+            Assert.False(pv.SeeAVs, "SeeAVs mapped from LandData");
+            Assert.False(pv.AllowVoiceChat, "AllowVoiceChat mapped from LandData.Flags");
         }
 
         // Unknown/absent parcel resolves to the benign default (visible, voice-on, no bans).
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RealScene_UnknownParcel_IsBenign()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = NewSceneWithLand(out _);   // no parcel added
             ParcelView pv = new FeederWorldFromScene(scene).GetParcelByGlobalId(UUID.Random());
 
-            Assert.That(pv.SeeAVs, Is.True, "unknown parcel must not hide");
-            Assert.That(pv.AllowVoiceChat, Is.True, "unknown parcel must not mute");
+            Assert.True(pv.SeeAVs, "unknown parcel must not hide");
+            Assert.True(pv.AllowVoiceChat, "unknown parcel must not mute");
         }
 
         // Event -> dirty wiring: a land change flips the feeder's pending-invalidation flag
         // (WireEvents only, so no running loop consumes it). No presences created.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EventWiring_LandChange_SetsPendingInvalidation()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             var svc = new VoiceVisibilityService(scene, 250);
             svc.WireEvents();
 
-            Assert.That(svc.HasPendingInvalidation, Is.False);
+            Assert.False(svc.HasPendingInvalidation);
             scene.EventManager.TriggerLandObjectRemoved(UUID.Random());
-            Assert.That(svc.HasPendingInvalidation, Is.True, "OnLandObjectRemoved must mark the feeder dirty");
+            Assert.True(svc.HasPendingInvalidation, "OnLandObjectRemoved must mark the feeder dirty");
         }
     }
 }
