@@ -24,10 +24,8 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
-    public class PositionLogNoiseTests
-    {
+    public class PositionLogNoiseTests : IAsyncLifetime
+        {
         private static readonly UUID A = new UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
         private sealed class Capture : ILoggerProvider, ILogger
@@ -54,17 +52,13 @@ namespace osWebRtcVoice.Tests
         private Capture _log;
         private LogCapture _logging;
         private long _now;
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
             _now = 10_000;
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             _logging.Dispose();
             _log.Dispose();
@@ -109,38 +103,59 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        [TestCase("read")]
-        [TestCase("tick")]
-        [TestCase("send")]
+        [InlineData("read")]
+        [InlineData("tick")]
+        [InlineData("send")]
+        [Theory(Timeout = 60000)]
         public async Task TwentyFailingTicksInTenSeconds_GiveOneWarning_ThenOneMoreWithTheCount(string site)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var world = new World { Throw = site == "read" };
             var sink = new Sink { ThrowOnProtocol = site == "tick", ThrowOnSend = site == "send" };
             VoicePositionPump pump = Pump(world, sink);
 
             await TickManyAsync(pump, 20);
 
-            Assert.That(_log.AtOrAbove(LogLevel.Warning, "[VOICE POSITIONS]"), Has.Count.EqualTo(1), site);
+            {
+                var assertedValue = _log.AtOrAbove(LogLevel.Warning, "[VOICE POSITIONS]");
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), site);
+            }
 
             _now += 60_000;
             await TickManyAsync(pump, 1);
 
             List<string> lines = _log.AtOrAbove(LogLevel.Warning, "[VOICE POSITIONS]");
-            Assert.That(lines, Has.Count.EqualTo(2), string.Join(" | ", lines));
-            Assert.That(lines[1], Does.Contain("19 more"));
+            {
+                var assertedValue = lines;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue.Count()), string.Join(" | ", lines));
+            }
+            Assert.Contains("19 more", lines[1]);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task TheSinksPeerPosSendFailure_IsNotAWarning()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var sink = new JanusPeerCtlBatchSink("http://localhost/voiceAdmin", "secret", TimeSpan.FromSeconds(5),
                 UUID.Random(), "Test Region", 4, _ => throw new InvalidOperationException("admin down"));
             var body = new OSDMap { ["request"] = OSD.FromString("peer_pos"), ["room"] = OSD.FromInteger(7) };
 
             for (int i = 0; i < 5; i++)
-                Assert.That(await sink.SendPositionsAsync(body), Is.False);
+                Assert.False(await sink.SendPositionsAsync(body));
 
-            Assert.That(_log.AtOrAbove(LogLevel.Information, "peer_pos send failed"), Is.Empty);
+            Assert.Empty(_log.AtOrAbove(LogLevel.Information, "peer_pos send failed"));
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

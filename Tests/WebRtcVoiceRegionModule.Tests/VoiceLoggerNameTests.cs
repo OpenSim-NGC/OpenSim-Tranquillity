@@ -16,13 +16,11 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using NUnit.Framework;
+using Xunit;
 using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]   // swaps the process-wide logger factory
     public class VoiceLoggerNameTests
     {
         public const string Prefix = "osWebRtcVoice";
@@ -43,9 +41,10 @@ namespace osWebRtcVoice.Tests
             catch (ReflectionTypeLoadException e) { return e.Types.Where(t => t is not null); }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void EveryVoiceLogger_LogsUnderTheOneNamePrefix()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             using LogCapture log = new LogCapture();
             List<string> found = new();
 
@@ -59,18 +58,25 @@ namespace osWebRtcVoice.Tests
                         int before = log.Lines.Count;
                         logger.LogCritical("probe {Type}.{Field}", type.FullName, field.Name);
                         List<LogCapture.Line> added = log.Lines.Skip(before).ToList();
-                        Assert.That(added.Count, Is.EqualTo(1), $"{type.FullName}.{field.Name} wrote its probe");
+                        {
+                            var assertedValue = added.Count;
+                            TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), $"{type.FullName}.{field.Name} wrote its probe");
+                        }
                         found.Add($"{type.FullName}.{field.Name} -> {added[0].Category}");
-                        Assert.That(added[0].Category, Does.StartWith(Prefix + "."), $"{type.FullName}.{field.Name}");
+                        {
+                            var assertedValue = added[0].Category;
+                            TestAssert.WithMessage(() => Assert.StartsWith(Prefix + ".", assertedValue), $"{type.FullName}.{field.Name}");
+                        }
                     }
 
-            TestContext.Out.WriteLine($"{found.Count} voice loggers, all under {Prefix}:\n" + string.Join("\n", found));
-            Assert.That(found.Count, Is.GreaterThanOrEqualTo(10), "the search found the voice loggers");
+            TestContext.Current.TestOutputHelper.WriteLine($"{found.Count} voice loggers, all under {Prefix}:\n" + string.Join("\n", found));
+            Assert.True(found.Count >= 10, "the search found the voice loggers");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheReadmesLoggingLine_RaisesVoiceToWarning_AndLeavesOtherCategoriesAlone()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             IConfiguration config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string>
             {
                 ["Logging:LogLevel:Default"] = "Information",
@@ -86,7 +92,7 @@ namespace osWebRtcVoice.Tests
             voice.LogError("voice error");
             other.LogInformation("other information");
 
-            Assert.That(log.Lines.Select(l => l.Text), Is.EqualTo(new[] { "voice warning", "voice error", "other information" }));
+            Assert.Equal(new[] { "voice warning", "voice error", "other information" }, log.Lines.Select(l => l.Text));
         }
     }
 }

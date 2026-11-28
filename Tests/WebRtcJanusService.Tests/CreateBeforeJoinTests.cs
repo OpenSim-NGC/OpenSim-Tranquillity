@@ -40,10 +40,8 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    [NonParallelizable]
-    public class CreateBeforeJoinTests
-    {
+    public class CreateBeforeJoinTests : IAsyncLifetime
+        {
         private sealed class Capture : ILoggerProvider, ILogger
         {
             public readonly List<(LogLevel Level, string Text)> Lines = new();
@@ -68,17 +66,13 @@ namespace osWebRtcVoice.Tests
         private Capture _log;
         private LogCapture _logging;
         private readonly List<WebRtcJanusService> _services = new();
-
-        [SetUp]
-        public void SetUp()
+        private void SetUp()
         {
             _gw = new FakeJanusGateway { ModelRooms = true };
             _log = new Capture();
             _logging = new LogCapture(_log, LogLevel.Trace);
         }
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             _services.Clear();   // the fake gateway is in-memory; nothing outlives the test process
             _logging.Dispose();
@@ -131,7 +125,7 @@ namespace osWebRtcVoice.Tests
         private async Task<int> RoomCreatedThenGraceDestroyed(WebRtcJanusService svc, UUID region)
         {
             OSDMap first = await Provision(svc, region);
-            Assert.That(Joined(first), Is.True, "precondition: an earlier provision created and joined the room");
+            Assert.True(Joined(first), "precondition: an earlier provision created and joined the room");
             int room = EstateRoomOf(region);
             _gw.GraceDestroy(room);
             return room;
@@ -146,9 +140,10 @@ namespace osWebRtcVoice.Tests
         /// send ONE create and ONE join, and be joined. TODAY the stale hint skips the create, the JSEP join draws 485,
         /// re-creates and re-sends the same join on the same handle, and Janus core refuses it 490 - not joined, two
         /// joins, three ERROR lines, and the viewer's own retry has to do the rest.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task V1_HintSaysExists_MixerHasNoRoom_OneCreateOneJoin_Joined()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService();
             UUID region = UUID.Random();
             await RoomCreatedThenGraceDestroyed(svc, region);
@@ -157,21 +152,31 @@ namespace osWebRtcVoice.Tests
 
             OSDMap reply = await Provision(svc, region);
 
-            TestContext.Out.WriteLine($"joined={Joined(reply)} creates={_gw.RoomCreates - creates} joins={_gw.RoomJoins - joins} " +
+            TestContext.Current.TestOutputHelper.WriteLine($"joined={Joined(reply)} creates={_gw.RoomCreates - creates} joins={_gw.RoomJoins - joins} " +
                 $"errors={_log.At(LogLevel.Error).Count} :: {Where()}");
-            Assert.That(Joined(reply), Is.True, "joined in ONE provision");
-            Assert.That(_gw.RoomCreates - creates, Is.EqualTo(1), "exactly one create");
-            Assert.That(_gw.RoomJoins - joins, Is.EqualTo(1), "exactly one join");
-            Assert.That(_log.At(LogLevel.Error), Is.Empty, "no ERROR");
+            Assert.True(Joined(reply), "joined in ONE provision");
+            {
+                var assertedValue = _gw.RoomCreates - creates;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "exactly one create");
+            }
+            {
+                var assertedValue = _gw.RoomJoins - joins;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "exactly one join");
+            }
+            {
+                var assertedValue = _log.At(LogLevel.Error);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no ERROR");
+            }
         }
 
         // ---- V2 --------------------------------------------------------------------------------------------------
 
         /// <summary>V2: the room exists. The create answers 486 - success - then one join, joined, and nothing is logged
         /// at WARN or ERROR: the 486 is now the normal case on almost every provision, so its "Reusing!" line is DEBUG.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task V2_RoomExists_Create486_OneJoin_Joined_NoWarnOrError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService();
             UUID region = UUID.Random();
             int room = EstateRoomOf(region);
@@ -180,13 +185,21 @@ namespace osWebRtcVoice.Tests
 
             OSDMap reply = await Provision(svc, region);
 
-            TestContext.Out.WriteLine($"joined={Joined(reply)} creates={_gw.RoomCreates} joins={_gw.RoomJoins} :: {Where()}");
-            Assert.That(Joined(reply), Is.True);
-            Assert.That(_gw.RoomCreates, Is.EqualTo(1), "the create was sent and answered 486");
-            Assert.That(_gw.RoomsCreated, Is.Zero, "and created nothing, because the room was there");
-            Assert.That(_gw.RoomJoins, Is.EqualTo(1));
-            Assert.That(_log.At(LogLevel.Warning).Concat(_log.At(LogLevel.Error)), Is.Empty,
-                "no WARN or ERROR on the normal path");
+            TestContext.Current.TestOutputHelper.WriteLine($"joined={Joined(reply)} creates={_gw.RoomCreates} joins={_gw.RoomJoins} :: {Where()}");
+            Assert.True(Joined(reply));
+            {
+                var assertedValue = _gw.RoomCreates;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the create was sent and answered 486");
+            }
+            {
+                var assertedValue = _gw.RoomsCreated;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "and created nothing, because the room was there");
+            }
+            Assert.Equal(1, _gw.RoomJoins);
+            {
+                var assertedValue = _log.At(LogLevel.Warning).Concat(_log.At(LogLevel.Error));
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no WARN or ERROR on the normal path");
+            }
         }
 
         // ---- V3 --------------------------------------------------------------------------------------------------
@@ -194,9 +207,10 @@ namespace osWebRtcVoice.Tests
         /// <summary>V3: a 485 on the join anyway - the room vanished between the create and the join. Exactly ONE join
         /// attempt (no same-handle retry: Janus core would refuse it 490), the provision fails back to the viewer as
         /// before, ONE WARN, no ERROR. There is no hint left to forget: the next provision creates unconditionally.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task V3_A485OnTheJoinAnyway_OneJoin_ProvisionFails_OneWarn_NoError()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService();
             UUID region = UUID.Random();
             int room = EstateRoomOf(region);
@@ -205,17 +219,26 @@ namespace osWebRtcVoice.Tests
 
             OSDMap reply = await Provision(svc, region);
 
-            TestContext.Out.WriteLine($"joined={Joined(reply)} joins={_gw.RoomJoins} warns={_log.At(LogLevel.Warning).Count} " +
+            TestContext.Current.TestOutputHelper.WriteLine($"joined={Joined(reply)} joins={_gw.RoomJoins} warns={_log.At(LogLevel.Warning).Count} " +
                 $"errors={_log.At(LogLevel.Error).Count} :: {Where()}");
-            Assert.That(Joined(reply), Is.False, "the provision fails back to the viewer");
-            Assert.That(reply?["response"].AsString(), Is.EqualTo("failed"));
-            Assert.That(_gw.RoomJoins, Is.EqualTo(1), "exactly ONE join attempt - never the same JSEP join twice on a handle");
-            Assert.That(_log.At(LogLevel.Warning).Count, Is.EqualTo(1), "one WARN");
-            Assert.That(_log.At(LogLevel.Error), Is.Empty, "no ERROR");
+            Assert.False(Joined(reply), "the provision fails back to the viewer");
+            Assert.Equal("failed", reply?["response"].AsString());
+            {
+                var assertedValue = _gw.RoomJoins;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "exactly ONE join attempt - never the same JSEP join twice on a handle");
+            }
+            {
+                var assertedValue = _log.At(LogLevel.Warning).Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one WARN");
+            }
+            {
+                var assertedValue = _log.At(LogLevel.Error);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "no ERROR");
+            }
 
             _gw.DestroyAfterCreate = 0;
             OSDMap retry = await Provision(svc, region);   // the viewer's own retry
-            Assert.That(Joined(retry), Is.True, "and the next provision creates the room and joins");
+            Assert.True(Joined(retry), "and the next provision creates the room and joins");
         }
 
         // ---- V4 --------------------------------------------------------------------------------------------------
@@ -223,9 +246,10 @@ namespace osWebRtcVoice.Tests
         /// <summary>V4: two provisions at once into one room that is missing (created by this process once, since
         /// destroyed by the grace - which used to leave a stale hint). One room is created, both join: the loser's create
         /// answers 486, which is success.</summary>
-        [Test]
+        [Fact(Timeout = 60000)]
         public async Task V4_TwoConcurrentProvisionsIntoOneMissingRoom_OneCreated_BothJoined()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             WebRtcJanusService svc = NewService();
             UUID region = UUID.Random();
             int room = await RoomCreatedThenGraceDestroyed(svc, region);
@@ -233,12 +257,30 @@ namespace osWebRtcVoice.Tests
 
             OSDMap[] replies = await Task.WhenAll(Provision(svc, region), Provision(svc, region));
 
-            TestContext.Out.WriteLine($"joined={Joined(replies[0])}/{Joined(replies[1])} created={_gw.RoomsCreated - created} " +
+            TestContext.Current.TestOutputHelper.WriteLine($"joined={Joined(replies[0])}/{Joined(replies[1])} created={_gw.RoomsCreated - created} " +
                 $"joins={_gw.RoomJoins - joins} :: {Where()}");
-            Assert.That(Joined(replies[0]) && Joined(replies[1]), Is.True, "both joined");
-            Assert.That(_gw.RoomsCreated - created, Is.EqualTo(1), "one room created");
-            Assert.That(_gw.RoomJoins - joins, Is.EqualTo(2), "two joins");
-            Assert.That(_gw.Rooms.ContainsKey(room), Is.True);
+            Assert.True((Joined(replies[0]) && Joined(replies[1])), "both joined");
+            {
+                var assertedValue = _gw.RoomsCreated - created;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one room created");
+            }
+            {
+                var assertedValue = _gw.RoomJoins - joins;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "two joins");
+            }
+            Assert.True(_gw.Rooms.ContainsKey(room));
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            SetUp();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

@@ -24,19 +24,20 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class VoiceModerationStoreSnapshotTests
     {
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Snapshot_EmptyStore_IsEmpty()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new VoiceModerationStore();
-            Assert.That(s.Snapshot(), Is.Empty);
+            Assert.Empty(s.Snapshot());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Snapshot_ReportsMutedAgentsPerParcel()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new VoiceModerationStore();
             UUID parcel = UUID.Random();
             UUID a = UUID.Random();
@@ -45,28 +46,30 @@ namespace osWebRtcVoice.Tests
             s.MuteAgent(parcel, b);
 
             IReadOnlyList<ParcelModerationView> snap = s.Snapshot();
-            Assert.That(snap, Has.Count.EqualTo(1));
-            Assert.That(snap[0].ParcelGlobalId, Is.EqualTo(parcel));
-            Assert.That(snap[0].MuteEveryone, Is.False);
-            Assert.That(snap[0].MutedAgents, Is.EquivalentTo(new[] { a, b }));
+            Assert.Single(snap);
+            Assert.Equal(parcel, snap[0].ParcelGlobalId);
+            Assert.False(snap[0].MuteEveryone);
+            Assert.Equivalent(new[] { a, b }, snap[0].MutedAgents, strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Snapshot_ReportsMuteEveryoneWithNoIndividualMutes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new VoiceModerationStore();
             UUID parcel = UUID.Random();
             s.SetMuteEveryone(parcel, true);
 
             IReadOnlyList<ParcelModerationView> snap = s.Snapshot();
-            Assert.That(snap, Has.Count.EqualTo(1));
-            Assert.That(snap[0].MuteEveryone, Is.True);
-            Assert.That(snap[0].MutedAgents, Is.Empty);
+            Assert.Single(snap);
+            Assert.True(snap[0].MuteEveryone);
+            Assert.Empty(snap[0].MutedAgents);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Snapshot_IsADetachedCopy_LaterMutesDoNotAppearInIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new VoiceModerationStore();
             UUID parcel = UUID.Random();
             s.MuteAgent(parcel, UUID.Random());
@@ -74,13 +77,17 @@ namespace osWebRtcVoice.Tests
             IReadOnlyList<ParcelModerationView> snap = s.Snapshot();
             s.MuteAgent(parcel, UUID.Random());
 
-            Assert.That(snap[0].MutedAgents, Has.Count.EqualTo(1), "the snapshot must not alias the live set");
-            Assert.That(s.Snapshot()[0].MutedAgents, Has.Count.EqualTo(2));
+            {
+                var assertedValue = snap[0].MutedAgents;
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "the snapshot must not alias the live set");
+            }
+            Assert.Equal(2, s.Snapshot()[0].MutedAgents.Count());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Snapshot_OrdersParcelsStably()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new VoiceModerationStore();
             var parcels = new List<UUID>();
             for (int i = 0; i < 8; i++)
@@ -97,85 +104,96 @@ namespace osWebRtcVoice.Tests
             foreach (ParcelModerationView v in s.Snapshot())
                 second.Add(v.ParcelGlobalId);
 
-            Assert.That(second, Is.EqualTo(first), "two listings of unchanged state must read the same");
-            Assert.That(first, Is.EquivalentTo(parcels));
+            {
+                var assertedValue = second;
+                TestAssert.WithMessage(() => Assert.Equal(first, assertedValue), "two listings of unchanged state must read the same");
+            }
+            Assert.Equivalent(parcels, first, strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void UnmuteAgent_ReturnsTrueOnlyWhenAnEntryWasCleared()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new VoiceModerationStore();
             UUID parcel = UUID.Random();
             UUID agent = UUID.Random();
             s.MuteAgent(parcel, agent);
 
-            Assert.That(s.UnmuteAgent(parcel, agent), Is.True, "first clear removes the entry");
-            Assert.That(s.UnmuteAgent(parcel, agent), Is.False, "second clear has nothing to remove");
-            Assert.That(s.UnmuteAgent(UUID.Random(), agent), Is.False, "unknown parcel");
-            Assert.That(s.IsModerated(parcel, agent), Is.False);
-            Assert.That(s.Snapshot(), Is.Empty, "an emptied parcel is dropped from the store");
+            Assert.True(s.UnmuteAgent(parcel, agent), "first clear removes the entry");
+            Assert.False(s.UnmuteAgent(parcel, agent), "second clear has nothing to remove");
+            Assert.False(s.UnmuteAgent(UUID.Random(), agent), "unknown parcel");
+            Assert.False(s.IsModerated(parcel, agent));
+            {
+                var assertedValue = s.Snapshot();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "an emptied parcel is dropped from the store");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void UnmuteAgent_LeavesMuteEveryoneAndTheParcelInPlace()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var s = new VoiceModerationStore();
             UUID parcel = UUID.Random();
             UUID agent = UUID.Random();
             s.SetMuteEveryone(parcel, true);
             s.MuteAgent(parcel, agent);
 
-            Assert.That(s.UnmuteAgent(parcel, agent), Is.True);
+            Assert.True(s.UnmuteAgent(parcel, agent));
             IReadOnlyList<ParcelModerationView> snap = s.Snapshot();
-            Assert.That(snap, Has.Count.EqualTo(1));
-            Assert.That(snap[0].MuteEveryone, Is.True);
-            Assert.That(snap[0].MutedAgents, Is.Empty);
-            Assert.That(s.IsModerated(parcel, agent), Is.True, "mute-everyone still covers this agent");
+            Assert.Single(snap);
+            Assert.True(snap[0].MuteEveryone);
+            Assert.Empty(snap[0].MutedAgents);
+            Assert.True(s.IsModerated(parcel, agent), "mute-everyone still covers this agent");
         }
     }
 
-    [TestFixture]
     public class VoiceModerationTargetsTests
     {
         private static List<VoiceModerationCandidate> Candidates(params VoiceModerationCandidate[] c)
             => new List<VoiceModerationCandidate>(c);
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_Uuid_ResolvesEvenWhenNotInTheMutedSet()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID id = UUID.Random();
             VoiceModerationTargetMatch m = VoiceModerationTargets.Resolve(
                 id.ToString(), Candidates(), out UUID target, out _);
 
-            Assert.That(m, Is.EqualTo(VoiceModerationTargetMatch.Resolved));
-            Assert.That(target, Is.EqualTo(id));
+            Assert.Equal(VoiceModerationTargetMatch.Resolved, m);
+            Assert.Equal(id, target);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_ZeroUuid_IsNotATarget()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceModerationTargetMatch m = VoiceModerationTargets.Resolve(
                 UUID.Zero.ToString(), Candidates(), out UUID target, out _);
 
-            Assert.That(m, Is.EqualTo(VoiceModerationTargetMatch.NotFound));
-            Assert.That(target, Is.EqualTo(UUID.Zero));
+            Assert.Equal(VoiceModerationTargetMatch.NotFound, m);
+            Assert.Equal(UUID.Zero, target);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_Name_MatchesCaseInsensitivelyAndIgnoresSurroundingSpace()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID id = UUID.Random();
             VoiceModerationTargetMatch m = VoiceModerationTargets.Resolve(
                 "  test USER ", Candidates(new VoiceModerationCandidate(id, "Test User")),
                 out UUID target, out _);
 
-            Assert.That(m, Is.EqualTo(VoiceModerationTargetMatch.Resolved));
-            Assert.That(target, Is.EqualTo(id));
+            Assert.Equal(VoiceModerationTargetMatch.Resolved, m);
+            Assert.Equal(id, target);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_SameAgentMutedOnSeveralParcels_IsOneCandidateNotAnAmbiguity()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID id = UUID.Random();
             VoiceModerationTargetMatch m = VoiceModerationTargets.Resolve(
                 "Test User",
@@ -183,13 +201,14 @@ namespace osWebRtcVoice.Tests
                            new VoiceModerationCandidate(id, "Test User")),
                 out UUID target, out _);
 
-            Assert.That(m, Is.EqualTo(VoiceModerationTargetMatch.Resolved));
-            Assert.That(target, Is.EqualTo(id));
+            Assert.Equal(VoiceModerationTargetMatch.Resolved, m);
+            Assert.Equal(id, target);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_TwoDistinctAgentsWithOneName_IsAmbiguousAndListsBoth()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = UUID.Random();
             UUID b = UUID.Random();
             VoiceModerationTargetMatch m = VoiceModerationTargets.Resolve(
@@ -198,29 +217,31 @@ namespace osWebRtcVoice.Tests
                            new VoiceModerationCandidate(b, "test user")),
                 out UUID target, out IReadOnlyList<VoiceModerationCandidate> ambiguous);
 
-            Assert.That(m, Is.EqualTo(VoiceModerationTargetMatch.Ambiguous));
-            Assert.That(target, Is.EqualTo(UUID.Zero));
-            Assert.That(ambiguous, Has.Count.EqualTo(2));
+            Assert.Equal(VoiceModerationTargetMatch.Ambiguous, m);
+            Assert.Equal(UUID.Zero, target);
+            Assert.Equal(2, ambiguous.Count());
             var ids = new List<UUID>();
             foreach (VoiceModerationCandidate c in ambiguous)
                 ids.Add(c.AgentId);
-            Assert.That(ids, Is.EquivalentTo(new[] { a, b }));
+            Assert.Equivalent(new[] { a, b }, ids, strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_UnknownName_IsNotFound()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceModerationTargetMatch m = VoiceModerationTargets.Resolve(
                 "Nobody Here", Candidates(new VoiceModerationCandidate(UUID.Random(), "Test User")),
                 out UUID target, out _);
 
-            Assert.That(m, Is.EqualTo(VoiceModerationTargetMatch.NotFound));
-            Assert.That(target, Is.EqualTo(UUID.Zero));
+            Assert.Equal(VoiceModerationTargetMatch.NotFound, m);
+            Assert.Equal(UUID.Zero, target);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_UnresolvedNameCandidates_NeverMatchByName()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Two entries whose names the scene could not resolve must not collide under a shared
             // pseudo-name; they stay UUID-addressable only.
             VoiceModerationTargetMatch m = VoiceModerationTargets.Resolve(
@@ -229,23 +250,22 @@ namespace osWebRtcVoice.Tests
                            new VoiceModerationCandidate(UUID.Random(), "  ")),
                 out _, out _);
 
-            Assert.That(m, Is.EqualTo(VoiceModerationTargetMatch.NotFound));
+            Assert.Equal(VoiceModerationTargetMatch.NotFound, m);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_EmptyOrNullToken_IsNotFound()
         {
-            Assert.That(VoiceModerationTargets.Resolve(null, Candidates(), out _, out _),
-                Is.EqualTo(VoiceModerationTargetMatch.NotFound));
-            Assert.That(VoiceModerationTargets.Resolve("   ", Candidates(), out _, out _),
-                Is.EqualTo(VoiceModerationTargetMatch.NotFound));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(VoiceModerationTargetMatch.NotFound, VoiceModerationTargets.Resolve(null, Candidates(), out _, out _));
+            Assert.Equal(VoiceModerationTargetMatch.NotFound, VoiceModerationTargets.Resolve("   ", Candidates(), out _, out _));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_NullCandidateList_IsNotFound()
         {
-            Assert.That(VoiceModerationTargets.Resolve("Test User", null, out _, out _),
-                Is.EqualTo(VoiceModerationTargetMatch.NotFound));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(VoiceModerationTargetMatch.NotFound, VoiceModerationTargets.Resolve("Test User", null, out _, out _));
         }
     }
 }

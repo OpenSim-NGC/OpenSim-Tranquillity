@@ -25,97 +25,127 @@ using osWebRtcVoice;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class AgentRoomTableTests
     {
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Resolve_MissingAgent_IsNull()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var t = new AgentRoomTable();
-            Assert.That(t.Resolve(UUID.Random()), Is.Null);
-            Assert.That(t.Count, Is.EqualTo(0));
+            Assert.Null(t.Resolve(UUID.Random()));
+            Assert.Equal(0, t.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Record_ThenResolve_ReturnsTheRoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var t = new AgentRoomTable();
             UUID a = UUID.Random();
             t.Record(a, 1967062692);
-            Assert.That(t.Resolve(a), Is.EqualTo(1967062692));
-            Assert.That(t.Count, Is.EqualTo(1));
+            Assert.Equal(1967062692, t.Resolve(a));
+            Assert.Equal(1, t.Count);
         }
 
         // The newest provision wins; a relog overlap's older session is addressed at the new room.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Record_Twice_NewestWins()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var t = new AgentRoomTable();
             UUID a = UUID.Random();
             t.Record(a, 226001844);
             t.Record(a, 1578726032);
-            Assert.That(t.Resolve(a), Is.EqualTo(1578726032), "second provision replaces the first");
-            Assert.That(t.Count, Is.EqualTo(1), "one record per agent, not one per provision");
+            {
+                var assertedValue = t.Resolve(a);
+                TestAssert.WithMessage(() => Assert.Equal(1578726032, assertedValue), "second provision replaces the first");
+            }
+            {
+                var assertedValue = t.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one record per agent, not one per provision");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Record_ZeroUuid_IsIgnored()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var t = new AgentRoomTable();
             t.Record(UUID.Zero, 5);
-            Assert.That(t.Resolve(UUID.Zero), Is.Null);
-            Assert.That(t.Count, Is.EqualTo(0));
+            Assert.Null(t.Resolve(UUID.Zero));
+            Assert.Equal(0, t.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Tables_AreIndependent_PerInstance()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // One table per VoiceVisibilityService, i.e. per region: a record in one is invisible in another.
             var t1 = new AgentRoomTable();
             var t2 = new AgentRoomTable();
             UUID a = UUID.Random();
             t1.Record(a, 7);
-            Assert.That(t2.Resolve(a), Is.Null);
+            Assert.Null(t2.Resolve(a));
         }
 
         // Service-level wiring: OnListenerProvisioned(agent, room) records; (agent, null) and the
         // the overload without a room leaves the record alone; RoomOf is the table's resolver.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Service_RecordsOnSuccess_LeavesRecordOnNull_NewestWins()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             var svc = new VoiceVisibilityService(scene, cadenceMs: 250);   // not started: no tick thread
             UUID a = UUID.Random();
 
-            Assert.That(svc.RoomOf(a), Is.Null, "no record before any provision");
+            {
+                var assertedValue = svc.RoomOf(a);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no record before any provision");
+            }
 
             svc.OnListenerProvisioned(a, 226001844);                  // success map carried a room
-            Assert.That(svc.RoomOf(a), Is.EqualTo(226001844));
+            Assert.Equal(226001844, svc.RoomOf(a));
 
             svc.OnListenerProvisioned(a, null);                       // failure / logout map: no room
-            Assert.That(svc.RoomOf(a), Is.EqualTo(226001844), "a null room must not erase the record");
+            {
+                var assertedValue = svc.RoomOf(a);
+                TestAssert.WithMessage(() => Assert.Equal(226001844, assertedValue), "a null room must not erase the record");
+            }
 
             svc.OnListenerProvisioned(a);                             // overload without a room delegates null
-            Assert.That(svc.RoomOf(a), Is.EqualTo(226001844), "the old overload leaves the record untouched");
+            {
+                var assertedValue = svc.RoomOf(a);
+                TestAssert.WithMessage(() => Assert.Equal(226001844, assertedValue), "the old overload leaves the record untouched");
+            }
 
             svc.OnListenerProvisioned(a, 1578726032);                 // re-provision elsewhere
-            Assert.That(svc.RoomOf(a), Is.EqualTo(1578726032), "newest provision wins");
+            {
+                var assertedValue = svc.RoomOf(a);
+                TestAssert.WithMessage(() => Assert.Equal(1578726032, assertedValue), "newest provision wins");
+            }
         }
 
         // The address of an agent is the room its last provision joined and nothing else: an agent that has only been
         // in a group or avatar-to-avatar call has no record, so the service resolves no room for it.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void Service_ResolveRoom_IsTheRecordOnly()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Scene scene = new SceneHelpers().SetupScene();
             var svc = new VoiceVisibilityService(scene, cadenceMs: 250);
             UUID a = UUID.Random();
 
-            Assert.That(svc.ResolveRoom(a), Is.Null, "no provision, so no room");
+            {
+                var assertedValue = svc.ResolveRoom(a);
+                TestAssert.WithMessage(() => Assert.Null(assertedValue), "no provision, so no room");
+            }
 
             svc.OnListenerProvisioned(a, 226001844);
-            Assert.That(svc.ResolveRoom(a), Is.EqualTo(226001844));
-            Assert.That(svc.ResolveRoom(a), Is.EqualTo(svc.RoomOf(a)), "the resolver the sender uses is the sink's");
+            Assert.Equal(226001844, svc.ResolveRoom(a));
+            {
+                var assertedValue = svc.ResolveRoom(a);
+                TestAssert.WithMessage(() => Assert.Equal(svc.RoomOf(a), assertedValue), "the resolver the sender uses is the sink's");
+            }
         }
     }
 }
