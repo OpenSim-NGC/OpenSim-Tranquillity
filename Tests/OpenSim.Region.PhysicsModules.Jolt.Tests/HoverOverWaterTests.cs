@@ -8,7 +8,6 @@
 using Nini.Config;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Xunit;
-using Xunit.Abstractions;
 using Omv = OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;

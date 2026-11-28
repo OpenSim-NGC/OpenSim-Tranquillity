@@ -32,7 +32,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps.Tests;
 /// UpdateNotecardTaskInventory and the rest). Each saves one type of item, and the checks made before the content
 /// is stored are those of that type.
 /// </summary>
-public class ItemAssetUpdateCapTests : OpenSimTestCase
+// Not an OpenSimTestCase: that constructor removes MainServer's default server, which the event queue tests may be
+// using at the same time. Every region here builds its own caps server, so this class runs in parallel.
+public class ItemAssetUpdateCapTests
 {
     private const uint NoModify = (uint)(PermissionMask.Copy | PermissionMask.Transfer | PermissionMask.Move);
 

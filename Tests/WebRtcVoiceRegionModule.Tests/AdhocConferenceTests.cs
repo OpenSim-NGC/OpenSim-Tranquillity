@@ -21,7 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice;
@@ -30,7 +30,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class AdhocConferenceTests
     {
         private const string Grid = "example-grid";
@@ -57,27 +56,40 @@ namespace osWebRtcVoice.Tests
 
         // ---- the reply, which is the whole point --------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StartConferenceProducesTheEventQueueReplyWithBothIds()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             UUID temp = UUID.Random();
 
             bool handled = AdhocVoiceChatSession.TryHandleStartConference(
                 StartConference(temp, Bob, Carol), Alice, e, RegionA, enabled: true, out ChatSessionOutcome o);
 
-            Assert.That(handled, Is.True);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK), o.Instrument);
-            Assert.That(o.Reply, Is.Not.Null, "no Reply means no event-queue event and the viewer times out");
-            Assert.That(o.Reply.TempSessionId, Is.EqualTo(temp), "the viewer keys the reply by the id it sent");
-            Assert.That(o.Reply.SessionId, Is.Not.EqualTo(UUID.Zero));
-            Assert.That(o.Reply.SessionId, Is.Not.EqualTo(temp),
-                        "ADHOC is the one type that genuinely re-keys: the server owns the authoritative id");
+            Assert.True(handled);
+            {
+                var assertedValue = o.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.OK, assertedValue), o.Instrument);
+            }
+            {
+                var assertedValue = o.Reply;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "no Reply means no event-queue event and the viewer times out");
+            }
+            {
+                var assertedValue = o.Reply.TempSessionId;
+                TestAssert.WithMessage(() => Assert.Equal(temp, assertedValue), "the viewer keys the reply by the id it sent");
+            }
+            Assert.NotEqual(UUID.Zero, o.Reply.SessionId);
+            {
+                var assertedValue = o.Reply.SessionId;
+                TestAssert.WithMessage(() => Assert.NotEqual(temp, assertedValue), "ADHOC is the one type that genuinely re-keys: the server owns the authoritative id");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheEngineHoldsTheAdhocSessionWithTheInviteesFromParams()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             UUID temp = UUID.Random();
 
@@ -85,21 +97,25 @@ namespace osWebRtcVoice.Tests
                 StartConference(temp, Bob, Carol), Alice, e, RegionA, enabled: true, out ChatSessionOutcome o);
 
             NonSpatialVoiceSession s = e.Store.Get(o.Reply.SessionId);
-            Assert.That(s, Is.Not.Null);
-            Assert.That(s.Type, Is.EqualTo(NonSpatialSessionType.Adhoc));
-            Assert.That(s.RequiresRekey, Is.True);
-            Assert.That(s.TempSessionId, Is.EqualTo(temp));
-            Assert.That(s.Creator, Is.EqualTo(Alice));
-            Assert.That(s.Find(Alice)?.HoldsSeat, Is.True, "the creator takes its seat at start");
-            Assert.That(s.Find(Bob)?.State, Is.EqualTo(MemberState.Invited));
-            Assert.That(s.Find(Carol)?.State, Is.EqualTo(MemberState.Invited));
-            Assert.That(s.SeatsHeld, Is.EqualTo(1), "an invitation holds no seat");
-            Assert.That(s.RoomKey, Does.StartWith("nsv1:adhoc:"));
+            Assert.NotNull(s);
+            Assert.Equal(NonSpatialSessionType.Adhoc, s.Type);
+            Assert.True(s.RequiresRekey);
+            Assert.Equal(temp, s.TempSessionId);
+            Assert.Equal(Alice, s.Creator);
+            Assert.True((s.Find(Alice)?.HoldsSeat), "the creator takes its seat at start");
+            Assert.Equal(MemberState.Invited, s.Find(Bob)?.State);
+            Assert.Equal(MemberState.Invited, s.Find(Carol)?.State);
+            {
+                var assertedValue = s.SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "an invitation holds no seat");
+            }
+            Assert.StartsWith("nsv1:adhoc:", s.RoomKey);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARetriedStartFindsTheSameSessionAndSendsTheSameIds()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The viewer mints its temp id once, at session creation, and re-POSTs with the same one
             // after a timeout. A second session would mean a second room and a second reply.
             NonSpatialVoiceSessionEngine e = Engine();
@@ -108,94 +124,108 @@ namespace osWebRtcVoice.Tests
             AdhocVoiceChatSession.TryHandleStartConference(StartConference(temp, Bob), Alice, e, RegionA, true, out ChatSessionOutcome a);
             AdhocVoiceChatSession.TryHandleStartConference(StartConference(temp, Bob), Alice, e, RegionA, true, out ChatSessionOutcome b);
 
-            Assert.That(b.Reply.SessionId, Is.EqualTo(a.Reply.SessionId));
-            Assert.That(b.Reply.TempSessionId, Is.EqualTo(temp));
-            Assert.That(b.Instrument, Does.Contain(AdhocVoiceChatSession.DecisionIdempotent));
-            Assert.That(e.Store.All().Count, Is.EqualTo(1), "one session, one room, one reply");
+            Assert.Equal(a.Reply.SessionId, b.Reply.SessionId);
+            Assert.Equal(temp, b.Reply.TempSessionId);
+            Assert.Contains(AdhocVoiceChatSession.DecisionIdempotent, b.Instrument);
+            {
+                var assertedValue = e.Store.All().Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "one session, one room, one reply");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TwoDifferentConferencesFromOneCreatorAreTwoSessions()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             AdhocVoiceChatSession.TryHandleStartConference(StartConference(UUID.Random(), Bob), Alice, e, RegionA, true, out _);
             AdhocVoiceChatSession.TryHandleStartConference(StartConference(UUID.Random(), Carol), Alice, e, RegionA, true, out _);
-            Assert.That(e.Store.All().Count, Is.EqualTo(2), "idempotency is per temp id, not per creator");
+            {
+                var assertedValue = e.Store.All().Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "idempotency is per temp id, not per creator");
+            }
         }
 
         // ---- params parsing ------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParamsIsAnArrayForAConference_AndAScalarIsStillAccepted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // startConferenceCoro sends an LLSD ARRAY (llimview.cpp:2484-2487); "start p2p voice"
             // sends a scalar. Accepting both costs two lines and avoids an empty conference.
             OSDArray arr = new OSDArray { OSD.FromUUID(Bob), OSD.FromUUID(Carol) };
-            Assert.That(AdhocVoiceChatSession.ParseInvitees(new OSDMap { ["params"] = arr }),
-                        Is.EquivalentTo(new[] { Bob, Carol }));
-            Assert.That(AdhocVoiceChatSession.ParseInvitees(new OSDMap { ["params"] = OSD.FromUUID(Bob) }),
-                        Is.EquivalentTo(new[] { Bob }));
-            Assert.That(AdhocVoiceChatSession.ParseInvitees(new OSDMap()), Is.Empty);
-            Assert.That(AdhocVoiceChatSession.ParseInvitees(null), Is.Empty);
+            Assert.Equivalent(new[] { Bob, Carol }, AdhocVoiceChatSession.ParseInvitees(new OSDMap { ["params"] = arr }), strict: true);
+            Assert.Equivalent(new[] { Bob }, AdhocVoiceChatSession.ParseInvitees(new OSDMap { ["params"] = OSD.FromUUID(Bob) }), strict: true);
+            Assert.Empty(AdhocVoiceChatSession.ParseInvitees(new OSDMap()));
+            Assert.Empty(AdhocVoiceChatSession.ParseInvitees(null));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void DuplicateAndZeroInviteesAreDropped()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             OSDArray arr = new OSDArray { OSD.FromUUID(Bob), OSD.FromUUID(Bob), OSD.FromUUID(UUID.Zero) };
-            Assert.That(AdhocVoiceChatSession.ParseInvitees(new OSDMap { ["params"] = arr }),
-                        Is.EquivalentTo(new[] { Bob }));
+            Assert.Equivalent(new[] { Bob }, AdhocVoiceChatSession.ParseInvitees(new OSDMap { ["params"] = arr }), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AConferenceWithNoInviteesStillOpens()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The viewer can open a conference and invite afterwards; refusing here would break that.
             NonSpatialVoiceSessionEngine e = Engine();
             AdhocVoiceChatSession.TryHandleStartConference(StartConference(UUID.Random()), Alice, e, RegionA, true, out ChatSessionOutcome o);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(e.Store.Get(o.Reply.SessionId).SeatsHeld, Is.EqualTo(1));
+            Assert.Equal(HttpStatusCode.OK, o.Status);
+            Assert.Equal(1, e.Store.Get(o.Reply.SessionId).SeatsHeld);
         }
 
         // ---- the arm takes only what is its own -----------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void NothingIsTakenWhenAdhocVoiceIsDisabled()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
-            Assert.That(AdhocVoiceChatSession.TryHandleStartConference(
-                        StartConference(UUID.Random(), Bob), Alice, e, RegionA, enabled: false, out ChatSessionOutcome o), Is.False);
-            Assert.That(o, Is.Null);
-            Assert.That(e.Store.All(), Is.Empty, "and no session is created");
+            Assert.False(AdhocVoiceChatSession.TryHandleStartConference(
+                        StartConference(UUID.Random(), Bob), Alice, e, RegionA, enabled: false, out ChatSessionOutcome o));
+            Assert.Null(o);
+            {
+                var assertedValue = e.Store.All();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "and no session is created");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlyStartConferenceIsTaken()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             foreach (string m in new[] { "call", "start p2p voice", "accept invitation", "decline invitation", "fetch history", "invite" })
             {
                 OSDMap body = new OSDMap { ["method"] = OSD.FromString(m), ["session-id"] = OSD.FromUUID(UUID.Random()) };
-                Assert.That(AdhocVoiceChatSession.TryHandleStartConference(body, Alice, e, RegionA, true, out _), Is.False, m);
+                Assert.False(AdhocVoiceChatSession.TryHandleStartConference(body, Alice, e, RegionA, true, out _), m);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStartConferenceWithNoSessionIdIsNotOurs()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             OSDMap body = new OSDMap { ["method"] = OSD.FromString("start conference") };
-            Assert.That(AdhocVoiceChatSession.TryHandleStartConference(body, Alice, e, RegionA, true, out _), Is.False);
+            Assert.False(AdhocVoiceChatSession.TryHandleStartConference(body, Alice, e, RegionA, true, out _));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheAdhocRoomKeyIsDistinctFromTheGroupAndP2PKeysForTheSameId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID id = UUID.Random();
             string adhoc = NonSpatialRoomKey.Derive(Grid, NonSpatialSessionType.Adhoc, id);
-            Assert.That(adhoc, Is.Not.EqualTo(NonSpatialRoomKey.Derive(Grid, NonSpatialSessionType.Group, id)));
-            Assert.That(adhoc, Is.Not.EqualTo(NonSpatialRoomKey.Derive(Grid, NonSpatialSessionType.P2P, id)));
-            Assert.That(UUID.TryParse(adhoc, out _), Is.False, "still never mistakable for an A2A channel");
+            Assert.NotEqual(NonSpatialRoomKey.Derive(Grid, NonSpatialSessionType.Group, id), adhoc);
+            Assert.NotEqual(NonSpatialRoomKey.Derive(Grid, NonSpatialSessionType.P2P, id), adhoc);
+            Assert.False(UUID.TryParse(adhoc, out _), "still never mistakable for an A2A channel");
         }
     }
 }

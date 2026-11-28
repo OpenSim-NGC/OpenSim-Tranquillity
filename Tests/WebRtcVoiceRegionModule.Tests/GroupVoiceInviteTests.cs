@@ -22,7 +22,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice;
@@ -31,7 +31,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class GroupVoiceInviteTests
     {
         private const string Grid = "example-grid";
@@ -70,25 +69,27 @@ namespace osWebRtcVoice.Tests
 
         // ---- send-once -------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheFirstSeatStartsTheRing_AndNoLaterSeatDoes()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             foreach (UUID a in new[] { Alice, Bob, Carol }) g.Join(a, grp);
 
             GroupVoiceChatSession.TryHandleCall(Call(grp), Alice, p, e, RegionA, out ChatSessionOutcome first);
-            Assert.That(first.StartedRinging, Is.True, "0 -> 1 rings");
+            Assert.True(first.StartedRinging, "0 -> 1 rings");
 
             GroupVoiceChatSession.TryHandleCall(Call(grp), Bob, p, e, RegionA, out ChatSessionOutcome second);
-            Assert.That(second.StartedRinging, Is.False, "1 -> 2 must not re-ring the group");
+            Assert.False(second.StartedRinging, "1 -> 2 must not re-ring the group");
             GroupVoiceChatSession.TryHandleCall(Call(grp), Carol, p, e, RegionA, out ChatSessionOutcome third);
-            Assert.That(third.StartedRinging, Is.False);
+            Assert.False(third.StartedRinging);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ConcurrentFirstJoiners_RingExactlyOnce()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             UUID[] agents = Enumerable.Range(0, 12).Select(_ => UUID.Random()).ToArray();
@@ -101,34 +102,39 @@ namespace osWebRtcVoice.Tests
                 if (o is not null && o.StartedRinging) System.Threading.Interlocked.Increment(ref rings);
             });
 
-            Assert.That(rings, Is.EqualTo(1), "the 0 -> 1 claim is made inside the store mutation");
-            Assert.That(e.Store.Get(grp).SeatsHeld, Is.EqualTo(agents.Length));
+            {
+                var assertedValue = rings;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the 0 -> 1 claim is made inside the store mutation");
+            }
+            Assert.Equal(agents.Length, e.Store.Get(grp).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void WhenTheRoomEmptiesAndSomeoneStartsItAgain_ItRingsAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             g.Join(Alice, grp); g.Join(Bob, grp);
 
             GroupVoiceChatSession.TryHandleCall(Call(grp), Alice, p, e, RegionA, out ChatSessionOutcome a1);
-            Assert.That(a1.StartedRinging, Is.True);
+            Assert.True(a1.StartedRinging);
             e.MarkInvited(grp, new[] { Bob });
-            Assert.That(e.Store.Get(grp).WasInvited(Bob), Is.True);
+            Assert.True(e.Store.Get(grp).WasInvited(Bob));
 
             e.Depart(grp, Alice, DepartureReason.VoiceTeardown);          // room empties
-            Assert.That(e.Store.Get(grp).SeatsHeld, Is.EqualTo(0));
-            Assert.That(e.Store.Get(grp).RingSent, Is.False, "the ring cycle ended with the call");
-            Assert.That(e.Store.Get(grp).WasInvited(Bob), Is.False, "and the invited set was cleared");
+            Assert.Equal(0, e.Store.Get(grp).SeatsHeld);
+            Assert.False(e.Store.Get(grp).RingSent, "the ring cycle ended with the call");
+            Assert.False(e.Store.Get(grp).WasInvited(Bob), "and the invited set was cleared");
 
             GroupVoiceChatSession.TryHandleCall(Call(grp), Bob, p, e, RegionA, out ChatSessionOutcome a2);
-            Assert.That(a2.StartedRinging, Is.True, "a later start rings the group again");
+            Assert.True(a2.StartedRinging, "a later start rings the group again");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARoomThatMerelyThinsOut_DoesNotReRing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             foreach (UUID a in new[] { Alice, Bob, Carol }) g.Join(a, grp);
@@ -136,17 +142,18 @@ namespace osWebRtcVoice.Tests
                 GroupVoiceChatSession.TryHandleCall(Call(grp), a, p, e, RegionA, out _);
 
             e.Depart(grp, Carol, DepartureReason.ChatLeave);              // 3 -> 2, still live
-            Assert.That(e.Store.Get(grp).RingSent, Is.True, "the cycle is still running");
+            Assert.True(e.Store.Get(grp).RingSent, "the cycle is still running");
 
             GroupVoiceChatSession.TryHandleCall(Call(grp), Carol, p, e, RegionA, out ChatSessionOutcome back);
-            Assert.That(back.StartedRinging, Is.False, "rejoining a live call must not ring everyone again");
+            Assert.False(back.StartedRinging, "rejoining a live call must not ring everyone again");
         }
 
         // ---- the target list -------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TargetsAreMembersWithBothPowers_ExcludingTheInitiator()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             g.Join(Alice, grp);                                            // initiator
@@ -158,12 +165,13 @@ namespace osWebRtcVoice.Tests
             List<UUID> targets = GroupVoiceInvite.Targets(new[] { Alice, Bob, Carol, Dave },
                                                           e.Store.Get(grp), Alice, p);
 
-            Assert.That(targets, Is.EquivalentTo(new[] { Bob }));
+            Assert.Equivalent(new[] { Bob }, targets, strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AlreadySeatedMembersAreNotRung()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             foreach (UUID a in new[] { Alice, Bob, Carol }) g.Join(a, grp);
@@ -172,12 +180,13 @@ namespace osWebRtcVoice.Tests
 
             List<UUID> targets = GroupVoiceInvite.Targets(new[] { Alice, Bob, Carol }, e.Store.Get(grp), Alice, p);
 
-            Assert.That(targets, Is.EquivalentTo(new[] { Carol }));
+            Assert.Equivalent(new[] { Carol }, targets, strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AMemberAlreadyRungThisCycleIsNotRungAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             foreach (UUID a in new[] { Alice, Bob, Carol }) g.Join(a, grp);
@@ -185,27 +194,28 @@ namespace osWebRtcVoice.Tests
 
             e.MarkInvited(grp, new[] { Bob });
 
-            Assert.That(GroupVoiceInvite.Targets(new[] { Alice, Bob, Carol }, e.Store.Get(grp), Alice, p),
-                        Is.EquivalentTo(new[] { Carol }));
+            Assert.Equivalent(new[] { Carol }, GroupVoiceInvite.Targets(new[] { Alice, Bob, Carol }, e.Store.Get(grp), Alice, p), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TargetsIsEmptyWhenGroupVoiceIsDisabled()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             g.Join(Alice, grp); g.Join(Bob, grp);
             GroupVoiceChatSession.TryHandleCall(Call(grp), Alice, p, e, RegionA, out _);
 
-            Assert.That(GroupVoiceInvite.Targets(new[] { Bob }, e.Store.Get(grp), Alice, GroupVoicePolicy.Disabled), Is.Empty);
-            Assert.That(GroupVoiceInvite.Targets(null, e.Store.Get(grp), Alice, p), Is.Empty);
+            Assert.Empty(GroupVoiceInvite.Targets(new[] { Bob }, e.Store.Get(grp), Alice, GroupVoicePolicy.Disabled));
+            Assert.Empty(GroupVoiceInvite.Targets(null, e.Store.Get(grp), Alice, p));
         }
 
         // ---- the invitation body ---------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheBodyCarriesTheGroupIdAndTheVoiceKey()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             g.Join(Alice, grp);
@@ -215,24 +225,30 @@ namespace osWebRtcVoice.Tests
 
             OSDMap body = GroupVoiceInvite.BuildBody(s, token, Alice, "Test Caller", "The Group");
 
-            Assert.That(body["session_id"].AsUUID(), Is.EqualTo(grp),
-                        "the GROUP id is what makes the viewer choose VoiceInviteGroup");
-            Assert.That(body.ContainsKey("voice"), Is.True, "no voice key means the viewer ignores it");
-            Assert.That(body.ContainsKey("instantmessage"), Is.False, "that key would route to the IM branch");
+            {
+                var assertedValue = body["session_id"].AsUUID();
+                TestAssert.WithMessage(() => Assert.Equal(grp, assertedValue), "the GROUP id is what makes the viewer choose VoiceInviteGroup");
+            }
+            Assert.True(body.ContainsKey("voice"), "no voice key means the viewer ignores it");
+            Assert.False(body.ContainsKey("instantmessage"), "that key would route to the IM branch");
             OSDMap voice = (OSDMap)body["voice"];
-            Assert.That(voice["invitation_type"].AsInteger(), Is.EqualTo(0), "GROUP_CHAT_SESSION, not P2P(2)");
-            Assert.That(voice["invitation_type"].AsInteger(), Is.Not.EqualTo(A2AInvitation.InvitationTypeP2P));
-            Assert.That(voice["voice_server_type"].AsString(), Is.EqualTo("webrtc"));
-            Assert.That(voice["channel_uri"].AsString(), Is.EqualTo(s.RoomKey));
-            Assert.That(voice["channel_uri"].AsString(), Does.StartWith("nsv1:group:"));
-            Assert.That(voice["channel_credentials"].AsString(), Is.EqualTo(token));
-            Assert.That(body["from_id"].AsUUID(), Is.EqualTo(Alice));
-            Assert.That(body["session_name"].AsString(), Is.EqualTo("The Group"));
+            {
+                var assertedValue = voice["invitation_type"].AsInteger();
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "GROUP_CHAT_SESSION, not P2P(2)");
+            }
+            Assert.NotEqual(A2AInvitation.InvitationTypeP2P, voice["invitation_type"].AsInteger());
+            Assert.Equal("webrtc", voice["voice_server_type"].AsString());
+            Assert.Equal(s.RoomKey, voice["channel_uri"].AsString());
+            Assert.StartsWith("nsv1:group:", voice["channel_uri"].AsString());
+            Assert.Equal(token, voice["channel_credentials"].AsString());
+            Assert.Equal(Alice, body["from_id"].AsUUID());
+            Assert.Equal("The Group", body["session_name"].AsString());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheBodyRefusesToBeBuiltWithoutAToken()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             g.Join(Alice, grp);
@@ -241,9 +257,10 @@ namespace osWebRtcVoice.Tests
                 () => GroupVoiceInvite.BuildBody(e.Store.Get(grp), null, Alice, "Test User", "G"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheBodyRefusesANonGroupSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, _) = Setup();
             SessionOutcome adhoc = e.StartAdhoc(Alice, UUID.Random(), RegionA);
             Assert.Throws<ArgumentException>(
@@ -252,9 +269,10 @@ namespace osWebRtcVoice.Tests
 
         // ---- accept invitation ------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AcceptInvitationAdmitsTheMemberAndTakesItsSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             g.Join(Alice, grp); g.Join(Bob, grp);
@@ -262,16 +280,20 @@ namespace osWebRtcVoice.Tests
 
             bool handled = GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(grp), Bob, p, e, out ChatSessionOutcome o);
 
-            Assert.That(handled, Is.True);
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK), o.Instrument);
-            Assert.That(o.Instrument, Does.Contain(GroupVoiceChatSession.DecisionAcceptAdmitted));
-            Assert.That(e.Store.Get(grp).Find(Bob).HoldsSeat, Is.True, "accepting the popup IS the join");
-            Assert.That(e.Store.Get(grp).SeatsHeld, Is.EqualTo(2));
+            Assert.True(handled);
+            {
+                var assertedValue = o.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.OK, assertedValue), o.Instrument);
+            }
+            Assert.Contains(GroupVoiceChatSession.DecisionAcceptAdmitted, o.Instrument);
+            Assert.True(e.Store.Get(grp).Find(Bob).HoldsSeat, "accepting the popup IS the join");
+            Assert.Equal(2, e.Store.Get(grp).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AcceptInvitationIsRefusedWithoutTheVoicePower()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             g.Join(Alice, grp);
@@ -280,13 +302,14 @@ namespace osWebRtcVoice.Tests
 
             GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(grp), Bob, p, e, out ChatSessionOutcome o);
 
-            Assert.That(o.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(e.Store.Get(grp).SeatsHeld, Is.EqualTo(1));
+            Assert.Equal(HttpStatusCode.Forbidden, o.Status);
+            Assert.Equal(1, e.Store.Get(grp).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AcceptInvitationPastTheCapIs409()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup(cap: 2);
             UUID grp = UUID.Random();
             foreach (UUID a in new[] { Alice, Bob, Carol }) g.Join(a, grp);
@@ -295,37 +318,36 @@ namespace osWebRtcVoice.Tests
 
             GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(grp), Carol, p, e, out ChatSessionOutcome o);
 
-            Assert.That((int)o.Status, Is.EqualTo(NonSpatialCaps.CapacityHttpStatus));
+            Assert.Equal(NonSpatialCaps.CapacityHttpStatus, (int)o.Status);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AcceptInvitationIsNotTakenForANonMemberOrAnUnknownSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             g.Join(Alice, grp);
             GroupVoiceChatSession.TryHandleCall(Call(grp), Alice, p, e, RegionA, out _);
 
-            Assert.That(GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(grp), Dave, p, e, out _), Is.False,
-                        "a non-member's accept falls through to the A2A arm untouched");
-            Assert.That(GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(UUID.Random()), Alice, p, e, out _), Is.False,
-                        "an accept for an unknown session is not ours");
-            Assert.That(GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(grp), Alice, GroupVoicePolicy.Disabled, e, out _), Is.False,
-                        "and nothing is taken when group voice is off");
+            Assert.False(GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(grp), Dave, p, e, out _), "a non-member's accept falls through to the A2A arm untouched");
+            Assert.False(GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(UUID.Random()), Alice, p, e, out _), "an accept for an unknown session is not ours");
+            Assert.False(GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(grp), Alice, GroupVoicePolicy.Disabled, e, out _), "and nothing is taken when group voice is off");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnAcceptForAnAdhocSessionIsNotTaken()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, _) = Setup();
             SessionOutcome adhoc = e.StartAdhoc(Alice, UUID.Random(), RegionA);
-            Assert.That(GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(adhoc.Session.SessionId), Alice, p, e, out _),
-                        Is.False, "the ad-hoc arm owns the ad-hoc accept; this arm must not claim it");
+            Assert.False(GroupVoiceChatSession.TryHandleAcceptInvitation(Accept(adhoc.Session.SessionId), Alice, p, e, out _), "the ad-hoc arm owns the ad-hoc accept; this arm must not claim it");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlyTheAcceptMethodIsTakenByTheAcceptArm()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             (GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, Grid_ g) = Setup();
             UUID grp = UUID.Random();
             g.Join(Alice, grp);
@@ -333,15 +355,16 @@ namespace osWebRtcVoice.Tests
             foreach (string m in new[] { "call", "decline invitation", "start conference", "fetch history" })
             {
                 OSDMap body = new OSDMap { ["method"] = OSD.FromString(m), ["session-id"] = OSD.FromUUID(grp) };
-                Assert.That(GroupVoiceChatSession.TryHandleAcceptInvitation(body, Alice, p, e, out _), Is.False, m);
+                Assert.False(GroupVoiceChatSession.TryHandleAcceptInvitation(body, Alice, p, e, out _), m);
             }
         }
 
         // ---- the presence filter, one request for the whole list ------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlineOnlyBatch_AsksOnceForAShortList_AndKeepsTheOnesReportedOnline()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             List<UUID> candidates = Enumerable.Range(0, 35).Select(_ => UUID.Random()).ToList();
             int requests = 0;
 
@@ -351,36 +374,39 @@ namespace osWebRtcVoice.Tests
                 return ids.Take(20).ToDictionary(i => i, _ => UUID.Random());   // the first twenty are online
             });
 
-            Assert.That(requests, Is.EqualTo(1));
-            Assert.That(online, Is.EqualTo(candidates.Take(20)));
+            Assert.Equal(1, requests);
+            Assert.Equal(candidates.Take(20), online);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlineOnlyBatch_SplitsAVeryLongListIntoRequestsOfABoundedSize()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             List<UUID> candidates = Enumerable.Range(0, GroupVoiceInvite.PresenceBatchSize * 2 + 5).Select(_ => UUID.Random()).ToList();
             List<int> sizes = new();
 
             GroupVoiceInvite.OnlineOnlyBatch(candidates, ids => { sizes.Add(ids.Count); return new Dictionary<UUID, UUID>(); });
 
-            Assert.That(sizes, Is.EqualTo(new[] { GroupVoiceInvite.PresenceBatchSize, GroupVoiceInvite.PresenceBatchSize, 5 }));
+            Assert.Equal(new[] { GroupVoiceInvite.PresenceBatchSize, GroupVoiceInvite.PresenceBatchSize, 5 }, sizes);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlineOnlyBatch_TreatsARequestThatThrowsAsOffline_AndAMissingOrZeroRegionAsOffline()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID a = UUID.Random(), b = UUID.Random();
 
-            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(new[] { a, b }, _ => throw new InvalidOperationException("presence service down")), Is.Empty);
-            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(new[] { a, b }, _ => new Dictionary<UUID, UUID> { [a] = UUID.Zero }), Is.Empty);
-            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(new[] { a, b }, _ => null), Is.Empty);
-            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(new[] { a }, null), Is.Empty);
-            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(null, _ => new Dictionary<UUID, UUID>()), Is.Empty);
+            Assert.Empty(GroupVoiceInvite.OnlineOnlyBatch(new[] { a, b }, _ => throw new InvalidOperationException("presence service down")));
+            Assert.Empty(GroupVoiceInvite.OnlineOnlyBatch(new[] { a, b }, _ => new Dictionary<UUID, UUID> { [a] = UUID.Zero }));
+            Assert.Empty(GroupVoiceInvite.OnlineOnlyBatch(new[] { a, b }, _ => null));
+            Assert.Empty(GroupVoiceInvite.OnlineOnlyBatch(new[] { a }, null));
+            Assert.Empty(GroupVoiceInvite.OnlineOnlyBatch(null, _ => new Dictionary<UUID, UUID>()));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TargetsFromARoster_AreTheSameAsTargetsFromThePolicy()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             UUID group = UUID.Random();
             UUID member = UUID.Random(), noPower = UUID.Random(), outsider = UUID.Random();
             GroupVoicePolicy policy = new GroupVoicePolicy
@@ -405,8 +431,11 @@ namespace osWebRtcVoice.Tests
             List<UUID> fromRoster = GroupVoiceInvite.Targets(present, session, UUID.Zero, policy, roster);
             List<UUID> fromPolicy = GroupVoiceInvite.Targets(present, session, UUID.Zero, policy);
 
-            Assert.That(fromRoster, Is.EqualTo(fromPolicy));
-            Assert.That(GroupVoiceInvite.Targets(present, session, UUID.Zero, policy, null), Is.EqualTo(fromPolicy), "no roster: the policy is asked");
+            Assert.Equal(fromPolicy, fromRoster);
+            {
+                var assertedValue = GroupVoiceInvite.Targets(present, session, UUID.Zero, policy, null);
+                TestAssert.WithMessage(() => Assert.Equal(fromPolicy, assertedValue), "no roster: the policy is asked");
+            }
         }
     }
 }

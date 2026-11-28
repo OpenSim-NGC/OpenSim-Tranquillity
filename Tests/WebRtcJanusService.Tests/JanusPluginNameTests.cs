@@ -18,7 +18,6 @@ using Nini.Config;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class JanusPluginNameTests
     {
         // JanusSession's ctor stores fields only (no network), so this is safe in a unit test.
@@ -28,44 +27,49 @@ namespace osWebRtcVoice.Tests
 
         // The fix: a configured plugin name flows through JanusAudioBridge to the
         // name-agnostic JanusPlugin base (it is no longer hardcoded to audiobridge).
-        [Test]
+        [Fact(Timeout = 60000)]
         public void JanusAudioBridge_HonorsConfiguredPluginName()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var ab = new JanusAudioBridge(NewSession(), "janus.plugin.slvoice");
-            Assert.That(ab.PluginName, Is.EqualTo("janus.plugin.slvoice"));
+            Assert.Equal("janus.plugin.slvoice", ab.PluginName);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void JanusAudioBridge_AudiobridgeNameFlowsThrough()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var ab = new JanusAudioBridge(NewSession(), "janus.plugin.audiobridge");
-            Assert.That(ab.PluginName, Is.EqualTo("janus.plugin.audiobridge"));
+            Assert.Equal("janus.plugin.audiobridge", ab.PluginName);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void DefaultPluginName_IsTheStockAudioBridge()
         {
-            Assert.That(WebRtcJanusService.DefaultPluginName, Is.EqualTo("janus.plugin.audiobridge"));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal("janus.plugin.audiobridge", WebRtcJanusService.DefaultPluginName);
         }
 
         // The key-absent path WebRtcJanusService takes: section present, PluginName absent.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void PluginName_DefaultsToStockAudioBridge_WhenKeyAbsent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var src = new IniConfigSource();
             IConfig cfg = src.AddConfig("JanusWebRtcVoice");
             cfg.Set("JanusGatewayURI", "http://janus.test/voice");
-            Assert.That(WebRtcJanusService.ReadPluginName(cfg), Is.EqualTo("janus.plugin.audiobridge"));
+            Assert.Equal("janus.plugin.audiobridge", WebRtcJanusService.ReadPluginName(cfg));
         }
 
         // An operator who wants the spatial mixer sets the key explicitly.
-        [Test]
+        [Fact(Timeout = 60000)]
         public void PluginName_IsHonored_WhenKeySet()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var src = new IniConfigSource();
             IConfig cfg = src.AddConfig("JanusWebRtcVoice");
             cfg.Set("PluginName", "janus.plugin.slvoice");
-            Assert.That(WebRtcJanusService.ReadPluginName(cfg), Is.EqualTo("janus.plugin.slvoice"));
+            Assert.Equal("janus.plugin.slvoice", WebRtcJanusService.ReadPluginName(cfg));
         }
     }
 }

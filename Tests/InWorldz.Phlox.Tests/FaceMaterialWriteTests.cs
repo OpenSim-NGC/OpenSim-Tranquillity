@@ -14,7 +14,6 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using Phlox.ScriptEngine;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace InWorldz.Phlox.Tests;
 

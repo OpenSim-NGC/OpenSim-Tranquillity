@@ -21,17 +21,14 @@ using OpenMetaverse;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
-    public class RootCloseAllRegionsTests
-    {
+    public class RootCloseAllRegionsTests : IAsyncLifetime
+        {
         private static readonly UUID RegionA = new UUID("bbbbbbbb-0000-0000-0000-0000000a0074");
         private static readonly UUID RegionB = new UUID("bbbbbbbb-0000-0000-0000-0000000b0074");
         private static readonly UUID TestAgent = new UUID("aaaaaaaa-2222-2222-2222-000000000074");
         private static readonly UUID Login = new UUID("cccccccc-3333-3333-3333-000000000074");
         private static readonly UUID NextLogin = new UUID("dddddddd-4444-4444-4444-000000000074");
-
-        [TearDown]
-        public void TearDown()
+        private void TearDown()
         {
             foreach (UUID token in new[] { Login, NextLogin, UUID.Zero })
                 foreach (UUID region in new[] { RegionA, RegionB })
@@ -58,41 +55,55 @@ namespace osWebRtcVoice.Tests
                 VoiceViewerSession.CloseCompleted(s);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RootClose_CapturesTheAgentsSessionsInEveryRegion()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeViewerSession root = Register(RegionA, Login);
             FakeViewerSession neighbour = Register(RegionB, Login);
 
             List<IVoiceViewerSession> captured = WebRtcVoiceServiceModule.CaptureForClientClose(
                 TestAgent, pClosingPresenceIsChild: false, Login, new HashSet<UUID>());
 
-            Assert.That(captured, Is.EquivalentTo(new IVoiceViewerSession[] { root, neighbour }),
-                "the root region's AND the neighbour region's session are captured");
-            Assert.That(VoiceViewerSession.IsAgentInRegion(RegionA, TestAgent), Is.False);
-            Assert.That(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent), Is.False, "no ghost left in the neighbour region");
-            Assert.That(VoiceViewerSession.CaptureSessionsForClose(RegionA, TestAgent, Login), Is.Empty, "registry empty for the agent in A");
-            Assert.That(VoiceViewerSession.CaptureSessionsForClose(RegionB, TestAgent, Login), Is.Empty, "registry empty for the agent in B");
+            {
+                var assertedValue = captured;
+                TestAssert.WithMessage(() => Assert.Equivalent(new IVoiceViewerSession[] { root, neighbour }, assertedValue, strict: true), "the root region's AND the neighbour region's session are captured");
+            }
+            Assert.False(VoiceViewerSession.IsAgentInRegion(RegionA, TestAgent));
+            Assert.False(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent), "no ghost left in the neighbour region");
+            {
+                var assertedValue = VoiceViewerSession.CaptureSessionsForClose(RegionA, TestAgent, Login);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "registry empty for the agent in A");
+            }
+            {
+                var assertedValue = VoiceViewerSession.CaptureSessionsForClose(RegionB, TestAgent, Login);
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "registry empty for the agent in B");
+            }
             Release(captured);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ChildClose_CapturesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Register(RegionA, Login);
             Register(RegionB, Login);
 
             List<IVoiceViewerSession> captured = WebRtcVoiceServiceModule.CaptureForClientClose(
                 TestAgent, pClosingPresenceIsChild: true, Login, new HashSet<UUID>());
 
-            Assert.That(captured, Is.Empty, "a child close (border / draw distance) tears nothing down");
-            Assert.That(VoiceViewerSession.IsAgentInRegion(RegionA, TestAgent), Is.True);
-            Assert.That(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent), Is.True);
+            {
+                var assertedValue = captured;
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "a child close (border / draw distance) tears nothing down");
+            }
+            Assert.True(VoiceViewerSession.IsAgentInRegion(RegionA, TestAgent));
+            Assert.True(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TeleportSourceClose_IsAChildClose_DestinationSessionSurvives()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Same login in both regions: the teleport keeps the client SessionId, so the token alone
             // could not protect the destination. The ordering does: the source is already child when
             // CloseAgent fires after the teleport.
@@ -102,15 +113,16 @@ namespace osWebRtcVoice.Tests
             List<IVoiceViewerSession> captured = WebRtcVoiceServiceModule.CaptureForClientClose(
                 TestAgent, pClosingPresenceIsChild: true, Login, new HashSet<UUID>());
 
-            Assert.That(captured, Is.Empty);
-            Assert.That(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent), Is.True, "the new root region's session is untouched");
-            Assert.That(destination.ShutdownCalls, Is.EqualTo(0));
-            Assert.That(source.ShutdownCalls, Is.EqualTo(0));
+            Assert.Empty(captured);
+            Assert.True(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent), "the new root region's session is untouched");
+            Assert.Equal(0, destination.ShutdownCalls);
+            Assert.Equal(0, source.ShutdownCalls);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RootClose_SkipsARegionWhereTheAgentIsCurrentlyRoot()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // Belt and braces for any path that closed a root while the agent is already root elsewhere.
             FakeViewerSession closing = Register(RegionA, Login);
             FakeViewerSession liveRoot = Register(RegionB, Login);
@@ -118,24 +130,36 @@ namespace osWebRtcVoice.Tests
             List<IVoiceViewerSession> captured = WebRtcVoiceServiceModule.CaptureForClientClose(
                 TestAgent, pClosingPresenceIsChild: false, Login, new HashSet<UUID> { RegionB });
 
-            Assert.That(captured, Is.EquivalentTo(new IVoiceViewerSession[] { closing }));
-            Assert.That(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent), Is.True, "the region where the agent is root keeps its session");
-            Assert.That(liveRoot.ShutdownCalls, Is.EqualTo(0));
+            Assert.Equivalent(new IVoiceViewerSession[] { closing }, captured, strict: true);
+            Assert.True(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent), "the region where the agent is root keeps its session");
+            Assert.Equal(0, liveRoot.ShutdownCalls);
             Release(captured);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RootClose_NeverCapturesASuccessorLoginsSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeViewerSession dying = Register(RegionA, Login);
             Register(RegionB, NextLogin);   // a relog racing the close, in the neighbour region
 
             List<IVoiceViewerSession> captured = WebRtcVoiceServiceModule.CaptureForClientClose(
                 TestAgent, pClosingPresenceIsChild: false, Login, new HashSet<UUID>());
 
-            Assert.That(captured, Is.EquivalentTo(new IVoiceViewerSession[] { dying }));
-            Assert.That(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent), Is.True, "the successor login's session survives");
+            Assert.Equivalent(new IVoiceViewerSession[] { dying }, captured, strict: true);
+            Assert.True(VoiceViewerSession.IsAgentInRegion(RegionB, TestAgent), "the successor login's session survives");
             Release(captured);
+        }
+
+        public ValueTask InitializeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            TearDown();
+            return ValueTask.CompletedTask;
         }
     }
 }

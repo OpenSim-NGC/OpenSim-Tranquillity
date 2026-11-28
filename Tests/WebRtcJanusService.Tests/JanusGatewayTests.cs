@@ -27,21 +27,20 @@ using osWebRtcVoice.Tests.StockJanus;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class JanusGatewayTests
     {
         private static string Env(string name) => Environment.GetEnvironmentVariable(name);
 
         private static object Field(object o, string name) =>
             o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(o);
-
-        [Test]
         [NeedsPlugin(JanusPluginKind.Stock)]   // it attaches Janus's stock AudioBridge plugin, not the slvoice mixer
+        [Fact(Timeout = 60000)]
         public async Task ServiceStarts_CreatesASessionAttachesAudioBridgeAndCreatesARoom()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             string url = Env("WEBRTC_JANUS_TEST_URL");
             if (string.IsNullOrEmpty(url))
-                Assert.Ignore("Set WEBRTC_JANUS_TEST_URL to run against a Janus gateway");
+                Assert.Skip("Set WEBRTC_JANUS_TEST_URL to run against a Janus gateway");
 
             var config = new IniConfigSource();
             IConfig voice = config.AddConfig("WebRtcVoice");
@@ -65,19 +64,34 @@ namespace osWebRtcVoice.Tests
                 MainConsole.Instance = savedConsole;
             }
 
-            Assert.That(Field(service, "_Enabled"), Is.EqualTo(true),
-                "the service disables itself when it cannot create a session or attach the plugin");
+            {
+                var assertedValue = Field(service, "_Enabled");
+                TestAssert.WithMessage(() => Assert.Equal(true, assertedValue), "the service disables itself when it cannot create a session or attach the plugin");
+            }
             var viewerSession = (JanusViewerSession)Field(service, "_ViewerSession");
-            Assert.That(long.Parse(viewerSession.Session.SessionId), Is.Not.Zero, "Janus session id");
-            TestContext.Out.WriteLine($"Janus session id {viewerSession.Session.SessionId}, AudioBridge handle {viewerSession.AudioBridge.PluginId}");
-            Assert.That(viewerSession.AudioBridge.PluginId, Is.Not.Null.And.Not.Empty, "AudioBridge handle");
+            {
+                var assertedValue = long.Parse(viewerSession.Session.SessionId);
+                TestAssert.WithMessage(() => Assert.NotEqual(0, assertedValue), "Janus session id");
+            }
+            TestContext.Current.TestOutputHelper.WriteLine($"Janus session id {viewerSession.Session.SessionId}, AudioBridge handle {viewerSession.AudioBridge.PluginId}");
+            {
+                var assertedValue = viewerSession.AudioBridge.PluginId;
+                TestAssert.WithMessage(() =>
+                {
+                    Assert.NotNull(assertedValue);
+                    Assert.NotEmpty(assertedValue);
+                }, "AudioBridge handle");
+            }
 
             int roomId = Random.Shared.Next(100000, 2000000000);
             JanusRoom room = await viewerSession.AudioBridge.CreateRoom(roomId, true, "unit test room");
             try
             {
-                Assert.That(room, Is.Not.Null, "AudioBridge created the room");
-                Assert.That(room.RoomId, Is.EqualTo(roomId));
+                {
+                    var assertedValue = room;
+                    TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "AudioBridge created the room");
+                }
+                Assert.Equal(roomId, room.RoomId);
             }
             finally
             {

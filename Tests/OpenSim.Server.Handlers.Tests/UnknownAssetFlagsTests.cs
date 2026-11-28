@@ -32,7 +32,6 @@ using OpenSim.Data.SQLite;
 using OpenSim.Framework;
 using Xunit;
 using Assert = Xunit.Assert;
-using Theory = Xunit.TheoryAttribute;
 
 namespace OpenSim.Server.Handlers.Tests;
 

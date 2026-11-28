@@ -17,14 +17,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialIdempotencyTests
     {
         /// <summary>Run <paramref name="n"/> delegates as simultaneously as the scheduler allows.</summary>
@@ -47,27 +46,29 @@ namespace osWebRtcVoice.Tests
 
         // ---- race 1: a repeated start -----------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RepeatedStart_CreatesOneSessionOneRoomAndOneMembership()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID temp = NonSpatialVoiceSessionEngine.DeriveSessionId(NonSpatialSessionType.P2P, Alice, Bob);
 
             SessionOutcome first = e.Start(NonSpatialSessionType.P2P, Alice, Bob, temp, RegionA);
             SessionOutcome second = e.Start(NonSpatialSessionType.P2P, Alice, Bob, temp, RegionA);
 
-            Assert.That(first.Created, Is.True);
-            Assert.That(second.Created, Is.False);
-            Assert.That(second.Decision, Is.EqualTo("start-idempotent"));
-            Assert.That(second.Session.SessionId, Is.EqualTo(first.Session.SessionId));
-            Assert.That(second.Session.RoomKey, Is.EqualTo(first.Session.RoomKey));
-            Assert.That(e.Store.All().Count, Is.EqualTo(1));
-            Assert.That(e.Store.Get(first.Session.SessionId).Members.Count, Is.EqualTo(2));
+            Assert.True(first.Created);
+            Assert.False(second.Created);
+            Assert.Equal("start-idempotent", second.Decision);
+            Assert.Equal(first.Session.SessionId, second.Session.SessionId);
+            Assert.Equal(first.Session.RoomKey, second.Session.RoomKey);
+            Assert.Single(e.Store.All());
+            Assert.Equal(2, e.Store.Get(first.Session.SessionId).Members.Count);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARetriedAdhocStart_FindsTheFirstSession_BecauseTheViewerResendsItsTempId()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The viewer mints its conference id once (llimview.cpp:2542) and re-POSTs with the same
             // one after a timeout, so a retry must not open a second room and a second start reply.
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
@@ -76,114 +77,134 @@ namespace osWebRtcVoice.Tests
             SessionOutcome first = e.StartAdhoc(Alice, temp, RegionA);
             SessionOutcome retry = e.StartAdhoc(Alice, temp, RegionA);
 
-            Assert.That(retry.Created, Is.False);
-            Assert.That(retry.Session.SessionId, Is.EqualTo(first.Session.SessionId));
-            Assert.That(e.Store.All().Count, Is.EqualTo(1));
+            Assert.False(retry.Created);
+            Assert.Equal(first.Session.SessionId, retry.Session.SessionId);
+            Assert.Single(e.Store.All());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TwoDifferentAdhocStartsFromTheSameCreator_AreTwoSessions()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             e.StartAdhoc(Alice, UUID.Random(), RegionA);
             e.StartAdhoc(Alice, UUID.Random(), RegionA);
-            Assert.That(e.Store.All().Count, Is.EqualTo(2), "idempotency is per temp id, not per creator");
+            {
+                var assertedValue = e.Store.All().Count;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue), "idempotency is per temp id, not per creator");
+            }
         }
 
         // ---- race 2: both parties start the same P2P at once -------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void BothPartiesStartingTheSameP2PSimultaneously_ProduceOneSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
 
             SessionOutcome[] r = InParallel(2, i => i == 0
                 ? e.Start(NonSpatialSessionType.P2P, Alice, Bob, UUID.Zero, RegionA)
                 : e.Start(NonSpatialSessionType.P2P, Bob, Alice, UUID.Zero, RegionB));
 
-            Assert.That(r.All(x => x.Ok), Is.True);
-            Assert.That(r[0].Session.SessionId, Is.EqualTo(r[1].Session.SessionId));
-            Assert.That(r.Count(x => x.Created), Is.EqualTo(1), "exactly one creation");
-            Assert.That(e.Store.All().Count, Is.EqualTo(1));
+            Assert.True(r.All(x => x.Ok));
+            Assert.Equal(r[1].Session.SessionId, r[0].Session.SessionId);
+            {
+                var assertedValue = r.Count(x => x.Created);
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "exactly one creation");
+            }
+            Assert.Single(e.Store.All());
         }
 
         // ---- race 3: a retried invite ------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RepeatedInvite_DoesNotDuplicateTheMembership()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
 
             SessionOutcome first = e.Invite(id, Alice, Bob);
             SessionOutcome again = e.Invite(id, Alice, Bob);
 
-            Assert.That(first.Decision, Is.EqualTo("invited"));
-            Assert.That(again.Decision, Is.EqualTo("invite-idempotent"));
-            Assert.That(e.Store.Get(id).Members.Count(m => m.AgentId == Bob), Is.EqualTo(1));
+            Assert.Equal("invited", first.Decision);
+            Assert.Equal("invite-idempotent", again.Decision);
+            Assert.Equal(1, e.Store.Get(id).Members.Count(m => m.AgentId == Bob));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ConcurrentInvitesOfTheSameAgent_ProduceOneMembership()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
 
             InParallel(8, _ => e.Invite(id, Alice, Bob));
 
-            Assert.That(e.Store.Get(id).Members.Count(m => m.AgentId == Bob), Is.EqualTo(1));
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1), "still only the creator");
+            Assert.Equal(1, e.Store.Get(id).Members.Count(m => m.AgentId == Bob));
+            {
+                var assertedValue = e.Store.Get(id).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "still only the creator");
+            }
         }
 
         // ---- race 4: a double accept -------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RepeatedAccept_TakesOneSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
 
-            Assert.That(e.Accept(id, Bob, RegionA).Decision, Is.EqualTo("accepted"));
-            Assert.That(e.Accept(id, Bob, RegionA).Decision, Is.EqualTo("accept-idempotent"));
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(2));
+            Assert.Equal("accepted", e.Accept(id, Bob, RegionA).Decision);
+            Assert.Equal("accept-idempotent", e.Accept(id, Bob, RegionA).Decision);
+            Assert.Equal(2, e.Store.Get(id).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ConcurrentAcceptsByOneAgent_TakeOneSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
 
             InParallel(16, _ => e.Accept(id, Bob, RegionA));
 
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(2));
+            Assert.Equal(2, e.Store.Get(id).SeatsHeld);
         }
 
         // ---- race 5: reconnect after departure ----------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AcceptAfterDeparture_ReSeatsWithoutDuplicating()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
             e.Accept(id, Bob, RegionA);
             e.Depart(id, Bob, DepartureReason.VoiceTeardown);
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1));
+            Assert.Equal(1, e.Store.Get(id).SeatsHeld);
 
             SessionOutcome back = e.Accept(id, Bob, RegionA);
 
-            Assert.That(back.Ok, Is.True, back.Decision);
-            Assert.That(e.Store.Get(id).Members.Count(m => m.AgentId == Bob), Is.EqualTo(1));
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(2));
-            Assert.That(e.Store.Get(id).Find(Bob).Departure, Is.EqualTo(DepartureReason.None), "the stale reason is cleared");
+            Assert.True(back.Ok, back.Decision);
+            Assert.Equal(1, e.Store.Get(id).Members.Count(m => m.AgentId == Bob));
+            Assert.Equal(2, e.Store.Get(id).SeatsHeld);
+            {
+                var assertedValue = e.Store.Get(id).Find(Bob).Departure;
+                TestAssert.WithMessage(() => Assert.Equal(DepartureReason.None, assertedValue), "the stale reason is cleared");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARepeatStartAfterTheCreatorDeparted_ReSeatsTheCreator()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID temp = NonSpatialVoiceSessionEngine.DeriveSessionId(NonSpatialSessionType.P2P, Alice, Bob);
             UUID id = e.Start(NonSpatialSessionType.P2P, Alice, Bob, temp, RegionA).Session.SessionId;
@@ -191,15 +212,16 @@ namespace osWebRtcVoice.Tests
 
             e.Start(NonSpatialSessionType.P2P, Alice, Bob, temp, RegionA);
 
-            Assert.That(e.Store.Get(id).Find(Alice).State, Is.EqualTo(MemberState.Accepted));
-            Assert.That(e.Store.All().Count, Is.EqualTo(1));
+            Assert.Equal(MemberState.Accepted, e.Store.Get(id).Find(Alice).State);
+            Assert.Single(e.Store.All());
         }
 
         // ---- race 6: region crossing ---------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AcceptFromASecondRegion_RepointsTheMembershipInsteadOfAddingOne()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
@@ -207,30 +229,35 @@ namespace osWebRtcVoice.Tests
 
             e.Accept(id, Bob, RegionB, "vs-2");
 
-            Assert.That(e.Store.Get(id).Members.Count(m => m.AgentId == Bob), Is.EqualTo(1));
-            Assert.That(e.Store.Get(id).Find(Bob).OriginRegion, Is.EqualTo(RegionB), "latest region wins");
-            Assert.That(e.Store.Get(id).Find(Bob).ViewerSession, Is.EqualTo("vs-2"));
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(2));
+            Assert.Equal(1, e.Store.Get(id).Members.Count(m => m.AgentId == Bob));
+            {
+                var assertedValue = e.Store.Get(id).Find(Bob).OriginRegion;
+                TestAssert.WithMessage(() => Assert.Equal(RegionB, assertedValue), "latest region wins");
+            }
+            Assert.Equal("vs-2", e.Store.Get(id).Find(Bob).ViewerSession);
+            Assert.Equal(2, e.Store.Get(id).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void SimultaneousAcceptsFromTwoRegions_TakeOneSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
 
             InParallel(8, i => e.Accept(id, Bob, i % 2 == 0 ? RegionA : RegionB));
 
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(2));
-            Assert.That(e.Store.Get(id).Members.Count(m => m.AgentId == Bob), Is.EqualTo(1));
+            Assert.Equal(2, e.Store.Get(id).SeatsHeld);
+            Assert.Equal(1, e.Store.Get(id).Members.Count(m => m.AgentId == Bob));
         }
 
         // ---- race 7: the cap boundary ---------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ConcurrentAcceptsAtTheCapBoundary_ProduceExactlyCapSeats()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const int cap = 10;
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA, requestedCap: cap).Session.SessionId;
@@ -241,32 +268,43 @@ namespace osWebRtcVoice.Tests
             SessionOutcome[] r = InParallel(agents.Length, i => e.Accept(id, agents[i], RegionA));
 
             int seated = r.Count(x => x.Ok);
-            Assert.That(seated, Is.EqualTo(cap - 1), "the creator already held one of the " + cap + " seats");
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(cap), "never cap+1");
-            Assert.That(r.Where(x => !x.Ok).All(x => x.Decision == SessionOutcome.Capacity), Is.True);
+            {
+                var assertedValue = seated;
+                TestAssert.WithMessage(() => Assert.Equal(cap - 1, assertedValue), "the creator already held one of the " + cap + " seats");
+            }
+            {
+                var assertedValue = e.Store.Get(id).SeatsHeld;
+                TestAssert.WithMessage(() => Assert.Equal(cap, assertedValue), "never cap+1");
+            }
+            Assert.True(r.Where(x => !x.Ok).All(x => x.Decision == SessionOutcome.Capacity));
         }
 
         // ---- race 8: a repeated departure -------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RepeatedDeparture_IsANoOp_AndDoesNotFreeASecondSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
             e.Accept(id, Bob, RegionA);
 
-            Assert.That(e.Depart(id, Bob, DepartureReason.ChatLeave).Decision, Is.EqualTo("departed"));
+            Assert.Equal("departed", e.Depart(id, Bob, DepartureReason.ChatLeave).Decision);
             SessionOutcome again = e.Depart(id, Bob, DepartureReason.VoiceTeardown);
 
-            Assert.That(again.Decision, Is.EqualTo("depart-idempotent"));
-            Assert.That(e.Store.Get(id).Find(Bob).Departure, Is.EqualTo(DepartureReason.ChatLeave), "the first reason stands");
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1));
+            Assert.Equal("depart-idempotent", again.Decision);
+            {
+                var assertedValue = e.Store.Get(id).Find(Bob).Departure;
+                TestAssert.WithMessage(() => Assert.Equal(DepartureReason.ChatLeave, assertedValue), "the first reason stands");
+            }
+            Assert.Equal(1, e.Store.Get(id).SeatsHeld);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AllThreeLifecyclesFiringAtOnce_ReleaseExactlyOneSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = NonSpatialIdentityTests.NewEngine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
@@ -275,8 +313,8 @@ namespace osWebRtcVoice.Tests
             DepartureReason[] reasons = { DepartureReason.ChatLeave, DepartureReason.VoiceTeardown, DepartureReason.PresenceLost };
             InParallel(reasons.Length, i => e.Depart(id, Bob, reasons[i]));
 
-            Assert.That(e.Store.Get(id).SeatsHeld, Is.EqualTo(1));
-            Assert.That(e.Store.Get(id).Find(Bob).State, Is.EqualTo(MemberState.Departed));
+            Assert.Equal(1, e.Store.Get(id).SeatsHeld);
+            Assert.Equal(MemberState.Departed, e.Store.Get(id).Find(Bob).State);
         }
     }
 }

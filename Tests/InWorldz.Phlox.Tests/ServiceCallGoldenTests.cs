@@ -7,7 +7,6 @@
 
 using System.Diagnostics;
 using Xunit;
-using Xunit.Abstractions;
 using OpenMetaverse;
 using OpenSim.Tests.Common;
 

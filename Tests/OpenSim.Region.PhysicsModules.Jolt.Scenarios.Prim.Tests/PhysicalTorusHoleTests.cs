@@ -10,7 +10,6 @@ using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.Jolt.Harness;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Xunit;
-using Xunit.Abstractions;
 using static OpenSim.Region.PhysicsModules.Jolt.Tests.MeshShapesTodayTests;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
@@ -143,8 +142,8 @@ public class PhysicalTorusHoleTests
         var mesher = new OpenSim.Region.PhysicsModules.Meshing.Meshmerizer();
         mesher.Initialise(config);
         IMesh mesh = mesher.CreateMesh("torus", Torus(hollow), TorusSize, 32f, false, false, false);
-        float[] v = mesh.getVertexListAsFloat();
-        int[] ix = mesh.getIndexListAsInt();
+        float[] v = mesh.getVertexListAsFloatLocked();
+        int[] ix = mesh.getIndexListAsIntLocked();
         float rMin = float.MaxValue, rMax = 0f;
         for (int i = 0; i + 2 < v.Length; i += 3)
         {
