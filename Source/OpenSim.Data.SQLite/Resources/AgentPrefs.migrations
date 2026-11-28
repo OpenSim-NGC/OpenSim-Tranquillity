@@ -18,9 +18,12 @@ COMMIT;
 
 :VERSION 2
 
+# Version 1 first used MySQL syntax that SQLite refuses, so it made no table and this step made it. Version 1 was
+# fixed later and makes the same table, so this step only makes it where version 1 did not.
+
 BEGIN;
 
-CREATE TABLE AgentPrefs(
+CREATE TABLE IF NOT EXISTS AgentPrefs(
     PrincipalID CHAR(36) NOT NULL,
     AccessPrefs CHAR(2) NOT NULL DEFAULT 'M',
     HoverHeight DOUBLE(30, 27) NOT NULL DEFAULT 0,
