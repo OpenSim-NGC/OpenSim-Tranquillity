@@ -38,7 +38,7 @@ public class AvatarHitSweepTests
         => Harness.Harness.Run(AvatarHitScenarios.Thrown($"avatar-hit-{kg}kg-{height}m", kg, Speed),
             new HarnessOptions { RateHz = 11.0, PhysicsRateHz = physicsRate, AvatarHeight = height });
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 24 scenario(s)")]
+    [Theory]
     [MemberData(nameof(Cases))]
     public void A_box_thrown_at_a_standing_avatar_moves_it_no_faster_than_their_momentum_allows(double physicsRate, float height, float kg)
     {
@@ -50,7 +50,7 @@ public class AvatarHitSweepTests
         Assert.True(peak >= allowed * 0.5f, $"{r.Name}: the avatar was hardly moved ({peak:0.00} m/s; their common speed is {allowed:0.00})");
     }
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 24 scenario(s)")]
+    [Theory]
     [MemberData(nameof(Cases))]
     public void A_box_thrown_at_a_standing_avatar_tells_core_the_speed_it_closed_at(double physicsRate, float height, float kg)
     {

@@ -424,7 +424,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             scene.RegisterModuleInterface<PhysicsScene>(this);
 
             _scene = scene;
-            InitialiseRegion(scene.RegionInfo.RegionSizeX, scene.RegionInfo.RegionSizeY, scene.PhysicsRequestAsset,
+            InitialiseRegion(scene.RegionInfo.RegionSizeX, scene.RegionInfo.RegionSizeY,
+                scene.RegionInfo.ObjectCapacity, scene.RegionInfo.AgentCapacity, scene.PhysicsRequestAsset,
                 () => scene.Heightmap != null ? scene.Heightmap.GetFloatsSerialised() : new float[scene.RegionInfo.RegionSizeX * scene.RegionInfo.RegionSizeY],
                 () => (float)scene.RegionInfo.RegionSettings.WaterHeight, scene.FrameTime);
         }
@@ -435,20 +436,35 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         /// <see cref="Initialise"/> first with a config that selects this module.
         /// </summary>
         internal void InitialiseWithoutScene(string regionName, uint sizeX, uint sizeY, float[] heightMap, float waterHeight, float heartbeatSeconds)
+            => InitialiseWithoutScene(regionName, sizeX, sizeY, heightMap, waterHeight, heartbeatSeconds,
+                JoltConfig.StandardObjectCapacity, JoltConfig.StandardAgentCapacity);
+
+        /// <summary>As above, for a region of this object capacity ([Region] MaxPrims) and agent capacity (MaxAgents).</summary>
+        internal void InitialiseWithoutScene(string regionName, uint sizeX, uint sizeY, float[] heightMap, float waterHeight, float heartbeatSeconds,
+            int objectCapacity, int agentCapacity)
         {
             if (!m_Enabled)
                 throw new InvalidOperationException("Initialise with [Startup] physics = Jolt first.");
             RegionName = regionName;
             PhysicsSceneName = Name + "/" + RegionName;
-            InitialiseRegion(sizeX, sizeY, null, () => heightMap, () => waterHeight, heartbeatSeconds);
+            InitialiseRegion(sizeX, sizeY, objectCapacity, agentCapacity, null, () => heightMap, () => waterHeight, heartbeatSeconds);
         }
+
+        // The capacity lines this region has logged (the 80 % warning, and the refused-body and dropped-collision lines),
+        // counted and kept for tests.
+        internal int BodyLimitWarnings { get; private set; }
+        internal string LastBodyLimitWarning { get; private set; }
+        internal int CapacityWarnings { get; private set; }
+        internal string LastCapacityWarning { get; private set; }
+        private readonly BodyLimitWatch _bodyLimitWatch = new BodyLimitWatch();
 
         // AddRegion's work once the scene is known. The heightmap and water height are read where AddRegion
         // always read them, after the backend exists.
         /// <summary>TEST-ONLY: run on the new backend before it is initialised, so a test can make Initialize fail.</summary>
         internal Action<JoltPhysicsBackend> BackendCreatedForTest;
 
-        private void InitialiseRegion(uint sizeX, uint sizeY, RequestAssetDelegate requestAsset, Func<float[]> heightMap, Func<float> waterHeight, float heartbeatSeconds)
+        private void InitialiseRegion(uint sizeX, uint sizeY, int objectCapacity, int agentCapacity,
+            RequestAssetDelegate requestAsset, Func<float[]> heightMap, Func<float> waterHeight, float heartbeatSeconds)
         {
             // Stored BEFORE base.Initialise, because that calls SetTerrain(heightMap) - which needs the
             // region dims to interpret the flat float[] and build the (N+1) field.
@@ -456,7 +472,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             _regionSizeY = (int)sizeY;
 
             // Every knob comes from [Jolt] (JoltConfig). The defaults are exactly what this used to hardcode:
-            // the backend's default settings, MaxBodies = 65536 per 256 m scaled by area, and
+            // the backend's default settings, the engine limits (JoltConfig.ToBackendSettings), and
             // CollisionSteps = 6 - the RIGID-BODY solver sub-stepped 6x inside _system.Update: at
             // OpenSim's ~11 fps a single integration lets a fast prim move ~1.5 m and tunnel through the terrain
             // heightfield. CollisionSteps slices the SOLVER only, NOT the character step (once per Step, before
@@ -469,7 +485,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 m_log.LogInformation($"{LogHeader} region '{RegionName}': {rateNote}");
             _substeps = stepRate > 0f ? new SubstepAccumulator(stepRate) : null;
 
-            PhysicsBackendSettings settings = _joltConfig.ToBackendSettings(sizeX, sizeY, _substeps != null ? stepRate : 0f);
+            PhysicsBackendSettings settings = _joltConfig.ToBackendSettings(sizeX, sizeY, _substeps != null ? stepRate : 0f, objectCapacity, agentCapacity);
             CollisionSteps = Math.Max(1, settings.CollisionSteps);
             settings.RegionName = RegionName;   // names this region when another waits for its job pool (metrics)
             settings.RayCastClock = RayCastClock;
@@ -507,7 +523,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // to the backend for vehicle hover.
             base.Initialise(requestAsset, heightMap(), waterHeight());
 
-            m_log.LogInformation($"{LogHeader} region '{RegionName}' {sizeX}x{sizeY}m: backend initialised, MaxBodies={settings.MaxBodies}. {EngineName}");
+            m_log.LogInformation($"{LogHeader} region '{RegionName}' {sizeX}x{sizeY}m: backend initialised, MaxBodies={settings.MaxBodies}, " +
+                                 $"MaxBodyPairs={settings.MaxBodyPairs}, MaxContactConstraints={settings.MaxContactConstraints} " +
+                                 $"(object capacity {objectCapacity}, agent capacity {agentCapacity}). {EngineName}");
 
             RayWarmUpMs = WarmUpRayCasts();
             m_log.LogInformation($"{LogHeader} region '{RegionName}': ray casts warmed up in {RayWarmUpMs:0.00} ms.");
@@ -1572,11 +1590,12 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // keyed on GetMeshKey(size, lod), and returns the SAME instance for every identical prim
             // (the key has no isPhysical/convex part; the one answer that depends on isPhysical, the 8-corner box
             // given to a small non-physical mesh, is kept in a cache of its own, so a physical request for the
-            // same mesh is never handed that box). getIndexListAsInt()/getVertexListAsFloat() throw
-            // NotSupportedException once m_triangles/m_vertices are null, and releaseSourceMeshData()
-            // nulls exactly those - so calling it POISONS the cache and makes the NEXT identical prim's
-            // extraction throw. Both accessors already return FRESH COPIES, so we own the arrays and must
-            // NOT mutate/release the shared mesh (ReleaseMesh is a no-op anyway; the mesher owns eviction).
+            // same mesh is never handed that box). The cache never lets a mesh go (ReleaseMesh is a no-op), so
+            // ReadMeshArrays leaves the cached mesh holding only its flat arrays: getIndexListAsInt()/
+            // getVertexListAsFloat() throw NotSupportedException once releaseSourceMeshData() has nulled the
+            // triangle and vertex objects, and every read of a cached mesh here goes through the *Locked()
+            // accessors, which keep the flat arrays in the mesh and answer from them. We copy those arrays
+            // before use, so nothing here mutates the shared mesh's data.
             // Everything the mesher/extraction can throw is inside ONE guard -> a clean bbox fallback,
             // never a propagating exception that could abort a prim rez or a whole region load.
             SVector3[] points;
@@ -1613,8 +1632,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     return ShapeId.Invalid;
                 }
 
-                indices = mesh.getIndexListAsInt();          // fresh copy - do NOT release the shared mesh
-                float[] verts = mesh.getVertexListAsFloat(); // fresh copy (flattened x,y,z,...)
+                // Own copies (flattened x,y,z,... and triangles). This mesh's objects can go: the mesher's bounding-box
+                // answer reads a cached mesh's objects only for a request with isPhysical false under 0.2 m on every side,
+                // and this scene asks such a request first (for a prim that is not a mesh), or never (a mesh asset).
+                ReadMeshArrays(mesh, true, out float[] verts, out indices);
                 if (verts == null || indices == null || verts.Length < 12 || indices.Length < 3 || (indices.Length % 3) != 0)
                 {
                     if (RepeatingWarnings.MesherGeometryUnusable.ShouldLog(out long occurrence))
@@ -1630,8 +1651,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     IMesh whole = m_mesher.CreateMesh("jolt-prim", pbs, size, MeshLod, true, false, false);
                     if (whole != null)
                     {
-                        float[] wholeVertices = whole.getVertexListAsFloat();
-                        int[] wholeIndices = whole.getIndexListAsInt();
+                        // Under 0.2 m on every side the mesher makes its bounding-box answer for this shape from this mesh
+                        // (Meshmerizer.MakeMesh), which reads its vertex objects: that one keeps them.
+                        ReadMeshArrays(whole, ReferenceEquals(whole, mesh), out float[] wholeVertices, out int[] wholeIndices);
                         meshVolume = PrimHullCells.MeshVolume(wholeVertices, wholeIndices);
                         // The assessment reads the mesh at the size it was made at; a prim is its unit shape scaled on each axis, so
                         // the checks hold at every size and the volume is the unit one times the size's three sides.
@@ -1719,6 +1741,36 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 if (RepeatingWarnings.CookThrew.ShouldLog(out long occurrence))
                     m_log.LogWarning($"{LogHeader} backend cook of mesher output threw ({e.GetType().Name}: {e.Message}); bounding-box fallback.{RepeatLimiter.Suffix(occurrence)}");
                 return ShapeId.Invalid;   // kind stays "bbox(fallback)"
+            }
+        }
+
+        // The mesher keeps every mesh it makes (its cache is static, so it is shared by every scene in the process, and
+        // the physics engine is one per process, [Startup] physics). A mesh is built as Triangle and Vertex objects and
+        // a vertex dictionary, a few times the size of the two flat arrays this scene cooks from, and a later prim of the
+        // same shape reads only those arrays. So the arrays are read with the *Locked() accessors, which keep them in the
+        // mesh, and then, where `release` allows, the builder objects are dropped (releaseSourceMeshData). Both are on
+        // IMesh. Only for the Meshmerizer (the one IMesherShapeData mesher), whose Mesh class this follows; another mesher's
+        // meshes are read as before. One lock for the read and the drop: two scenes can be handed the same cached mesh at
+        // once, and one must not drop the objects between the other's check for the kept arrays and its read of the
+        // objects. The arrays returned are copies, which the caller may change (an inverted sculpt's triangles are turned).
+        private static readonly object s_meshArraysLock = new object();
+
+        private void ReadMeshArrays(IMesh mesh, bool release, out float[] vertices, out int[] indices)
+        {
+            if (!(m_mesher is IMesherShapeData))
+            {
+                indices = mesh.getIndexListAsInt();
+                vertices = mesh.getVertexListAsFloat();
+                return;
+            }
+            lock (s_meshArraysLock)
+            {
+                float[] keptVertices = mesh.getVertexListAsFloatLocked();
+                int[] keptIndices = mesh.getIndexListAsIntLocked();
+                if (release)
+                    mesh.releaseSourceMeshData();
+                vertices = (float[])keptVertices?.Clone();
+                indices = (int[])keptIndices?.Clone();
             }
         }
 
@@ -3173,6 +3225,13 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             PhysicsCapacityStats s = backend.GetCapacityStats();
             long now = System.DateTime.UtcNow.Ticks;
             CheckGateWait(in s, now, timeStep);
+            string nearFull = _bodyLimitWatch.Check(RegionName, s.LiveBodyCount, s.MaxBodies);
+            if (nearFull != null)
+            {
+                m_log.LogWarning(nearFull);
+                BodyLimitWarnings++;
+                LastBodyLimitWarning = nearFull;
+            }
             if (!_capBaseSet)
             {
                 _capBase = s;
@@ -3195,7 +3254,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             string msg = CapacityReport.Warning(RegionName,
                 _capBase, s, System.Math.Max(1.0, (now - _capBaseTicks) / (double)System.TimeSpan.TicksPerSecond));
             if (msg != null)
+            {
                 m_log.LogWarning(msg);
+                CapacityWarnings++;
+                LastCapacityWarning = msg;
+            }
             _capLastWarnTicks = now;
             _capBase = s;
             _capBaseTicks = now;

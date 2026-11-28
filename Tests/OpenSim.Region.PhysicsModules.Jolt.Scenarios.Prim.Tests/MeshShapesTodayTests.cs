@@ -246,11 +246,11 @@ public partial class MeshShapesTodayTests
         foreach (float scale in new[] { 0.1f, 0.19f, 0.25f, 1f })
         {
             IMesh m = mesher.CreateMesh("probe", MeshPbs(asset), new Vector3(scale, scale, scale), 32f, false, false, false);
-            int vertices = m.getVertexListAsFloat().Length / 3;
+            int vertices = m.getVertexListAsFloatLocked().Length / 3;
             // The mesher replaces a non-physical mesh with every side under 0.2 m by its bounding box (8 corners); the
             // module asks the mesher for isPhysical = false for every mesh, so this reaches a non-physical or physical prim.
             Assert.Equal(scale < 0.2f, vertices == 8);
-            string line = $"MESH-SHAPES mesher scale={scale} isPhysical=false vertices={vertices} triangles={m.getIndexListAsInt().Length / 3}";
+            string line = $"MESH-SHAPES mesher scale={scale} isPhysical=false vertices={vertices} triangles={m.getIndexListAsIntLocked().Length / 3}";
             _out.WriteLine(line);
             Console.WriteLine(line);
         }
