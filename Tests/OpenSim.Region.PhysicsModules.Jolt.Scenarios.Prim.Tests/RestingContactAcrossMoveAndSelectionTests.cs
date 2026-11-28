@@ -71,7 +71,7 @@ public class RestingContactAcrossMoveAndSelectionTests
 
     private static int CountIn(List<double> times, double from, double to) => times.Count(t => t > from - 1e-9 && t < to - 1e-9);
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 2 scenario(s)")]
+    [Theory]
     [InlineData(45.0)]
     [InlineData(0.0)]
     public void A_sleeping_box_wakes_and_falls_when_its_platform_is_moved_away(double physicsHz)

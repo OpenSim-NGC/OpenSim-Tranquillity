@@ -60,7 +60,7 @@ public class MaterialChangeWakesRestingBodiesTests
         awakeAfter = after;
     }
 
-    [OpenSim.Tests.Common.KnownFailureFact("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Fact]
     public void A_changed_friction_on_the_platform_wakes_the_box_resting_on_it()
     {
         Run(p => p.Actor.Friction = 0.05f, out bool asleepBefore, out bool awakeAfter);
@@ -68,7 +68,7 @@ public class MaterialChangeWakesRestingBodiesTests
         Assert.True(awakeAfter, "the box stayed asleep after the platform's friction changed");
     }
 
-    [OpenSim.Tests.Common.KnownFailureFact("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Fact]
     public void A_changed_restitution_on_the_platform_wakes_the_box_resting_on_it()
     {
         Run(p => p.Actor.Restitution = 0.9f, out bool asleepBefore, out bool awakeAfter);
@@ -76,7 +76,7 @@ public class MaterialChangeWakesRestingBodiesTests
         Assert.True(awakeAfter, "the box stayed asleep after the platform's restitution changed");
     }
 
-    [OpenSim.Tests.Common.KnownFailureFact("Jolt 2.26 update", "Jolt 2.26 behavior differs for 1 scenario(s)")]
+    [Fact]
     public void A_changed_material_type_on_the_platform_wakes_the_box_resting_on_it()
     {
         // 6 is rubber (JoltPrim.MaterialTable), whose friction and restitution differ from a new prim's.

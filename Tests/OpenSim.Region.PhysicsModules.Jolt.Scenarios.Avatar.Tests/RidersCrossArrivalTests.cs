@@ -424,7 +424,7 @@ public class RidersCrossArrivalTests
 
     // ------------------------------------------------------------------ the reports core's detection reads
 
-    [OpenSim.Tests.Common.KnownFailureTheory("Jolt 2.26 update", "Jolt 2.26 behavior differs for 4 scenario(s)")]
+    [Theory]
     [InlineData(0f, false)]
     [InlineData(0f, true)]
     [InlineData(45f, false)]
