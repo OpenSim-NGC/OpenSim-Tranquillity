@@ -86,7 +86,8 @@ public class GloebitCredentialLogTests
             ["estimatedCost"] = 10,
             ["secureSessionId"] = secureSession
         });
-        MethodInfo buy = typeof(GloebitMoneyModule).GetMethod("buy_func", BindingFlags.Instance | BindingFlags.NonPublic);
+        MethodInfo buy = typeof(GloebitMoneyModule).GetMethod("buy_func", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(GloebitMoneyModule).FullName, "buy_func");
 
         using LogCapture log = new();
         IgnoreFailureAfterLogging(() =>

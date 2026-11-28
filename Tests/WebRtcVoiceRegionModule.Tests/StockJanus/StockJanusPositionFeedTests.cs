@@ -31,24 +31,29 @@ using osWebRtcVoice.Tests.StockJanus;
 
 namespace osWebRtcVoice.Tests
 {
-#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
-    [TestFixture, NUnit.Framework.Timeout(240000)]
-#pragma warning restore CS0618
     [NeedsPlugin(JanusPluginKind.Mixer)]
-    public class StockJanusPositionFeedTests
+    public class StockJanusPositionFeedTests : IClassFixture<StockJanusPositionFeedTests.GatewayResources>
     {
         private static readonly UUID Alice = new UUID("a11ce000-0000-4000-8000-000000000001");
         private static readonly UUID Bob = new UUID("b0b00000-0000-4000-8000-000000000002");
         private static readonly TimeSpan Settle = TimeSpan.FromSeconds(10);
 
-        private readonly RawJanus _janus = new();
-        private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(10) };
+        public sealed class GatewayResources : IDisposable
+        {
+            public RawJanus Janus { get; } = new();
+            public HttpClient Http { get; } = new() { Timeout = TimeSpan.FromSeconds(10) };
+            public void Dispose() => Http.Dispose();
+        }
 
-        [OneTimeSetUp]
-        public void RequireGateway() => StockJanusEnvironment.IgnoreUnlessConfigured();
+        private readonly RawJanus _janus;
+        private readonly HttpClient _http;
 
-        [OneTimeTearDown]
-        public void Dispose() => _http.Dispose();
+        public StockJanusPositionFeedTests(GatewayResources resources)
+        {
+            StockJanusEnvironment.IgnoreUnlessConfigured(JanusPluginKind.Mixer);
+            _janus = resources.Janus;
+            _http = resources.Http;
+        }
 
         /// <summary>Every WARN and ERROR line the sim writes while the test runs.</summary>
         private sealed class ProblemCollector : ILoggerProvider
@@ -122,32 +127,38 @@ namespace osWebRtcVoice.Tests
             return copy.ToJsonString();
         }
 
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task TheVersionCheck_ChangesNothingInTheRoomsVisibility()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StockJanusEnvironment.IgnoreUnlessPeerAvailable();
-            Assume.That(StockJanusEnvironment.AdminUrl, Is.Not.Empty, "WEBRTC_JANUS_TEST_ADMIN_URL is not set");
+            Assert.SkipWhen(string.IsNullOrEmpty(StockJanusEnvironment.AdminUrl), "WEBRTC_JANUS_TEST_ADMIN_URL is not set");
             using var region = StockRegion.Create((voice, janus) => { });   // the position feed is off: the check is the only request
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel + new Vector3(3, 0, 0));
             using Joined a = await region.JoinAsync(Alice, o => StockRegion.LocalBody(o));
             using Joined b = await region.JoinAsync(Bob, o => StockRegion.LocalBody(o));
-            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+            Assert.True(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle));
 
             JsonObject before = await VisibilityBlockAsync();
-            Assert.That(before, Is.Not.Null, "the mixer reported a visibility block for the room");
+            {
+                var assertedValue = before;
+                TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the mixer reported a visibility block for the room");
+            }
 
             using var sink = new JanusPeerCtlBatchSink(StockJanusEnvironment.AdminUrl, StockJanusEnvironment.AdminSecret,
                 TimeSpan.FromSeconds(10), UUID.Random(), "Test Region");
-            Assert.That(await sink.CheckMixerProtocolAsync(), Is.True);
-            Assert.That(sink.MixerProtocolKnown, Is.True);
-            Assert.That(sink.MixerVisProtocol, Is.GreaterThanOrEqualTo(3), "the mixer answered with its version");
+            Assert.True(await sink.CheckMixerProtocolAsync());
+            Assert.True(sink.MixerProtocolKnown);
+            Assert.True(sink.MixerVisProtocol >= 3, "the mixer answered with its version");
 
             JsonObject after = await VisibilityBlockAsync();
-            TestContext.Out.WriteLine("before: " + WithoutAges(before));
-            TestContext.Out.WriteLine("after:  " + WithoutAges(after));
-            Assert.That(WithoutAges(after), Is.EqualTo(WithoutAges(before)),
-                "no epoch, generation, record, heartbeat or position counter moved");
+            TestContext.Current.TestOutputHelper.WriteLine("before: " + WithoutAges(before));
+            TestContext.Current.TestOutputHelper.WriteLine("after:  " + WithoutAges(after));
+            {
+                var assertedValue = WithoutAges(after);
+                TestAssert.WithMessage(() => Assert.Equal(WithoutAges(before), assertedValue), "no epoch, generation, record, heartbeat or position counter moved");
+            }
         }
 
         private static long Counter(JsonObject block, string name) => block?[name] is JsonNode n ? n.GetValue<long>() : 0;
@@ -166,11 +177,12 @@ namespace osWebRtcVoice.Tests
             return block;
         }
 
-        [Test]
+        [Fact(Timeout = 240000)]
         public async Task PositionFeed_IsReceivedAndAppliedByTheMixer_AndItsCountersMove()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             StockJanusEnvironment.IgnoreUnlessPeerAvailable();
-            Assume.That(StockJanusEnvironment.AdminUrl, Is.Not.Empty, "WEBRTC_JANUS_TEST_ADMIN_URL is not set");
+            Assert.SkipWhen(string.IsNullOrEmpty(StockJanusEnvironment.AdminUrl), "WEBRTC_JANUS_TEST_ADMIN_URL is not set");
             var problems = new ProblemCollector();
             var logging = new LogCapture(problems, LogLevel.Warning);
             try
@@ -180,35 +192,48 @@ namespace osWebRtcVoice.Tests
                 region.AddAvatar(Bob, StockRegion.InEstateChannelParcel + new Vector3(3, 0, 0));
                 using Joined a = await region.JoinAsync(Alice, o => StockRegion.LocalBody(o));
                 using Joined b = await region.JoinAsync(Bob, o => StockRegion.LocalBody(o));
-                Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+                Assert.True(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle));
 
                 // The region asks the mixer which vis_protocol it speaks, then sends the room's first full snapshot at the
                 // next position tick.
                 JsonObject first = await WaitForBatchesAsync(1, TimeSpan.FromSeconds(30));
-                Assert.That(first, Is.Not.Null, "the mixer reported no visibility.positions block for the room: it accepted no peer_pos");
+                {
+                    var assertedValue = first;
+                    TestAssert.WithMessage(() => Assert.NotNull(assertedValue), "the mixer reported no visibility.positions block for the room: it accepted no peer_pos");
+                }
                 long before = Counter(first, "batches");
-                TestContext.Out.WriteLine("after the first snapshot: " + first.ToJsonString());
-                Assert.That(before, Is.GreaterThanOrEqualTo(1));
+                TestContext.Current.TestOutputHelper.WriteLine("after the first snapshot: " + first.ToJsonString());
+                Assert.True(before >= 1);
 
                 // A participant who walks away is sent as a change; one who stands still is repeated at the keep-alive.
                 alice.AbsolutePosition = StockRegion.InEstateChannelParcel + new Vector3(-6, 0, 0);
                 JsonObject later = await WaitForBatchesAsync(before + 2, TimeSpan.FromSeconds(30));
-                TestContext.Out.WriteLine("after the move and a keep-alive: " + later?.ToJsonString());
-                Assert.That(Counter(later, "batches"), Is.GreaterThanOrEqualTo(before + 2), "the mixer's batch counter moved");
+                TestContext.Current.TestOutputHelper.WriteLine("after the move and a keep-alive: " + later?.ToJsonString());
+                Assert.True(Counter(later, "batches") >= before + 2, "the mixer's batch counter moved");
 
-                Assert.That(Counter(later, "rejected_stale_seq"), Is.EqualTo(0), "the mixer refused none for a stale sequence number");
-                Assert.That(Counter(later, "rejected_stale_epoch"), Is.EqualTo(0));
-                Assert.That(Counter(later, "entries_skipped"), Is.EqualTo(0), "the mixer skipped no entry");
+                {
+                    var assertedValue = Counter(later, "rejected_stale_seq");
+                    TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the mixer refused none for a stale sequence number");
+                }
+                Assert.Equal(0, Counter(later, "rejected_stale_epoch"));
+                {
+                    var assertedValue = Counter(later, "entries_skipped");
+                    TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the mixer skipped no entry");
+                }
 
                 string[] lines;
                 lock (problems.Lines) lines = problems.Lines.ToArray();
-                foreach (string l in lines) TestContext.Out.WriteLine(l.Length > 400 ? l.Substring(0, 400) : l);
-                Assert.That(lines.Where(l => l.Contains("refused a peer_pos")), Is.Empty, "the region saw no refusal");
+                foreach (string l in lines) TestContext.Current.TestOutputHelper.WriteLine(l.Length > 400 ? l.Substring(0, 400) : l);
+                {
+                    var assertedValue = lines.Where(l => l.Contains("refused a peer_pos"));
+                    TestAssert.WithMessage(() => Assert.Empty(assertedValue), "the region saw no refusal");
+                }
             }
             finally
             {
                 logging.Dispose();
             }
         }
+
     }
 }

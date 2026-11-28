@@ -319,7 +319,7 @@ public sealed class OptionalHttpTransportTests : IDisposable
             using var request = Assert.IsType<HttpRequestMessage>(build.Invoke(api,
                 new object?[] { "local-payment", "POST", null, contentType, parameters }));
             Assert.Equal(contentType, request.Content!.Headers.ContentType!.MediaType);
-            string body = await request.Content.ReadAsStringAsync();
+            string body = await request.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
             if (contentType == "application/json")
                 Assert.Equal("a&b caf\u00e9", Assert.IsType<OSDMap>(OSDParser.DeserializeJson(body))["message"].AsString());
             else

@@ -14,20 +14,22 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialStartRaceTests
     {
-        [Test]
-        [Repeat(20)]
-        public void SimultaneousRetriesOfOneAdhocStartMakeExactlyOneSession()
+        public static TheoryData<int> Repetitions => new(Enumerable.Range(1, 20));
+
+        [Theory(Timeout = 60000)]
+        [MemberData(nameof(Repetitions))]
+        public async Task SimultaneousRetriesOfOneAdhocStartMakeExactlyOneSession(int repetition)
         {
+            TestContext.Current.TestOutputHelper.WriteLine("Repetition {0}", repetition);
             NonSpatialVoiceSessionEngine e = NewEngine(limits: new NonSpatialLimits
             {
                 MaxNonSpatialSessions = 100000,
@@ -38,15 +40,23 @@ namespace osWebRtcVoice.Tests
             using Barrier gate = new Barrier(attempts);
             Task<SessionOutcome>[] tasks = Enumerable.Range(0, attempts).Select(_ => Task.Factory.StartNew(() =>
             {
-                gate.SignalAndWait();
+                gate.SignalAndWait(TestContext.Current.CancellationToken);
                 return e.StartAdhoc(Alice, temp, RegionA);
             }, TaskCreationOptions.LongRunning)).ToArray();
-            Task.WaitAll(tasks);
+            SessionOutcome[] results = await Task.WhenAll(tasks);
 
-            Assert.That(e.Store.All(), Has.Count.EqualTo(1), "one conference for one temp id");
-            Assert.That(tasks.Select(t => t.Result.Session.SessionId).Distinct().Count(), Is.EqualTo(1),
-                        "every retry was handed the same session");
-            Assert.That(tasks.Count(t => t.Result.Created), Is.EqualTo(1), "exactly one attempt created it");
+            {
+                var assertedValue = e.Store.All();
+                TestAssert.WithMessage(() => Assert.Single(assertedValue), "one conference for one temp id");
+            }
+            {
+                var assertedValue = results.Select(t => t.Session.SessionId).Distinct().Count();
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "every retry was handed the same session");
+            }
+            {
+                var assertedValue = results.Count(t => t.Created);
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "exactly one attempt created it");
+            }
         }
     }
 }

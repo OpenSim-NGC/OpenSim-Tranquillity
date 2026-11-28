@@ -14,7 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using osWebRtcVoice.NonSpatial;
@@ -22,7 +22,6 @@ using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class NonSpatialInviteeBoundTests
     {
         private static List<UUID> People(int count)
@@ -58,9 +57,10 @@ namespace osWebRtcVoice.Tests
         private static NonSpatialVoiceSessionEngine Engine()
             => NewEngine(limits: new NonSpatialLimits { MaxNonSpatialSessions = 100000, MaxSessionsPerAgent = 100000 });
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ParseInviteesDeDuplicatesInLinearTime_KeepingFirstSeenOrder()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             List<UUID> distinct = People(300000);
             List<UUID> asked = new List<UUID>(distinct);
             asked.Add(UUID.Zero);
@@ -72,85 +72,104 @@ namespace osWebRtcVoice.Tests
             watch.Stop();
 
             // A scan of the list per entry takes tens of seconds for this many; a set takes milliseconds.
-            Assert.That(watch.ElapsedMilliseconds, Is.LessThan(2000));
+            Assert.True(watch.ElapsedMilliseconds < 2000);
 
-            Assert.That(parsed, Has.Count.EqualTo(300000));
-            Assert.That(parsed.Take(3), Is.EqualTo(distinct.Take(3)));
-            Assert.That(parsed, Does.Not.Contain(UUID.Zero));
+            Assert.Equal(300000, parsed.Count());
+            Assert.Equal(distinct.Take(3), parsed.Take(3));
+            Assert.DoesNotContain(UUID.Zero, parsed);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStartWithMoreNewInviteesThanTheConferenceHasRoomForIsRefusedWhole()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             // The conference cap is 50 and it includes whoever starts the call, so 49 can be invited and 50 cannot.
-            Assert.That(AdhocVoiceChatSession.TryHandleStartConference(StartBody(People(50)), Alice, e, RegionA, true,
-                out ChatSessionOutcome outcome), Is.True);
+            Assert.True(AdhocVoiceChatSession.TryHandleStartConference(StartBody(People(50)), Alice, e, RegionA, true,
+                out ChatSessionOutcome outcome));
 
-            Assert.That(outcome.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(outcome.Reply, Is.Null);
-            Assert.That(outcome.Instrument, Does.Contain("decision=adhoc-refused-" + SessionOutcome.TooManyInvitees));
-            Assert.That(e.Store.All(), Is.Empty, "nothing was created, and nobody was rung");
+            Assert.Equal(HttpStatusCode.Forbidden, outcome.Status);
+            Assert.Null(outcome.Reply);
+            Assert.Contains("decision=adhoc-refused-" + SessionOutcome.TooManyInvitees, outcome.Instrument);
+            {
+                var assertedValue = e.Store.All();
+                TestAssert.WithMessage(() => Assert.Empty(assertedValue), "nothing was created, and nobody was rung");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AStartAtTheLimitIsAccepted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
-            Assert.That(AdhocVoiceChatSession.TryHandleStartConference(StartBody(People(49)), Alice, e, RegionA, true,
-                out ChatSessionOutcome outcome), Is.True);
+            Assert.True(AdhocVoiceChatSession.TryHandleStartConference(StartBody(People(49)), Alice, e, RegionA, true,
+                out ChatSessionOutcome outcome));
 
-            Assert.That(outcome.Status, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(e.Store.All(), Has.Count.EqualTo(1));
-            Assert.That(e.Store.All()[0].Members, Has.Count.EqualTo(50), "the starter and 49 invitees fill the cap of 50");
+            Assert.Equal(HttpStatusCode.OK, outcome.Status);
+            Assert.Single(e.Store.All());
+            {
+                var assertedValue = e.Store.All()[0].Members;
+                TestAssert.WithMessage(() => Assert.Equal(50, assertedValue.Count()), "the starter and 49 invitees fill the cap of 50");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheStarterCountsAgainstARequestedSmallerCapToo()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
 
-            Assert.That(e.StartAdhoc(Alice, UUID.Random(), RegionA, People(5), requestedCap: 5).Decision,
-                        Is.EqualTo(SessionOutcome.TooManyInvitees), "five invitees and the starter are six people");
-            Assert.That(e.StartAdhoc(Alice, UUID.Random(), RegionA, People(4), requestedCap: 5).Ok, Is.True,
-                        "four invitees and the starter are five");
+            {
+                var assertedValue = e.StartAdhoc(Alice, UUID.Random(), RegionA, People(5), requestedCap: 5).Decision;
+                TestAssert.WithMessage(() => Assert.Equal(SessionOutcome.TooManyInvitees, assertedValue), "five invitees and the starter are six people");
+            }
+            Assert.True(e.StartAdhoc(Alice, UUID.Random(), RegionA, People(4), requestedCap: 5).Ok, "four invitees and the starter are five");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void RepeatsAndTheCreatorDoNotCountAgainstTheLimit()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             List<UUID> asked = People(49);
             asked.AddRange(People(49));      // every invitee twice
             asked.Add(Alice);                // the creator inviting themselves
             asked.Add(UUID.Zero);
 
-            Assert.That(AdhocVoiceChatSession.TryHandleStartConference(StartBody(asked), Alice, e, RegionA, true,
-                out ChatSessionOutcome outcome), Is.True);
+            Assert.True(AdhocVoiceChatSession.TryHandleStartConference(StartBody(asked), Alice, e, RegionA, true,
+                out ChatSessionOutcome outcome));
 
-            Assert.That(outcome.Status, Is.EqualTo(HttpStatusCode.OK), outcome.Instrument);
+            {
+                var assertedValue = outcome.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.OK, assertedValue), outcome.Instrument);
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnInviteThatWouldOverfillTheRoomIsRefusedWhole_NotTruncated()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
             e.Accept(id, Bob, RegionA);   // two seats held, so 48 more people fit
 
-            Assert.That(AdhocVoiceChatSession.TryHandleInvite(InviteBody(id, People(49)), Alice, e, true,
-                out ChatSessionOutcome outcome, out List<UUID> rung), Is.True);
+            Assert.True(AdhocVoiceChatSession.TryHandleInvite(InviteBody(id, People(49)), Alice, e, true,
+                out ChatSessionOutcome outcome, out List<UUID> rung));
 
-            Assert.That(outcome.Status, Is.EqualTo(HttpStatusCode.Forbidden));
-            Assert.That(outcome.Instrument, Does.Contain("decision=adhoc-refused-" + SessionOutcome.TooManyInvitees));
-            Assert.That(rung, Is.Empty);
-            Assert.That(e.Store.Get(id).Members, Has.Count.EqualTo(2), "not even the first 48 were invited");
+            Assert.Equal(HttpStatusCode.Forbidden, outcome.Status);
+            Assert.Contains("decision=adhoc-refused-" + SessionOutcome.TooManyInvitees, outcome.Instrument);
+            Assert.Empty(rung);
+            {
+                var assertedValue = e.Store.Get(id).Members;
+                TestAssert.WithMessage(() => Assert.Equal(2, assertedValue.Count()), "not even the first 48 were invited");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnInviteThatJustFitsIsAccepted_AndPeopleAlreadySeatedAreNotCounted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             e.Invite(id, Alice, Bob);
@@ -158,16 +177,20 @@ namespace osWebRtcVoice.Tests
             List<UUID> asked = People(48);
             asked.Add(Bob);   // already in the call: nothing new
 
-            Assert.That(AdhocVoiceChatSession.TryHandleInvite(InviteBody(id, asked), Alice, e, true,
-                out ChatSessionOutcome outcome, out List<UUID> rung), Is.True);
+            Assert.True(AdhocVoiceChatSession.TryHandleInvite(InviteBody(id, asked), Alice, e, true,
+                out ChatSessionOutcome outcome, out List<UUID> rung));
 
-            Assert.That(outcome.Status, Is.EqualTo(HttpStatusCode.OK), outcome.Instrument);
-            Assert.That(rung, Has.Count.EqualTo(48));
+            {
+                var assertedValue = outcome.Status;
+                TestAssert.WithMessage(() => Assert.Equal(HttpStatusCode.OK, assertedValue), outcome.Instrument);
+            }
+            Assert.Equal(48, rung.Count());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusalLogsCountsAndNeverTheListOfIds()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             List<string> warnings = new();
             e.LimitRefused += (agent, decision, detail) => warnings.Add(decision + " " + detail);
@@ -175,18 +198,19 @@ namespace osWebRtcVoice.Tests
 
             AdhocVoiceChatSession.TryHandleStartConference(StartBody(asked), Alice, e, RegionA, true, out ChatSessionOutcome outcome);
 
-            Assert.That(warnings, Has.Count.EqualTo(1));
-            Assert.That(warnings[0], Does.Contain("asked=60"));
+            Assert.Single(warnings);
+            Assert.Contains("asked=60", warnings[0]);
             foreach (UUID id in asked.Take(5))
             {
-                Assert.That(warnings[0], Does.Not.Contain(id.ToString()));
-                Assert.That(outcome.Instrument, Does.Not.Contain(id.ToString()));
+                Assert.DoesNotContain(id.ToString(), warnings[0]);
+                Assert.DoesNotContain(id.ToString(), outcome.Instrument);
             }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnInviteLineNamesHowManyWereRefusedButNotWho()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             NonSpatialVoiceSessionEngine e = Engine();
             UUID id = e.StartAdhoc(Alice, UUID.Random(), RegionA).Session.SessionId;
             UUID stranger = People(1)[0];
@@ -194,8 +218,8 @@ namespace osWebRtcVoice.Tests
             AdhocVoiceChatSession.TryHandleInvite(InviteBody(id, new[] { stranger }), Bob, e, true,
                 out ChatSessionOutcome outcome, out _);
 
-            Assert.That(outcome.Instrument, Does.Contain("refused=1"));
-            Assert.That(outcome.Instrument, Does.Not.Contain(stranger.ToString()));
+            Assert.Contains("refused=1", outcome.Instrument);
+            Assert.DoesNotContain(stranger.ToString(), outcome.Instrument);
         }
     }
 }

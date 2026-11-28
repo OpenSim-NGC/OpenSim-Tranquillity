@@ -18,7 +18,6 @@ using OpenSim.Region.Framework.Interfaces;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class StunServersTests
     {
         // Records the features the module adds.
@@ -55,25 +54,28 @@ namespace osWebRtcVoice.Tests
             return features.Added;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StunServers_Unset_AdvertisesNothing()
         {
-            Assert.That(Advertised(null), Does.Not.ContainKey("stun-servers"));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(Advertised(null).ContainsKey("stun-servers"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StunServers_Blank_AdvertisesNothing()
         {
-            Assert.That(Advertised("   "), Does.Not.ContainKey("stun-servers"));
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+            Assert.False(Advertised("   ").ContainsKey("stun-servers"));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void StunServers_Set_IsAdvertisedAsGiven()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             const string list = "stun:stun.example.org:3478,stun:stun2.example.org:3478";
             Dictionary<string, OSD> added = Advertised(list);
-            Assert.That(added, Does.ContainKey("stun-servers"));
-            Assert.That(added["stun-servers"].AsString(), Is.EqualTo(list));
+            Assert.True(added.ContainsKey("stun-servers"));
+            Assert.Equal(list, added["stun-servers"].AsString());
         }
     }
 }

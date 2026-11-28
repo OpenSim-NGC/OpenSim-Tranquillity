@@ -49,14 +49,17 @@ public class RemoteAdminCredentialLogTests
         });
         XmlRpcResponse response = new() { Value = new Hashtable() };
         MethodInfo method = typeof(RemoteAdminPlugin)
-            .GetMethod("XmlRpcAuthenticateUserMethod", BindingFlags.Instance | BindingFlags.NonPublic);
+            .GetMethod("XmlRpcAuthenticateUserMethod", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(RemoteAdminPlugin).FullName, "XmlRpcAuthenticateUserMethod");
 
         using LogCapture log = new();
         method.Invoke(plugin, new object[] { request, response, new IPEndPoint(IPAddress.Parse("192.0.2.1"), 9000) });
 
-        Hashtable result = (Hashtable)response.Value;
+        Hashtable result = response.Value as Hashtable
+            ?? throw new InvalidOperationException("Authentication response was not a Hashtable.");
         Xunit.Assert.Equal(true, result["success"]);
-        string token = (string)result["token"];
+        string token = result["token"] as string
+            ?? throw new InvalidOperationException("Authentication response did not contain a token.");
         Xunit.Assert.False(string.IsNullOrEmpty(token), "the caller must still receive the token");
 
         Xunit.Assert.False(log.Contains(token), "token reached the log");

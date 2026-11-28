@@ -38,6 +38,7 @@ using OpenSim.Data.MySQL;
 using OpenSim.Data.PGSQL;
 using OpenSim.Data.SQLite;
 using OpenSim.Framework;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace OpenSim.Region.Framework.Scenes.Tests;
@@ -50,7 +51,10 @@ public sealed class PGSQLServerFactAttribute : FactAttribute
 {
     public const string EnvVar = "OPENSIM_TEST_PGSQL";
 
-    public PGSQLServerFactAttribute()
+    public PGSQLServerFactAttribute(
+        [CallerFilePath] string sourceFilePath = "",
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(EnvVar)))
             Skip = $"Requires a PostgreSQL server; set {EnvVar} to run.";
@@ -65,7 +69,10 @@ public sealed class MySQLServerFactAttribute : FactAttribute
 {
     public const string EnvVar = "OPENSIM_TEST_MYSQL";
 
-    public MySQLServerFactAttribute()
+    public MySQLServerFactAttribute(
+        [CallerFilePath] string sourceFilePath = "",
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(EnvVar)))
             Skip = $"Requires a MySQL or MariaDB server; set {EnvVar} to run.";

@@ -10,7 +10,6 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Xunit;
-using Xunit.Abstractions;
 using Rig = OpenSim.Region.PhysicsModules.Jolt.Tests.StepRateRig;
 
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;

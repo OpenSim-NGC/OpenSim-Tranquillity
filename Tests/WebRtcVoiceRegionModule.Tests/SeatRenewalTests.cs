@@ -12,7 +12,7 @@
  */
 using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Xunit;
 using OpenMetaverse;
 using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.NonSpatialIdentityTests;
@@ -20,7 +20,6 @@ using static osWebRtcVoice.Tests.GridStoreResilienceTests;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class SeatRenewalTests
     {
         private static readonly UUID GroupOne = new UUID("99999999-9999-9999-9999-9999999999a1");
@@ -68,34 +67,45 @@ namespace osWebRtcVoice.Tests
         {
             r.Flaky.Up = false;
             r.Sessions.Depart(session, agent, DepartureReason.VoiceTeardown);
-            Assert.That(r.Outbox.Count, Is.EqualTo(1), "the departure waits in the outbox");
+            {
+                var assertedValue = r.Outbox.Count;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "the departure waits in the outbox");
+            }
             r.Clock.Now += TimeSpan.FromSeconds(61);
             r.Flaky.Up = true;
             r.Outbox.RunOnce();
-            Assert.That(r.Outbox.Dropped, Is.EqualTo(1), "and is given up after its age limit");
+            {
+                var assertedValue = r.Outbox.Dropped;
+                TestAssert.WithMessage(() => Assert.Equal(1, assertedValue), "and is given up after its age limit");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADepartureTheServiceNeverReceived_StillFreesTheSeatWhenTheLeaseRunsOut_WhileTheAgentStaysInTheRegion()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Region r = NewRegionOver(Alice, Bob);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupOne, GroupOne, RegionA);
             r.Sessions.Accept(GroupOne, Bob, RegionA);
             OneInterval(r);
-            Assert.That(SeatHeld(r.Service, GroupOne, Alice), Is.True);
+            Assert.True(SeatHeld(r.Service, GroupOne, Alice));
 
             DepartIsLost(r, GroupOne, Alice);
             for (int i = 0; i < 4; i++)   // longer than the 180 s lease
                 OneInterval(r);
 
-            Assert.That(SeatHeld(r.Service, GroupOne, Alice), Is.False, "Alice left the call here; her seat is not renewed, so the lease returns it");
-            Assert.That(SeatHeld(r.Service, GroupOne, Bob), Is.True, "Bob's seat is still held here and is kept");
-            Assert.That(r.InRegion, Does.Contain(Alice), "all the while Alice stayed in the region");
+            Assert.False(SeatHeld(r.Service, GroupOne, Alice), "Alice left the call here; her seat is not renewed, so the lease returns it");
+            Assert.True(SeatHeld(r.Service, GroupOne, Bob), "Bob's seat is still held here and is kept");
+            {
+                var assertedValue = r.InRegion;
+                TestAssert.WithMessage(() => Assert.Contains(Alice, assertedValue), "all the while Alice stayed in the region");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void OnlyTheSeatThatWasDeparted_IsLeftToTheLease_AnotherSeatOfTheSameAgentIsKept()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Region r = NewRegionOver(Alice);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupOne, GroupOne, RegionA);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupTwo, GroupTwo, RegionA);
@@ -105,13 +115,14 @@ namespace osWebRtcVoice.Tests
             for (int i = 0; i < 4; i++)
                 OneInterval(r);
 
-            Assert.That(SeatHeld(r.Service, GroupOne, Alice), Is.False, "the departed seat is released by its lease");
-            Assert.That(SeatHeld(r.Service, GroupTwo, Alice), Is.True, "the seat she still holds here is renewed");
+            Assert.False(SeatHeld(r.Service, GroupOne, Alice), "the departed seat is released by its lease");
+            Assert.True(SeatHeld(r.Service, GroupTwo, Alice), "the seat she still holds here is renewed");
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASeatTakenAgainAfterADeparture_IsRenewedAgain()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             // The queued departure is dropped when the agent takes the seat again (the departure would remove the seat
             // just taken), and the seat is one the region holds once more, so it is kept.
             Region r = NewRegionOver(Alice);
@@ -119,19 +130,23 @@ namespace osWebRtcVoice.Tests
             r.Flaky.Up = false;
             r.Sessions.Depart(GroupOne, Alice, DepartureReason.VoiceTeardown);
             r.Flaky.Up = true;
-            Assert.That(r.Outbox.Count, Is.EqualTo(1));
+            Assert.Equal(1, r.Outbox.Count);
             r.Sessions.Accept(GroupOne, Alice, RegionA);
-            Assert.That(r.Outbox.Count, Is.EqualTo(0), "the stale departure is dropped");
+            {
+                var assertedValue = r.Outbox.Count;
+                TestAssert.WithMessage(() => Assert.Equal(0, assertedValue), "the stale departure is dropped");
+            }
 
             for (int i = 0; i < 4; i++)
                 OneInterval(r);
 
-            Assert.That(SeatHeld(r.Service, GroupOne, Alice), Is.True);
+            Assert.True(SeatHeld(r.Service, GroupOne, Alice));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASeatAnotherRegionTook_IsNotKeptAliveByThisRegionJustBecauseTheAgentStandsHere()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Region a = NewRegionOver(Alice);
             Region b = NewRegionOver(Bob);
             b.Service = a.Service;                       // two regions, one session service
@@ -154,28 +169,30 @@ namespace osWebRtcVoice.Tests
                 a.Service.Sweep();
             }
 
-            Assert.That(SeatHeld(a.Service, GroupOne, Alice), Is.True, "Alice's seat is region A's and region A keeps it");
-            Assert.That(SeatHeld(a.Service, GroupOne, Bob), Is.False, "Bob's seat is region B's; region A does not renew it");
+            Assert.True(SeatHeld(a.Service, GroupOne, Alice), "Alice's seat is region A's and region A keeps it");
+            Assert.False(SeatHeld(a.Service, GroupOne, Bob), "Bob's seat is region B's; region A does not renew it");
         }
 
         // ---- what the region records as held ---------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ASeatIsHeldFromTheMomentTheRegionTakesIt_UntilTheRegionDepartsIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Region r = NewRegionOver(Alice, Bob);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupOne, GroupOne, RegionA);
             r.Sessions.Accept(GroupOne, Bob, RegionA, "vs-bob");
-            Assert.That(r.Sessions.HeldSeats(), Is.EquivalentTo(new[] { new SeatKey(GroupOne, Alice), new SeatKey(GroupOne, Bob) }));
+            Assert.Equivalent(new[] { new SeatKey(GroupOne, Alice), new SeatKey(GroupOne, Bob) }, r.Sessions.HeldSeats(), strict: true);
 
             r.Sessions.Depart(GroupOne, Bob, DepartureReason.VoiceTeardown);
 
-            Assert.That(r.Sessions.HeldSeats(), Is.EquivalentTo(new[] { new SeatKey(GroupOne, Alice) }));
+            Assert.Equivalent(new[] { new SeatKey(GroupOne, Alice) }, r.Sessions.HeldSeats(), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADepartureForgetsTheSeatWhetherOrNotTheServiceReceivedIt()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Region r = NewRegionOver(Alice);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupOne, GroupOne, RegionA);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupTwo, GroupTwo, RegionA);
@@ -183,12 +200,13 @@ namespace osWebRtcVoice.Tests
 
             r.Sessions.Depart(GroupOne, Alice, DepartureReason.VoiceTeardown);
 
-            Assert.That(r.Sessions.HeldSeats(), Is.EquivalentTo(new[] { new SeatKey(GroupTwo, Alice) }));
+            Assert.Equivalent(new[] { new SeatKey(GroupTwo, Alice) }, r.Sessions.HeldSeats(), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ALogoutForgetsOnlyTheSeatTaggedWithThatViewerSession()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Region r = NewRegionOver(Alice);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupOne, GroupOne, RegionA);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupTwo, GroupTwo, RegionA);
@@ -198,12 +216,13 @@ namespace osWebRtcVoice.Tests
 
             r.Sessions.DepartByViewerSession(Alice, "vs-one", DepartureReason.VoiceTeardown);
 
-            Assert.That(r.Sessions.HeldSeats(), Is.EquivalentTo(new[] { new SeatKey(GroupTwo, Alice) }));
+            Assert.Equivalent(new[] { new SeatKey(GroupTwo, Alice) }, r.Sessions.HeldSeats(), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void AnAgentLeavingTheRegion_ForgetsEverySeatItHeld_ThatCouldNotBeDeparted()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Region r = NewRegionOver(Alice, Bob);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupOne, GroupOne, RegionA);
             r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupTwo, GroupTwo, RegionA);
@@ -212,39 +231,42 @@ namespace osWebRtcVoice.Tests
 
             r.Sessions.DepartAll(Alice, DepartureReason.PresenceLost);
 
-            Assert.That(r.Sessions.HeldSeats(), Is.EquivalentTo(new[] { new SeatKey(GroupOne, Bob) }));
+            Assert.Equivalent(new[] { new SeatKey(GroupOne, Bob) }, r.Sessions.HeldSeats(), strict: true);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ADeclinedInvitation_IsNotAHeldSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Region r = NewRegionOver(Alice, Bob);
             UUID id = r.Sessions.StartAdhoc(Alice, UUID.Random(), RegionA, new List<UUID> { Bob }).Session.SessionId;
             r.Sessions.Accept(id, Bob, RegionA);
-            Assert.That(r.Sessions.HeldSeats(), Does.Contain(new SeatKey(id, Bob)));
+            Assert.Contains(new SeatKey(id, Bob), r.Sessions.HeldSeats());
 
             r.Sessions.Decline(id, Bob);
 
-            Assert.That(r.Sessions.HeldSeats(), Does.Not.Contain(new SeatKey(id, Bob)));
+            Assert.DoesNotContain(new SeatKey(id, Bob), r.Sessions.HeldSeats());
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARefusedOrUnansweredRequest_HoldsNoSeat()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             Region r = NewRegionOver(Alice);
             r.Flaky.Up = false;
 
             SessionOutcome started = r.Sessions.Start(NonSpatialSessionType.Group, Alice, GroupOne, GroupOne, RegionA);
 
-            Assert.That(started.Ok, Is.False);
-            Assert.That(r.Sessions.HeldSeats(), Is.Empty);
+            Assert.False(started.Ok);
+            Assert.Empty(r.Sessions.HeldSeats());
         }
 
         // ---- the service renews by seat ----------------------------------------------------------------------------
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void TheServiceRenewsTheSeatsNamed_NotEveryOtherSeatOfTheSameAgent()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             FakeClock clock = Clock();
             VoiceSessionService service = NewReal(clock);
             GridNonSpatialSessions region = NewRegion(service, clock: clock);
@@ -256,20 +278,21 @@ namespace osWebRtcVoice.Tests
             clock.Now += TimeSpan.FromSeconds(100);
             VoiceSessionService.SweepResult swept = service.Sweep();
 
-            Assert.That(swept.LeasesExpired, Is.EqualTo(1));
-            Assert.That(SeatHeld(service, GroupOne, Alice), Is.False, "not named, so its lease ran out");
-            Assert.That(SeatHeld(service, GroupTwo, Alice), Is.True);
+            Assert.Equal(1, swept.LeasesExpired);
+            Assert.False(SeatHeld(service, GroupOne, Alice), "not named, so its lease ran out");
+            Assert.True(SeatHeld(service, GroupTwo, Alice));
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void ARenewalWithNoSeats_IsAnsweredAndChangesNothing()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             VoiceSessionService service = NewReal(Clock());
 
             SessionReply reply = service.RenewSeats(new List<SeatKey>());
 
-            Assert.That(reply.Ok, Is.True);
-            Assert.That(reply.Count, Is.EqualTo(0));
+            Assert.True(reply.Ok);
+            Assert.Equal(0, reply.Count);
         }
     }
 }

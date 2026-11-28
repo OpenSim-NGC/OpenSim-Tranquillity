@@ -23,7 +23,6 @@ using OpenSim.Tests.Common;
 
 namespace osWebRtcVoice.Tests
 {
-    [TestFixture]
     public class ProvisionPassthroughTests
     {
         private static readonly UUID Alice = new UUID("a11ce000-0000-4000-8000-000000000001");
@@ -85,80 +84,92 @@ namespace osWebRtcVoice.Tests
             return m;
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void X1_EverySwitchOff_AMultiagentProvision_GoesToTheVoiceService()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, scene, svc) = Harness();
 
             (int status, OSDMap body) = Provision(mod, scene, Body("multiagent"));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(svc.Calls, Is.EqualTo(1));
-            Assert.That(body?["viewer_session"].AsString(), Is.EqualTo("vs-1"), "and its answer comes back");
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.Equal(1, svc.Calls);
+            {
+                var assertedValue = body?["viewer_session"].AsString();
+                TestAssert.WithMessage(() => Assert.Equal("vs-1", assertedValue), "and its answer comes back");
+            }
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void X2_EverySwitchOff_AProvisionWithNoChannelType_GoesToTheVoiceService_AndAnEmptyAnswerIsA200()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, scene, svc) = Harness();
             svc.AnswerNull = true;   // the service has nothing to give a body with no channel_type
 
             (int status, OSDMap body) = Provision(mod, scene, Body(null));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(svc.Calls, Is.EqualTo(1));
-            Assert.That(body, Is.Null);
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.Equal(1, svc.Calls);
+            Assert.Null(body);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void X3_EverySwitchOff_AnotherChannelType_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, scene, svc) = Harness();
 
             (int status, _) = Provision(mod, scene, Body("group"));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(svc.Calls, Is.Zero);
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            Assert.Equal(0, svc.Calls);
         }
 
-        [TestCase("m_a2aVoiceEnabled")]
-        [TestCase("m_adhocVoiceEnabled")]
+        [InlineData("m_a2aVoiceEnabled")]
+        [InlineData("m_adhocVoiceEnabled")]
+        [Theory(Timeout = 60000)]
         public void X3b_WithAFeatureOn_AnotherChannelType_IsRefused(string field)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, scene, svc) = Harness(m => Set(m, field, true));
 
             (int status, _) = Provision(mod, scene, Body("group"));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(svc.Calls, Is.Zero);
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            Assert.Equal(0, svc.Calls);
         }
 
-        [TestCase("m_a2aVoiceEnabled")]
-        [TestCase("m_adhocVoiceEnabled")]
+        [InlineData("m_a2aVoiceEnabled")]
+        [InlineData("m_adhocVoiceEnabled")]
+        [Theory(Timeout = 60000)]
         public void X4_WithAFeatureOn_AMultiagentProvisionForAnUnknownChannel_IsRefused(string field)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, scene, svc) = Harness(m => Set(m, field, true));
 
             (int status, _) = Provision(mod, scene, Body("multiagent"));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(svc.Calls, Is.Zero);
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            Assert.Equal(0, svc.Calls);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void X5_WithAFeatureOn_AProvisionWithNoChannelType_IsRefused()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, scene, svc) = Harness(m => Set(m, "m_a2aVoiceEnabled", true));
 
             (int status, _) = Provision(mod, scene, Body(null));
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
-            Assert.That(svc.Calls, Is.Zero);
+            Assert.Equal((int)HttpStatusCode.Forbidden, status);
+            Assert.Equal(0, svc.Calls);
         }
 
-        [Test]
+        [Fact(Timeout = 60000)]
         public void X6_EverySwitchOff_ALogoutIsStillRoutedToTheVoiceService()
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var (mod, scene, svc) = Harness();
             var body = new OSDMap
             {
@@ -169,8 +180,8 @@ namespace osWebRtcVoice.Tests
 
             (int status, _) = Provision(mod, scene, body);
 
-            Assert.That(status, Is.EqualTo((int)HttpStatusCode.OK));
-            Assert.That(svc.Calls, Is.EqualTo(1));
+            Assert.Equal((int)HttpStatusCode.OK, status);
+            Assert.Equal(1, svc.Calls);
         }
     }
 }
